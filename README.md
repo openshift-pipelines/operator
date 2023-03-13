@@ -5,9 +5,18 @@ This is the repository of a *proof-of-concept* of OpenShift Operator based of th
 
 - [x] Import `cmd/…`
 - [x] Import `config/…`
-- [ ] Import `openshift` specific package
-- [ ] GitHub workflows
-- [ ] Create `v1beta1.OpenShiftPipelineConfig` to *replace* `TektonConfig`
-- [ ] openshift-ci for tests
+- [x] Import `openshift` specific package
+- [x] GitHub workflows
+- [ ] Import `OpenShiftPipelineAsCode` in here
+- [ ] `Makefile`
 - [ ] Automated/scripted import payload (copy from tektoncd/operator)
 - [ ] Automated/scripted import `tektoncd/operator` CRDs
+- [ ] e2e tests
+  Run upstream ones, import "and forget" ?
+- [ ] Handle "component" *payload* images rebuild
+  - We can use the upstream images…
+  - but we could also *rebuild them all*, to be even closer to
+    downstream. The question is how ?
+- [ ] Create `v1beta1.OpenShiftPipelineConfig` to *replace* `TektonConfig`
+- [ ] openshift-ci for tests
+- [ ] Remove openshift specifics from upstream
