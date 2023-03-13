@@ -31,12 +31,12 @@ import (
 func main() {
 	serviceName := os.Getenv("WEBHOOK_SERVICE_NAME")
 	if serviceName == "" {
-		serviceName = "tekton-operator-webhook"
+		serviceName = "openshift-pipelines-operator-webhook"
 	}
 
 	secretName := os.Getenv("WEBHOOK_SECRET_NAME")
 	if secretName == "" {
-		secretName = "tekton-operator-webhook-certs"
+		secretName = "openshift-pipelines-operator-webhook-certs"
 	}
 
 	//Set up a signal context with our webhook options
