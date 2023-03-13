@@ -19,7 +19,7 @@ package main
 import (
 	"context"
 
-	"github.com/tektoncd/operator/pkg/reconciler/openshift/annotation"
+	"github.com/openshift-pipelines/operator/pkg/reconciler/annotation"
 	"github.com/tektoncd/operator/pkg/reconciler/proxy"
 	"knative.dev/pkg/configmap"
 	"knative.dev/pkg/controller"

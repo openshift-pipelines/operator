@@ -17,7 +17,7 @@ limitations under the License.
 package main
 
 import (
-	"github.com/tektoncd/operator/pkg/reconciler/openshift/openshiftplatform"
+	"github.com/openshift-pipelines/operator/pkg/reconciler/openshiftplatform"
 	"github.com/tektoncd/operator/pkg/reconciler/platform"
 )
 
