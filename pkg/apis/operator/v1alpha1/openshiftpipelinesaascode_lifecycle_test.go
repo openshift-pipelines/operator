@@ -23,20 +23,20 @@ import (
 	apistest "knative.dev/pkg/apis/testing"
 )
 
-func TestPipelinesAsCodeGroupVersionKind(t *testing.T) {
-	r := &PipelinesAsCode{}
+func TestOpenShiftPipelinesAsCodeGroupVersionKind(t *testing.T) {
+	r := &OpenShiftPipelinesAsCode{}
 	want := schema.GroupVersionKind{
 		Group:   GroupName,
 		Version: SchemaVersion,
-		Kind:    KindPipelinesAsCode,
+		Kind:    KindOpenShiftPipelinesAsCode,
 	}
 	if got := r.GetGroupVersionKind(); got != want {
 		t.Errorf("got: %v, want: %v", got, want)
 	}
 }
 
-func TestPipelinesAsCodeHappyPath(t *testing.T) {
-	pac := &PipelinesAsCodeStatus{}
+func TestOpenShiftPipelinesAsCodeHappyPath(t *testing.T) {
+	pac := &OpenShiftPipelinesAsCodeStatus{}
 	pac.InitializeConditions()
 
 	apistest.CheckConditionOngoing(pac, DependenciesInstalled, t)
@@ -73,8 +73,8 @@ func TestPipelinesAsCodeHappyPath(t *testing.T) {
 	}
 }
 
-func TestPipelinesAsCodeErrorPath(t *testing.T) {
-	pac := &PipelinesAsCodeStatus{}
+func TestOpenShiftPipelinesAsCodeErrorPath(t *testing.T) {
+	pac := &OpenShiftPipelinesAsCodeStatus{}
 	pac.InitializeConditions()
 
 	apistest.CheckConditionOngoing(pac, DependenciesInstalled, t)

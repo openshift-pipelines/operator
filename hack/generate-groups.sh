@@ -51,8 +51,6 @@ shift 4
   go install k8s.io/code-generator/cmd/{defaulter-gen,client-gen,lister-gen,informer-gen,deepcopy-gen}
 )
 
-set -x
-
 PREFIX=${GOBIN:-${GOPATH}/bin}
 
 function codegen::join() { local IFS="$1"; shift; echo "$*"; }

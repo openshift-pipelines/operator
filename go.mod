@@ -24,22 +24,23 @@ require (
 	k8s.io/apimachinery v0.26.1
 	k8s.io/client-go v0.26.1
 	k8s.io/code-generator v0.26.1
-	knative.dev/pkg v0.0.0-20230310210124-b769fef17fa3
+	knative.dev/pkg v0.0.0-20230221145627-8efb3485adcf
 	sigs.k8s.io/controller-runtime v0.13.1
 	sigs.k8s.io/yaml v1.3.0
 )
 
-replace knative.dev/pkg => knative.dev/pkg v0.0.0-20221123011842-b78020c16606
+// replace knative.dev/pkg => knative.dev/pkg v0.0.0-20221123011842-b78020c16606
+replace knative.dev/pkg => knative.dev/pkg v0.0.0-20230221145627-8efb3485adcf
 
-replace k8s.io/api => k8s.io/api v0.25.5
+replace k8s.io/api => k8s.io/api v0.25.7
 
-replace k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.25.5
+replace k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.25.7
 
-replace k8s.io/apimachinery => k8s.io/apimachinery v0.25.5
+replace k8s.io/apimachinery => k8s.io/apimachinery v0.25.7
 
-replace k8s.io/client-go => k8s.io/client-go v0.25.5
+replace k8s.io/client-go => k8s.io/client-go v0.25.7
 
-replace k8s.io/code-generator => k8s.io/code-generator v0.25.5
+replace k8s.io/code-generator => k8s.io/code-generator v0.25.7
 
 require (
 	contrib.go.opencensus.io/exporter/ocagent v0.7.1-0.20200907061046-05415f1de66d // indirect

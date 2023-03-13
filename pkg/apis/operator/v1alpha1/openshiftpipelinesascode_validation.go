@@ -23,7 +23,7 @@ import (
 	"knative.dev/pkg/apis"
 )
 
-func (pac *PipelinesAsCode) Validate(ctx context.Context) (errs *apis.FieldError) {
+func (pac *OpenShiftPipelinesAsCode) Validate(ctx context.Context) (errs *apis.FieldError) {
 	if apis.IsInDelete(ctx) {
 		return nil
 	}
