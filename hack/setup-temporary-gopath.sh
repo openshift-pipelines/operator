@@ -8,9 +8,9 @@ set -o nounset
 # the current repo directory is not within GOPATH.
 function shim_gopath() {
   local REPO_DIR=$(git rev-parse --show-toplevel)
-  local TEMP_GOPATH="${REPO_DIR}/.gopath"
+  local TEMP_GOPATH="$(mktemp -d)/.gopath"
   local TEMP_TEKTONCD="${TEMP_GOPATH}/src/github.com/openshift-pipelines"
-  local TEMP_OPERATOR="${TEMP_TEKTONCD}/operator"
+  local TEMP_PIPELINE="${TEMP_TEKTONCD}/operator"
   local NEEDS_MOVE=1
 
   # Checks if GOPATH exists without triggering nounset panic.
@@ -40,11 +40,11 @@ function shim_gopath() {
 
   mkdir -p "$TEMP_TEKTONCD"
   # This will create a symlink from
-  # (repo-root)/.gopath/src/github.com/tektoncd/operator
+  # $(mktemp -d)/.gopath/src/github.com/openshift-pipelines/operator
   # to the user's pipeline checkout.
-  ln -s "$REPO_DIR" "$TEMP_TEKTONCD"
-  echo "Moving to $TEMP_OPERATOR"
-  cd "$TEMP_OPERATOR"
+  ln -s "$REPO_DIR" "$TEMP_PIPELINE"
+  echo "Moving to $TEMP_PIPELINE"
+  cd "$TEMP_PIPELINE"
   export GOPATH="$TEMP_GOPATH"
 }
 
@@ -59,7 +59,7 @@ function shim_gopath() {
 # script's execution we just print a message to let them know.
 function shim_gopath_clean() {
   local REPO_DIR=$(git rev-parse --show-toplevel)
-  local TEMP_GOPATH="${REPO_DIR}/.gopath"
+  local TEMP_GOPATH="$(mktemp -d)/.gopath"
   if [ -d "$TEMP_GOPATH" ] ; then
     # Put the user back at the root of the pipelines repo
     # after all the symlink shenanigans.
@@ -74,9 +74,9 @@ function shim_gopath_clean() {
 # Delete the temp symlink to pipelines repo from the temp GOPATH dir.
 function delete_pipeline_repo_symlink() {
   local REPO_DIR=$(git rev-parse --show-toplevel)
-  local TEMP_GOPATH="${REPO_DIR}/.gopath"
+  local TEMP_GOPATH="$(mktemp -d)/.gopath"
   if [ -d "$TEMP_GOPATH" ] ; then
-    local REPO_SYMLINK="${TEMP_GOPATH}/src/github.com/tektoncd/pipeline"
+    local REPO_SYMLINK="${TEMP_GOPATH}/src/github.com/openshift-pipelines"
     if [ -L $REPO_SYMLINK ] ; then
       echo "Deleting symlink to pipelines repo $REPO_SYMLINK"
       rm -f "${REPO_SYMLINK}"

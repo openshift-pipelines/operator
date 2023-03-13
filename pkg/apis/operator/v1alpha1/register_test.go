@@ -23,8 +23,8 @@ import (
 )
 
 func TestRegisterHelpers(t *testing.T) {
-	if got, want := Resource("PipelinesAsCode"), "PipelinesAsCode."+GroupName; got.String() != want {
-		t.Errorf("Resource(PipelinesAsCode) = %v, want %v", got.String(), want)
+	if got, want := Resource("TektonPipeline"), "TektonPipeline."+GroupName; got.String() != want {
+		t.Errorf("Resource(TektonPipeline) = %v, want %v", got.String(), want)
 	}
 
 	if got, want := SchemeGroupVersion.String(), GroupName+"/v1alpha1"; got != want {
