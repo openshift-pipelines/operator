@@ -22,11 +22,13 @@ import (
 	"os"
 
 	mf "github.com/manifestival/manifestival"
-	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
-	"github.com/tektoncd/operator/pkg/client/clientset/versioned"
-	operatorclient "github.com/tektoncd/operator/pkg/client/injection/client"
+	tektonoperatorv1alpha1 "github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
+	tektonversioned "github.com/tektoncd/operator/pkg/client/clientset/versioned"
+	"github.com/openshift-pipelines/operator/pkg/client/clientset/versioned"
+	tektonoperatorclient "github.com/tektoncd/operator/pkg/client/injection/client"
+	operatorclient "github.com/openshift-pipelines/operator/pkg/client/injection/client"
 	"github.com/tektoncd/operator/pkg/reconciler/common"
-	"github.com/tektoncd/operator/pkg/reconciler/openshift/tektonconfig/extension"
+	"github.com/openshift-pipelines/operator/pkg/reconciler/tektonconfig/extension"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	nsV1 "k8s.io/client-go/informers/core/v1"
 	rbacV1 "k8s.io/client-go/informers/rbac/v1"
@@ -42,33 +44,35 @@ const (
 
 func OpenShiftExtension(ctx context.Context) common.Extension {
 	return openshiftExtension{
-		operatorClientSet: operatorclient.Get(ctx),
-		kubeClientSet:     kubeclient.Get(ctx),
-		rbacInformer:      rbacInformer.Get(ctx),
-		nsInformer:        namespaceinformer.Get(ctx),
+		tektonoperatorClientSet: tektonoperatorclient.Get(ctx),
+		operatorClientSet:       operatorclient.Get(ctx),
+		kubeClientSet:           kubeclient.Get(ctx),
+		rbacInformer:            rbacInformer.Get(ctx),
+		nsInformer:              namespaceinformer.Get(ctx),
 	}
 }
 
 type openshiftExtension struct {
-	operatorClientSet versioned.Interface
-	kubeClientSet     kubernetes.Interface
-	rbacInformer      rbacV1.ClusterRoleBindingInformer
-	nsInformer        nsV1.NamespaceInformer
+	tektonoperatorClientSet tektonversioned.Interface
+	operatorClientSet       versioned.Interface
+	kubeClientSet           kubernetes.Interface
+	rbacInformer            rbacV1.ClusterRoleBindingInformer
+	nsInformer              nsV1.NamespaceInformer
 }
 
-func (oe openshiftExtension) Transformers(comp v1alpha1.TektonComponent) []mf.Transformer {
+func (oe openshiftExtension) Transformers(comp tektonoperatorv1alpha1.TektonComponent) []mf.Transformer {
 	return []mf.Transformer{}
 }
-func (oe openshiftExtension) PreReconcile(ctx context.Context, tc v1alpha1.TektonComponent) error {
+func (oe openshiftExtension) PreReconcile(ctx context.Context, tc tektonoperatorv1alpha1.TektonComponent) error {
 
-	config := tc.(*v1alpha1.TektonConfig)
+	config := tc.(*tektonoperatorv1alpha1.TektonConfig)
 	r := rbac{
-		kubeClientSet:     oe.kubeClientSet,
-		operatorClientSet: oe.operatorClientSet,
-		rbacInformer:      oe.rbacInformer,
-		nsInformer:        oe.nsInformer,
-		version:           os.Getenv(versionKey),
-		tektonConfig:      config,
+		kubeClientSet:           oe.kubeClientSet,
+		operatorClientSet:       oe.tektonoperatorClientSet,
+		rbacInformer:            oe.rbacInformer,
+		nsInformer:              oe.nsInformer,
+		version:                 os.Getenv(versionKey),
+		tektonConfig:            config,
 	}
 
 	// set openshift specific defaults
@@ -82,7 +86,7 @@ func (oe openshiftExtension) PreReconcile(ctx context.Context, tc v1alpha1.Tekto
 		tcLabels := config.GetLabels()
 		tcLabels[serviceAccountCreationLabel] = "true"
 		config.SetLabels(tcLabels)
-		if _, err := oe.operatorClientSet.OperatorV1alpha1().TektonConfigs().Update(ctx, config, metav1.UpdateOptions{}); err != nil {
+		if _, err := oe.tektonoperatorClientSet.OperatorV1alpha1().TektonConfigs().Update(ctx, config, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
 	}
@@ -116,43 +120,43 @@ func (oe openshiftExtension) PreReconcile(ctx context.Context, tc v1alpha1.Tekto
 	return nil
 }
 
-func (oe openshiftExtension) PostReconcile(ctx context.Context, comp v1alpha1.TektonComponent) error {
-	configInstance := comp.(*v1alpha1.TektonConfig)
+func (oe openshiftExtension) PostReconcile(ctx context.Context, comp tektonoperatorv1alpha1.TektonComponent) error {
+	configInstance := comp.(*tektonoperatorv1alpha1.TektonConfig)
 
-	if configInstance.Spec.Profile == v1alpha1.ProfileAll {
-		if _, err := extension.EnsureTektonAddonExists(ctx, oe.operatorClientSet.OperatorV1alpha1().TektonAddons(), configInstance); err != nil {
+	if configInstance.Spec.Profile == tektonoperatorv1alpha1.ProfileAll {
+		if _, err := extension.EnsureTektonAddonExists(ctx, oe.tektonoperatorClientSet.OperatorV1alpha1().TektonAddons(), configInstance); err != nil {
 			configInstance.Status.MarkComponentNotReady(fmt.Sprintf("TektonAddon: %s", err.Error()))
-			return v1alpha1.REQUEUE_EVENT_AFTER
+			return tektonoperatorv1alpha1.REQUEUE_EVENT_AFTER
 		}
 	}
-	if configInstance.Spec.Profile == v1alpha1.ProfileLite || configInstance.Spec.Profile == v1alpha1.ProfileBasic {
-		if err := extension.EnsureTektonAddonCRNotExists(ctx, oe.operatorClientSet.OperatorV1alpha1().TektonAddons()); err != nil {
+	if configInstance.Spec.Profile == tektonoperatorv1alpha1.ProfileLite || configInstance.Spec.Profile == tektonoperatorv1alpha1.ProfileBasic {
+		if err := extension.EnsureTektonAddonCRNotExists(ctx, oe.tektonoperatorClientSet.OperatorV1alpha1().TektonAddons()); err != nil {
 			return err
 		}
 	}
 
 	pac := configInstance.Spec.Platforms.OpenShift.PipelinesAsCode
 	if pac != nil && *pac.Enable {
-		if _, err := extension.EnsureOpenShiftPipelinesAsCodeExists(ctx, oe.operatorClientSet.OperatorV1alpha1().OpenShiftPipelinesAsCodes(), configInstance); err != nil {
+		if _, err := extension.EnsureOpenShiftPipelinesAsCodeExists(ctx, oe.operatorClientSet.OperatorV1alpha1().PipelinesAsCodes(), configInstance); err != nil {
 			configInstance.Status.MarkComponentNotReady(fmt.Sprintf("OpenShiftPipelinesAsCode: %s", err.Error()))
-			return v1alpha1.REQUEUE_EVENT_AFTER
+			return tektonoperatorv1alpha1.REQUEUE_EVENT_AFTER
 		}
 	} else {
-		if err := extension.EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx, oe.operatorClientSet.OperatorV1alpha1().OpenShiftPipelinesAsCodes()); err != nil {
+		if err := extension.EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx, oe.operatorClientSet.OperatorV1alpha1().PipelinesAsCodes()); err != nil {
 			return err
 		}
 	}
 	return nil
 }
-func (oe openshiftExtension) Finalize(ctx context.Context, comp v1alpha1.TektonComponent) error {
-	configInstance := comp.(*v1alpha1.TektonConfig)
-	if configInstance.Spec.Profile == v1alpha1.ProfileAll {
-		if err := extension.EnsureTektonAddonCRNotExists(ctx, oe.operatorClientSet.OperatorV1alpha1().TektonAddons()); err != nil {
+func (oe openshiftExtension) Finalize(ctx context.Context, comp tektonoperatorv1alpha1.TektonComponent) error {
+	configInstance := comp.(*tektonoperatorv1alpha1.TektonConfig)
+	if configInstance.Spec.Profile == tektonoperatorv1alpha1.ProfileAll {
+		if err := extension.EnsureTektonAddonCRNotExists(ctx, oe.tektonoperatorClientSet.OperatorV1alpha1().TektonAddons()); err != nil {
 			return err
 		}
 	}
 	if configInstance.Spec.Platforms.OpenShift.PipelinesAsCode != nil && *configInstance.Spec.Platforms.OpenShift.PipelinesAsCode.Enable {
-		if err := extension.EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx, oe.operatorClientSet.OperatorV1alpha1().OpenShiftPipelinesAsCodes()); err != nil {
+		if err := extension.EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx, oe.operatorClientSet.OperatorV1alpha1().PipelinesAsCodes()); err != nil {
 			return err
 		}
 	}
@@ -165,16 +169,16 @@ func (oe openshiftExtension) Finalize(ctx context.Context, comp v1alpha1.TektonC
 }
 
 // configOwnerRef returns owner reference pointing to passed instance
-func configOwnerRef(tc v1alpha1.TektonInstallerSet) metav1.OwnerReference {
+func configOwnerRef(tc tektonoperatorv1alpha1.TektonInstallerSet) metav1.OwnerReference {
 	return *metav1.NewControllerRef(&tc, tc.GetGroupVersionKind())
 }
 
 // tektonConfigOwnerRef returns owner reference of tektonConfig
-func tektonConfigOwnerRef(tc v1alpha1.TektonConfig) metav1.OwnerReference {
+func tektonConfigOwnerRef(tc tektonoperatorv1alpha1.TektonConfig) metav1.OwnerReference {
 	return *metav1.NewControllerRef(&tc, tc.GetGroupVersionKind())
 }
 
-func changeOwnerRefOfPreExistingSA(ctx context.Context, kc kubernetes.Interface, tc v1alpha1.TektonConfig) error {
+func changeOwnerRefOfPreExistingSA(ctx context.Context, kc kubernetes.Interface, tc tektonoperatorv1alpha1.TektonConfig) error {
 	allSAs, err := kc.CoreV1().ServiceAccounts("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -196,7 +200,7 @@ func changeOwnerRefOfPreExistingSA(ctx context.Context, kc kubernetes.Interface,
 // we add this label from pipelines 1.8, and do not add tektoninstaller set as owner of serviceaccount created
 // if label not present it means SA was created earlier and we need to remove ownerRef before we do the update
 // this helps us to keep pre-existing SA as it is.
-func existingSAWithOwnerRef(tc *v1alpha1.TektonConfig) bool {
+func existingSAWithOwnerRef(tc *tektonoperatorv1alpha1.TektonConfig) bool {
 	tcLabels := tc.GetLabels()
 	_, ok := tcLabels[serviceAccountCreationLabel]
 	return !ok

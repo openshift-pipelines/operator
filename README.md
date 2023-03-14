@@ -9,6 +9,7 @@ This is the repository of a *proof-of-concept* of OpenShift Operator based of th
 - [x] GitHub workflows
 - [x] Import `OpenShiftPipelinesAsCode` in here
 - [x] Rename `OpenShiftPipelinesAsCode` to `PipelinesAsCode`
+- [ ] Support watching/converting `OpenShiftPipelinesAsCode` to `PipelinesAsCode`
 - [ ] `Makefile`
 - [ ] Automated/scripted import payload (copy from tektoncd/operator)
 - [ ] Automated/scripted import `tektoncd/operator` CRDs

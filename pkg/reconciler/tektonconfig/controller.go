@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
-	openshiftpipelinesascodeinformer "github.com/tektoncd/operator/pkg/client/injection/informers/operator/v1alpha1/openshiftpipelinesascode"
+	pipelinesascodeinformer "github.com/openshift-pipelines/operator/pkg/client/injection/informers/operator/v1alpha1/pipelinesascode"
 	tektonAddoninformer "github.com/tektoncd/operator/pkg/client/injection/informers/operator/v1alpha1/tektonaddon"
 	"github.com/tektoncd/operator/pkg/reconciler/shared/tektonconfig"
 	"k8s.io/client-go/tools/cache"
@@ -36,7 +36,7 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 		FilterFunc: controller.FilterController(&v1alpha1.TektonConfig{}),
 		Handler:    controller.HandleAll(ctrl.EnqueueControllerOf),
 	})
-	openshiftpipelinesascodeinformer.Get(ctx).Informer().AddEventHandler(cache.FilteringResourceEventHandler{
+	pipelinesascodeinformer.Get(ctx).Informer().AddEventHandler(cache.FilteringResourceEventHandler{
 		FilterFunc: controller.FilterController(&v1alpha1.TektonConfig{}),
 		Handler:    controller.HandleAll(ctrl.EnqueueControllerOf),
 	})
