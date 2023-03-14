@@ -18,6 +18,6 @@ limitations under the License.
 
 package v1alpha1
 
-// OpenShiftPipelinesAsCodeListerExpansion allows custom methods to be added to
-// OpenShiftPipelinesAsCodeLister.
-type OpenShiftPipelinesAsCodeListerExpansion interface{}
+// PipelinesAsCodeListerExpansion allows custom methods to be added to
+// PipelinesAsCodeLister.
+type PipelinesAsCodeListerExpansion interface{}

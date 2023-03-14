@@ -17,121 +17,122 @@ limitations under the License.
 package v1alpha1
 
 import (
+	tektonoperatorv1alpha1 "github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"knative.dev/pkg/apis"
 )
 
 var (
-	_ TektonComponentStatus = (*OpenShiftPipelinesAsCodeStatus)(nil)
+	_ tektonoperatorv1alpha1.TektonComponentStatus = (*PipelinesAsCodeStatus)(nil)
 
 	opacCondSet = apis.NewLivingConditionSet(
-		DependenciesInstalled,
-		PreReconciler,
-		InstallerSetAvailable,
-		InstallerSetReady,
-		PostReconciler,
+		tektonoperatorv1alpha1.DependenciesInstalled,
+		tektonoperatorv1alpha1.PreReconciler,
+		tektonoperatorv1alpha1.InstallerSetAvailable,
+		tektonoperatorv1alpha1.InstallerSetReady,
+		tektonoperatorv1alpha1.PostReconciler,
 	)
 )
 
-func (pac *OpenShiftPipelinesAsCode) GroupVersionKind() schema.GroupVersionKind {
-	return SchemeGroupVersion.WithKind(KindOpenShiftPipelinesAsCode)
+func (pac *PipelinesAsCode) GroupVersionKind() schema.GroupVersionKind {
+	return SchemeGroupVersion.WithKind(KindPipelinesAsCode)
 }
 
-func (pac *OpenShiftPipelinesAsCode) GetGroupVersionKind() schema.GroupVersionKind {
-	return SchemeGroupVersion.WithKind(KindOpenShiftPipelinesAsCode)
+func (pac *PipelinesAsCode) GetGroupVersionKind() schema.GroupVersionKind {
+	return SchemeGroupVersion.WithKind(KindPipelinesAsCode)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) GetCondition(t apis.ConditionType) *apis.Condition {
+func (pac *PipelinesAsCodeStatus) GetCondition(t apis.ConditionType) *apis.Condition {
 	return opacCondSet.Manage(pac).GetCondition(t)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) InitializeConditions() {
+func (pac *PipelinesAsCodeStatus) InitializeConditions() {
 	opacCondSet.Manage(pac).InitializeConditions()
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) IsReady() bool {
+func (pac *PipelinesAsCodeStatus) IsReady() bool {
 	return opacCondSet.Manage(pac).IsHappy()
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) MarkPreReconcilerComplete() {
-	opacCondSet.Manage(pac).MarkTrue(PreReconciler)
+func (pac *PipelinesAsCodeStatus) MarkPreReconcilerComplete() {
+	opacCondSet.Manage(pac).MarkTrue(tektonoperatorv1alpha1.PreReconciler)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) MarkInstallerSetAvailable() {
-	opacCondSet.Manage(pac).MarkTrue(InstallerSetAvailable)
+func (pac *PipelinesAsCodeStatus) MarkInstallerSetAvailable() {
+	opacCondSet.Manage(pac).MarkTrue(tektonoperatorv1alpha1.InstallerSetAvailable)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) MarkInstallerSetReady() {
-	opacCondSet.Manage(pac).MarkTrue(InstallerSetReady)
+func (pac *PipelinesAsCodeStatus) MarkInstallerSetReady() {
+	opacCondSet.Manage(pac).MarkTrue(tektonoperatorv1alpha1.InstallerSetReady)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) MarkPostReconcilerComplete() {
-	opacCondSet.Manage(pac).MarkTrue(PostReconciler)
+func (pac *PipelinesAsCodeStatus) MarkPostReconcilerComplete() {
+	opacCondSet.Manage(pac).MarkTrue(tektonoperatorv1alpha1.PostReconciler)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) MarkNotReady(msg string) {
+func (pac *PipelinesAsCodeStatus) MarkNotReady(msg string) {
 	opacCondSet.Manage(pac).MarkFalse(
 		apis.ConditionReady,
 		"Error",
 		"Ready: %s", msg)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) MarkPreReconcilerFailed(msg string) {
+func (pac *PipelinesAsCodeStatus) MarkPreReconcilerFailed(msg string) {
 	pac.MarkNotReady("PreReconciliation failed")
 	opacCondSet.Manage(pac).MarkFalse(
-		PreReconciler,
+		tektonoperatorv1alpha1.PreReconciler,
 		"Error",
 		"PreReconciliation failed with message: %s", msg)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) MarkInstallerSetNotAvailable(msg string) {
+func (pac *PipelinesAsCodeStatus) MarkInstallerSetNotAvailable(msg string) {
 	pac.MarkNotReady("TektonInstallerSet not ready")
 	opacCondSet.Manage(pac).MarkFalse(
-		InstallerSetAvailable,
+		tektonoperatorv1alpha1.InstallerSetAvailable,
 		"Error",
 		"Installer set not ready: %s", msg)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) MarkInstallerSetNotReady(msg string) {
+func (pac *PipelinesAsCodeStatus) MarkInstallerSetNotReady(msg string) {
 	pac.MarkNotReady("TektonInstallerSet not ready")
 	opacCondSet.Manage(pac).MarkFalse(
-		InstallerSetReady,
+		tektonoperatorv1alpha1.InstallerSetReady,
 		"Error",
 		"Installer set not ready: %s", msg)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) MarkPostReconcilerFailed(msg string) {
+func (pac *PipelinesAsCodeStatus) MarkPostReconcilerFailed(msg string) {
 	pac.MarkNotReady("PostReconciliation failed")
 	opacCondSet.Manage(pac).MarkFalse(
-		PostReconciler,
+		tektonoperatorv1alpha1.PostReconciler,
 		"Error",
 		"PostReconciliation failed with message: %s", msg)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) MarkDependenciesInstalled() {
-	opacCondSet.Manage(pac).MarkTrue(DependenciesInstalled)
+func (pac *PipelinesAsCodeStatus) MarkDependenciesInstalled() {
+	opacCondSet.Manage(pac).MarkTrue(tektonoperatorv1alpha1.DependenciesInstalled)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) MarkDependencyInstalling(msg string) {
+func (pac *PipelinesAsCodeStatus) MarkDependencyInstalling(msg string) {
 	pac.MarkNotReady("Dependencies installing")
 	opacCondSet.Manage(pac).MarkFalse(
-		DependenciesInstalled,
+		tektonoperatorv1alpha1.DependenciesInstalled,
 		"Error",
 		"Dependencies are installing: %s", msg)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) MarkDependencyMissing(msg string) {
+func (pac *PipelinesAsCodeStatus) MarkDependencyMissing(msg string) {
 	pac.MarkNotReady("Missing Dependencies for TektonTriggers")
 	opacCondSet.Manage(pac).MarkFalse(
-		DependenciesInstalled,
+		tektonoperatorv1alpha1.DependenciesInstalled,
 		"Error",
 		"Dependencies are missing: %s", msg)
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) GetVersion() string {
+func (pac *PipelinesAsCodeStatus) GetVersion() string {
 	return pac.Version
 }
 
-func (pac *OpenShiftPipelinesAsCodeStatus) SetVersion(version string) {
+func (pac *PipelinesAsCodeStatus) SetVersion(version string) {
 	pac.Version = version
 }
