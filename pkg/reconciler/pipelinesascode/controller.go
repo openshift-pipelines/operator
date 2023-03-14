@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openshiftpipelinesascode
+package pipelinesascode
 
 import (
 	"context"
 
-	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
-	operatorclient "github.com/tektoncd/operator/pkg/client/injection/client"
-	pacInformer "github.com/tektoncd/operator/pkg/client/injection/informers/operator/v1alpha1/openshiftpipelinesascode"
+	"github.com/openshift-pipelines/operator/pkg/apis/operator/v1alpha1"
+	tektonoperatorclient "github.com/tektoncd/operator/pkg/client/injection/client"
+	pacInformer "github.com/openshift-pipelines/operator/pkg/client/injection/informers/operator/v1alpha1/pipelinesascode"
 	tektonInstallerinformer "github.com/tektoncd/operator/pkg/client/injection/informers/operator/v1alpha1/tektoninstallerset"
 	tektonPipelineinformer "github.com/tektoncd/operator/pkg/client/injection/informers/operator/v1alpha1/tektonpipeline"
-	pacreconciler "github.com/tektoncd/operator/pkg/client/injection/reconciler/operator/v1alpha1/openshiftpipelinesascode"
+	pacreconciler "github.com/openshift-pipelines/operator/pkg/client/injection/reconciler/operator/v1alpha1/pipelinesascode"
 	"github.com/tektoncd/operator/pkg/reconciler/common"
 	"github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektoninstallerset/client"
 	"k8s.io/client-go/tools/cache"
@@ -58,7 +58,7 @@ func NewExtendedController(generator common.ExtensionGenerator) injection.Contro
 			logger.Fatal(err)
 		}
 
-		tisClient := operatorclient.Get(ctx).OperatorV1alpha1().TektonInstallerSets()
+		tisClient := tektonoperatorclient.Get(ctx).OperatorV1alpha1().TektonInstallerSets()
 
 		metrics, err := common.NoMetrics()
 		if err != nil {
@@ -67,19 +67,19 @@ func NewExtendedController(generator common.ExtensionGenerator) injection.Contro
 
 		c := &Reconciler{
 			pipelineInformer:   tektonPipelineinformer.Get(ctx),
-			installerSetClient: client.NewInstallerSetClient(tisClient, operatorVer, pacVersion, v1alpha1.KindOpenShiftPipelinesAsCode, metrics),
+			installerSetClient: client.NewInstallerSetClient(tisClient, operatorVer, pacVersion, v1alpha1.KindPipelinesAsCode, metrics),
 			extension:          generator(ctx),
 			manifest:           manifest,
 			pacVersion:         pacVersion,
 		}
 		impl := pacreconciler.NewImpl(ctx, c)
 
-		logger.Info("Setting up event handlers for OpenShiftPipelinesAsCode")
+		logger.Info("Setting up event handlers for PipelinesAsCode")
 
 		pacInformer.Get(ctx).Informer().AddEventHandler(controller.HandleAll(impl.Enqueue))
 
 		tektonInstallerinformer.Get(ctx).Informer().AddEventHandler(cache.FilteringResourceEventHandler{
-			FilterFunc: controller.FilterController(&v1alpha1.OpenShiftPipelinesAsCode{}),
+			FilterFunc: controller.FilterController(&v1alpha1.PipelinesAsCode{}),
 			Handler:    controller.HandleAll(impl.EnqueueControllerOf),
 		})
 		return impl

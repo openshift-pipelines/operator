@@ -22,38 +22,38 @@ import (
 	tektonoperatorv1alpha1 "github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 )
 
-// OpenShiftPipelinesAsCode is the Schema for the OpenShiftPipelinesAsCode API
+// PipelinesAsCode is the Schema for the PipelinesAsCode API
 // +genclient
 // +genreconciler:krshapedlogic=false
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +genclient:nonNamespaced
-type OpenShiftPipelinesAsCode struct {
+type PipelinesAsCode struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   OpenShiftPipelinesAsCodeSpec   `json:"spec,omitempty"`
-	Status OpenShiftPipelinesAsCodeStatus `json:"status,omitempty"`
+	Spec   PipelinesAsCodeSpec   `json:"spec,omitempty"`
+	Status PipelinesAsCodeStatus `json:"status,omitempty"`
 }
 
 // GetSpec implements TektonComponent
-func (pac *OpenShiftPipelinesAsCode) GetSpec() TektonComponentSpec {
+func (pac *PipelinesAsCode) GetSpec() tektonoperatorv1alpha1.TektonComponentSpec {
 	return &pac.Spec
 }
 
 // GetStatus implements TektonComponent
-func (pac *OpenShiftPipelinesAsCode) GetStatus() TektonComponentStatus {
+func (pac *PipelinesAsCode) GetStatus() tektonoperatorv1alpha1.TektonComponentStatus {
 	return &pac.Status
 }
 
-// OpenShiftPipelinesAsCodeSpec defines the desired state of OpenShiftPipelinesAsCode
-type OpenShiftPipelinesAsCodeSpec struct {
+// PipelinesAsCodeSpec defines the desired state of PipelinesAsCode
+type PipelinesAsCodeSpec struct {
 	tektonoperatorv1alpha1.CommonSpec  `json:",inline"`
 	tektonoperatorv1alpha1.Config      `json:"config,omitempty"`
 	PACSettings `json:",inline"`
 }
 
-// OpenShiftPipelinesAsCodeStatus defines the observed state of OpenShiftPipelinesAsCode
-type OpenShiftPipelinesAsCodeStatus struct {
+// PipelinesAsCodeStatus defines the observed state of PipelinesAsCode
+type PipelinesAsCodeStatus struct {
 	duckv1.Status `json:",inline"`
 
 	// The version of the installed release
@@ -61,12 +61,12 @@ type OpenShiftPipelinesAsCodeStatus struct {
 	Version string `json:"version,omitempty"`
 }
 
-// OpenShiftPipelinesAsCodeList contains a list of OpenShiftPipelinesAsCode
+// PipelinesAsCodeList contains a list of PipelinesAsCode
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type OpenShiftPipelinesAsCodeList struct {
+type PipelinesAsCodeList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []OpenShiftPipelinesAsCode `json:"items"`
+	Items           []PipelinesAsCode `json:"items"`
 }
 
 type PACSettings struct {

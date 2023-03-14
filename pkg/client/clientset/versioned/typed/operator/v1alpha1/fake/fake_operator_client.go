@@ -28,8 +28,8 @@ type FakeOperatorV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeOperatorV1alpha1) OpenShiftPipelinesAsCodes() v1alpha1.OpenShiftPipelinesAsCodeInterface {
-	return &FakeOpenShiftPipelinesAsCodes{c}
+func (c *FakeOperatorV1alpha1) PipelinesAsCodes() v1alpha1.PipelinesAsCodeInterface {
+	return &FakePipelinesAsCodes{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

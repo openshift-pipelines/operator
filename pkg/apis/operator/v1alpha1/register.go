@@ -29,35 +29,8 @@ const (
 	// SchemaVersion is the current version of the API.
 	SchemaVersion = "v1alpha1"
 
-	// KindTektonPipeline is the Kind of Tekton Pipeline in a GVK context.
-	KindTektonPipeline = "TektonPipeline"
-
-	// KindTektonTrigger is the Kind of Tekton Trigger in a GVK context.
-	KindTektonTrigger = "TektonTrigger"
-
-	// KindTektonDashboard is the Kind of Tekton Dashboard in a GVK context.
-	KindTektonDashboard = "TektonDashboard"
-
-	// KindTektonAddon is the Kind of Tekton Addon in a GVK context.
-	KindTektonAddon = "TektonAddon"
-
-	// KindTektonConfig is the Kind of Tekton Config in a GVK context.
-	KindTektonConfig = "TektonConfig"
-
-	// KindTektonResult is the Kind of Tekton Result in a GVK context.
-	KindTektonResult = "TektonResult"
-
-	// KindTektonInstallerSet is the Kind of TektonInstallerSet in a GVK context.
-	KindTektonInstallerSet = "TektonInstallerSet"
-
-	// KindTektonHub is the Kind of TektonHub in a GVK context.
-	KindTektonHub = "TektonHub"
-
-	// KindTektonChain is the Kind of Tekton Chain in a GVK context.
-	KindTektonChain = "TektonChain"
-
-	// KindOpenShiftPipelinesAsCode is the Kind of OpenShiftPipelinesAsCode in a GVK context.
-	KindOpenShiftPipelinesAsCode = "OpenShiftPipelinesAsCode"
+	// KindPipelinesAsCode is the Kind of OpenShiftPipelinesAsCode in a GVK context.
+	KindPipelinesAsCode = "PipelinesAsCode"
 )
 
 // Resource takes an unqualified resource and returns a Group qualified GroupResource
@@ -69,8 +42,8 @@ func Resource(resource string) schema.GroupResource {
 // scheme.
 func addKnownTypes(s *runtime.Scheme) error {
 	s.AddKnownTypes(SchemeGroupVersion,
-		&OpenShiftPipelinesAsCode{},
-		&OpenShiftPipelinesAsCodeList{},
+		&PipelinesAsCode{},
+		&PipelinesAsCodeList{},
 	)
 	metav1.AddToGroupVersion(s, SchemeGroupVersion)
 	return nil
