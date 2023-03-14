@@ -22,15 +22,16 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
-	op "github.com/tektoncd/operator/pkg/client/clientset/versioned/typed/operator/v1alpha1"
+	"github.com/openshift-pipelines/operator/pkg/apis/operator/v1alpha1"
+	tektonoperatorv1alpha1 "github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
+	op "github.com/openshift-pipelines/operator/pkg/client/clientset/versioned/typed/operator/v1alpha1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"knative.dev/pkg/apis"
 )
 
-func EnsureOpenShiftPipelinesAsCodeExists(ctx context.Context, clients op.OpenShiftPipelinesAsCodeInterface, config *v1alpha1.TektonConfig) (*v1alpha1.OpenShiftPipelinesAsCode, error) {
-	opacCR, err := GetPAC(ctx, clients, v1alpha1.OpenShiftPipelinesAsCodeName)
+func EnsureOpenShiftPipelinesAsCodeExists(ctx context.Context, clients op.PipelinesAsCodeInterface, config *tektonoperatorv1alpha1.TektonConfig) (*v1alpha1.PipelinesAsCode, error) {
+	opacCR, err := GetPAC(ctx, clients, v1alpha1.PipelinesAsCodeName)
 	if err != nil {
 		if !apierrs.IsNotFound(err) {
 			return nil, err
@@ -38,7 +39,7 @@ func EnsureOpenShiftPipelinesAsCodeExists(ctx context.Context, clients op.OpenSh
 		if _, err = createOPAC(ctx, clients, config); err != nil {
 			return nil, err
 		}
-		return nil, v1alpha1.RECONCILE_AGAIN_ERR
+		return nil, tektonoperatorv1alpha1.RECONCILE_AGAIN_ERR
 	}
 
 	opacCR, err = updateOPAC(ctx, opacCR, config, clients)
@@ -51,22 +52,22 @@ func EnsureOpenShiftPipelinesAsCodeExists(ctx context.Context, clients op.OpenSh
 		return nil, err
 	}
 	if !ok {
-		return nil, v1alpha1.RECONCILE_AGAIN_ERR
+		return nil, tektonoperatorv1alpha1.RECONCILE_AGAIN_ERR
 	}
 
 	return opacCR, err
 }
 
-func createOPAC(ctx context.Context, clients op.OpenShiftPipelinesAsCodeInterface, config *v1alpha1.TektonConfig) (*v1alpha1.OpenShiftPipelinesAsCode, error) {
+func createOPAC(ctx context.Context, clients op.PipelinesAsCodeInterface, config *tektonoperatorv1alpha1.TektonConfig) (*v1alpha1.PipelinesAsCode, error) {
 	ownerRef := *metav1.NewControllerRef(config, config.GroupVersionKind())
 
-	opacCR := &v1alpha1.OpenShiftPipelinesAsCode{
+	opacCR := &v1alpha1.PipelinesAsCode{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            v1alpha1.OpenShiftPipelinesAsCodeName,
+			Name:            v1alpha1.PipelinesAsCodeName,
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
 		},
-		Spec: v1alpha1.OpenShiftPipelinesAsCodeSpec{
-			CommonSpec: v1alpha1.CommonSpec{
+		Spec: v1alpha1.PipelinesAsCodeSpec{
+			CommonSpec: tektonoperatorv1alpha1.CommonSpec{
 				TargetNamespace: config.Spec.TargetNamespace,
 			},
 			Config: config.Spec.Config,
@@ -81,12 +82,12 @@ func createOPAC(ctx context.Context, clients op.OpenShiftPipelinesAsCodeInterfac
 	return opacCR, nil
 }
 
-func GetPAC(ctx context.Context, clients op.OpenShiftPipelinesAsCodeInterface, name string) (*v1alpha1.OpenShiftPipelinesAsCode, error) {
+func GetPAC(ctx context.Context, clients op.PipelinesAsCodeInterface, name string) (*v1alpha1.PipelinesAsCode, error) {
 	return clients.Get(ctx, name, metav1.GetOptions{})
 }
 
-func updateOPAC(ctx context.Context, opacCR *v1alpha1.OpenShiftPipelinesAsCode, config *v1alpha1.TektonConfig,
-	clients op.OpenShiftPipelinesAsCodeInterface) (*v1alpha1.OpenShiftPipelinesAsCode, error) {
+func updateOPAC(ctx context.Context, opacCR *v1alpha1.PipelinesAsCode, config *tektonoperatorv1alpha1.TektonConfig,
+	clients op.PipelinesAsCodeInterface) (*v1alpha1.PipelinesAsCode, error) {
 	// if the pac spec is changed then update the instance
 	updated := false
 
@@ -116,24 +117,24 @@ func updateOPAC(ctx context.Context, opacCR *v1alpha1.OpenShiftPipelinesAsCode, 
 		if err != nil {
 			return nil, err
 		}
-		return nil, v1alpha1.RECONCILE_AGAIN_ERR
+		return nil, tektonoperatorv1alpha1.RECONCILE_AGAIN_ERR
 	}
 
 	return opacCR, nil
 }
 
 // isOPACReady will check the status conditions of the OpenShiftPipelinesAsCode and return true if the OpenShiftPipelinesAsCode is ready.
-func isOPACReady(s *v1alpha1.OpenShiftPipelinesAsCode, err error) (bool, error) {
+func isOPACReady(s *v1alpha1.PipelinesAsCode, err error) (bool, error) {
 	if s.GetStatus() != nil && s.GetStatus().GetCondition(apis.ConditionReady) != nil {
-		if strings.Contains(s.GetStatus().GetCondition(apis.ConditionReady).Message, v1alpha1.UpgradePending) {
-			return false, v1alpha1.DEPENDENCY_UPGRADE_PENDING_ERR
+		if strings.Contains(s.GetStatus().GetCondition(apis.ConditionReady).Message, tektonoperatorv1alpha1.UpgradePending) {
+			return false, tektonoperatorv1alpha1.DEPENDENCY_UPGRADE_PENDING_ERR
 		}
 	}
 	return s.Status.IsReady(), err
 }
 
-func EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx context.Context, clients op.OpenShiftPipelinesAsCodeInterface) error {
-	if _, err := GetPAC(ctx, clients, v1alpha1.OpenShiftPipelinesAsCodeName); err != nil {
+func EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx context.Context, clients op.PipelinesAsCodeInterface) error {
+	if _, err := GetPAC(ctx, clients, v1alpha1.PipelinesAsCodeName); err != nil {
 		if apierrs.IsNotFound(err) {
 			// OpenShiftPipelinesAsCode CR is gone, hence return nil
 			return nil
@@ -141,15 +142,15 @@ func EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx context.Context, clients op.O
 		return err
 	}
 	// if the Get was successful, try deleting the CR
-	if err := clients.Delete(ctx, v1alpha1.OpenShiftPipelinesAsCodeName, metav1.DeleteOptions{}); err != nil {
+	if err := clients.Delete(ctx, v1alpha1.PipelinesAsCodeName, metav1.DeleteOptions{}); err != nil {
 		if apierrs.IsNotFound(err) {
 			// OpenShiftPipelinesAsCode CR is gone, hence return nil
 			return nil
 		}
-		return fmt.Errorf("OpenShiftPipelinesAsCode %q failed to delete: %v", v1alpha1.OpenShiftPipelinesAsCodeName, err)
+		return fmt.Errorf("OpenShiftPipelinesAsCode %q failed to delete: %v", v1alpha1.PipelinesAsCodeName, err)
 	}
 	// if the Delete API call was success,
 	// then return requeue_event
 	// so that in a subsequent reconcile call the absence of the CR is verified by one of the 2 checks above
-	return v1alpha1.RECONCILE_AGAIN_ERR
+	return tektonoperatorv1alpha1.RECONCILE_AGAIN_ERR
 }
