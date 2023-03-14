@@ -15,7 +15,7 @@ require (
 	github.com/tektoncd/operator v0.65.1
 	github.com/tektoncd/pipeline v0.44.0
 	github.com/tektoncd/plumbing v0.0.0-20230309231045-dbb204980ea8
-	github.com/tektoncd/triggers v0.22.1
+	github.com/tektoncd/triggers v0.23.0
 	go.uber.org/zap v1.24.0
 	gomodules.xyz/jsonpatch/v2 v2.2.0
 	gotest.tools/v3 v3.4.0
