@@ -13,7 +13,7 @@ require (
 	github.com/openshift/api v0.0.0-20210910062324-a41d3573a3ba
 	github.com/openshift/client-go v0.0.0-20210521082421-73d9475a9142
 	github.com/tektoncd/operator v0.65.1
-	github.com/tektoncd/pipeline v0.44.0
+	github.com/tektoncd/pipeline v0.45.0
 	github.com/tektoncd/plumbing v0.0.0-20230309231045-dbb204980ea8
 	github.com/tektoncd/triggers v0.23.0
 	go.uber.org/zap v1.24.0
