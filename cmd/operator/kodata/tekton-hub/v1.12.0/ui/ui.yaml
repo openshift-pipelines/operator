@@ -7,6 +7,8 @@ data:
   API_VERSION: ''
   AUTH_BASE_URL: ''
   REDIRECT_URI: ''
+  CUSTOM_LOGO_MEDIA_TYPE: 'image/png'
+  CUSTOM_LOGO_BASE64_DATA: ''
 
 ---
 apiVersion: apps/v1
@@ -32,7 +34,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: tekton-hub-ui
-          image: quay.io/tekton-hub/ui:v1.11.1
+          image: quay.io/tekton-hub/ui:v1.12.0
           resources:
             requests:
               cpu: 100m
@@ -67,6 +69,16 @@ spec:
                 configMapKeyRef:
                   name: tekton-hub-ui
                   key: REDIRECT_URI
+            - name: CUSTOM_LOGO_MEDIA_TYPE
+              valueFrom:
+                configMapKeyRef:
+                  name: tekton-hub-ui
+                  key: CUSTOM_LOGO_MEDIA_TYPE
+            - name: CUSTOM_LOGO_BASE64_DATA
+              valueFrom:
+                configMapKeyRef:
+                  name: tekton-hub-ui
+                  key: CUSTOM_LOGO_BASE64_DATA
           ports:
             - containerPort: 8080
               protocol: TCP

@@ -137,12 +137,12 @@ func (oe openshiftExtension) PostReconcile(ctx context.Context, comp tektonopera
 
 	pac := configInstance.Spec.Platforms.OpenShift.PipelinesAsCode
 	if pac != nil && *pac.Enable {
-		if _, err := extension.EnsureOpenShiftPipelinesAsCodeExists(ctx, oe.operatorClientSet.OperatorV1alpha1().PipelinesAsCodes(), configInstance); err != nil {
-			configInstance.Status.MarkComponentNotReady(fmt.Sprintf("OpenShiftPipelinesAsCode: %s", err.Error()))
+		if _, err := extension.EnsurePipelinesAsCodeExists(ctx, oe.operatorClientSet.OperatorV1alpha1().PipelinesAsCodes(), configInstance); err != nil {
+			configInstance.Status.MarkComponentNotReady(fmt.Sprintf("PipelinesAsCode: %s", err.Error()))
 			return tektonoperatorv1alpha1.REQUEUE_EVENT_AFTER
 		}
 	} else {
-		if err := extension.EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx, oe.operatorClientSet.OperatorV1alpha1().PipelinesAsCodes()); err != nil {
+		if err := extension.EnsurePipelinesAsCodeCRNotExists(ctx, oe.operatorClientSet.OperatorV1alpha1().PipelinesAsCodes()); err != nil {
 			return err
 		}
 	}
@@ -156,7 +156,7 @@ func (oe openshiftExtension) Finalize(ctx context.Context, comp tektonoperatorv1
 		}
 	}
 	if configInstance.Spec.Platforms.OpenShift.PipelinesAsCode != nil && *configInstance.Spec.Platforms.OpenShift.PipelinesAsCode.Enable {
-		if err := extension.EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx, oe.operatorClientSet.OperatorV1alpha1().PipelinesAsCodes()); err != nil {
+		if err := extension.EnsurePipelinesAsCodeCRNotExists(ctx, oe.operatorClientSet.OperatorV1alpha1().PipelinesAsCodes()); err != nil {
 			return err
 		}
 	}
