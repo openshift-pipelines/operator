@@ -30,7 +30,7 @@ import (
 	"knative.dev/pkg/apis"
 )
 
-func EnsureOpenShiftPipelinesAsCodeExists(ctx context.Context, clients op.PipelinesAsCodeInterface, config *tektonoperatorv1alpha1.TektonConfig) (*v1alpha1.PipelinesAsCode, error) {
+func EnsurePipelinesAsCodeExists(ctx context.Context, clients op.PipelinesAsCodeInterface, config *tektonoperatorv1alpha1.TektonConfig) (*v1alpha1.PipelinesAsCode, error) {
 	opacCR, err := GetPAC(ctx, clients, v1alpha1.PipelinesAsCodeName)
 	if err != nil {
 		if !apierrs.IsNotFound(err) {
@@ -133,7 +133,7 @@ func isOPACReady(s *v1alpha1.PipelinesAsCode, err error) (bool, error) {
 	return s.Status.IsReady(), err
 }
 
-func EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx context.Context, clients op.PipelinesAsCodeInterface) error {
+func EnsurePipelinesAsCodeCRNotExists(ctx context.Context, clients op.PipelinesAsCodeInterface) error {
 	if _, err := GetPAC(ctx, clients, v1alpha1.PipelinesAsCodeName); err != nil {
 		if apierrs.IsNotFound(err) {
 			// OpenShiftPipelinesAsCode CR is gone, hence return nil
@@ -147,7 +147,7 @@ func EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx context.Context, clients op.P
 			// OpenShiftPipelinesAsCode CR is gone, hence return nil
 			return nil
 		}
-		return fmt.Errorf("OpenShiftPipelinesAsCode %q failed to delete: %v", v1alpha1.PipelinesAsCodeName, err)
+		return fmt.Errorf("PipelinesAsCode %q failed to delete: %v", v1alpha1.PipelinesAsCodeName, err)
 	}
 	// if the Delete API call was success,
 	// then return requeue_event

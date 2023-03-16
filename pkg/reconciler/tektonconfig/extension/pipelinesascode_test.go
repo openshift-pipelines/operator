@@ -31,7 +31,7 @@ import (
 	ts "knative.dev/pkg/reconciler/testing"
 )
 
-func TestEnsureOpenShiftPipelinesAsCodeExists(t *testing.T) {
+func TestEnsurePipelinesAsCodeExists(t *testing.T) {
 	ctx, _, _ := ts.SetupFakeContextWithCancel(t)
 	c := fake.Get(ctx)
 	tConfig := pipeline.GetTektonConfig()
@@ -40,53 +40,53 @@ func TestEnsureOpenShiftPipelinesAsCodeExists(t *testing.T) {
 
 	tConfig.SetDefaults(ctx)
 	// first invocation should create instance as it is non-existent and return RECONCILE_AGAIN_ERR
-	_, err := EnsureOpenShiftPipelinesAsCodeExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes(), tConfig)
+	_, err := EnsurePipelinesAsCodeExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes(), tConfig)
 	util.AssertEqual(t, err, tektonoperatorv1alpha1.RECONCILE_AGAIN_ERR)
 
 	// during second invocation instance exists but waiting on dependencies (pipeline, triggers)
 	// hence returns DEPENDENCY_UPGRADE_PENDING_ERR
-	_, err = EnsureOpenShiftPipelinesAsCodeExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes(), tConfig)
+	_, err = EnsurePipelinesAsCodeExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes(), tConfig)
 	util.AssertEqual(t, err, tektonoperatorv1alpha1.RECONCILE_AGAIN_ERR)
 
 	// mark the instance ready
 	markOPACReady(t, ctx, c.OperatorV1alpha1().PipelinesAsCodes())
 
 	// next invocation should return nil error as the instance is ready
-	_, err = EnsureOpenShiftPipelinesAsCodeExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes(), tConfig)
+	_, err = EnsurePipelinesAsCodeExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes(), tConfig)
 	util.AssertEqual(t, err, nil)
 
 	// test update propagation from tektonConfig
 	tConfig.Spec.TargetNamespace = "foobar"
-	_, err = EnsureOpenShiftPipelinesAsCodeExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes(), tConfig)
+	_, err = EnsurePipelinesAsCodeExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes(), tConfig)
 	util.AssertEqual(t, err, tektonoperatorv1alpha1.RECONCILE_AGAIN_ERR)
 
-	_, err = EnsureOpenShiftPipelinesAsCodeExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes(), tConfig)
+	_, err = EnsurePipelinesAsCodeExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes(), tConfig)
 	util.AssertEqual(t, err, nil)
 }
 
-func TestEnsureOpenShiftPipelinesAsCodeCRNotExists(t *testing.T) {
+func TestEnsurePipelinesAsCodeCRNotExists(t *testing.T) {
 	ctx, _, _ := ts.SetupFakeContextWithCancel(t)
 	c := fake.Get(ctx)
 
 	t.Setenv("PLATFORM", "openshift")
 
 	// when no instance exists, nil error is returned immediately
-	err := EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes())
+	err := EnsurePipelinesAsCodeCRNotExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes())
 	util.AssertEqual(t, err, nil)
 
 	// create an instance for testing other cases
 	tConfig := pipeline.GetTektonConfig()
 	tConfig.SetDefaults(ctx)
-	_, err = EnsureOpenShiftPipelinesAsCodeExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes(), tConfig)
+	_, err = EnsurePipelinesAsCodeExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes(), tConfig)
 	util.AssertEqual(t, err, tektonoperatorv1alpha1.RECONCILE_AGAIN_ERR)
 
 	// when an instance exists the first invoacation should make the delete API call and
 	// return RECONCILE_AGAI_ERROR. So that the deletion can be confirmed in a subsequent invocation
-	err = EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes())
+	err = EnsurePipelinesAsCodeCRNotExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes())
 	util.AssertEqual(t, err, tektonoperatorv1alpha1.RECONCILE_AGAIN_ERR)
 
 	// when the instance is completely removed from a cluster, the function should return nil error
-	err = EnsureOpenShiftPipelinesAsCodeCRNotExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes())
+	err = EnsurePipelinesAsCodeCRNotExists(ctx, c.OperatorV1alpha1().PipelinesAsCodes())
 	util.AssertEqual(t, err, nil)
 }
 

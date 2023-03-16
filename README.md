@@ -9,6 +9,8 @@ This is the repository of a *proof-of-concept* of OpenShift Operator based of th
 - [x] GitHub workflows
 - [x] Import `OpenShiftPipelinesAsCode` in here
 - [x] Rename `OpenShiftPipelinesAsCode` to `PipelinesAsCode`
+- [ ] Refactor `InstallerSet` code to not hardcode upstream `v1alpha1`
+      schema for types
 - [ ] Support watching/converting `OpenShiftPipelinesAsCode` to `PipelinesAsCode`
 - [ ] `Makefile`
 - [ ] Automated/scripted import payload (copy from tektoncd/operator)
