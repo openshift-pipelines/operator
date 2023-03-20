@@ -28,7 +28,6 @@ const (
 	enableMetricsKey                         = "enableMetrics"
 	enableMetricsDefaultValue                = "true"
 	openshiftDefaultDisableAffinityAssistant = true
-	openshiftDefaultEmbeddedStatus           = "full"
 	ospDefaultSA                             = "pipeline"
 )
 
@@ -103,10 +102,6 @@ func (p *Pipeline) setDefaults() {
 	if IsOpenShiftPlatform() {
 		p.openshiftDefaulting()
 	}
-
-	if p.EmbeddedStatus == "" {
-		p.EmbeddedStatus = config.DefaultEmbeddedStatus
-	}
 }
 
 func (p *Pipeline) openshiftDefaulting() {
@@ -116,10 +111,6 @@ func (p *Pipeline) openshiftDefaulting() {
 
 	if p.DisableAffinityAssistant == nil {
 		p.DisableAffinityAssistant = ptr.Bool(openshiftDefaultDisableAffinityAssistant)
-	}
-
-	if p.EmbeddedStatus == "" {
-		p.EmbeddedStatus = openshiftDefaultEmbeddedStatus
 	}
 
 	// Add params with default values if not defined by user
