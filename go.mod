@@ -15,7 +15,7 @@ require (
 	github.com/tektoncd/operator v0.65.1
 	github.com/tektoncd/pipeline v0.44.0
 	github.com/tektoncd/plumbing v0.0.0-20230309231045-dbb204980ea8
-	github.com/tektoncd/triggers v0.23.0
+	github.com/tektoncd/triggers v0.23.1
 	go.uber.org/zap v1.24.0
 	gomodules.xyz/jsonpatch/v2 v2.2.0
 	gotest.tools/v3 v3.4.0
@@ -24,7 +24,7 @@ require (
 	k8s.io/apimachinery v0.26.1
 	k8s.io/client-go v0.26.1
 	k8s.io/code-generator v0.26.1
-	knative.dev/pkg v0.0.0-20230221145627-8efb3485adcf
+	knative.dev/pkg v0.0.0-20230224205330-75da922ef055
 	sigs.k8s.io/controller-runtime v0.14.5
 	sigs.k8s.io/yaml v1.3.0
 )
