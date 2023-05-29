@@ -36,22 +36,19 @@ func filterAndTransform(extension common.Extension) client.FilterAndTransform {
 		trigger := comp.(*v1alpha1.TektonTrigger)
 		triggerImages := common.ToLowerCaseKeys(common.ImagesFromEnv(common.TriggersImagePrefix))
 
-		filteredManifest := manifest.Filter(mf.Not(mf.ByKind("PodSecurityPolicy")))
-
 		// adding extension's transformers first to run them before `extra` transformers
 		trns := extension.Transformers(trigger)
 		extra := []mf.Transformer{
 			common.InjectOperandNameLabelOverwriteExisting(v1alpha1.OperandTektoncdTriggers),
 			common.AddConfigMapValues(ConfigDefaults, trigger.Spec.OptionalTriggersProperties),
 			common.AddConfigMapValues(FeatureFlag, trigger.Spec.TriggersProperties),
-			common.ApplyProxySettings,
 			common.DeploymentImages(triggerImages),
 			common.AddConfiguration(trigger.Spec.Config),
 		}
 		trns = append(trns, extra...)
-		if err := common.Transform(ctx, &filteredManifest, trigger, trns...); err != nil {
+		if err := common.Transform(ctx, manifest, trigger, trns...); err != nil {
 			return nil, err
 		}
-		return &filteredManifest, nil
+		return manifest, nil
 	}
 }

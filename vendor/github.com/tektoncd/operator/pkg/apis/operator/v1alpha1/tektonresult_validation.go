@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Tekton Authors
+Copyright 2023 The Tekton Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,17 +18,21 @@ package v1alpha1
 
 import (
 	"context"
+	"fmt"
 
 	"knative.dev/pkg/apis"
 )
 
-var _ apis.Defaultable = (*PipelineResource)(nil)
+func (tp *TektonResult) Validate(ctx context.Context) (errs *apis.FieldError) {
 
-// SetDefaults implements api.Defaultable
-func (t *PipelineResource) SetDefaults(ctx context.Context) {
-	t.Spec.SetDefaults(ctx)
-}
+	if apis.IsInDelete(ctx) {
+		return nil
+	}
 
-// SetDefaults implements api.Defaultable
-func (ts *PipelineResourceSpec) SetDefaults(ctx context.Context) {
+	if tp.GetName() != ResultResourceName {
+		errMsg := fmt.Sprintf("metadata.name, Only one instance of TektonResult is allowed by name, %s", ResultResourceName)
+		return errs.Also(apis.ErrInvalidValue(tp.GetName(), errMsg))
+	}
+
+	return nil
 }
