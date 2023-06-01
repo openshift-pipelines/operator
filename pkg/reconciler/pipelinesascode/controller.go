@@ -20,9 +20,8 @@ import (
 	"context"
 
 	"github.com/openshift-pipelines/operator/pkg/apis/operator/v1alpha1"
-	// tektonoperatorv1alpha1 "github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 	tektonoperatorclient "github.com/tektoncd/operator/pkg/client/injection/client"
-	pacInformer "github.com/openshift-pipelines/operator/pkg/client/injection/informers/operator/v1alpha1/pipelinesascode"	
+	pacInformer "github.com/openshift-pipelines/operator/pkg/client/injection/informers/operator/v1alpha1/pipelinesascode"
 	tektonInstallerinformer "github.com/tektoncd/operator/pkg/client/injection/informers/operator/v1alpha1/tektoninstallerset"
 	tektonPipelineinformer "github.com/tektoncd/operator/pkg/client/injection/informers/operator/v1alpha1/tektonpipeline"
 	pacreconciler "github.com/openshift-pipelines/operator/pkg/client/injection/reconciler/operator/v1alpha1/pipelinesascode"
