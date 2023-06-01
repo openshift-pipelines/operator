@@ -25,6 +25,7 @@ import (
 	clientset "github.com/tektoncd/operator/pkg/client/clientset/versioned"
 	tektonConfigreconciler "github.com/tektoncd/operator/pkg/client/injection/reconciler/operator/v1alpha1/tektonconfig"
 	"github.com/tektoncd/operator/pkg/reconciler/common"
+	"github.com/tektoncd/operator/pkg/reconciler/shared/tektonconfig/chain"
 	"github.com/tektoncd/operator/pkg/reconciler/shared/tektonconfig/pipeline"
 	"github.com/tektoncd/operator/pkg/reconciler/shared/tektonconfig/trigger"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -66,9 +67,26 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, original *v1alpha1.Tekton
 		if err := trigger.EnsureTektonTriggerCRNotExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonTriggers()); err != nil {
 			return err
 		}
+		if err := chain.EnsureTektonChainCRNotExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonChains()); err != nil {
+			return err
+		}
 		if err := pipeline.EnsureTektonPipelineCRNotExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonPipelines()); err != nil {
 			return err
 		}
+	}
+
+	// remove pruner tektonInstallerSet
+	labelSelector, err := common.LabelSelector(prunerInstallerSetLabel)
+	if err != nil {
+		return err
+	}
+	if err := r.operatorClientSet.OperatorV1alpha1().TektonInstallerSets().DeleteCollection(
+		ctx,
+		metav1.DeleteOptions{},
+		metav1.ListOptions{LabelSelector: labelSelector},
+	); err != nil {
+		logger.Error("failed to delete pruner installerSet", err)
+		return err
 	}
 
 	return nil
@@ -129,11 +147,32 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tc *v1alpha1.TektonConfi
 		if _, err := trigger.EnsureTektonTriggerExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonTriggers(), tektontrigger); err != nil {
 			tc.Status.MarkComponentNotReady(fmt.Sprintf("TektonTrigger: %s", err.Error()))
 			return v1alpha1.REQUEUE_EVENT_AFTER
+
 		}
+
+		tektonchain := chain.GetTektonChainCR(tc)
+		if _, err := chain.EnsureTektonChainExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonChains(), tektonchain); err != nil {
+			tc.Status.MarkComponentNotReady(fmt.Sprintf("TektonChain: %s", err.Error()))
+			return v1alpha1.REQUEUE_EVENT_AFTER
+		}
+
 	} else {
 		if err := trigger.EnsureTektonTriggerCRNotExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonTriggers()); err != nil {
 			tc.Status.MarkComponentNotReady(fmt.Sprintf("TektonTrigger: %s", err.Error()))
 			return v1alpha1.REQUEUE_EVENT_AFTER
+		}
+
+		if err := chain.EnsureTektonChainCRNotExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonChains()); err != nil {
+			tc.Status.MarkComponentNotReady(fmt.Sprintf("TektonChain: %s", err.Error()))
+			return v1alpha1.REQUEUE_EVENT_AFTER
+		}
+	}
+
+	// reconcile pruner installerSet
+	if !tc.Spec.Pruner.Disabled {
+		err := r.reconcilePrunerInstallerSet(ctx, tc)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -251,10 +290,9 @@ func (r *Reconciler) addTargetNamespaceLabel(ctx context.Context, targetNamespac
 	}
 	labels := ns.GetLabels()
 	if labels == nil {
-		labels = map[string]string{
-			"operator.tekton.dev/targetNamespace": "true",
-		}
+		labels = map[string]string{}
 	}
+	labels["operator.tekton.dev/targetNamespace"] = "true"
 	ns.SetLabels(labels)
 	_, err = r.kubeClientSet.CoreV1().Namespaces().Update(ctx, ns, v1.UpdateOptions{})
 	return err
