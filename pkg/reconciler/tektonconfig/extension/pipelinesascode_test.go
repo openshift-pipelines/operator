@@ -22,8 +22,7 @@ import (
 
 	op "github.com/tektoncd/operator/pkg/client/clientset/versioned/typed/operator/v1alpha1"
 	"github.com/tektoncd/operator/pkg/reconciler/shared/tektonconfig/pipeline"
-
-	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
+	tektonoperatorv1alpha1 "github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 	"github.com/tektoncd/operator/pkg/client/injection/client/fake"
 	util "github.com/tektoncd/operator/pkg/reconciler/common/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,7 +90,7 @@ func TestEnsurePipelinesAsCodeCRNotExists(t *testing.T) {
 
 func markOPACReady(t *testing.T, ctx context.Context, c op.OpenShiftPipelinesAsCodeInterface) {
 	t.Helper()
-	opac, err := c.Get(ctx, v1alpha1.OpenShiftPipelinesAsCodeName, metav1.GetOptions{})
+	opac, err := c.Get(ctx, tektonoperatorv1alpha1.OpenShiftPipelinesAsCodeName, metav1.GetOptions{})
 	util.AssertEqual(t, err, nil)
 	opac.Status.MarkDependenciesInstalled()
 	opac.Status.MarkPreReconcilerComplete()
