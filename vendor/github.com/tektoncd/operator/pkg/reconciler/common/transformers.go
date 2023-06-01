@@ -29,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"knative.dev/pkg/logging"
@@ -43,6 +44,7 @@ const (
 	AddonsImagePrefix             = "IMAGE_ADDONS_"
 	PacImagePrefix                = "IMAGE_PAC_"
 	ChainsImagePrefix             = "IMAGE_CHAINS_"
+	ResultsImagePrefix            = "IMAGE_RESULTS_"
 	HubImagePrefix                = "IMAGE_HUB_"
 
 	ArgPrefix   = "arg_"
@@ -530,10 +532,13 @@ func AddConfigMapValues(configMapName string, prop interface{}) mf.Transformer {
 				if !innerElem.IsValid() {
 					continue
 				}
+
 				if innerElem.Kind() == reflect.Bool {
 					cm.Data[key] = strconv.FormatBool(innerElem.Bool())
 				} else if innerElem.Kind() == reflect.Uint {
 					cm.Data[key] = strconv.FormatUint(innerElem.Uint(), 10)
+				} else if innerElem.Kind() == reflect.String {
+					cm.Data[key] = innerElem.String()
 				}
 				continue
 			}
@@ -804,6 +809,47 @@ func ReplaceDeploymentArg(deploymentName, existingArg, newArg string) mf.Transfo
 			return err
 		}
 		u.SetUnstructuredContent(unstrObj)
+		return nil
+	}
+}
+
+// replaces the namespace in serviceAccount
+func ReplaceNamespaceInServiceAccount(targetNamespace string) mf.Transformer {
+	return func(u *unstructured.Unstructured) error {
+		if u.GetKind() != "ServiceAccount" {
+			return nil
+		}
+
+		// update namespace
+		u.SetNamespace(targetNamespace)
+
+		return nil
+	}
+}
+
+// replaces the namespace in clusterRoleBinding
+func ReplaceNamespaceInClusterRoleBinding(targetNamespace string) mf.Transformer {
+	return func(u *unstructured.Unstructured) error {
+		if u.GetKind() != "ClusterRoleBinding" {
+			return nil
+		}
+
+		crb := &rbacv1.ClusterRoleBinding{}
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, crb)
+		if err != nil {
+			return err
+		}
+
+		// update namespace
+		for index := range crb.Subjects {
+			crb.Subjects[index].Namespace = targetNamespace
+		}
+
+		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(crb)
+		if err != nil {
+			return err
+		}
+		u.SetUnstructuredContent(obj)
 		return nil
 	}
 }

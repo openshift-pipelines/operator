@@ -54,6 +54,10 @@ const (
 	Reinstalling   = "reinstalling"
 
 	RequeueDelay = 10 * time.Second
+
+	// pruner default schedule, used in auto generate tektonConfig
+	PrunerDefaultSchedule = "0 8 * * *"
+	PrunerDefaultKeep     = uint(100)
 )
 
 var (
@@ -90,6 +94,11 @@ var (
 		"pipelinerun",
 	}
 
+	// pruner default resource, used in auto generate tektonConfig
+	PruningDefaultResources = []string{
+		"pipelinerun",
+	}
+
 	AddonParams = map[string]ParamValue{
 		ClusterTasksParam:      defaultParamValue,
 		PipelineTemplatesParam: defaultParamValue,
@@ -117,4 +126,5 @@ var (
 	ChainResourceName            = "chain"
 	OperandTektoncdChains        = "tektoncd-chains"
 	OpenShiftPipelinesAsCodeName = "pipelines-as-code"
+	PrunerResourceName           = "tektoncd-pruner"
 )

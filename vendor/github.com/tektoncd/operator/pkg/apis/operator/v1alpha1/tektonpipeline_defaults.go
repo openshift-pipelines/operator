@@ -28,7 +28,6 @@ const (
 	enableMetricsKey                         = "enableMetrics"
 	enableMetricsDefaultValue                = "true"
 	openshiftDefaultDisableAffinityAssistant = true
-	openshiftDefaultEmbeddedStatus           = "full"
 	ospDefaultSA                             = "pipeline"
 )
 
@@ -62,9 +61,15 @@ func (p *Pipeline) setDefaults() {
 	if p.EnableApiFields == "" {
 		p.EnableApiFields = config.DefaultEnableAPIFields
 	}
-	if p.VerificationMode == "" {
-		p.VerificationMode = config.DefaultResourceVerificationMode
+
+	// "verification-mode" is deprecated and never used.
+	// this field will be removed, see https://github.com/tektoncd/operator/issues/1497
+	p.VerificationMode = ""
+
+	if p.VerificationNoMatchPolicy == "" {
+		p.VerificationNoMatchPolicy = config.DefaultNoMatchPolicyConfig
 	}
+
 	if p.EnableProvenanceInStatus == nil {
 		p.EnableProvenanceInStatus = ptr.Bool(config.DefaultEnableProvenanceInStatus)
 	}
@@ -103,10 +108,6 @@ func (p *Pipeline) setDefaults() {
 	if IsOpenShiftPlatform() {
 		p.openshiftDefaulting()
 	}
-
-	if p.EmbeddedStatus == "" {
-		p.EmbeddedStatus = config.DefaultEmbeddedStatus
-	}
 }
 
 func (p *Pipeline) openshiftDefaulting() {
@@ -116,10 +117,6 @@ func (p *Pipeline) openshiftDefaulting() {
 
 	if p.DisableAffinityAssistant == nil {
 		p.DisableAffinityAssistant = ptr.Bool(openshiftDefaultDisableAffinityAssistant)
-	}
-
-	if p.EmbeddedStatus == "" {
-		p.EmbeddedStatus = openshiftDefaultEmbeddedStatus
 	}
 
 	// Add params with default values if not defined by user
