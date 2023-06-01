@@ -36,12 +36,12 @@ type OpenShiftPipelinesAsCode struct {
 }
 
 // GetSpec implements TektonComponent
-func (pac *OpenShiftPipelinesAsCode) GetSpec() TektonComponentSpec {
+func (pac *OpenShiftPipelinesAsCode) GetSpec() tektonoperatorv1alpha1.TektonComponentSpec {
 	return &pac.Spec
 }
 
 // GetStatus implements TektonComponent
-func (pac *OpenShiftPipelinesAsCode) GetStatus() TektonComponentStatus {
+func (pac *OpenShiftPipelinesAsCode) GetStatus() tektonoperatorv1alpha1.TektonComponentStatus {
 	return &pac.Status
 }
 
