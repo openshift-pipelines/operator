@@ -31,7 +31,7 @@ import (
 
 const (
 	ControllerTektonAddon              platform.ControllerName = "tektonaddon"
-	ControllerPipelinesAsCode          platform.ControllerName = "pipelinesascode"
+	ControllerPipelinesAsCode platform.ControllerName = "openshiftpipelinesascode"
 	PlatformNameOpenShift              string                  = "openshift"
 )
 
