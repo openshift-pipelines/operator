@@ -18,7 +18,7 @@ package openshiftplatform
 
 import (
 	k8sInstallerSet "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektoninstallerset"
-	"github.com/openshift-pipelines/operator/pkg/reconciler/pipelinesascode"
+	"github.com/openshift-pipelines/operator/pkg/reconciler/openshiftpipelinesascode"
 	openshiftAddon "github.com/openshift-pipelines/operator/pkg/reconciler/tektonaddon"
 	openshiftChain "github.com/openshift-pipelines/operator/pkg/reconciler/tektonchain"
 	openshiftConfig "github.com/openshift-pipelines/operator/pkg/reconciler/tektonconfig"
@@ -31,7 +31,7 @@ import (
 
 const (
 	ControllerTektonAddon              platform.ControllerName = "tektonaddon"
-	ControllerPipelinesAsCode platform.ControllerName = "openshiftpipelinesascode"
+	ControllerOpenShiftPipelinesAsCode platform.ControllerName = "openshiftpipelinesascode"
 	PlatformNameOpenShift              string                  = "openshift"
 )
 
@@ -63,9 +63,9 @@ var (
 			Name:                  string(ControllerTektonAddon),
 			ControllerConstructor: openshiftAddon.NewController,
 		},
-		ControllerPipelinesAsCode: injection.NamedControllerConstructor{
-			Name:                  string(ControllerPipelinesAsCode),
-			ControllerConstructor: pipelinesascode.NewController,
+		ControllerOpenShiftPipelinesAsCode: injection.NamedControllerConstructor{
+			Name:                  string(ControllerOpenShiftPipelinesAsCode),
+			ControllerConstructor: openshiftpipelinesascode.NewController,
 		},
 		// there is no openshift specific extension for TektonInstallerSet Reconciler (yet 🤓)
 		platform.ControllerTektonInstallerSet: injection.NamedControllerConstructor{

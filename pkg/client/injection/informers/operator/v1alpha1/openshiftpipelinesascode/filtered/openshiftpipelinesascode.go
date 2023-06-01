@@ -55,7 +55,7 @@ func withInformer(ctx context.Context) (context.Context, []controller.Informer) 
 	infs := []controller.Informer{}
 	for _, selector := range labelSelectors {
 		f := filtered.Get(ctx, selector)
-		inf := f.Operator().V1alpha1().PipelinesAsCodes()
+		inf := f.Operator().V1alpha1().OpenShiftPipelinesAsCodes()
 		ctx = context.WithValue(ctx, Key{Selector: selector}, inf)
 		infs = append(infs, inf.Informer())
 	}
@@ -77,13 +77,13 @@ func withDynamicInformer(ctx context.Context) context.Context {
 }
 
 // Get extracts the typed informer from the context.
-func Get(ctx context.Context, selector string) v1alpha1.PipelinesAsCodeInformer {
+func Get(ctx context.Context, selector string) v1alpha1.OpenShiftPipelinesAsCodeInformer {
 	untyped := ctx.Value(Key{Selector: selector})
 	if untyped == nil {
 		logging.FromContext(ctx).Panicf(
-			"Unable to fetch github.com/openshift-pipelines/operator/pkg/client/informers/externalversions/operator/v1alpha1.PipelinesAsCodeInformer with selector %s from context.", selector)
+			"Unable to fetch github.com/openshift-pipelines/operator/pkg/client/informers/externalversions/operator/v1alpha1.OpenShiftPipelinesAsCodeInformer with selector %s from context.", selector)
 	}
-	return untyped.(v1alpha1.PipelinesAsCodeInformer)
+	return untyped.(v1alpha1.OpenShiftPipelinesAsCodeInformer)
 }
 
 type wrapper struct {
@@ -92,24 +92,24 @@ type wrapper struct {
 	selector string
 }
 
-var _ v1alpha1.PipelinesAsCodeInformer = (*wrapper)(nil)
-var _ operatorv1alpha1.PipelinesAsCodeLister = (*wrapper)(nil)
+var _ v1alpha1.OpenShiftPipelinesAsCodeInformer = (*wrapper)(nil)
+var _ operatorv1alpha1.OpenShiftPipelinesAsCodeLister = (*wrapper)(nil)
 
 func (w *wrapper) Informer() cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformer(nil, &apisoperatorv1alpha1.PipelinesAsCode{}, 0, nil)
+	return cache.NewSharedIndexInformer(nil, &apisoperatorv1alpha1.OpenShiftPipelinesAsCode{}, 0, nil)
 }
 
-func (w *wrapper) Lister() operatorv1alpha1.PipelinesAsCodeLister {
+func (w *wrapper) Lister() operatorv1alpha1.OpenShiftPipelinesAsCodeLister {
 	return w
 }
 
-func (w *wrapper) List(selector labels.Selector) (ret []*apisoperatorv1alpha1.PipelinesAsCode, err error) {
+func (w *wrapper) List(selector labels.Selector) (ret []*apisoperatorv1alpha1.OpenShiftPipelinesAsCode, err error) {
 	reqs, err := labels.ParseToRequirements(w.selector)
 	if err != nil {
 		return nil, err
 	}
 	selector = selector.Add(reqs...)
-	lo, err := w.client.OperatorV1alpha1().PipelinesAsCodes().List(context.TODO(), v1.ListOptions{
+	lo, err := w.client.OperatorV1alpha1().OpenShiftPipelinesAsCodes().List(context.TODO(), v1.ListOptions{
 		LabelSelector: selector.String(),
 		// TODO(mattmoor): Incorporate resourceVersion bounds based on staleness criteria.
 	})
@@ -122,9 +122,9 @@ func (w *wrapper) List(selector labels.Selector) (ret []*apisoperatorv1alpha1.Pi
 	return ret, nil
 }
 
-func (w *wrapper) Get(name string) (*apisoperatorv1alpha1.PipelinesAsCode, error) {
+func (w *wrapper) Get(name string) (*apisoperatorv1alpha1.OpenShiftPipelinesAsCode, error) {
 	// TODO(mattmoor): Check that the fetched object matches the selector.
-	return w.client.OperatorV1alpha1().PipelinesAsCodes().Get(context.TODO(), name, v1.GetOptions{
+	return w.client.OperatorV1alpha1().OpenShiftPipelinesAsCodes().Get(context.TODO(), name, v1.GetOptions{
 		// TODO(mattmoor): Incorporate resourceVersion bounds based on staleness criteria.
 	})
 }

@@ -28,7 +28,7 @@ import (
 
 type OperatorV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	PipelinesAsCodesGetter
+	OpenShiftPipelinesAsCodesGetter
 }
 
 // OperatorV1alpha1Client is used to interact with features provided by the operator.openshift-pipelines.org group.
@@ -36,8 +36,8 @@ type OperatorV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *OperatorV1alpha1Client) PipelinesAsCodes() PipelinesAsCodeInterface {
-	return newPipelinesAsCodes(c)
+func (c *OperatorV1alpha1Client) OpenShiftPipelinesAsCodes() OpenShiftPipelinesAsCodeInterface {
+	return newOpenShiftPipelinesAsCodes(c)
 }
 
 // NewForConfig creates a new OperatorV1alpha1Client for the given config.

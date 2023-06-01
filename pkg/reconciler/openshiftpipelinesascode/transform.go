@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pipelinesascode
+package openshiftpipelinesascode
 
 import (
 	"context"
 
 	mf "github.com/manifestival/manifestival"
-	tektonoperatorv1alpha1 "github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
-	"github.com/openshift-pipelines/operator/pkg/apis/operator/v1alpha1"
+	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 	"github.com/tektoncd/operator/pkg/reconciler/common"
 	"github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektoninstallerset/client"
 	openshift "github.com/openshift-pipelines/operator/pkg/reconciler"
@@ -31,8 +30,8 @@ import (
 const pipelinesAsCodeCM = "pipelines-as-code"
 
 func filterAndTransform(extension common.Extension) client.FilterAndTransform {
-	return func(ctx context.Context, manifest *mf.Manifest, comp tektonoperatorv1alpha1.TektonComponent) (*mf.Manifest, error) {
-		pac := comp.(*v1alpha1.PipelinesAsCode)
+	return func(ctx context.Context, manifest *mf.Manifest, comp v1alpha1.TektonComponent) (*mf.Manifest, error) {
+		pac := comp.(*v1alpha1.OpenShiftPipelinesAsCode)
 		// installerSet adds it's owner as namespace's owner
 		// so deleting tekton addon deletes target namespace too
 		// to skip it we filter out namespace

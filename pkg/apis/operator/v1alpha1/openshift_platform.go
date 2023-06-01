@@ -19,10 +19,10 @@ package v1alpha1
 type OpenShift struct {
 	// PipelinesAsCode allows configuring PipelinesAsCode configurations
 	// +optional
-	PipelinesAsCode *PipelinesAsCodeConfig `json:"pipelinesAsCode,omitempty"`
+	PipelinesAsCode *PipelinesAsCode `json:"pipelinesAsCode,omitempty"`
 }
 
-type PipelinesAsCodeConfig struct {
+type PipelinesAsCode struct {
 	// Enable or disable pipelines as code by changing this bool
 	// +optional
 	Enable *bool `json:"enable,omitempty"`

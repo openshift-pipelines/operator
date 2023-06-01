@@ -22,7 +22,7 @@ import (
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params/settings"
 )
 
-func (pac *PipelinesAsCode) SetDefaults(ctx context.Context) {
+func (pac *OpenShiftPipelinesAsCode) SetDefaults(ctx context.Context) {
 	if pac.Spec.PACSettings.Settings == nil {
 		pac.Spec.PACSettings.Settings = map[string]string{}
 	}

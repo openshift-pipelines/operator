@@ -22,12 +22,12 @@ import (
 	context "context"
 
 	fake "github.com/openshift-pipelines/operator/pkg/client/injection/informers/factory/fake"
-	pipelinesascode "github.com/openshift-pipelines/operator/pkg/client/injection/informers/operator/v1alpha1/pipelinesascode"
+	openshiftpipelinesascode "github.com/openshift-pipelines/operator/pkg/client/injection/informers/operator/v1alpha1/openshiftpipelinesascode"
 	controller "knative.dev/pkg/controller"
 	injection "knative.dev/pkg/injection"
 )
 
-var Get = pipelinesascode.Get
+var Get = openshiftpipelinesascode.Get
 
 func init() {
 	injection.Fake.RegisterInformer(withInformer)
@@ -35,6 +35,6 @@ func init() {
 
 func withInformer(ctx context.Context) (context.Context, controller.Informer) {
 	f := fake.Get(ctx)
-	inf := f.Operator().V1alpha1().PipelinesAsCodes()
-	return context.WithValue(ctx, pipelinesascode.Key{}, inf), inf.Informer()
+	inf := f.Operator().V1alpha1().OpenShiftPipelinesAsCodes()
+	return context.WithValue(ctx, openshiftpipelinesascode.Key{}, inf), inf.Informer()
 }

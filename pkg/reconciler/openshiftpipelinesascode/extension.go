@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pipelinesascode
+package openshiftpipelinesascode
 
 import (
 	"context"
@@ -23,8 +23,7 @@ import (
 
 	mfc "github.com/manifestival/client-go-client"
 	mf "github.com/manifestival/manifestival"
-	tektonoperatorv1alpha1 "github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
-	"github.com/openshift-pipelines/operator/pkg/apis/operator/v1alpha1"
+	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 	operatorclient "github.com/tektoncd/operator/pkg/client/injection/client"
 	"github.com/tektoncd/operator/pkg/reconciler/common"
 	"github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektoninstallerset/client"
@@ -68,7 +67,7 @@ func OpenShiftExtension(ctx context.Context) common.Extension {
 	return openshiftExtension{
 		// component version is used for metrics, passing a dummy
 		// value through extension not going to affect execution
-		installerSetClient:   client.NewInstallerSetClient(tisClient, operatorVer, "pipelines-as-code-ext", v1alpha1.KindPipelinesAsCode, nil),
+		installerSetClient:   client.NewInstallerSetClient(tisClient, operatorVer, "pipelines-as-code-ext", v1alpha1.KindOpenShiftPipelinesAsCode, nil),
 		pacManifest:          &pacManifest,
 		pipelineRunTemplates: prTemplates,
 	}
@@ -80,13 +79,13 @@ type openshiftExtension struct {
 	pipelineRunTemplates *mf.Manifest
 }
 
-func (oe openshiftExtension) Transformers(comp tektonoperatorv1alpha1.TektonComponent) []mf.Transformer {
+func (oe openshiftExtension) Transformers(comp v1alpha1.TektonComponent) []mf.Transformer {
 	return nil
 }
-func (oe openshiftExtension) PreReconcile(context.Context, tektonoperatorv1alpha1.TektonComponent) error {
+func (oe openshiftExtension) PreReconcile(context.Context, v1alpha1.TektonComponent) error {
 	return nil
 }
-func (oe openshiftExtension) PostReconcile(ctx context.Context, comp tektonoperatorv1alpha1.TektonComponent) error {
+func (oe openshiftExtension) PostReconcile(ctx context.Context, comp v1alpha1.TektonComponent) error {
 	logger := logging.FromContext(ctx)
 
 	if err := oe.installerSetClient.PostSet(ctx, comp, oe.pipelineRunTemplates, extFilterAndTransform()); err != nil {
@@ -100,12 +99,12 @@ func (oe openshiftExtension) PostReconcile(ctx context.Context, comp tektonopera
 	}
 	return nil
 }
-func (oe openshiftExtension) Finalize(context.Context, tektonoperatorv1alpha1.TektonComponent) error {
+func (oe openshiftExtension) Finalize(context.Context, v1alpha1.TektonComponent) error {
 	return nil
 }
 
 func extFilterAndTransform() client.FilterAndTransform {
-	return func(ctx context.Context, manifest *mf.Manifest, comp tektonoperatorv1alpha1.TektonComponent) (*mf.Manifest, error) {
+	return func(ctx context.Context, manifest *mf.Manifest, comp v1alpha1.TektonComponent) (*mf.Manifest, error) {
 		prTemplates, err := manifest.Transform(mf.InjectNamespace(openshiftNS))
 		if err != nil {
 			return nil, err

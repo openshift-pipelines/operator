@@ -24,8 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// PipelinesAsCodes returns a PipelinesAsCodeInformer.
-	PipelinesAsCodes() PipelinesAsCodeInformer
+	// OpenShiftPipelinesAsCodes returns a OpenShiftPipelinesAsCodeInformer.
+	OpenShiftPipelinesAsCodes() OpenShiftPipelinesAsCodeInformer
 }
 
 type version struct {
@@ -39,7 +39,7 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// PipelinesAsCodes returns a PipelinesAsCodeInformer.
-func (v *version) PipelinesAsCodes() PipelinesAsCodeInformer {
-	return &pipelinesAsCodeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+// OpenShiftPipelinesAsCodes returns a OpenShiftPipelinesAsCodeInformer.
+func (v *version) OpenShiftPipelinesAsCodes() OpenShiftPipelinesAsCodeInformer {
+	return &openShiftPipelinesAsCodeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
