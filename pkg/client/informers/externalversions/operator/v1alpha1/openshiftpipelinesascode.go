@@ -32,58 +32,58 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// PipelinesAsCodeInformer provides access to a shared informer and lister for
-// PipelinesAsCodes.
-type PipelinesAsCodeInformer interface {
+// OpenShiftPipelinesAsCodeInformer provides access to a shared informer and lister for
+// OpenShiftPipelinesAsCodes.
+type OpenShiftPipelinesAsCodeInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.PipelinesAsCodeLister
+	Lister() v1alpha1.OpenShiftPipelinesAsCodeLister
 }
 
-type pipelinesAsCodeInformer struct {
+type openShiftPipelinesAsCodeInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
-// NewPipelinesAsCodeInformer constructs a new informer for PipelinesAsCode type.
+// NewOpenShiftPipelinesAsCodeInformer constructs a new informer for OpenShiftPipelinesAsCode type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewPipelinesAsCodeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredPipelinesAsCodeInformer(client, resyncPeriod, indexers, nil)
+func NewOpenShiftPipelinesAsCodeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredOpenShiftPipelinesAsCodeInformer(client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredPipelinesAsCodeInformer constructs a new informer for PipelinesAsCode type.
+// NewFilteredOpenShiftPipelinesAsCodeInformer constructs a new informer for OpenShiftPipelinesAsCode type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredPipelinesAsCodeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredOpenShiftPipelinesAsCodeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.OperatorV1alpha1().PipelinesAsCodes().List(context.TODO(), options)
+				return client.OperatorV1alpha1().OpenShiftPipelinesAsCodes().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.OperatorV1alpha1().PipelinesAsCodes().Watch(context.TODO(), options)
+				return client.OperatorV1alpha1().OpenShiftPipelinesAsCodes().Watch(context.TODO(), options)
 			},
 		},
-		&operatorv1alpha1.PipelinesAsCode{},
+		&operatorv1alpha1.OpenShiftPipelinesAsCode{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *pipelinesAsCodeInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPipelinesAsCodeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *openShiftPipelinesAsCodeInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredOpenShiftPipelinesAsCodeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *pipelinesAsCodeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&operatorv1alpha1.PipelinesAsCode{}, f.defaultInformer)
+func (f *openShiftPipelinesAsCodeInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&operatorv1alpha1.OpenShiftPipelinesAsCode{}, f.defaultInformer)
 }
 
-func (f *pipelinesAsCodeInformer) Lister() v1alpha1.PipelinesAsCodeLister {
-	return v1alpha1.NewPipelinesAsCodeLister(f.Informer().GetIndexer())
+func (f *openShiftPipelinesAsCodeInformer) Lister() v1alpha1.OpenShiftPipelinesAsCodeLister {
+	return v1alpha1.NewOpenShiftPipelinesAsCodeLister(f.Informer().GetIndexer())
 }

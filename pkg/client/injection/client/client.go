@@ -111,27 +111,27 @@ func (w *wrapOperatorV1alpha1) RESTClient() rest.Interface {
 	panic("RESTClient called on dynamic client!")
 }
 
-func (w *wrapOperatorV1alpha1) PipelinesAsCodes() typedoperatorv1alpha1.PipelinesAsCodeInterface {
-	return &wrapOperatorV1alpha1PipelinesAsCodeImpl{
+func (w *wrapOperatorV1alpha1) OpenShiftPipelinesAsCodes() typedoperatorv1alpha1.OpenShiftPipelinesAsCodeInterface {
+	return &wrapOperatorV1alpha1OpenShiftPipelinesAsCodeImpl{
 		dyn: w.dyn.Resource(schema.GroupVersionResource{
 			Group:    "operator.openshift-pipelines.org",
 			Version:  "v1alpha1",
-			Resource: "pipelinesascodes",
+			Resource: "openshiftpipelinesascodes",
 		}),
 	}
 }
 
-type wrapOperatorV1alpha1PipelinesAsCodeImpl struct {
+type wrapOperatorV1alpha1OpenShiftPipelinesAsCodeImpl struct {
 	dyn dynamic.NamespaceableResourceInterface
 }
 
-var _ typedoperatorv1alpha1.PipelinesAsCodeInterface = (*wrapOperatorV1alpha1PipelinesAsCodeImpl)(nil)
+var _ typedoperatorv1alpha1.OpenShiftPipelinesAsCodeInterface = (*wrapOperatorV1alpha1OpenShiftPipelinesAsCodeImpl)(nil)
 
-func (w *wrapOperatorV1alpha1PipelinesAsCodeImpl) Create(ctx context.Context, in *v1alpha1.PipelinesAsCode, opts v1.CreateOptions) (*v1alpha1.PipelinesAsCode, error) {
+func (w *wrapOperatorV1alpha1OpenShiftPipelinesAsCodeImpl) Create(ctx context.Context, in *v1alpha1.OpenShiftPipelinesAsCode, opts v1.CreateOptions) (*v1alpha1.OpenShiftPipelinesAsCode, error) {
 	in.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "operator.openshift-pipelines.org",
 		Version: "v1alpha1",
-		Kind:    "PipelinesAsCode",
+		Kind:    "OpenShiftPipelinesAsCode",
 	})
 	uo := &unstructured.Unstructured{}
 	if err := convert(in, uo); err != nil {
@@ -141,62 +141,62 @@ func (w *wrapOperatorV1alpha1PipelinesAsCodeImpl) Create(ctx context.Context, in
 	if err != nil {
 		return nil, err
 	}
-	out := &v1alpha1.PipelinesAsCode{}
+	out := &v1alpha1.OpenShiftPipelinesAsCode{}
 	if err := convert(uo, out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (w *wrapOperatorV1alpha1PipelinesAsCodeImpl) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (w *wrapOperatorV1alpha1OpenShiftPipelinesAsCodeImpl) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return w.dyn.Delete(ctx, name, opts)
 }
 
-func (w *wrapOperatorV1alpha1PipelinesAsCodeImpl) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (w *wrapOperatorV1alpha1OpenShiftPipelinesAsCodeImpl) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	return w.dyn.DeleteCollection(ctx, opts, listOpts)
 }
 
-func (w *wrapOperatorV1alpha1PipelinesAsCodeImpl) Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.PipelinesAsCode, error) {
+func (w *wrapOperatorV1alpha1OpenShiftPipelinesAsCodeImpl) Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.OpenShiftPipelinesAsCode, error) {
 	uo, err := w.dyn.Get(ctx, name, opts)
 	if err != nil {
 		return nil, err
 	}
-	out := &v1alpha1.PipelinesAsCode{}
+	out := &v1alpha1.OpenShiftPipelinesAsCode{}
 	if err := convert(uo, out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (w *wrapOperatorV1alpha1PipelinesAsCodeImpl) List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.PipelinesAsCodeList, error) {
+func (w *wrapOperatorV1alpha1OpenShiftPipelinesAsCodeImpl) List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.OpenShiftPipelinesAsCodeList, error) {
 	uo, err := w.dyn.List(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
-	out := &v1alpha1.PipelinesAsCodeList{}
+	out := &v1alpha1.OpenShiftPipelinesAsCodeList{}
 	if err := convert(uo, out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (w *wrapOperatorV1alpha1PipelinesAsCodeImpl) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PipelinesAsCode, err error) {
+func (w *wrapOperatorV1alpha1OpenShiftPipelinesAsCodeImpl) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.OpenShiftPipelinesAsCode, err error) {
 	uo, err := w.dyn.Patch(ctx, name, pt, data, opts)
 	if err != nil {
 		return nil, err
 	}
-	out := &v1alpha1.PipelinesAsCode{}
+	out := &v1alpha1.OpenShiftPipelinesAsCode{}
 	if err := convert(uo, out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (w *wrapOperatorV1alpha1PipelinesAsCodeImpl) Update(ctx context.Context, in *v1alpha1.PipelinesAsCode, opts v1.UpdateOptions) (*v1alpha1.PipelinesAsCode, error) {
+func (w *wrapOperatorV1alpha1OpenShiftPipelinesAsCodeImpl) Update(ctx context.Context, in *v1alpha1.OpenShiftPipelinesAsCode, opts v1.UpdateOptions) (*v1alpha1.OpenShiftPipelinesAsCode, error) {
 	in.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "operator.openshift-pipelines.org",
 		Version: "v1alpha1",
-		Kind:    "PipelinesAsCode",
+		Kind:    "OpenShiftPipelinesAsCode",
 	})
 	uo := &unstructured.Unstructured{}
 	if err := convert(in, uo); err != nil {
@@ -206,18 +206,18 @@ func (w *wrapOperatorV1alpha1PipelinesAsCodeImpl) Update(ctx context.Context, in
 	if err != nil {
 		return nil, err
 	}
-	out := &v1alpha1.PipelinesAsCode{}
+	out := &v1alpha1.OpenShiftPipelinesAsCode{}
 	if err := convert(uo, out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (w *wrapOperatorV1alpha1PipelinesAsCodeImpl) UpdateStatus(ctx context.Context, in *v1alpha1.PipelinesAsCode, opts v1.UpdateOptions) (*v1alpha1.PipelinesAsCode, error) {
+func (w *wrapOperatorV1alpha1OpenShiftPipelinesAsCodeImpl) UpdateStatus(ctx context.Context, in *v1alpha1.OpenShiftPipelinesAsCode, opts v1.UpdateOptions) (*v1alpha1.OpenShiftPipelinesAsCode, error) {
 	in.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "operator.openshift-pipelines.org",
 		Version: "v1alpha1",
-		Kind:    "PipelinesAsCode",
+		Kind:    "OpenShiftPipelinesAsCode",
 	})
 	uo := &unstructured.Unstructured{}
 	if err := convert(in, uo); err != nil {
@@ -227,13 +227,13 @@ func (w *wrapOperatorV1alpha1PipelinesAsCodeImpl) UpdateStatus(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-	out := &v1alpha1.PipelinesAsCode{}
+	out := &v1alpha1.OpenShiftPipelinesAsCode{}
 	if err := convert(uo, out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (w *wrapOperatorV1alpha1PipelinesAsCodeImpl) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (w *wrapOperatorV1alpha1OpenShiftPipelinesAsCodeImpl) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return nil, errors.New("NYI: Watch")
 }

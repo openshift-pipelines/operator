@@ -19,93 +19,92 @@ package v1alpha1
 import (
 	"testing"
 
-	tektonoperatorv1alpha1 "github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apistest "knative.dev/pkg/apis/testing"
 )
 
-func TestPipelinesAsCodeGroupVersionKind(t *testing.T) {
-	r := &PipelinesAsCode{}
+func TestOpenShiftPipelinesAsCodeGroupVersionKind(t *testing.T) {
+	r := &OpenShiftPipelinesAsCode{}
 	want := schema.GroupVersionKind{
 		Group:   GroupName,
 		Version: SchemaVersion,
-		Kind:    KindPipelinesAsCode,
+		Kind:    KindOpenShiftPipelinesAsCode,
 	}
 	if got := r.GetGroupVersionKind(); got != want {
 		t.Errorf("got: %v, want: %v", got, want)
 	}
 }
 
-func TestPipelinesAsCodeHappyPath(t *testing.T) {
-	pac := &PipelinesAsCodeStatus{}
+func TestOpenShiftPipelinesAsCodeHappyPath(t *testing.T) {
+	pac := &OpenShiftPipelinesAsCodeStatus{}
 	pac.InitializeConditions()
 
-	apistest.CheckConditionOngoing(pac, tektonoperatorv1alpha1.DependenciesInstalled, t)
-	apistest.CheckConditionOngoing(pac, tektonoperatorv1alpha1.PreReconciler, t)
-	apistest.CheckConditionOngoing(pac, tektonoperatorv1alpha1.InstallerSetAvailable, t)
-	apistest.CheckConditionOngoing(pac, tektonoperatorv1alpha1.InstallerSetReady, t)
-	apistest.CheckConditionOngoing(pac, tektonoperatorv1alpha1.PostReconciler, t)
+	apistest.CheckConditionOngoing(pac, DependenciesInstalled, t)
+	apistest.CheckConditionOngoing(pac, PreReconciler, t)
+	apistest.CheckConditionOngoing(pac, InstallerSetAvailable, t)
+	apistest.CheckConditionOngoing(pac, InstallerSetReady, t)
+	apistest.CheckConditionOngoing(pac, PostReconciler, t)
 
 	// Dependencies installed
 	pac.MarkDependenciesInstalled()
-	apistest.CheckConditionSucceeded(pac, tektonoperatorv1alpha1.DependenciesInstalled, t)
+	apistest.CheckConditionSucceeded(pac, DependenciesInstalled, t)
 
 	// Pre reconciler completes execution
 	pac.MarkPreReconcilerComplete()
-	apistest.CheckConditionSucceeded(pac, tektonoperatorv1alpha1.PreReconciler, t)
+	apistest.CheckConditionSucceeded(pac, PreReconciler, t)
 
 	// Installer set created
 	pac.MarkInstallerSetAvailable()
-	apistest.CheckConditionSucceeded(pac, tektonoperatorv1alpha1.InstallerSetAvailable, t)
+	apistest.CheckConditionSucceeded(pac, InstallerSetAvailable, t)
 
 	// InstallerSet is not ready when deployment pods are not up
 	pac.MarkInstallerSetNotReady("waiting for deployments")
-	apistest.CheckConditionFailed(pac, tektonoperatorv1alpha1.InstallerSetReady, t)
+	apistest.CheckConditionFailed(pac, InstallerSetReady, t)
 
 	// InstallerSet and then PostReconciler become ready and we're good.
 	pac.MarkInstallerSetReady()
-	apistest.CheckConditionSucceeded(pac, tektonoperatorv1alpha1.InstallerSetReady, t)
+	apistest.CheckConditionSucceeded(pac, InstallerSetReady, t)
 
 	pac.MarkPostReconcilerComplete()
-	apistest.CheckConditionSucceeded(pac, tektonoperatorv1alpha1.PostReconciler, t)
+	apistest.CheckConditionSucceeded(pac, PostReconciler, t)
 
 	if ready := pac.IsReady(); !ready {
 		t.Errorf("pac.IsReady() = %v, want true", ready)
 	}
 }
 
-func TestPipelinesAsCodeErrorPath(t *testing.T) {
-	pac := &PipelinesAsCodeStatus{}
+func TestOpenShiftPipelinesAsCodeErrorPath(t *testing.T) {
+	pac := &OpenShiftPipelinesAsCodeStatus{}
 	pac.InitializeConditions()
 
-	apistest.CheckConditionOngoing(pac, tektonoperatorv1alpha1.DependenciesInstalled, t)
-	apistest.CheckConditionOngoing(pac, tektonoperatorv1alpha1.PreReconciler, t)
-	apistest.CheckConditionOngoing(pac, tektonoperatorv1alpha1.InstallerSetAvailable, t)
-	apistest.CheckConditionOngoing(pac, tektonoperatorv1alpha1.InstallerSetReady, t)
-	apistest.CheckConditionOngoing(pac, tektonoperatorv1alpha1.PostReconciler, t)
+	apistest.CheckConditionOngoing(pac, DependenciesInstalled, t)
+	apistest.CheckConditionOngoing(pac, PreReconciler, t)
+	apistest.CheckConditionOngoing(pac, InstallerSetAvailable, t)
+	apistest.CheckConditionOngoing(pac, InstallerSetReady, t)
+	apistest.CheckConditionOngoing(pac, PostReconciler, t)
 
 	// Dependencies installed
 	pac.MarkDependenciesInstalled()
-	apistest.CheckConditionSucceeded(pac, tektonoperatorv1alpha1.DependenciesInstalled, t)
+	apistest.CheckConditionSucceeded(pac, DependenciesInstalled, t)
 
 	// Pre reconciler completes execution
 	pac.MarkPreReconcilerComplete()
-	apistest.CheckConditionSucceeded(pac, tektonoperatorv1alpha1.PreReconciler, t)
+	apistest.CheckConditionSucceeded(pac, PreReconciler, t)
 
 	// Installer set created
 	pac.MarkInstallerSetAvailable()
-	apistest.CheckConditionSucceeded(pac, tektonoperatorv1alpha1.InstallerSetAvailable, t)
+	apistest.CheckConditionSucceeded(pac, InstallerSetAvailable, t)
 
 	// InstallerSet is not ready when deployment pods are not up
 	pac.MarkInstallerSetNotReady("waiting for deployments")
-	apistest.CheckConditionFailed(pac, tektonoperatorv1alpha1.InstallerSetReady, t)
+	apistest.CheckConditionFailed(pac, InstallerSetReady, t)
 
 	// InstallerSet and then PostReconciler become ready and we're good.
 	pac.MarkInstallerSetReady()
-	apistest.CheckConditionSucceeded(pac, tektonoperatorv1alpha1.InstallerSetReady, t)
+	apistest.CheckConditionSucceeded(pac, InstallerSetReady, t)
 
 	pac.MarkPostReconcilerComplete()
-	apistest.CheckConditionSucceeded(pac, tektonoperatorv1alpha1.PostReconciler, t)
+	apistest.CheckConditionSucceeded(pac, PostReconciler, t)
 
 	if ready := pac.IsReady(); !ready {
 		t.Errorf("pac.IsReady() = %v, want true", ready)
@@ -115,7 +114,7 @@ func TestPipelinesAsCodeErrorPath(t *testing.T) {
 	// set will change to not ready
 
 	pac.MarkInstallerSetNotReady("webhook not ready")
-	apistest.CheckConditionFailed(pac, tektonoperatorv1alpha1.InstallerSetReady, t)
+	apistest.CheckConditionFailed(pac, InstallerSetReady, t)
 	if ready := pac.IsReady(); ready {
 		t.Errorf("pac.IsReady() = %v, want false", ready)
 	}
