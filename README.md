@@ -2,7 +2,6 @@
 
 This is the repository of a *proof-of-concept* of OpenShift Operator based of the upstream [`tektoncd/operator`](https://github.com/tektoncd/operator).
 
-
 - [x] Import `cmd/…`
 - [x] Import `config/…`
 - [x] Import `openshift` specific package
@@ -24,3 +23,5 @@ This is the repository of a *proof-of-concept* of OpenShift Operator based of th
 - [ ] Create `v1beta1.OpenShiftPipelineConfig` to *replace* `TektonConfig`
 - [ ] openshift-ci for tests
 - [ ] Remove openshift specifics from upstream
+
+TODO: Rewrite to make it seen as a non-poc
