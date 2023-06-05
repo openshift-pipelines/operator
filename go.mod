@@ -17,7 +17,7 @@ require (
 	github.com/tektoncd/plumbing v0.0.0-20230309231045-dbb204980ea8
 	github.com/tektoncd/triggers v0.24.0
 	go.uber.org/zap v1.24.0
-	gomodules.xyz/jsonpatch/v2 v2.2.0
+	gomodules.xyz/jsonpatch/v2 v2.3.0
 	gotest.tools/v3 v3.4.0
 	k8s.io/api v0.26.3
 	k8s.io/apiextensions-apiserver v0.26.3
