@@ -1,27 +1,15 @@
-# Proof of Concept: OpenShift Pipelines Operator
+# _Work in progress_ : OpenShift Pipelines Operator
 
-This is the repository of a *proof-of-concept* of OpenShift Operator based of the upstream [`tektoncd/operator`](https://github.com/tektoncd/operator).
+This is the repository for OpenShift Pipelines operator, based of the
+upstream [`tektoncd/operator`](https://github.com/tektoncd/operator).
 
-- [x] Import `cmd/…`
-- [x] Import `config/…`
-- [x] Import `openshift` specific package
-- [x] GitHub workflows
-- [x] Import `OpenShiftPipelinesAsCode` in here
-- [x] Rename `OpenShiftPipelinesAsCode` to `PipelinesAsCode`
-- [ ] Refactor `InstallerSet` code to not hardcode upstream `v1alpha1`
-      schema for types
-- [ ] Support watching/converting `OpenShiftPipelinesAsCode` to `PipelinesAsCode`
-- [ ] `Makefile`
-- [ ] Automated/scripted import payload (copy from tektoncd/operator)
-- [ ] Automated/scripted import `tektoncd/operator` CRDs
-- [ ] e2e tests
-  Run upstream ones, import "and forget" ?
-- [ ] Handle "component" *payload* images rebuild
-  - We can use the upstream images…
-  - but we could also *rebuild them all*, to be even closer to
-    downstream. The question is how ?
-- [ ] Create `v1beta1.OpenShiftPipelineConfig` to *replace* `TektonConfig`
-- [ ] openshift-ci for tests
-- [ ] Remove openshift specifics from upstream
+*It is still marked as wip until a release is using this instead of upstream*.
 
-TODO: Rewrite to make it seen as a non-poc
+This README needs to be updated as we go and get this repository to a ready-to-use state.
+
+# Developement/design notes
+
+- This repository uses `tektoncd/operator` as a dependency
+- By default it tracks released components, just like `tektoncd/operator` but it should be easy to build a nightly or "based-of" components PR version
+- We track `tektoncd/operator` `main` branch for the dependency, and will update it daily if it passes tests (not necessarily all of them).
+- It should be very easy to run end-to-end tests based of a clean OpenShift instance (provided by openshift-ci, clusterbot, or anything)

@@ -2,7 +2,13 @@ SHELL := bash
 
 GO           = go
 TIMEOUT_UNIT = 20m
-TIMEOUT_E2E  = 2h20m
+TIMEOUT_E2E  = 1h20m
+
+MODULE   = $(shell env GO111MODULE=on $(GO) list -m)
+DATE         ?= $(shell date +%FT%T%z)
+KO_DATA_PATH  = $(shell pwd)/cmd/operator/kodata
+
+BIN      = $(CURDIR)/.bin
 
 all: test
 
