@@ -14,6 +14,9 @@ all: test
 
 check: test
 
+# TODO: Update payload
+# TODO: Update dependency
+
 # Tests
 TEST_UNIT_TARGETS := test-unit-verbose test-unit-race test-unit-failfast
 test-unit-verbose: ARGS=-v
@@ -37,3 +40,7 @@ test-e2e-cleanup: ## cleanup test e2e namespace/pr left open
 .PHONY: test-e2e
 test-e2e:  test-e2e-cleanup ## run e2e tests
 	@go test $(GO_TEST_FLAGS) -timeout $(TIMEOUT_E2E)  -failfast -count=1 -tags=e2e $(GO_TEST_FLAGS) ./test
+
+.PHONY: test-unit/watch
+test-unit/watch:
+	@gotestsum --watch -- -failfast
