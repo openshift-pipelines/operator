@@ -22,22 +22,7 @@ source $(git rev-parse --show-toplevel)/vendor/github.com/tektoncd/plumbing/scri
 
 cd ${REPO_ROOT_DIR}
 
-VERSION="release-1.1"
-K8S_VERSION="v0.21.4"
-TRIGGERS_VERSION="v0.18.0"
-PIPELINE_VERSION="v0.31.0"
-
-# The list of dependencies that we track at HEAD and periodically
-# float forward in this repository.
-FLOATING_DEPS=(
-  "knative.dev/pkg@${VERSION}"
-  "k8s.io/api@${K8S_VERSION}"
-  "k8s.io/apimachinery@${K8S_VERSION}"
-  "k8s.io/client-go@${K8S_VERSION}"
-  "k8s.io/code-generator@${K8S_VERSION}"
-  "github.com/tektoncd/pipeline@${PIPELINE_VERSION}"
-  "github.com/tektoncd/triggers@${TRIGGERS_VERSION}"
-)
+BRANCH=main
 
 # Parse flags to determine any we should pass to dep.
 GO_GET=0
@@ -52,7 +37,19 @@ done
 readonly GO_GET
 
 if (( GO_GET )); then
-  go get -d ${FLOATING_DEPS[@]}
+    # We'll use the commit to fetch information from it
+    COMMIT=$(git ls-remote https://github.com/tektoncd/operator refs/heads/${BRANCH} | awk '{print $1 }')
+    echo "Updating dependency based of tektoncd/operator (${COMMIT})"
+
+    UPSTREAMGOMOD=$(mktemp /tmp/tektoncd-operator-${COMMIT}-gomod.XXXXXXXX)
+    trap "rm -f ${UPSTREAMGOMOD}" EXIT
+
+    curl -L https://github.com/tektoncd/operator/raw/${COMMIT}/go.mod > ${UPSTREAMGOMOD}
+    
+    go get -d github.com/tektoncd/operator@${COMMIT}
+
+    # Make sure we have the same "replace" as operator upstream
+    go run ./cmd/tool mod ${UPSTREAMGOMOD} go.mod
 fi
 
 # Prune modules.
@@ -68,4 +65,3 @@ if [[ -d hack/patches ]];then
     done
 fi
 
-update_licenses third_party/
