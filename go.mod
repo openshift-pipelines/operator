@@ -16,7 +16,7 @@ require (
 	github.com/openshift/api v0.0.0-20230503133300-8bbcb7ca7183
 	github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb
 	github.com/spf13/cobra v1.7.0
-	github.com/tektoncd/operator v0.63.1-0.20230615104225-6d89f9b79693
+	github.com/tektoncd/operator v0.63.1-0.20230616161038-5d9042ff4b12
 	github.com/tektoncd/pipeline v0.48.0
 	github.com/tektoncd/plumbing v0.0.0-20230309231045-dbb204980ea8
 	github.com/tektoncd/triggers v0.24.1

@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func checkCommand(ioStreams *cli.IOStreams) *cobra.Command {
+func CheckCommand(ioStreams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "check",
 		Short: "Check component versions (and if there is an upgrade needed)",
@@ -33,7 +33,7 @@ func checkCommand(ioStreams *cli.IOStreams) *cobra.Command {
 }
 
 func check(filename string, bugfix bool, out io.Writer) error {
-	components, err := readCompoments(filename)
+	components, err := ReadCompoments(filename)
 	if err != nil {
 		return err
 	}
