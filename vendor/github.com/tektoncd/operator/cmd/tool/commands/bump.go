@@ -1,5 +1,4 @@
-// Package main is the main package :D
-package main
+package commands
 
 import (
 	"fmt"
@@ -11,7 +10,7 @@ import (
 
 var bugfix bool
 
-func bumpCommand(ioStreams *cli.IOStreams) *cobra.Command {
+func BumpCommand(ioStreams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bump",
 		Short: "Bump components version",
@@ -32,7 +31,7 @@ func bumpCommand(ioStreams *cli.IOStreams) *cobra.Command {
 
 func bump(filename string, bugfix bool) error {
 	newComponents := map[string]component{}
-	components, err := readCompoments(filename)
+	components, err := ReadCompoments(filename)
 	if err != nil {
 		return err
 	}

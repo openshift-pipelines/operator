@@ -45,11 +45,11 @@ if (( GO_GET )); then
     trap "rm -f ${UPSTREAMGOMOD}" EXIT
 
     curl -L https://github.com/tektoncd/operator/raw/${COMMIT}/go.mod > ${UPSTREAMGOMOD}
-    
-    go get -d github.com/tektoncd/operator@${COMMIT}
 
+    go get -d github.com/tektoncd/operator@${COMMIT}
+    
     # Make sure we have the same "replace" as operator upstream
-    go run ./cmd/tool mod ${UPSTREAMGOMOD} go.mod
+    go run -mod=mod  ./cmd/tool mod ${UPSTREAMGOMOD} go.mod
 fi
 
 # Prune modules.
