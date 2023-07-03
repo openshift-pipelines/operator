@@ -3,8 +3,6 @@ module github.com/openshift-pipelines/operator
 go 1.19
 
 require (
-	github.com/Masterminds/semver v1.5.0
-	github.com/cli/go-gh v1.2.1
 	github.com/go-git/go-git/v5 v5.6.1
 	github.com/go-logr/zapr v1.2.4
 	github.com/google/go-cmp v0.5.9
@@ -22,9 +20,8 @@ require (
 	github.com/tektoncd/triggers v0.24.1
 	go.uber.org/zap v1.24.0
 	golang.org/x/mod v0.11.0
-	golang.org/x/sync v0.3.0
 	gomodules.xyz/jsonpatch/v2 v2.3.0
-	gotest.tools/v3 v3.4.0
+	gotest.tools/v3 v3.5.0
 	k8s.io/api v0.27.1
 	k8s.io/apiextensions-apiserver v0.26.3
 	k8s.io/apimachinery v0.27.1
@@ -48,6 +45,7 @@ require (
 	contrib.go.opencensus.io/exporter/ocagent v0.7.1-0.20200907061046-05415f1de66d // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2 // indirect
 	github.com/AlecAivazis/survey/v2 v2.3.6 // indirect
+	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Microsoft/go-winio v0.6.0 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20230320150741-8451524ecd7e // indirect
 	github.com/acomagu/bufpipe v1.0.4 // indirect
@@ -57,6 +55,7 @@ require (
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/cli/go-gh v1.2.1 // indirect
 	github.com/cli/safeexec v1.0.0 // indirect
 	github.com/cli/shurcooL-graphql v0.0.2 // indirect
 	github.com/cloudflare/circl v1.3.3 // indirect
@@ -140,6 +139,7 @@ require (
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.7.0 // indirect
+	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/term v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
