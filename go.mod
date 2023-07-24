@@ -3,7 +3,7 @@ module github.com/openshift-pipelines/operator
 go 1.19
 
 require (
-	github.com/go-git/go-git/v5 v5.7.0
+	github.com/go-git/go-git/v5 v5.8.0
 	github.com/go-logr/zapr v1.2.4
 	github.com/google/go-cmp v0.5.9
 	github.com/manifestival/client-go-client v0.5.0
