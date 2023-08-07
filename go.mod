@@ -10,7 +10,7 @@ require (
 	github.com/manifestival/controller-runtime-client v0.4.0
 	github.com/manifestival/manifestival v0.7.2
 	github.com/markbates/inflect v1.0.4
-	github.com/openshift-pipelines/pipelines-as-code v0.19.2
+	github.com/openshift-pipelines/pipelines-as-code v0.19.4
 	github.com/openshift/api v0.0.0-20230503133300-8bbcb7ca7183
 	github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb
 	github.com/spf13/cobra v1.7.0
