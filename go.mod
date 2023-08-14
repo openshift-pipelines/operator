@@ -20,7 +20,7 @@ require (
 	github.com/tektoncd/triggers v0.24.1
 	go.uber.org/zap v1.25.0
 	golang.org/x/mod v0.11.0
-	gomodules.xyz/jsonpatch/v2 v2.3.0
+	gomodules.xyz/jsonpatch/v2 v2.4.0
 	gotest.tools/v3 v3.5.0
 	k8s.io/api v0.27.1
 	k8s.io/apiextensions-apiserver v0.26.3
