@@ -1404,7 +1404,7 @@ func schema_pkg_apis_pipeline_v1beta1_Pipeline(ref common.ReferenceCallback) com
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Pipeline describes a list of Tasks to execute. It expresses how outputs of tasks feed into inputs of subsequent tasks.",
+				Description: "Pipeline describes a list of Tasks to execute. It expresses how outputs of tasks feed into inputs of subsequent tasks.\n\nDeprecated: Please use v1.Pipeline instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -1673,7 +1673,7 @@ func schema_pkg_apis_pipeline_v1beta1_PipelineRun(ref common.ReferenceCallback) 
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PipelineRun represents a single execution of a Pipeline. PipelineRuns are how the graph of Tasks declared in a Pipeline are executed; they specify inputs to Pipelines such as parameter values and capture operational aspects of the Tasks execution such as service account and tolerations. Creating a PipelineRun creates TaskRuns for Tasks in the referenced Pipeline.",
+				Description: "PipelineRun represents a single execution of a Pipeline. PipelineRuns are how the graph of Tasks declared in a Pipeline are executed; they specify inputs to Pipelines such as parameter values and capture operational aspects of the Tasks execution such as service account and tolerations. Creating a PipelineRun creates TaskRuns for Tasks in the referenced Pipeline.\n\nDeprecated: Please use v1.PipelineRun instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -2636,11 +2636,23 @@ func schema_pkg_apis_pipeline_v1beta1_PipelineTask(ref common.ReferenceCallback)
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
+					"pipelineRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PipelineRef is a reference to a pipeline definition Note: PipelineRef is in preview mode and not yet supported",
+							Ref:         ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.PipelineRef"),
+						},
+					},
+					"pipelineSpec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PipelineSpec is a specification of a pipeline Note: PipelineSpec is in preview mode and not yet supported",
+							Ref:         ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.PipelineSpec"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.EmbeddedTask", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.Matrix", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.Param", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.PipelineTaskResources", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.TaskRef", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.WhenExpression", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.WorkspacePipelineTaskBinding", "k8s.io/apimachinery/pkg/apis/meta/v1.Duration"},
+			"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.EmbeddedTask", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.Matrix", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.Param", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.PipelineRef", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.PipelineSpec", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.PipelineTaskResources", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.TaskRef", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.WhenExpression", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.WorkspacePipelineTaskBinding", "k8s.io/apimachinery/pkg/apis/meta/v1.Duration"},
 	}
 }
 
@@ -4206,7 +4218,7 @@ func schema_pkg_apis_pipeline_v1beta1_Task(ref common.ReferenceCallback) common.
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Task represents a collection of sequential steps that are run as part of a Pipeline using a set of inputs and producing a set of outputs. Tasks execute when TaskRuns are created that provide the input parameters and resources and output resources the Task requires.",
+				Description: "Task represents a collection of sequential steps that are run as part of a Pipeline using a set of inputs and producing a set of outputs. Tasks execute when TaskRuns are created that provide the input parameters and resources and output resources the Task requires.\n\nDeprecated: Please use v1.Task instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -4549,7 +4561,7 @@ func schema_pkg_apis_pipeline_v1beta1_TaskRun(ref common.ReferenceCallback) comm
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "TaskRun represents a single execution of a Task. TaskRuns are how the steps specified in a Task are executed; they specify the parameters and resources used to run the steps in a Task.",
+				Description: "TaskRun represents a single execution of a Task. TaskRuns are how the steps specified in a Task are executed; they specify the parameters and resources used to run the steps in a Task.\n\nDeprecated: Please use v1.TaskRun instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -6012,7 +6024,7 @@ func schema_pkg_apis_resolution_v1beta1_ResolutionRequestSpec(ref common.Referen
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.Param"),
+										Ref:     ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.Param"),
 									},
 								},
 							},
@@ -6022,7 +6034,7 @@ func schema_pkg_apis_resolution_v1beta1_ResolutionRequestSpec(ref common.Referen
 			},
 		},
 		Dependencies: []string{
-			"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.Param"},
+			"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.Param"},
 	}
 }
 
@@ -6087,13 +6099,13 @@ func schema_pkg_apis_resolution_v1beta1_ResolutionRequestStatus(ref common.Refer
 					"source": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Deprecated: Use RefSource instead",
-							Ref:         ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.ConfigSource"),
+							Ref:         ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.RefSource"),
 						},
 					},
 					"refSource": {
 						SchemaProps: spec.SchemaProps{
 							Description: "RefSource is the source reference of the remote data that records the url, digest and the entrypoint.",
-							Ref:         ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.RefSource"),
+							Ref:         ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.RefSource"),
 						},
 					},
 				},
@@ -6101,7 +6113,7 @@ func schema_pkg_apis_resolution_v1beta1_ResolutionRequestStatus(ref common.Refer
 			},
 		},
 		Dependencies: []string{
-			"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.ConfigSource", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.RefSource", "knative.dev/pkg/apis.Condition"},
+			"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.RefSource", "knative.dev/pkg/apis.Condition"},
 	}
 }
 
@@ -6123,13 +6135,13 @@ func schema_pkg_apis_resolution_v1beta1_ResolutionRequestStatusFields(ref common
 					"source": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Deprecated: Use RefSource instead",
-							Ref:         ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.ConfigSource"),
+							Ref:         ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.RefSource"),
 						},
 					},
 					"refSource": {
 						SchemaProps: spec.SchemaProps{
 							Description: "RefSource is the source reference of the remote data that records the url, digest and the entrypoint.",
-							Ref:         ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.RefSource"),
+							Ref:         ref("github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.RefSource"),
 						},
 					},
 				},
@@ -6137,6 +6149,6 @@ func schema_pkg_apis_resolution_v1beta1_ResolutionRequestStatusFields(ref common
 			},
 		},
 		Dependencies: []string{
-			"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.ConfigSource", "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1.RefSource"},
+			"github.com/tektoncd/pipeline/pkg/apis/pipeline/v1.RefSource"},
 	}
 }
