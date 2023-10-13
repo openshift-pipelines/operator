@@ -1,6 +1,6 @@
 module github.com/openshift-pipelines/operator
 
-go 1.19
+go 1.20
 
 require (
 	github.com/tektoncd/plumbing v0.0.0-20230309231045-dbb204980ea8

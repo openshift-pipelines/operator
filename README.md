@@ -9,7 +9,6 @@ This README needs to be updated as we go and get this repository to a ready-to-u
 
 # Developement/design notes
 
-- This repository uses `tektoncd/operator` as a dependency
-- By default it tracks released components, just like `tektoncd/operator` but it should be easy to build a nightly or "based-of" components PR version
-- We track `tektoncd/operator` `main` branch for the dependency, and will update it daily if it passes tests (not necessarily all of them).
+- This repository "pulls" `tektoncd/operator` release, installs it and manages it
+- This repository can build any `tektoncd/operator` commits (PRs, branches, tags, forks, etc.) as well as any operands (pipeline, triggers, etc.)
 - It should be very easy to run end-to-end tests based of a clean OpenShift instance (provided by openshift-ci, clusterbot, or anything)
