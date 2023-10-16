@@ -1,0 +1,95 @@
+# Copyright 2020 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tekton-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: tekton-operator
+  template:
+    metadata:
+      labels:
+        name: tekton-operator
+        app: tekton-operator
+    spec:
+      serviceAccountName: tekton-operator
+      containers:
+      - name: tekton-operator-lifecycle  # all reconcilers except tektoninstallerset reconciler
+        image: ko://github.com/tektoncd/operator/cmd/kubernetes/operator
+        args:
+        - "-controllers"
+        - "tektonconfig,tektonpipeline,tektontrigger,tektonhub,tektonchain,tektonresult,tektondashboard"
+        - "-unique-process-name"
+        - "tekton-operator-lifecycle"
+        imagePullPolicy: Always
+        env:
+        - name: SYSTEM_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: OPERATOR_NAME
+          value: "tekton-operator"
+        - name: IMAGE_PIPELINES_PROXY
+          value: ko://github.com/tektoncd/operator/cmd/kubernetes/proxy-webhook
+        - name: IMAGE_JOB_PRUNER_TKN
+          value: gcr.io/tekton-releases/dogfooding/tkn@sha256:a572f1748eb5c0e8002dd0a83ee836ad9d755d035cbd5bfbdef5de810d2bea0b
+        - name: METRICS_DOMAIN
+          value: tekton.dev/operator
+        - name: VERSION
+          value: "devel"
+        - name: CONFIG_OBSERVABILITY_NAME
+          value: tekton-config-observability
+        - name: AUTOINSTALL_COMPONENTS
+          valueFrom:
+            configMapKeyRef:
+              name: tekton-config-defaults
+              key: AUTOINSTALL_COMPONENTS
+        - name: DEFAULT_TARGET_NAMESPACE
+          valueFrom:
+            configMapKeyRef:
+              name: tekton-config-defaults
+              key: DEFAULT_TARGET_NAMESPACE
+      - name: tekton-operator-cluster-operations  # tektoninstallerset reconciler
+        image: ko://github.com/tektoncd/operator/cmd/kubernetes/operator
+        args:
+        - "-controllers"
+        - "tektoninstallerset"
+        - "-unique-process-name"
+        - "tekton-operator-cluster-operations"
+        imagePullPolicy: Always
+        env:
+          - name: SYSTEM_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: OPERATOR_NAME
+            value: "tekton-operator"
+          - name: PROFILING_PORT
+            value: "9009"
+          - name: VERSION
+            value: "devel"
+          - name: METRICS_DOMAIN
+            value: tekton.dev/operator

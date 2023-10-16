@@ -3,6 +3,7 @@ module github.com/openshift-pipelines/operator
 go 1.20
 
 require (
+	github.com/magefile/mage v1.15.0
 	github.com/tektoncd/plumbing v0.0.0-20230309231045-dbb204980ea8
 	k8s.io/code-generator v0.27.1
 	knative.dev/pkg v0.0.0-20230320014357-4c84b1b51ee8
