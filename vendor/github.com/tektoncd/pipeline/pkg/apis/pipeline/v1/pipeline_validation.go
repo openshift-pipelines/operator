@@ -37,6 +37,13 @@ import (
 var _ apis.Validatable = (*Pipeline)(nil)
 var _ resourcesemantics.VerbLimited = (*Pipeline)(nil)
 
+const (
+	taskRef      = "taskRef"
+	taskSpec     = "taskSpec"
+	pipelineRef  = "pipelineRef"
+	pipelineSpec = "pipelineSpec"
+)
+
 // SupportedVerbs returns the operations that validation should be called for
 func (p *Pipeline) SupportedVerbs() []admissionregistrationv1.OperationType {
 	return []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update}
@@ -50,8 +57,14 @@ func (p *Pipeline) Validate(ctx context.Context) *apis.FieldError {
 	// When a Pipeline is created directly, instead of declared inline in a PipelineRun,
 	// we do not support propagated parameters and workspaces.
 	// Validate that all params and workspaces it uses are declared.
-	errs = errs.Also(p.Spec.validatePipelineParameterUsage().ViaField("spec"))
-	return errs.Also(p.Spec.validatePipelineWorkspacesUsage().ViaField("spec"))
+	errs = errs.Also(p.Spec.validatePipelineParameterUsage(ctx).ViaField("spec"))
+	errs = errs.Also(p.Spec.validatePipelineWorkspacesUsage().ViaField("spec"))
+	// Validate beta fields when a Pipeline is defined, but not as part of validating a Pipeline spec.
+	// This prevents validation from failing when a Pipeline is converted to a different API version.
+	// See https://github.com/tektoncd/pipeline/issues/6616 for more information.
+	// TODO(#6592): Decouple API versioning from feature versioning
+	errs = errs.Also(p.Spec.ValidateBetaFields(ctx))
+	return errs
 }
 
 // Validate checks that taskNames in the Pipeline are valid and that the graph
@@ -70,7 +83,6 @@ func (ps *PipelineSpec) Validate(ctx context.Context) (errs *apis.FieldError) {
 	errs = errs.Also(validatePipelineContextVariables(ps.Tasks).ViaField("tasks"))
 	errs = errs.Also(validatePipelineContextVariables(ps.Finally).ViaField("finally"))
 	errs = errs.Also(validateExecutionStatusVariables(ps.Tasks, ps.Finally))
-	errs = errs.Also(ps.ValidateBetaFeaturesEnabledForParamArrayIndexing(ctx))
 	// Validate the pipeline's workspaces.
 	errs = errs.Also(validatePipelineWorkspacesDeclarations(ps.Workspaces))
 	// Validate the pipeline's results
@@ -81,6 +93,60 @@ func (ps *PipelineSpec) Validate(ctx context.Context) (errs *apis.FieldError) {
 	errs = errs.Also(validateMatrix(ctx, ps.Tasks).ViaField("tasks"))
 	errs = errs.Also(validateMatrix(ctx, ps.Finally).ViaField("finally"))
 	errs = errs.Also(validateResultsFromMatrixedPipelineTasksNotConsumed(ps.Tasks, ps.Finally))
+	return errs
+}
+
+// ValidateBetaFields returns an error if the Pipeline spec uses beta features but does not
+// have "enable-api-fields" set to "alpha" or "beta".
+func (ps *PipelineSpec) ValidateBetaFields(ctx context.Context) *apis.FieldError {
+	var errs *apis.FieldError
+	// Object parameters
+	for i, p := range ps.Params {
+		if p.Type == ParamTypeObject {
+			errs = errs.Also(version.ValidateEnabledAPIFields(ctx, "object type parameter", config.BetaAPIFields).ViaFieldIndex("params", i))
+		}
+	}
+	// Indexing into array parameters
+	arrayParamIndexingRefs := ps.GetIndexingReferencesToArrayParams()
+	if len(arrayParamIndexingRefs) != 0 {
+		errs = errs.Also(version.ValidateEnabledAPIFields(ctx, "indexing into array parameters", config.BetaAPIFields))
+	}
+	// array and object results
+	for i, result := range ps.Results {
+		switch result.Type {
+		case ResultsTypeObject:
+			errs = errs.Also(version.ValidateEnabledAPIFields(ctx, "object results", config.BetaAPIFields).ViaFieldIndex("results", i))
+		case ResultsTypeArray:
+			errs = errs.Also(version.ValidateEnabledAPIFields(ctx, "array results", config.BetaAPIFields).ViaFieldIndex("results", i))
+		case ResultsTypeString:
+		default:
+		}
+	}
+	for i, pt := range ps.Tasks {
+		errs = errs.Also(pt.validateBetaFields(ctx).ViaFieldIndex("tasks", i))
+	}
+	for i, pt := range ps.Finally {
+		errs = errs.Also(pt.validateBetaFields(ctx).ViaFieldIndex("tasks", i))
+	}
+
+	return errs
+}
+
+// validateBetaFields returns an error if the PipelineTask uses beta features but does not
+// have "enable-api-fields" set to "alpha" or "beta".
+func (pt *PipelineTask) validateBetaFields(ctx context.Context) *apis.FieldError {
+	var errs *apis.FieldError
+	if pt.TaskRef != nil {
+		// Resolvers
+		if pt.TaskRef.Resolver != "" {
+			errs = errs.Also(version.ValidateEnabledAPIFields(ctx, "taskref.resolver", config.BetaAPIFields))
+		}
+		if len(pt.TaskRef.Params) > 0 {
+			errs = errs.Also(version.ValidateEnabledAPIFields(ctx, "taskref.params", config.BetaAPIFields))
+		}
+	} else if pt.TaskSpec != nil {
+		errs = errs.Also(pt.TaskSpec.ValidateBetaFields(ctx))
+	}
 	return errs
 }
 
@@ -110,6 +176,16 @@ func (l PipelineTaskList) Validate(ctx context.Context, taskNames sets.String, p
 	return errs
 }
 
+// validateUsageOfDeclaredPipelineTaskParameters validates that all parameters referenced in the pipeline Task are declared by the pipeline Task.
+func (l PipelineTaskList) validateUsageOfDeclaredPipelineTaskParameters(ctx context.Context, path string) (errs *apis.FieldError) {
+	for i, t := range l {
+		if t.TaskSpec != nil {
+			errs = errs.Also(ValidateUsageOfDeclaredParameters(ctx, t.TaskSpec.Steps, t.TaskSpec.Params).ViaFieldIndex(path, i))
+		}
+	}
+	return errs
+}
+
 // ValidateName checks whether the PipelineTask's name is a valid DNS label
 func (pt PipelineTask) ValidateName() *apis.FieldError {
 	if err := validation.IsDNS1123Label(pt.Name); len(err) > 0 {
@@ -126,7 +202,7 @@ func (pt PipelineTask) ValidateName() *apis.FieldError {
 // Validate classifies whether a task is a custom task or a regular task(dag/final)
 // calls the validation routine based on the type of the task
 func (pt PipelineTask) Validate(ctx context.Context) (errs *apis.FieldError) {
-	errs = errs.Also(pt.validateRefOrSpec())
+	errs = errs.Also(pt.validateRefOrSpec(ctx))
 
 	errs = errs.Also(pt.validateEmbeddedOrType())
 	// taskKinds contains the kinds when the apiVersion is not set, they are not custom tasks,
@@ -158,7 +234,6 @@ func (pt *PipelineTask) validateMatrix(ctx context.Context) (errs *apis.FieldErr
 		// when the enable-api-fields feature gate is anything but "alpha".
 		errs = errs.Also(version.ValidateEnabledAPIFields(ctx, "matrix", config.AlphaAPIFields))
 		errs = errs.Also(pt.Matrix.validateCombinationsCount(ctx))
-		errs = errs.Also(pt.Matrix.validateNoWholeArrayResults())
 		errs = errs.Also(pt.Matrix.validateUniqueParams())
 	}
 	errs = errs.Also(pt.Matrix.validateParameterInOneOfMatrixOrParams(pt.Params))
@@ -221,15 +296,39 @@ func (pt *PipelineTask) validateWorkspaces(workspaceNames sets.String) (errs *ap
 	return errs
 }
 
-// validateRefOrSpec validates at least one of taskRef or taskSpec is specified
-func (pt PipelineTask) validateRefOrSpec() (errs *apis.FieldError) {
-	// can't have both taskRef and taskSpec at the same time
-	if pt.TaskRef != nil && pt.TaskSpec != nil {
-		errs = errs.Also(apis.ErrMultipleOneOf("taskRef", "taskSpec"))
+// validateRefOrSpec validates at least one of taskRef or taskSpec or pipelineRef or pipelineSpec is specified
+func (pt PipelineTask) validateRefOrSpec(ctx context.Context) (errs *apis.FieldError) {
+	// collect all the specified specifications
+	nonNilFields := []string{}
+	if pt.TaskRef != nil {
+		nonNilFields = append(nonNilFields, taskRef)
 	}
-	// Check that one of TaskRef and TaskSpec is present
-	if pt.TaskRef == nil && pt.TaskSpec == nil {
-		errs = errs.Also(apis.ErrMissingOneOf("taskRef", "taskSpec"))
+	if pt.TaskSpec != nil {
+		nonNilFields = append(nonNilFields, taskSpec)
+	}
+	if pt.PipelineRef != nil {
+		errs = errs.Also(version.ValidateEnabledAPIFields(ctx, pipelineRef, config.AlphaAPIFields))
+		nonNilFields = append(nonNilFields, pipelineRef)
+	}
+	if pt.PipelineSpec != nil {
+		errs = errs.Also(version.ValidateEnabledAPIFields(ctx, pipelineSpec, config.AlphaAPIFields))
+		nonNilFields = append(nonNilFields, pipelineSpec)
+	}
+
+	// check the length of nonNilFields
+	// if one of taskRef or taskSpec or pipelineRef or pipelineSpec is specified,
+	// the length of nonNilFields should exactly be 1
+	if len(nonNilFields) > 1 {
+		errs = errs.Also(apis.ErrGeneric("expected exactly one, got multiple", nonNilFields...))
+	} else if len(nonNilFields) == 0 {
+		cfg := config.FromContextOrDefaults(ctx)
+		// check for TaskRef or TaskSpec or PipelineRef or PipelineSpec with alpha feature flag
+		if cfg.FeatureFlags.EnableAPIFields == config.AlphaAPIFields {
+			errs = errs.Also(apis.ErrMissingOneOf(taskRef, taskSpec, pipelineRef, pipelineSpec))
+		} else {
+			// check for taskRef and taskSpec with beta/stable feature flag
+			errs = errs.Also(apis.ErrMissingOneOf(taskRef, taskSpec))
+		}
 	}
 	return errs
 }
@@ -253,29 +352,18 @@ func (pt PipelineTask) validateCustomTask() (errs *apis.FieldError) {
 
 // validateTask validates a pipeline task or a final task for taskRef and taskSpec
 func (pt PipelineTask) validateTask(ctx context.Context) (errs *apis.FieldError) {
-	cfg := config.FromContextOrDefaults(ctx)
 	// Validate TaskSpec if it's present
 	if pt.TaskSpec != nil {
-		errs = errs.Also(pt.TaskSpec.Validate(ctx).ViaField("taskSpec"))
+		errs = errs.Also(pt.TaskSpec.Validate(ctx).ViaField(taskSpec))
 	}
 	if pt.TaskRef != nil {
-		if pt.TaskRef.Name != "" {
-			// TaskRef name must be a valid k8s name
-			if errSlice := validation.IsQualifiedName(pt.TaskRef.Name); len(errSlice) != 0 {
-				errs = errs.Also(apis.ErrInvalidValue(strings.Join(errSlice, ","), "name"))
-			}
-		} else if pt.TaskRef.Resolver == "" {
-			errs = errs.Also(apis.ErrInvalidValue("taskRef must specify name", "taskRef.name"))
-		}
-		if cfg.FeatureFlags.EnableAPIFields != config.BetaAPIFields && cfg.FeatureFlags.EnableAPIFields != config.AlphaAPIFields {
-			// fail if resolver or resource are present when enable-api-fields is false.
-			if pt.TaskRef.Resolver != "" {
-				errs = errs.Also(apis.ErrDisallowedFields("taskref.resolver"))
-			}
-			if len(pt.TaskRef.Params) > 0 {
-				errs = errs.Also(apis.ErrDisallowedFields("taskref.params"))
-			}
-		}
+		errs = errs.Also(pt.TaskRef.Validate(ctx).ViaField(taskRef))
+	}
+	if pt.PipelineRef != nil {
+		errs = errs.Also(pt.PipelineRef.Validate(ctx).ViaField(pipelineRef))
+	}
+	if pt.PipelineSpec != nil {
+		errs = errs.Also(pt.PipelineSpec.Validate(ctx).ViaField(pipelineSpec))
 	}
 	return errs
 }
@@ -300,7 +388,9 @@ func validatePipelineWorkspacesDeclarations(wss []PipelineWorkspaceDeclaration) 
 }
 
 // validatePipelineParameterUsage validates that parameters referenced in the Pipeline are declared by the Pipeline
-func (ps *PipelineSpec) validatePipelineParameterUsage() (errs *apis.FieldError) {
+func (ps *PipelineSpec) validatePipelineParameterUsage(ctx context.Context) (errs *apis.FieldError) {
+	errs = errs.Also(PipelineTaskList(ps.Tasks).validateUsageOfDeclaredPipelineTaskParameters(ctx, "tasks"))
+	errs = errs.Also(PipelineTaskList(ps.Finally).validateUsageOfDeclaredPipelineTaskParameters(ctx, "finally"))
 	errs = errs.Also(validatePipelineTaskParameterUsage(ps.Tasks, ps.Params).ViaField("tasks"))
 	errs = errs.Also(validatePipelineTaskParameterUsage(ps.Finally, ps.Params).ViaField("finally"))
 	return errs
@@ -440,7 +530,7 @@ func validateExecutionStatusVariablesInFinally(tasksNames sets.String, finally [
 
 func (pt *PipelineTask) validateExecutionStatusVariablesDisallowed() (errs *apis.FieldError) {
 	for _, param := range pt.Params {
-		if expressions, ok := GetVarSubstitutionExpressionsForParam(param); ok {
+		if expressions, ok := param.GetVarSubstitutionExpressions(); ok {
 			errs = errs.Also(validateContainsExecutionStatusVariablesDisallowed(expressions, "value").
 				ViaFieldKey("params", param.Name))
 		}
@@ -456,7 +546,7 @@ func (pt *PipelineTask) validateExecutionStatusVariablesDisallowed() (errs *apis
 
 func (pt *PipelineTask) validateExecutionStatusVariablesAllowed(ptNames sets.String) (errs *apis.FieldError) {
 	for _, param := range pt.Params {
-		if expressions, ok := GetVarSubstitutionExpressionsForParam(param); ok {
+		if expressions, ok := param.GetVarSubstitutionExpressions(); ok {
 			errs = errs.Also(validateExecutionStatusVariablesExpressions(expressions, ptNames, "value").
 				ViaFieldKey("params", param.Name))
 		}
@@ -535,7 +625,7 @@ func validatePipelineResults(results []PipelineResult, tasks []PipelineTask, fin
 	pipelineTaskNames := getPipelineTasksNames(tasks)
 	pipelineFinallyTaskNames := getPipelineTasksNames(finally)
 	for idx, result := range results {
-		expressions, ok := GetVarSubstitutionExpressionsForPipelineResult(result)
+		expressions, ok := result.GetVarSubstitutionExpressions()
 		if !ok {
 			errs = errs.Also(apis.ErrInvalidValue("expected pipeline results to be task result expressions but no expressions were found",
 				"value").ViaFieldIndex("results", idx))
@@ -623,7 +713,7 @@ func validateFinalTasks(tasks []PipelineTask, finalTasks []PipelineTask) (errs *
 func validateTaskResultReferenceInFinallyTasks(finalTasks []PipelineTask, ts sets.String, fts sets.String) (errs *apis.FieldError) {
 	for idx, t := range finalTasks {
 		for _, p := range t.Params {
-			if expressions, ok := GetVarSubstitutionExpressionsForParam(p); ok {
+			if expressions, ok := p.GetVarSubstitutionExpressions(); ok {
 				errs = errs.Also(validateResultsVariablesExpressionsInFinally(expressions, ts, fts, "value").ViaFieldKey(
 					"params", p.Name).ViaFieldIndex("finally", idx))
 			}
@@ -695,35 +785,6 @@ func validateResultsFromMatrixedPipelineTasksNotConsumed(tasks []PipelineTask, f
 		errs = errs.Also(pt.validateResultsFromMatrixedPipelineTasksNotConsumed(matrixedPipelineTasks).ViaFieldIndex("finally", idx))
 	}
 	return errs
-}
-
-// ValidateParamArrayIndex validates if the param reference to an array param is out of bound.
-// error is returned when the array indexing reference is out of bound of the array param
-// e.g. if a param reference of $(params.array-param[2]) and the array param is of length 2.
-// TODO(#6616): Move this functionality to the reconciler, as it is only used there
-func (ps *PipelineSpec) ValidateParamArrayIndex(ctx context.Context, params Params) error {
-	// Collect all array params lengths
-	arrayParamsLengths := ps.Params.extractParamArrayLengths()
-	for k, v := range params.extractParamArrayLengths() {
-		arrayParamsLengths[k] = v
-	}
-	// extract all array indexing references, for example []{"$(params.array-params[1])"}
-	arrayIndexParamRefs := ps.GetIndexingReferencesToArrayParams().List()
-	return validateOutofBoundArrayParams(arrayIndexParamRefs, arrayParamsLengths)
-}
-
-// ValidateBetaFeaturesEnabledForParamArrayIndexing validates that "enable-api-fields" is set to "alpha" or "beta" if the pipeline spec
-// contains indexing references to array params.
-// This can be removed when array param indexing is moved to "stable".
-func (ps *PipelineSpec) ValidateBetaFeaturesEnabledForParamArrayIndexing(ctx context.Context) (errs *apis.FieldError) {
-	if config.CheckAlphaOrBetaAPIFields(ctx) {
-		return nil
-	}
-	arrayParamIndexingRefs := ps.GetIndexingReferencesToArrayParams()
-	if len(arrayParamIndexingRefs) == 0 {
-		return nil
-	}
-	return apis.ErrGeneric(fmt.Sprintf("cannot index into array parameters when 'enable-api-fields' is 'stable', but found indexing references: %s", arrayParamIndexingRefs))
 }
 
 // GetIndexingReferencesToArrayParams returns all strings referencing indices of PipelineRun array parameters
