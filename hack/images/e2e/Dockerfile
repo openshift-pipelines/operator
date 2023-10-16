@@ -22,12 +22,12 @@ RUN ARCH=$(uname -m) \
     && echo https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${OC_VERSION}/openshift-client-${OS}.tar.gz \
     && curl -L https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${OC_VERSION}/openshift-client-${OS}.tar.gz | tar zxf - -C /usr/local/bin
 
+RUN dnf install -y jq make diffutils which git gcc openssl findutils tree podman skopeo && rm -rf /var/cache/yum /var/cache/dnf
+
 WORKDIR ${HOME}
 ADD . .
 COPY hack/images/e2e/bin /usr/local/bin
 RUN  /usr/local/bin/user_setup
-
-RUN dnf install -y jq make diffutils which git gcc openssl findutils && rm -rf /var/cache/yum /var/cache/dnf
 
 ENTRYPOINT ["/usr/local/bin/entrypoint"]
 
