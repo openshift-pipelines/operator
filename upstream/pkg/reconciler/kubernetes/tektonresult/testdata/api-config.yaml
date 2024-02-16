@@ -1,0 +1,27 @@
+apiVersion: v1
+data:
+  config: |-
+    DB_HOST=
+    DB_PORT=5432
+    SERVER_PORT=8080
+    PROMETHEUS_PORT=9090
+    DB_NAME=
+    DB_SSLMODE=disable
+    DB_ENABLE_AUTO_MIGRATION=true
+    TLS_HOSTNAME_OVERRIDE=tekton-results-api-service.tekton-pipelines.svc.cluster.local
+    TLS_PATH=/etc/tls
+    AUTH_DISABLE=false
+    AUTH_IMPERSONATE=false
+    LOG_LEVEL=debug
+    LOGS_API=true
+    LOGS_TYPE=File
+    LOGS_BUFFER_SIZE=32768
+    LOGS_PATH=/logs
+    STORAGE_EMULATOR_HOST=
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/part-of: tekton-results
+    operator.tekton.dev/operand-name: tektoncd-pipelines
+  name: tekton-results-api-config
+  namespace: tekton-pipelines
