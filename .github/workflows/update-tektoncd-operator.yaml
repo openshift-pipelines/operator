@@ -2,12 +2,15 @@ name: update-tektoncd-operator
 
 on:
   schedule:
-    - cron: "*/1 * * * *" # every 1 minute
+  - cron: "*/1 * * * *" # every 1 minute
 
 jobs:
 
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
     - name: Checkout the current repo
       uses: actions/checkout@v4
