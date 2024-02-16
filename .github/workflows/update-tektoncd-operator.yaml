@@ -30,9 +30,9 @@ jobs:
         rm -rf upstream/operator/.git
         git add upstream
         git commit -m "[bot] Update tektoncd/operator"
-        git push origin actions/update/tektoncd-operator
+        git push -f origin actions/update/tektoncd-operator
 
     - name: Create pull request
-      run: gh pr create -B main -H actions/update/tektoncd-operator --title "[bot]Update tektoncd/operator" --body "Auto-generated pull request by GitHub actions"
+      run: gh pr create -B main -H actions/update/tektoncd-operator --title "[bot] Update tektoncd/operator" --body "Auto-generated pull request by GitHub actions"
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
