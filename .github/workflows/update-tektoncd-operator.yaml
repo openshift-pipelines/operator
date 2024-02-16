@@ -23,10 +23,13 @@ jobs:
 
     - name: Commit new changes
       run: |
+        ls upstream/
         git config user.name github-actions
         git config user.email github-actions@github.com
         git checkout -b actions/update/tektoncd-operator
-        git commit -am "[bot] Update tektoncd/operator"
+        rm -rf upstream/operator/.git
+        git add upstream
+        git commit -m "[bot] Update tektoncd/operator"
 
     - name: Create pull request
       run: gh pr create -B main -H actions/update/tektoncd-operator --title "[bot]Update tektoncd/operator" --body "Auto-generated pull request by GitHub actions"
