@@ -53,7 +53,7 @@ type Reconciler struct {
 	// manifests are immutable, and any created during reconcile are
 	// expected to be appended to this one, obviating the passing of
 	// client & logger
-	manifest mf.Manifest
+	manifest *mf.Manifest
 	// Platform-specific behavior to affect the transform
 	extension common.Extension
 
@@ -112,6 +112,8 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tr *v1alpha1.TektonResul
 
 	logger.Infow("Reconciling TektonResults", "status", tr.Status)
 
+	manifest := *r.manifest
+
 	if tr.GetName() != v1alpha1.ResultResourceName {
 		msg := fmt.Sprintf("Resource ignored, Expected Name: %s, Got Name: %s",
 			v1alpha1.ResultResourceName,
@@ -168,12 +170,14 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tr *v1alpha1.TektonResul
 	if err != nil {
 		return err
 	}
+
 	if existingInstallerSet == "" {
-		createdIs, err := r.createInstallerSet(ctx, tr)
+		createdIs, err := r.createInstallerSet(ctx, tr, manifest)
 		if err != nil {
 			return err
 		}
-		return r.updateTektonResultsStatus(ctx, tr, createdIs)
+		r.updateTektonResultsStatus(ctx, tr, createdIs)
+		return v1alpha1.REQUEUE_EVENT_AFTER
 	}
 
 	// If exists, then fetch the TektonInstallerSet
@@ -181,11 +185,12 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tr *v1alpha1.TektonResul
 		Get(ctx, existingInstallerSet, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			createdIs, err := r.createInstallerSet(ctx, tr)
+			createdIs, err := r.createInstallerSet(ctx, tr, manifest)
 			if err != nil {
 				return err
 			}
-			return r.updateTektonResultsStatus(ctx, tr, createdIs)
+			r.updateTektonResultsStatus(ctx, tr, createdIs)
+			return v1alpha1.REQUEUE_EVENT_AFTER
 		}
 		logger.Error("failed to get InstallerSet: %s", err)
 		return err
@@ -236,9 +241,7 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tr *v1alpha1.TektonResul
 
 		if lastAppliedHash != expectedSpecHash {
 
-			r.filterExternalDB(tr)
-
-			if err := r.transform(ctx, &r.manifest, tr); err != nil {
+			if err := r.transform(ctx, &manifest, tr); err != nil {
 				logger.Error("manifest transformation failed:  ", err)
 				return err
 			}
@@ -249,7 +252,7 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tr *v1alpha1.TektonResul
 			installedTIS.SetAnnotations(current)
 
 			// Update the manifests
-			installedTIS.Spec.Manifests = r.manifest.Resources()
+			installedTIS.Spec.Manifests = manifest.Resources()
 
 			if _, err = r.operatorClientSet.OperatorV1alpha1().TektonInstallerSets().
 				Update(ctx, installedTIS, metav1.UpdateOptions{}); err != nil {
@@ -261,6 +264,8 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tr *v1alpha1.TektonResul
 			return v1alpha1.REQUEUE_EVENT_AFTER
 		}
 	}
+
+	r.updateTektonResultsStatus(ctx, tr, installedTIS)
 
 	// Mark InstallerSet Available
 	tr.Status.MarkInstallerSetAvailable()
@@ -298,12 +303,10 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tr *v1alpha1.TektonResul
 	return nil
 }
 
-func (r *Reconciler) updateTektonResultsStatus(ctx context.Context, tr *v1alpha1.TektonResult, createdIs *v1alpha1.TektonInstallerSet) error {
+func (r *Reconciler) updateTektonResultsStatus(ctx context.Context, tr *v1alpha1.TektonResult, createdIs *v1alpha1.TektonInstallerSet) {
 	// update the tr with TektonInstallerSet
 	tr.Status.SetTektonInstallerSet(createdIs.Name)
 	tr.Status.SetVersion(r.resultsVersion)
-
-	return nil
 }
 
 // TektonResults expects secrets to be created before installing
