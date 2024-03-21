@@ -33,6 +33,12 @@ jobs:
         git push -f origin actions/update/tektoncd-operator
 
     - name: Create pull request
-      run: gh pr create -B main -H actions/update/tektoncd-operator --title "[bot] Update tektoncd/operator" --body "Auto-generated pull request by GitHub actions"
+      run: |
+        if [ "$(gh pr list --base main --head actions/update/tektoncd-operator --json url --jq 'length')" = "0" ]; then
+          echo "creating PR..."
+          gh pr create -B main -H actions/update/tektoncd-operator --title "[bot] Update tektoncd/operator" --body "Auto-generated pull request by GitHub actions"
+        else
+          echo "a PR already exists, skipping..."
+        fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
