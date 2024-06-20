@@ -33,6 +33,9 @@ The TektonConfig CR provides the following features
     name: config
   spec:
     targetNamespace: tekton-pipelines
+    targetNamespaceMetadata:
+      labels: {}
+      annotations: {}
     profile: all
     config:
       nodeSelector: <>
@@ -47,6 +50,7 @@ The TektonConfig CR provides the following features
       disable-creds-init: false
       disable-home-env-overwrite: true
       disable-working-directory-overwrite: true
+      disable-inline-spec: "pipeline,pipelinerun,taskrun"
       enable-api-fields: beta
       enable-bundles-resolver: true
       enable-cel-in-whenexpression: false
@@ -84,6 +88,7 @@ The TektonConfig CR provides the following features
         disabled: false
         configMaps: {}
         deployments: {}
+        webhookConfigurationOptions: {}
     pruner:
       disabled: false
       schedule: "0 8 * * *"
@@ -102,12 +107,14 @@ The TektonConfig CR provides the following features
         disabled: false
         configMaps: {}
         deployments: {}
+        webhookConfigurationOptions: {}
     dashboard:
       readonly: true
       options:
         disabled: false
         configMaps: {}
         deployments: {}
+        webhookConfigurationOptions: {}
     platforms:
       openshift:
         pipelinesAsCode:
@@ -140,6 +147,7 @@ The TektonConfig CR provides the following features
           disabled: false
           configMaps: {}
           deployments: {}
+          webhookConfigurationOptions: {}
 ```
 Look for the particular section to understand a particular field in the spec.
 
@@ -150,6 +158,10 @@ This allows user to choose a namespace to install the Tekton Components such as 
 By default, namespace would be `tekton-pipelines` for Kubernetes and `openshift-pipelines` for OpenShift.
 
 **Note:** Namespace `openshift-operators` is not allowed in `OpenShift` as a `targetNamespace`.
+
+### Target Namespace Metadata
+
+`targetNamespaceMetadata` allows user to add their custom `labels` and `annotations` to the target namespace via TektonConfig CR.
 
 ### Profile
 
@@ -319,7 +331,7 @@ By default pruner job will be created from the global pruner config (`spec.prune
 > `keep: 100` <br>
 ### Addon
 
-TektonAddon install some resources along with Tekton Pipelines on the cluster. This provides few ClusterTasks, PipelineTemplates.
+TektonAddon install some resources along with Tekton Pipelines on the cluster. This provides few ClusterTasks, PipelineTemplates, Tasks.
 
 This section allows to customize installation of those resources through params. You can read more about the supported params [here](./TektonAddon.md).
 
@@ -330,6 +342,8 @@ addon:
     - name: "clusterTask"
       value: "true"
     - name: "pipelineTemplates"
+      value: "true"
+    - name: "resolverTasks"
       value: "true"
 ```
 
@@ -550,6 +564,15 @@ options:
               averageUtilization: 85
               type: Utilization
           type: Resource
+  webhookConfigurationOptions:
+    validation.webhook.pipeline.tekton.dev:
+      failurePolicy: Fail
+      timeoutSeconds: 20
+      sideEffects: None
+    webhook.pipeline.tekton.dev:
+      failurePolicy: Fail
+      timeoutSeconds: 20
+      sideEffects: None
 ```
 * `disabled` - disables the additional `options` support, if `disabled` set to `true`. default: `false`
 
@@ -644,6 +667,14 @@ The following fields are supported in `HorizontalPodAutoscaler` (aka HPA)
     * `scaleDown` - replaces scaleDown with this, if not empty
 
 **NOTE**: If a Deployment or StatefulSet has a Horizontal Pod Autoscaling (HPA) and is in active state, Operator will not control the replicas to that resource. However if `status.desiredReplicas` and `spec.minReplicas` not present in HPA, operator takes the control. Also if HPA disabled, operator takes control. Even though the operator takes the control, the replicas value will be adjusted to the hpa's scaling range.
+
+#### webhookConfigurationOptions
+Defines additional options for each webhooks. Use webhook name as a key to define options for a webhook. Options are ignored if the webhook does not exist with the name key. To get detailed information about webhooks options visit https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/
+
+the following options are supported for webhookConfigurationOptions
+* `failurePolicy` -  defines how unrecognized errors and timeout errors from the admission webhook are handled. Allowed values are `Ignore` or `Fail`
+* `timeoutSeconds` - allows configuring how long the API server should wait for a webhook to respond before treating the call as a failure.
+* `sideEffects` -  indicates whether the webhook have a side effet. Allowed values are `None`, `NoneOnDryRun`, `Unknown`, or `Some`
 
 [node-selector]:https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
 [tolerations]:https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/

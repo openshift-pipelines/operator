@@ -19,10 +19,13 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"reflect"
 
-	"github.com/openshift-pipelines/pipelines-as-code/pkg/params/settings"
+	pacSettings "github.com/openshift-pipelines/pipelines-as-code/pkg/params/settings"
+	"go.uber.org/zap"
 	kubernetesValidation "k8s.io/apimachinery/pkg/util/validation"
 	"knative.dev/pkg/apis"
+	"knative.dev/pkg/logging"
 )
 
 // limit is 25 because this name goes in the installerset name which already have 38 characters, so additional length we
@@ -36,22 +39,25 @@ func (pac *OpenShiftPipelinesAsCode) Validate(ctx context.Context) *apis.FieldEr
 
 	var errs *apis.FieldError
 
+	logger := logging.FromContext(ctx)
+
 	// execute common spec validations
 	errs = errs.Also(pac.Spec.CommonSpec.validate("spec"))
 
-	errs = errs.Also(pac.Spec.PACSettings.validate("spec"))
+	errs = errs.Also(pac.Spec.PACSettings.validate(logger, "spec"))
 
 	return errs
 }
 
-func (pacSettings *PACSettings) validate(path string) *apis.FieldError {
+func (ps *PACSettings) validate(logger *zap.SugaredLogger, path string) *apis.FieldError {
 	var errs *apis.FieldError
 
-	if err := settings.Validate(pacSettings.Settings); err != nil {
+	defaultPacSettings := pacSettings.DefaultSettings()
+	if err := pacSettings.SyncConfig(logger, &defaultPacSettings, ps.Settings, pacSettings.DefaultValidators()); err != nil {
 		errs = errs.Also(apis.ErrInvalidValue(err, fmt.Sprintf("%s.settings", path)))
 	}
 
-	for name, additionalPACControllerConfig := range pacSettings.AdditionalPACControllers {
+	for name, additionalPACControllerConfig := range ps.AdditionalPACControllers {
 		if err := validateAdditionalPACControllerName(name); err != nil {
 			errs = errs.Also(apis.ErrInvalidValue(err, fmt.Sprintf("%s.additionalPACControllers", path)))
 		}
@@ -62,18 +68,18 @@ func (pacSettings *PACSettings) validate(path string) *apis.FieldError {
 	return errs
 }
 
-func (additionalPACControllerConfig AdditionalPACControllerConfig) validate(path string) *apis.FieldError {
+func (aps AdditionalPACControllerConfig) validate(path string) *apis.FieldError {
 	var errs *apis.FieldError
 
-	if err := validateKubernetesName(additionalPACControllerConfig.ConfigMapName); err != nil {
+	if err := validateKubernetesName(aps.ConfigMapName); err != nil {
 		errs = errs.Also(apis.ErrInvalidValue(err, fmt.Sprintf("%s.configMapName", path)))
 	}
 
-	if err := validateKubernetesName(additionalPACControllerConfig.SecretName); err != nil {
+	if err := validateKubernetesName(aps.SecretName); err != nil {
 		errs = errs.Also(apis.ErrInvalidValue(err, fmt.Sprintf("%s.secretName", path)))
 	}
 
-	if err := settings.Validate(additionalPACControllerConfig.Settings); err != nil {
+	if err := validateAdditionalPACControllerSettings(aps.Settings); err != nil {
 		errs = errs.Also(apis.ErrInvalidValue(err, fmt.Sprintf("%s.settings", path)))
 	}
 
@@ -114,4 +120,42 @@ func validateKubernetesName(name string) *apis.FieldError {
 		}
 	}
 	return nil
+}
+
+// validates the settings of the additionalPACController
+func validateAdditionalPACControllerSettings(settings map[string]string) *apis.FieldError {
+	var errs *apis.FieldError
+	validators := pacSettings.DefaultValidators()
+	if len(settings) > 0 {
+		fieldTagMapDetails := getFieldTagMap()
+		for key, value := range settings {
+			fieldName, ok := fieldTagMapDetails[key]
+			if !ok {
+				continue
+			}
+			if validationFunc, ok := validators[fieldName]; ok && value != "" {
+				if err := validationFunc(value); err != nil {
+					errs = errs.Also(apis.ErrInvalidValue(err, fmt.Sprintf("validation failed for field %s", key)))
+					continue
+				}
+			}
+		}
+		return errs
+	}
+	return nil
+}
+
+// this will return map with all the json tags with value equal to their field names
+func getFieldTagMap() map[string]string {
+	var fieldTagMapping = make(map[string]string)
+	rt := reflect.TypeOf(pacSettings.Settings{})
+	for i := 0; i < rt.NumField(); i++ {
+		f := rt.Field(i)
+		v := f.Tag.Get("json")
+		if v == "" || v == "-" {
+			continue
+		}
+		fieldTagMapping[v] = f.Name
+	}
+	return fieldTagMapping
 }

@@ -8,7 +8,7 @@ FORCE_FETCH_RELEASE = false
 CR            = config/basic
 PLATFORM := $(if $(PLATFORM),--platform $(PLATFORM))
 
-GOLANGCI_VERSION  = v1.55.2
+GOLANGCI_VERSION  = v1.57.2
 
 BIN      = $(CURDIR)/.bin
 
@@ -63,9 +63,11 @@ ifeq ($(TARGET), openshift)
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-chains
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-hub
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-results
+	rm -rf ./cmd/$(TARGET)/operator/kodata/manual-approval-gate
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-pruner
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/addons/02-clustertasks/source_external/
+	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/addons/07-ecosystem/task-*
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/go.yaml
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/java.yaml
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/nodejs.yaml
@@ -73,6 +75,7 @@ ifeq ($(TARGET), openshift)
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/generic.yaml
 else
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton*
+	rm -rf ./cmd/$(TARGET)/operator/kodata/manual-approval-gate
 endif
 
 .PHONY: clean-bin
@@ -94,7 +97,7 @@ FORCE:
 bin/%: cmd/% FORCE
 	$Q $(GO) build -mod=vendor $(LDFLAGS) -v -o $@ ./$<
 
-.PHONY: compoments/bump
+.PHONY: components/bump
 components/bump: $(OPERATORTOOL)
 	@go run ./cmd/tool bump components.yaml
 
@@ -166,7 +169,7 @@ lint-go: | $(GOLANGCILINT) ## runs go linter on all go files
 	@$(GOLANGCILINT) run ./... --modules-download-mode=vendor \
 							--max-issues-per-linter=0 \
 							--max-same-issues=0 \
-							--deadline 5m
+							--timeout 5m
 
 YAML_FILES := $(shell find . -type f -regex ".*y[a]ml" -print)
 .PHONY: lint-yaml

@@ -16,7 +16,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
-    operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev"]'
+    operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev"]'
     repository: https://github.com/tektoncd/operator
     support: Red Hat
   labels:
@@ -212,6 +212,27 @@ spec:
           x-descriptors:
             - urn:alm:descriptor:com.tectonic.ui:label
       version: v1alpha1
+    - description: Represents an installation of latest version of Manual Approval Gate
+      displayName: Manual Approval Gate
+      kind: ManualApprovalGate
+      name: manualapprovalgates.operator.tekton.dev
+      resources:
+        - kind: tektoninstallersets
+          name: ''
+          version: v1alpha1
+      specDescriptors:
+        - description: Namespace where Manual Approval Gate installed
+          displayName: Target Namespace
+          path: targetNamespace
+          x-descriptors:
+            - urn:alm:descriptor:com.tectonic.ui:label
+      statusDescriptors:
+        - description: The version of Manual Approval Gate installed
+          displayName: Version
+          path: version
+          x-descriptors:
+            - urn:alm:descriptor:com.tectonic.ui:label
+      version: v1alpha1
     - description: This CustomResourceDefinition (CRD) is used internally by the other OpenShift Pipelines CRDs to maintain the lifecycle of OpenShift Pipelines Components
       displayName: Tekton Installer Set
       kind: TektonInstallerSet
@@ -290,11 +311,14 @@ spec:
     - Tekton Chains: {{ with index .Versions "chains"}}{{ .Version }}{{end}}
     - Tekton Hub (tech-preview): {{ with index .Versions "hub"}}{{ .Version }}{{end}}
     - Tekton Results (tech-preview): {{ with index .Versions "results"}}{{ .Version }}{{end}}
+    - Manual Approval Gate (tech-preview): {{ with index .Versions "manual-approval-gate"}}{{ .Version }}{{end}}
 
     ## Getting Started
-    In order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/container-platform/OPENSHIFT_DOCS_VERSION/cicd/pipelines/creating-applications-with-cicd-pipelines.html).
+
+    In order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/pipelines/OPENSHIFT_PIPELINES_MINOR_VERSION/create/creating-applications-with-cicd-pipelines.html).
 
     ## CLI (tkn)
+
     Tekton Pipelines cli project provides a CLI (tkn) for interacting with OpenShift Pipelines.
 
     [Download tkn](/command-line-tools) (links will be available on `command line tools` page after this operator is installed).

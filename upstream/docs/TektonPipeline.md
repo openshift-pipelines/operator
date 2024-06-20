@@ -24,6 +24,7 @@ spec:
   disable-creds-init: false
   disable-home-env-overwrite: true
   disable-working-directory-overwrite: true
+  disable-inline-spec: "taskrun,pipelinerun,pipeline"
   enable-api-fields: beta
   enable-bundles-resolver: true
   enable-cel-in-whenexpression: false
@@ -57,6 +58,10 @@ spec:
     threads-per-controller: 2
     kube-api-qps: 5.0
     kube-api-burst: 10
+  options:
+    disabled: false
+    configMaps: {}
+    deployments: {}
 ```
 You can install this component using [TektonConfig](./TektonConfig.md) by choosing appropriate `profile`.
 
@@ -230,6 +235,9 @@ request supersedes.
 
     `default-managed-by-label-value: "tekton-pipelines"`
 
+- `disable-inline-spec` (Default: ``)
+
+    Inline specifications can be disabled for specific resources only. To achieve that, set the disable-inline-spec flag to a comma-separated list of the desired resources. Valid values are `pipeline`, `pipelinerun` and `taskrun`.
 
 - `default-pod-template`
 
