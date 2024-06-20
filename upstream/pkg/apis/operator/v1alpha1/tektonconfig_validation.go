@@ -25,12 +25,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"knative.dev/pkg/apis"
 	kubeclient "knative.dev/pkg/client/injection/kube/client"
+	"knative.dev/pkg/logging"
 )
 
 func (tc *TektonConfig) Validate(ctx context.Context) (errs *apis.FieldError) {
 
 	if apis.IsInDelete(ctx) {
 		return nil
+	}
+
+	// disallow to update the targetNamespace
+	if apis.IsInUpdate(ctx) {
+		existingTC := apis.GetBaseline(ctx).(*TektonConfig)
+		if existingTC.Spec.GetTargetNamespace() != tc.Spec.GetTargetNamespace() {
+			errs = errs.Also(apis.ErrGeneric("Doesn't allow to update targetNamespace, delete existing TektonConfig and create the updated TektonConfig", "spec.targetNamespace"))
+		}
 	}
 
 	if tc.GetName() != ConfigResourceName {
@@ -48,7 +57,8 @@ func (tc *TektonConfig) Validate(ctx context.Context) (errs *apis.FieldError) {
 	}
 
 	if IsOpenShiftPlatform() && tc.Spec.Platforms.OpenShift.PipelinesAsCode != nil {
-		errs = errs.Also(tc.Spec.Platforms.OpenShift.PipelinesAsCode.PACSettings.validate("spec.platforms.openshift.pipelinesAsCode"))
+		logger := logging.FromContext(ctx)
+		errs = errs.Also(tc.Spec.Platforms.OpenShift.PipelinesAsCode.PACSettings.validate(logger, "spec.platforms.openshift.pipelinesAsCode"))
 	}
 
 	// validate SCC config
@@ -104,6 +114,12 @@ func (tc *TektonConfig) Validate(ctx context.Context) (errs *apis.FieldError) {
 	}
 
 	errs = errs.Also(tc.Spec.Pipeline.PipelineProperties.validate("spec.pipeline"))
+
+	errs = errs.Also(tc.Spec.Pipeline.Options.validate("spec.pipeline.options"))
+	errs = errs.Also(tc.Spec.Hub.Options.validate("spec.hub.options"))
+	errs = errs.Also(tc.Spec.Dashboard.Options.validate("spec.dashboard.options"))
+	errs = errs.Also(tc.Spec.Chain.Options.validate("spec.chain.options"))
+	errs = errs.Also(tc.Spec.Trigger.Options.validate("spec.trigger.options"))
 
 	return errs.Also(tc.Spec.Trigger.TriggersProperties.validate("spec.trigger"))
 }

@@ -45,6 +45,7 @@ const (
 	AddonsImagePrefix             = "IMAGE_ADDONS_"
 	PacImagePrefix                = "IMAGE_PAC_"
 	ChainsImagePrefix             = "IMAGE_CHAINS_"
+	ManualApprovalGatePrefix      = "IMAGE_MAG_"
 	ResultsImagePrefix            = "IMAGE_RESULTS_"
 	HubImagePrefix                = "IMAGE_HUB_"
 
@@ -309,7 +310,7 @@ func SplitsByEqual(arg string) ([]string, bool) {
 // TaskImages replaces step and params images.
 func TaskImages(images map[string]string) mf.Transformer {
 	return func(u *unstructured.Unstructured) error {
-		if u.GetKind() != "ClusterTask" {
+		if u.GetKind() != "ClusterTask" && u.GetKind() != "Task" {
 			return nil
 		}
 
@@ -526,8 +527,8 @@ func replaceNamespaceInContainerArg(container *corev1.Container, targetNamespace
 	}
 }
 
-// AddConfigMapValues will loop on the interface passed and add the fields in configmap
-// with key as json tag of the struct field
+// AddConfigMapValues will loop on the interface (should be a struct) and add the fields in to configMap
+// the key will be the json tag of the struct field
 func AddConfigMapValues(configMapName string, prop interface{}) mf.Transformer {
 	return func(u *unstructured.Unstructured) error {
 		if u.GetKind() != "ConfigMap" || u.GetName() != configMapName || prop == nil {
@@ -563,6 +564,14 @@ func AddConfigMapValues(configMapName string, prop interface{}) mf.Transformer {
 			if element.Kind() == reflect.Ptr {
 				if element.IsNil() {
 					continue
+				}
+				// empty string value will not be included in the following switch statement
+				// however, *string pointer can have empty("") string
+				// so copying the actual string value to the configMap, it can be a empty string too
+				if value, ok := element.Interface().(*string); ok {
+					if value != nil {
+						cm.Data[key] = *value
+					}
 				}
 				// extract the actual element from the pointer
 				element = values.Field(index).Elem()

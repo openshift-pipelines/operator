@@ -21,13 +21,14 @@ import (
 	"fmt"
 
 	mf "github.com/manifestival/manifestival"
-	"github.com/openshift-pipelines/pipelines-as-code/pkg/params/settings"
+	pacSettings "github.com/openshift-pipelines/pipelines-as-code/pkg/params/settings"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 	"github.com/tektoncd/operator/pkg/reconciler/common"
 	"github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektoninstallerset/client"
 	"github.com/tektoncd/operator/pkg/reconciler/openshift"
 	occommon "github.com/tektoncd/operator/pkg/reconciler/openshift/common"
+	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -222,10 +223,16 @@ func updateAdditionControllerConfigMap(config v1alpha1.AdditionalPACControllerCo
 		if config.Settings == nil {
 			config.Settings = map[string]string{}
 		}
-		settings.SetDefaults(config.Settings)
+
+		defaultPacSettings := pacSettings.DefaultSettings()
+		err := pacSettings.SyncConfig(zap.NewNop().Sugar(), &defaultPacSettings, config.Settings, pacSettings.DefaultValidators())
+		config.Settings = pacSettings.ConvertPacStructToConfigMap(&defaultPacSettings)
+		if err != nil {
+			return err
+		}
 
 		cm := &corev1.ConfigMap{}
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, cm)
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, cm)
 		if err != nil {
 			return err
 		}
