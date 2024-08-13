@@ -1,0 +1,17 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Component
+metadata:
+  annotations:
+    image.redhat.com/generate: "true"
+    appstudio.openshift.io/pac-provision: request
+    build.appstudio.openshift.io/pipeline: '{"name":"fbc-builder","bundle":"latest"}'
+    build.appstudio.openshift.io/request: configure-pac
+  name: openshift-pipelines-index
+spec:
+  componentName: openshift-pipelines-index
+  application: openshift-pipelines-operator
+  source:
+    git:
+      url: https://github.com/openshift-pipelines/operator.git
+      dockerfileUrl: olm-catalog/openshift-pipelines/index/Dockerfile
+      revision: main

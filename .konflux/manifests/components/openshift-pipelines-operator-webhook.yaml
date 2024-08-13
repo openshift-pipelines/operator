@@ -1,0 +1,19 @@
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Component
+metadata:
+  annotations:
+    image.redhat.com/generate: "true"
+    appstudio.openshift.io/pac-provision: request
+    build.appstudio.openshift.io/pipeline: '{"name":"docker-build","bundle":"latest"}'
+    build.appstudio.openshift.io/request: configure-pac
+  name: openshift-pipelines-operator
+spec:
+  componentName: openshift-pipelines-operator
+  application: openshift-pipelines-operator
+  build-nudges-ref:
+    - openshift-pipelines-bundle
+  source:
+    git:
+      url: https://github.com/openshift-pipelines/operator.git
+      dockerfileUrl: dockerfiles/webhook.Dockerfile
+      revision: main
