@@ -1,5 +1,6 @@
 # FIXME: this needs to be generated
-FROM openshift/golang-builder:rhel_8_golang_1.22 AS builder
+# FROM openshift/golang-builder:rhel_8_golang_1.22 AS builder
+FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.22-openshift-4.16 AS builder
 
 WORKDIR /go/src/github.com/tektoncd/operator
 COPY upstream .
