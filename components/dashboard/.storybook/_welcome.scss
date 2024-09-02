@@ -1,0 +1,81 @@
+/*
+Copyright 2023-2024 The Tekton Authors
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/type' as *;
+
+.welcome__container {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: 100vi;
+  max-inline-size: 120ch;
+  padding: 3rem;
+  background-color: $background;
+
+  .welcome__heading {
+    display: flex;
+    margin-block-end: 2rem;
+  }
+
+  h2 {
+    @include type-style('heading-07');
+    color: $text-primary;
+  }
+
+  h2 + p {
+    @include type-style('heading-03');
+    font-weight: 600;
+  }
+
+  h3 {
+    margin-block-start: 2rem;
+  }
+
+  img {
+    block-size: 250px;
+    margin-inline-start: auto;
+  }
+
+  a:not([target="_self"]) {
+    @include type-style('body-compact-01');
+    outline: none;
+    text-decoration: none;
+    transition: color 70ms cubic-bezier(0.2, 0, 0.38, 0.9);
+  }
+
+  a, a:hover, a:visited, a.storylink code {
+    color: $link-primary;
+  }
+
+  a:hover {
+    color: $link-primary-hover;
+    text-decoration: underline;
+  }
+
+  a:focus {
+    outline: 1px solid $focus;
+  }
+
+  p {
+    margin-block-start: 1rem;
+  }
+
+  ul li {
+    margin-block-start: 0.5rem;
+  }
+
+  .tkn-graph-story .sb-story {
+    background-color: $background;
+  }
+}

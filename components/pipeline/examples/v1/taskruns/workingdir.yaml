@@ -1,0 +1,20 @@
+apiVersion: tekton.dev/v1
+kind: TaskRun
+metadata:
+  generateName: workingdir-
+spec:
+  taskSpec:
+    steps:
+    - name: default
+      image: mirror.gcr.io/ubuntu
+      workingDir: /workspace
+      script: |
+        #!/usr/bin/env bash
+        [[ $PWD == /workspace ]]
+
+    - name: override
+      image: mirror.gcr.io/ubuntu
+      workingDir: '/a/path/too/far'
+      script: |
+        #!/usr/bin/env bash
+        [[ $PWD == /a/path/too/far ]]

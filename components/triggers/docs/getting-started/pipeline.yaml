@@ -1,0 +1,150 @@
+---
+# The getting-started Pipeline will run through several tasks:
+# - source is pulled from git
+# - source is built into an image by img
+# - image output is pushed to ECR
+# - cloudevent emitted
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: getting-started-pipeline
+  namespace: getting-started
+spec:
+  params:
+    - name: git-url
+    - name: git-revision
+    - name: url
+  workspaces:
+    - name: git-source
+  tasks:
+    - name: fetch-from-git
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/tektoncd/catalog.git
+          - name: pathInRepo
+            value: /task/git-clone/0.9/git-clone.yaml
+          - name: revision
+            value: main
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: revision
+          value: $(params.git-revision)
+      workspaces:
+        - name: output
+          workspace: git-source
+    - name: build-docker-image
+      taskRef:
+        name: build-docker-image
+      params:
+        - name: IMAGE
+          value: $(params.url)
+      runAfter: [fetch-from-git]
+      workspaces:
+        - name: source
+          workspace: git-source
+    - name: deploy-locally
+      taskRef:
+        name: deploy-locally
+      params:
+        - name: IMAGE
+          value: $(params.url)
+      runAfter:
+        - build-docker-image
+    - name: send-cloud-event
+      taskRef:
+        resolver: hub
+        params:
+        - name: name
+          value: cloudevent
+        - name: version
+          value: 0.1
+      params:
+      - name: sink
+      # URL of the Service we create below
+        value: http://event-display.getting-started.svc.cluster.local
+      - name: eventID
+        value: $(context.taskRun.name)
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-locally
+  namespace: getting-started
+spec:
+  params:
+    - name: IMAGE
+      description: Name (reference) of the image to build.
+  steps:
+    - name: run-kubectl
+      image: lachlanevenson/k8s-kubectl
+      command: ["kubectl"]
+      args:
+        - "run"
+        - "tekton-triggers-built-me"
+        - "--image"
+        - "$(params.IMAGE)"
+        - "--env=PORT=8080"
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-docker-image
+  namespace: getting-started
+spec:
+  params:
+    - name: IMAGE
+      description: Name (reference) of the image to build.
+    - name: pathToContext
+      description:
+        The build directory used by img
+      default: ./
+    - name: pathToDockerFile
+      type: string
+      description: The path to the dockerfile to build
+      default: ./Dockerfile
+  workspaces:
+    - name: source
+  steps:
+    - name: build-and-push
+      workingDir: $(workspaces.source.path)
+      image: gcr.io/kaniko-project/executor:v0.16.0
+      command:
+        - /kaniko/executor
+      args:
+        - --dockerfile=$(params.pathToDockerFile)
+        - --destination=$(params.IMAGE)
+        - --context=$(workspaces.source.path)/$(params.pathToContext)
+---
+# Finally, we need something to receive our cloudevent announcing success!
+# That is this services only purpose
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-display
+  namespace: getting-started
+  labels:
+    app: event-display
+spec:
+  type: ClusterIP
+  ports:
+    - name: listener
+      port: 8080
+      protocol: TCP
+  selector:
+    app: event-display
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: event-display
+  namespace: getting-started
+  labels:
+    app: event-display
+spec:
+  hostname: event-display
+  containers:
+  - image: gcr.io/knative-releases/github.com/knative/eventing-sources/cmd/event_display
+    name: web

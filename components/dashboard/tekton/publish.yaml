@@ -1,0 +1,190 @@
+# Copyright 2019-2024 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: publish-dashboard-release
+  annotations:
+    chains.tekton.dev/transparency-upload: "true"
+spec:
+  params:
+    - name: package
+      description: package to release (e.g. github.com/<org>/<project>)
+      default: github.com/tektoncd/dashboard
+    - name: images
+      description: List of cmd/* paths to be published as images
+      default: "dashboard"
+    - name: versionTag
+      description: The vX.Y.Z version that the artifacts should be tagged with (including `v`)
+    - name: imageRegistry
+      description: The target image registry
+      default: gcr.io
+    - name: imageRegistryPath
+      description: The path (project) in the image registry
+    - name: imageRegistryRegions
+      description: The target image registry regions
+      default: "us eu asia"
+    - name: releaseAsLatest
+      description: Whether to tag and publish this release as Dashboard's latest
+      default: "true"
+    - name: platforms
+      description: Platforms to publish for the images (e.g. linux/amd64,linux/arm64)
+      default: linux/amd64,linux/arm,linux/arm64,linux/s390x,linux/ppc64le
+    - name: serviceAccountPath
+      description: The name of the service account path within the release-secret workspace
+  workspaces:
+    - name: source
+      description: The workspace where the repo has been cloned
+      mountPath: /go/src/$(params.package)
+    - name: release-secret
+      description: The secret that contains a service account authorized to push to the imageRegistry and to the output bucket
+    - name: output
+      description: The release YAML will be written to this workspace
+  stepTemplate:
+    env:
+      - name: "PROJECT_ROOT"
+        value: "$(workspaces.source.path)"
+      - name: CONTAINER_REGISTRY_CREDENTIALS
+        value: "$(workspaces.release-secret.path)/$(params.serviceAccountPath)"
+      - name: CONTAINER_REGISTRY
+        value: "$(params.imageRegistry)/$(params.imageRegistryPath)"
+      - name: REGIONS
+        value: "$(params.imageRegistryRegions)"
+      - name: OUTPUT_RELEASE_DIR
+        value: "$(workspaces.output.path)/$(params.versionTag)"
+  results:
+    # IMAGES result is picked up by Tekton Chains to sign the release.
+    # See https://github.com/tektoncd/plumbing/blob/main/docs/signing.md for more info.
+    - name: IMAGES
+  steps:
+    - name: container-registry-auth
+      image: gcr.io/go-containerregistry/crane:debug
+      script: |
+        #!/busybox/sh
+        set -ex
+
+        # Login to the container registry
+        DOCKER_CONFIG=$(cat ${CONTAINER_REGISTRY_CREDENTIALS} | \
+          crane auth login -u _json_key --password-stdin $(params.imageRegistry) 2>&1 | \
+          sed 's,^.*logged in via \(.*\)$,\1,g')
+
+        # Auth with account credentials for all regions.
+        for region in ${REGIONS}
+        do
+          HOSTNAME=${region}.$(params.imageRegistry)
+          cat ${CONTAINER_REGISTRY_CREDENTIALS} | crane auth login -u _json_key --password-stdin ${HOSTNAME}
+        done
+        cp ${DOCKER_CONFIG} /workspace/docker-config.json
+
+    - name: run-ko
+      image: gcr.io/tekton-releases/dogfooding/ko-gcloud:latest
+      env:
+        - name: KO_DOCKER_REPO
+          value: $(params.imageRegistry)/$(params.imageRegistryPath)
+        - name: GOPATH
+          value: /go
+      script: |
+        #!/usr/bin/env sh
+        set -ex
+
+        go version
+        ko version
+        kustomize version
+
+        # Setup docker-auth
+        DOCKER_CONFIG=~/.docker
+        mkdir -p ${DOCKER_CONFIG}
+        cp /workspace/docker-config.json ${DOCKER_CONFIG}/config.json
+
+        # Change to directory with our .ko.yaml
+        cd ${PROJECT_ROOT}
+
+        # Rewrite "devel" to params.versionTag
+        sed -i 's/devel/$(params.versionTag)/g' ${PROJECT_ROOT}/base/*.yaml
+
+        # Publish images and create release.yaml
+        mkdir -p $OUTPUT_RELEASE_DIR
+
+        # add installer script in the release
+        cp ${PROJECT_ROOT}/scripts/installer $OUTPUT_RELEASE_DIR/installer
+
+        # build manifests for installer
+        kustomize build overlays/installer/read-only  --load-restrictor LoadRestrictionsNone | ko resolve --platform=$(params.platforms) --preserve-import-paths -t $(params.versionTag) -f - > $OUTPUT_RELEASE_DIR/installer-release.yaml
+        kustomize build overlays/installer/read-write --load-restrictor LoadRestrictionsNone | ko resolve --platform=$(params.platforms) --preserve-import-paths -t $(params.versionTag) -f - > $OUTPUT_RELEASE_DIR/installer-release-full.yaml
+
+        # build pre configured manifests
+        ./scripts/installer release --debug              --platform $(params.platforms) --tag $(params.versionTag) --output $OUTPUT_RELEASE_DIR/release.yaml
+        ./scripts/installer release --debug --read-write --platform $(params.platforms) --tag $(params.versionTag) --output $OUTPUT_RELEASE_DIR/release-full.yaml
+
+    - name: koparse
+      image: gcr.io/tekton-releases/dogfooding/koparse:latest
+      script: |
+        set -ex
+
+        IMAGES_PATH=${CONTAINER_REGISTRY}/$(params.package)
+
+        for cmd in $(params.images)
+        do
+          IMAGES="${IMAGES} ${IMAGES_PATH}/cmd/${cmd}:$(params.versionTag)"
+        done
+
+        # Parse the built images from the release.yaml generated by ko
+        koparse \
+          --path $OUTPUT_RELEASE_DIR/release.yaml \
+          --base ${IMAGES_PATH} --images ${IMAGES} > /workspace/built_images
+
+    - name: tag-images
+      image: gcr.io/go-containerregistry/crane:debug
+      script: |
+        #!/busybox/sh
+        set -ex
+
+        # Setup docker-auth
+        DOCKER_CONFIG=~/.docker
+        mkdir -p ${DOCKER_CONFIG}
+        cp /workspace/docker-config.json ${DOCKER_CONFIG}/config.json
+
+        REGIONS="us eu asia"
+
+        # Tag the images and put them in all the regions
+        for IMAGE in $(cat /workspace/built_images)
+        do
+          IMAGE_WITHOUT_SHA=${IMAGE%%@*}
+          IMAGE_WITHOUT_SHA_AND_TAG=${IMAGE_WITHOUT_SHA%%:*}
+          IMAGE_WITH_SHA=${IMAGE_WITHOUT_SHA_AND_TAG}@${IMAGE##*@}
+
+          echo $IMAGE_WITH_SHA, >> $(results.IMAGES.path)
+
+          if [[ "$(params.releaseAsLatest)" == "true" ]]
+          then
+            crane cp ${IMAGE_WITH_SHA} ${IMAGE_WITHOUT_SHA_AND_TAG}:latest
+          fi
+
+          for REGION in ${REGIONS}
+          do
+            if [[ "$(params.releaseAsLatest)" == "true" ]]
+            then
+              for TAG in "latest" $(params.versionTag)
+              do
+                crane cp ${IMAGE_WITH_SHA} ${REGION}.${IMAGE_WITHOUT_SHA_AND_TAG}:$TAG
+              done
+            else
+              TAG="$(params.versionTag)"
+              crane cp ${IMAGE_WITH_SHA} ${REGION}.${IMAGE_WITHOUT_SHA_AND_TAG}:$TAG
+            fi
+            echo ${REGION}.$IMAGE_WITH_SHA, >> $(results.IMAGES.path)
+          done
+        done

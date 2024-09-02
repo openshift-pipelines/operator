@@ -1,0 +1,112 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: say-hello
+spec:
+  params:
+  - name: contenttype
+    description: The Content-Type of the event
+    type: string
+  workspaces:
+    - name: git
+      mountPath: /workspace
+  steps:
+  - name: say-hi
+    image: bash
+    command: ["bash", "-c"]
+    args:
+      - echo -e 'Hello Triggers!\nContent-Type is $(params.contenttype)'
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: say-message
+spec:
+  params:
+  - name: message
+    description: The message to print
+    default: This is the default message
+    type: string
+  workspaces:
+    - name: git
+      mountPath: /workspace
+  steps:
+  - name: say-message
+    image: bash
+    command: ["bash", "-c"]
+    args:
+      - echo '$(params.message)'
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: say-bye
+spec:
+  workspaces:
+    - name: git
+      mountPath: /workspace
+  steps:
+  - name: say-bye
+    image: bash
+    command: ["bash", "-c"]
+    args:
+    - echo 'Goodbye Triggers!'
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: simple-pipeline
+spec:
+  params:
+  - name: message
+    description: The message to print
+    default: This is the default message
+    type: string
+  - name: contenttype
+    description: The Content-Type of the event
+    type: string
+  - name: git-url
+    description: The Git URL to clone from
+  - name: git-revision
+    description: The Git revision to clone
+  workspaces:
+  - name: git-source
+  tasks:
+  - name: git-clone
+    taskRef:
+      name: git-clone
+    params:
+    - name: url
+      value: $(params.git-url)
+    - name: revision
+      value: $(params.git-revision)
+    workspaces:
+    - name: output
+      workspace: git-source
+  - name: say-hello
+    runAfter: [git-clone]
+    taskRef:
+      name: say-hello
+    params:
+    - name: contenttype
+      value: $(params.contenttype)
+    workspaces:
+      - name: git
+        workspace: git-source
+  - name: say-message
+    runAfter: [say-hello]
+    taskRef:
+      name: say-message
+    params:
+    - name: message
+      value: $(params.message)
+    workspaces:
+      - name: git
+        workspace: git-source
+  - name: say-bye
+    runAfter: [say-message]
+    taskRef:
+      name: say-bye
+    workspaces:
+      - name: git
+        workspace: git-source

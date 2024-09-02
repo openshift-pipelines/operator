@@ -1,0 +1,67 @@
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: getting-started-triggertemplate
+  namespace: getting-started
+spec:
+  params:
+    - name: gitrevision
+      description: The git revision
+      default: master
+    - name: gitrepositoryurl
+      description: The git repository url
+    - name: namespace
+      description: The namespace to create the resources
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: getting-started-pipeline-run-
+        namespace: $(tt.params.namespace)
+      spec:
+        serviceAccountName: tekton-triggers-example-sa
+        pipelineRef:
+          name: getting-started-pipeline
+        params:
+        - name: git-revision
+          value: $(tt.params.gitrevision)
+        - name: git-url
+          value: $(tt.params.gitrepositoryurl)
+        - name: url
+          value: DOCKERREPO-REPLACEME # docker-repo-location.com/repo:getting-started
+        workspaces:
+        - name: git-source
+          volumeClaimTemplate:
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: getting-started-pipelinebinding
+  namespace: getting-started
+spec:
+  params:
+    - name: gitrevision
+      value: $(body.head_commit.id)
+    - name: namespace
+      value: getting-started
+    - name: gitrepositoryurl
+      value: "https://github.com/$(body.repository.full_name)"
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: getting-started-listener
+  namespace: getting-started
+spec:
+  serviceAccountName: tekton-triggers-example-sa
+  triggers:
+    - bindings:
+      - ref: getting-started-pipelinebinding
+      template:
+        ref: getting-started-triggertemplate

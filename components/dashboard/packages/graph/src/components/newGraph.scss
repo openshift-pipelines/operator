@@ -1,0 +1,78 @@
+/*
+Copyright 2022-2024 The Tekton Authors
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+@use '@carbon/react/scss/config' as *;
+@use '@carbon/react/scss/theme' as *;
+
+@import '@carbon/charts-react/styles';
+
+.#{$prefix}--cc--card-node {
+  &.card-status-success {
+    border-color: $support-success;
+  }
+  &.card-status-success-warning {
+    border-color: $support-warning;
+  }
+  &.card-status-failed {
+    border-color: $support-error;
+  }
+  &.card-status-unknown {
+    border-color: $border-strong;
+  }
+}
+
+.#{$prefix}--cc--card-node__column {
+  overflow: hidden;
+}
+
+.#{$prefix}--cc--card-node__title {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.#{$prefix}--cc--shape-node__icon .#{$prefix}--tooltip__label .#{$prefix}--tooltip__trigger {
+  margin-inline-start: 0;
+}
+
+.status-icon {
+  .#{$prefix}--cc--shape-node__icon & {
+    inline-size: 24px;
+    block-size: 24px;
+  }
+
+  &.status-icon-failed {
+    fill: $support-error;
+  }
+
+  &.status-icon-success {
+    fill: $support-success;
+  }
+
+  &.status-icon-success-warning {
+    fill: $support-success;
+
+    path:nth-child(2) {
+      fill: $support-warning;
+    }
+  }
+}
+
+.tkn--pipeline-graph {
+  margin-block: 1rem;
+}
+
+.tkn--pipeline-graph > svg {
+  position: relative;
+  margin-block-start: 1rem;
+}

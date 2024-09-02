@@ -1,0 +1,70 @@
+import React, { useState } from 'react';
+import { Select, SelectVariant, SelectOption, SelectOptionObject } from '@patternfly/react-core';
+import { observer } from 'mobx-react';
+import { useMst } from '../../store/root';
+import { SortByFields } from '../../store/resource';
+import './SortDropDown.css';
+
+const Sort: React.FC = observer(() => {
+  const { resources } = useMst();
+
+  const [isOpen, setIsOpen] = useState(false);
+
+  const items: Array<string> = Object.values(SortByFields);
+  const keys = items.slice(1).map((value) => (
+    <SelectOption
+      key={value}
+      id={value}
+      value={value}
+      inputId={value}
+      onClick={(e) => {
+        resources.setSortBy(e.currentTarget.id.substr(0, e.currentTarget.id.length - 2));
+      }}
+    />
+  ));
+
+  const clearSelection = () => {
+    setIsOpen(false);
+    resources.setSortBy(SortByFields.Unknown);
+  };
+
+  const onToggle = () => setIsOpen(!isOpen);
+
+  const onSelect = (
+    _: React.MouseEvent | React.ChangeEvent,
+    value: string | SelectOptionObject,
+    isPlaceholder: boolean | undefined
+  ) => {
+    if (isPlaceholder) {
+      clearSelection();
+    } else {
+      if (value.toString() === SortByFields.Name) {
+        resources.setSortBy(SortByFields.Name);
+      } else if (value.toString() === SortByFields.Rating) {
+        resources.setSortBy(SortByFields.Rating);
+      } else {
+        resources.setSortBy(SortByFields.RecentlyUpdated);
+      }
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="hub-sort">
+      <Select
+        variant={SelectVariant.single}
+        isPlain={true}
+        typeAheadAriaLabel="Sort By"
+        onToggle={onToggle}
+        onSelect={onSelect}
+        onClear={clearSelection}
+        isOpen={isOpen}
+        selections={resources.sortBy}
+        placeholderText="Sort By"
+      >
+        {keys}
+      </Select>
+    </div>
+  );
+});
+export default Sort;

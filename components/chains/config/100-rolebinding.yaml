@@ -1,0 +1,178 @@
+# Copyright 2021 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tekton-chains-controller-cluster-access
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-chains
+subjects:
+  - kind: ServiceAccount
+    name: tekton-chains-controller
+    namespace: tekton-chains
+roleRef:
+  kind: ClusterRole
+  name: tekton-chains-controller-cluster-access
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: tekton-chains-controller-cluster-access
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-chains
+rules:
+  - apiGroups: [""]
+    # Controller needs to watch Pods created by TaskRuns to see them progress.
+    resources: ["pods"]
+    verbs: ["list", "watch"]
+    # Controller needs cluster access to all of the CRDs that it is responsible for
+    # managing.
+  - apiGroups: ["tekton.dev"]
+    resources: ["tasks", "clustertasks", "taskruns", "pipelines", "pipelineruns", "pipelineresources", "conditions", "runs"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+  - apiGroups: ["tekton.dev"]
+    resources: ["taskruns/finalizers", "pipelineruns/finalizers", "runs/finalizers"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+  - apiGroups: ["tekton.dev"]
+    resources: ["tasks/status", "clustertasks/status", "taskruns/status", "pipelines/status", "pipelineruns/status", "pipelineresources/status", "runs/status"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  # This is the access that the controller needs on a per-namespace basis.
+  name: tekton-chains-controller-tenant-access
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-chains
+rules:
+  # Read-write access to create Pods, K8s Events and PVCs (for Workspaces)
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "events", "persistentvolumeclaims"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+  # Read-only access to these.
+  - apiGroups: [""]
+    resources: ["configmaps", "limitranges", "secrets", "serviceaccounts"]
+    verbs: ["get", "list", "watch"]
+  # Read-write access to StatefulSets for Affinity Assistant.
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+---
+# If this ClusterRoleBinding is replaced with a RoleBinding
+# then the ClusterRole would be namespaced. The access described by
+# the tekton-pipelines-controller-tenant-access ClusterRole would
+# be scoped to individual tenant namespaces.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tekton-chains-controller-tenant-access
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-chains
+subjects:
+  - kind: ServiceAccount
+    name: tekton-chains-controller
+    namespace: tekton-chains
+roleRef:
+  kind: ClusterRole
+  name: tekton-chains-controller-tenant-access
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-chains-controller
+  namespace: tekton-chains
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-chains
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: tekton-chains-leader-election
+  namespace: tekton-chains
+  labels:
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-chains
+rules:
+  # We uses leases for leaderelection
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-chains-controller-leaderelection
+  namespace: tekton-chains
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-chains
+subjects:
+  - kind: ServiceAccount
+    name: tekton-chains-controller
+    namespace: tekton-chains
+roleRef:
+  kind: Role
+  name: tekton-chains-leader-election
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tekton-chains-info
+  namespace: tekton-chains
+  labels:
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-chains
+rules:
+  # All system:authenticated users need to have access
+  # to the chains-info ConfigMap even if they don't
+  # have access to other resources present in the
+  # installed namespace
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["chains-info"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-chains-info
+  namespace: tekton-chains
+  labels:
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-chains
+subjects:
+  # Giving all system:authenticated users the access to the
+  # ConfigMap which contains version information
+  - kind: Group
+    name: system:authenticated
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tekton-chains-info

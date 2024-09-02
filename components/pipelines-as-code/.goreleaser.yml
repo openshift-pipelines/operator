@@ -1,0 +1,155 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=jcroql
+version: 2
+
+before:
+  hooks:
+    - /bin/sh -c "env TARGET_BRANCH={{.Tag }} PAC_VERSION={{.Tag }} TARGET_OPENSHIFT=true ./hack/generate-releaseyaml.sh  > release.yaml"
+    - /bin/sh -c "env TARGET_BRANCH={{.Tag }} PAC_VERSION={{.Tag }} ./hack/generate-releaseyaml.sh  > release.k8s.yaml"
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    main: ./cmd/tkn-pac
+    binary: tkn-pac
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+      - s390x
+      - ppc64le
+    ldflags:
+      - -w
+      - -s
+      - -X github.com/openshift-pipelines/pipelines-as-code/pkg/params/version.Version={{.Version}}
+archives:
+  - name_template: >-
+      {{ .Binary }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "darwin" }}MacOS
+      {{- else if eq .Arch "linux" }}Linux
+      {{- else if eq .Arch "windows" }}Windows
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+checksum:
+  name_template: "checksums.txt"
+snapshot:
+  name_template: "{{ .Tag }}-next"
+release:
+  extra_files:
+    - glob: ./release.yaml
+    - glob: ./release.k8s.yaml
+  prerelease: true
+  header: |
+    # Pipelines as Code version {{.Tag}}
+
+    OpenShift Pipelines as Code {{.Tag }} has been released 🥳
+
+    TODO: XXXXX add high level changelog before setting this as released XXXXX,
+          describe the large features with some nice screenshot/demo if possible with doc links and pr links, if bugfixes just mention the notable bugfixes, see older releases for some example
+
+    ## Installation
+
+    To install this version you can install the release.yaml with [`kubectl`](https://kubernetes.io/docs/tasks/tools/#kubectl) for your platform :
+
+    ### Openshift
+    ```shell
+    kubectl apply -f https://github.com/openshift-pipelines/pipelines-as-code/releases/download/{{.Tag}}/release.yaml
+    ```
+    ### Kubernetes
+    ```shell
+    kubectl apply -f https://github.com/openshift-pipelines/pipelines-as-code/releases/download/{{.Tag}}/release.k8s.yaml
+    ```
+    ### Documentation
+
+    The documentation for this release is available here :
+
+    https://release-{{ replace .Tag "." "-" }}.pipelines-as-code.pages.dev
+
+brews:
+  - name: tektoncd-pac
+    repository:
+      owner: openshift-pipelines
+      name: homebrew-pipelines-as-code
+    directory: Formula
+    dependencies:
+      - name: tektoncd-cli
+        type: optional
+      - name: git
+    homepage: "https://pipelinesascode.com"
+    description: tkn-pac - A command line interface for interacting with Pipelines as Code
+    install: |
+      bin.install "tkn-pac" => "tkn-pac"
+      output = Utils.popen_read("SHELL=bash #{bin}/tkn-pac completion bash")
+      (bash_completion/"tkn-pac").write output
+      output = Utils.popen_read("SHELL=zsh #{bin}/tkn-pac completion zsh")
+      (zsh_completion/"_tkn-pac").write output
+      prefix.install_metafiles
+nfpms:
+  - file_name_template: >-
+      tkn-pac-
+      {{- .Version}}_{{.Os}}-
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "darwin" }}MacOS
+      {{- else if eq .Arch "linux" }}Linux
+      {{- else if eq .Arch "windows" }}Windows
+      {{- else }}{{ .Arch }}{{ end }}
+    homepage: https://pipelinesascode.com
+    description: A command line interface to OpenShift Pipelines as Code
+    maintainer: OpenShift Pipelines Developers <pipelines-dev@redhat.com>
+    license: Apache 2.0
+    vendor: Red Hat
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - Merge pull request
+      - Merge branch
+      - go mod tidy
+
+aurs:
+  - name: tkn-pac
+    homepage: "https://pipelinesascode.com"
+    skip_upload: true
+    description: tkn-pac - A command line interface for interacting with Pipelines as Code
+    maintainers:
+      - "Chmouel Boudjnah <chmouel@chmouel.com>"
+    license: Apache 2.0
+    private_key: "{{ .Env.AUR_PRIVATE_KEY }}"
+    git_url: ssh://aur@aur.archlinux.org/tkn-pac.git
+    package: |-
+      # bin
+      install -Dm755 "./tkn-pac" "${pkgdir}/usr/bin/tkn-pac"
+
+      # license
+      install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/tkn-pac/LICENSE"
+
+      # completions
+      mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
+      mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
+
+      ./tkn-pac completion zsh > tkn-pac.zsh
+      ./tkn-pac completion bash > tkn-pac.bash
+
+      install -Dm644 "tkn-pac.bash" "${pkgdir}/usr/share/bash-completion/completions/tkn-pac"
+      install -Dm644 "tkn-pac.zsh" "${pkgdir}/usr/share/zsh/site-functions/_tkn-pac"
+
+universal_binaries:
+  - replace: true
+    name_template: "tkn-pac"

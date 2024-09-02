@@ -1,0 +1,118 @@
+# Copyright 2021 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: results-release
+spec:
+  params:
+    - name: repo
+      description: Repo URL to clone.
+      default: https://github.com/tektoncd/results
+    - name: revision
+      description: The Git revision to checkout.
+      default: main
+    - name: docker_repo
+      default: "gcr.io/tekton-releases"
+    - name: bucket
+      description: "GCS bucket/folder to upload configs"
+    - name: version
+      description: "Version label to use for published images / configs"
+      default: "dev"
+  workspaces:
+    - name: ws
+  tasks:
+    - name: checkout
+      taskRef:
+        name: git-clone
+      params:
+        - name: url
+          value: $(params.repo)
+        - name: revision
+          value: $(params.revision)
+      workspaces:
+        - name: output
+          workspace: ws
+    - name: unit-tests
+      runAfter: [checkout]
+      taskRef:
+        name: golang-test
+      params:
+        - name: package
+          value: $(workspaces.source.path)/...
+      workspaces:
+        - name: source
+          workspace: ws
+    - name: publish-image
+      runAfter:
+        - unit-tests
+      taskSpec:
+        params:
+          - name: repo
+            description: Docker repository to publish to.
+          - name: tag
+            default: latest
+        workspaces:
+          - name: source
+        steps:
+          - name: publish
+            image: gcr.io/tekton-releases/dogfooding/ko-gcloud@sha256:d25f766de9cad0959e44b80548074441939de8fd1ee91ed0247bdd689f09a0d6
+            workingDir: $(workspaces.source.path)
+            script: |
+              gcloud auth list
+              gcloud auth configure-docker gcr.io,us-docker.pkg.dev
+
+              $(workspaces.source.path)/release/release.sh
+            env:
+              - name: KO_DOCKER_REPO
+                value: "$(params.repo)"
+              - name: RELEASE_VERSION
+                value: "$(params.tag)"
+      params:
+        - name: repo
+          value: $(params.docker_repo)
+        - name: tag
+          value: $(params.version)
+      workspaces:
+        - name: source
+          workspace: ws
+    - name: publish-config
+      runAfter: [publish-image]
+      # Inline spec since we're relying on Workload Identity and can't use the
+      # catalog GCS tasks, this allows us to provide our own behavior without
+      # creating a new on-cluster task.
+      taskSpec:
+        params:
+          - name: version
+          - name: bucket
+        workspaces:
+          - name: source
+        steps:
+          - name: upload
+            image: gcr.io/google.com/cloudsdktool/cloud-sdk:310.0.0@sha256:cb03669fcdb9191d55a6200f2911fff3baec0b8c39b156d95b68aabe975ac506 #tag: 310.0.0
+            script: |
+              gsutil cp $(workspaces.source.path)/release/release.yaml $(params.bucket)/previous/$(params.version)/release.yaml
+              gsutil cp $(workspaces.source.path)/release/release.yaml $(params.bucket)/latest/release.yaml
+              gsutil cp $(workspaces.source.path)/release/release_base.yaml $(params.bucket)/previous/$(params.version)/release_base.yaml
+              gsutil cp $(workspaces.source.path)/release/release_base.yaml $(params.bucket)/latest/release_base.yaml
+      params:
+        - name: version
+          value: $(params.version)
+        - name: bucket
+          value: $(params.bucket)
+      workspaces:
+        - name: source
+          workspace: ws

@@ -1,0 +1,247 @@
+/*
+Copyright 2019-2024 The Tekton Authors
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+@use '@carbon/react/scss/components/button/tokens' as buttonTokens;
+@use '@carbon/react/scss/config' as *;
+@use '@carbon/react/scss/utilities/convert';
+@use '@carbon/react/scss/utilities/layout';
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/type' as *;
+
+.tkn--table {
+  // add space between adjacent tables
+  ~ .tkn--table {
+    margin-block-start: $spacing-05;
+  }
+
+  .#{$prefix}--table-toolbar {
+    background: transparent;
+  }
+
+  .#{$prefix}--data-table.#{$prefix}--data-table--short td.#{$prefix}--table-expand {
+    block-size: 2rem;
+  }
+
+  .#{$prefix}--data-table-header {
+    padding-inline-start: 0;
+    padding-block-end: $spacing-03;
+  }
+
+  .#{$prefix}--data-table-container {
+    margin-block-start: 0;
+    inline-size: 100%;
+  }
+
+  .#{$prefix}--data-table td {
+    &:not(.cell-actions):not(.#{$prefix}--table-column-checkbox) {
+      max-inline-size: 10vi;
+      vertical-align: middle;
+
+      span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        vertical-align: middle;
+      }
+    }
+
+    &.#{$prefix}--table-column-checkbox {
+      padding-block-start: 0;
+      padding-block-end: 0;
+      vertical-align: middle;
+
+      .#{$prefix}--checkbox-label {
+        padding-inline-start: $spacing-05;
+      }
+    }
+
+    &.cell-run, &.cell-time {
+      svg {
+        margin-inline-end: 6px;
+        vertical-align: middle;
+      }
+    }
+
+    &.cell-run svg {
+      inline-size: 14px;
+      block-size: 14px;
+    }
+
+    &.cell-time svg {
+      inline-size: 12px;
+      block-size: 12px;
+    }
+
+    &.cell-actions {
+      inline-size: 3rem;
+
+      .tkn--danger.#{$prefix}--btn--ghost.#{$prefix}--btn--icon-only {
+        &:focus, &:hover {
+          svg, path {
+            fill: buttonTokens.$button-danger-primary;
+          }
+        }
+      }
+
+      .#{$prefix}--link.#{$prefix}--btn--icon-only {
+        vertical-align: top;
+        // from Carbon v11 button styles
+        padding-block-start: min(
+          calc(
+            (layout.size('height') - convert.to-rem(16px)) / 2 - convert.to-rem(1px)
+          ),
+          var(--temp-padding-block-max)
+        );
+      }
+    }
+  }
+
+  .noRows {
+    inline-size: 100%;
+    text-align: center;
+    font-style: italic;
+    font-size: 1rem;
+  }
+
+  &.tkn--table--inline-actions {
+    .#{$prefix}--data-table td {
+      &.cell-actions {
+        text-align: end;
+        inline-size: 8rem;
+
+        .#{$prefix}--tooltip {
+          text-align: initial;
+        }
+
+        .#{$prefix}--btn--icon-only:not(.#{$prefix}--link) {
+          margin-top: -1px; // to account for border
+        }
+      }
+    }
+  }
+
+  &.tkn--table-with-filters {
+    .#{$prefix}--data-table-container {
+      overflow: visible;
+    }
+
+    .#{$prefix}--table-toolbar {
+      overflow: visible;
+      flex-direction: row;
+
+      .#{$prefix}--multi-select__wrapper {
+        .#{$prefix}--combo-box {
+          border: none;
+        }
+
+        .#{$prefix}--text-input {
+          background-color: $layer;
+          border: none;
+        }
+      }
+
+      .#{$prefix}--multi-select__wrapper,
+      .#{$prefix}--dropdown__wrapper {
+        background-color: $layer;
+        display: flex;
+        align-items: center;
+        border-inline-end: 1px solid $border-subtle;
+        margin-inline-end: 0;
+        padding-inline-end: $spacing-03;
+        white-space: nowrap;
+
+        .#{$prefix}--label {
+          padding-inline-start: $spacing-05;
+        }
+
+        .#{$prefix}--text-input {
+          padding-block: 0;
+          padding-inline-start: $spacing-03;
+          padding-inline-end: $spacing-07;
+        }
+
+        .#{$prefix}--list-box__menu-icon {
+          inset-inline-end: $spacing-03;
+        }
+
+        .#{$prefix}--dropdown,
+        .#{$prefix}--multi-select {
+          inline-size: 10rem;
+        }
+
+        .#{$prefix}--multi-select--inline,
+        .#{$prefix}--list-box--inline {
+          background-color: $layer;
+          block-size: 100%;
+          max-block-size: 3rem;
+        }
+
+        .#{$prefix}--list-box__field {
+          block-size: 100%;
+
+          input.#{$prefix}--text-input {
+            &:placeholder-shown {
+              text-overflow: ellipsis;
+            }
+          }
+        }
+
+        &.#{$prefix}--dropdown__wrapper--inline .#{$prefix}--label {
+          padding-inline-start: 1rem;
+        }
+
+        @media (max-width: 672px) {
+          &.#{$prefix}--list-box__wrapper--inline .#{$prefix}--label {
+            display: none;
+          }
+        }
+      }
+    }
+  }
+
+  &.tkn--table-with-details tbody td {
+    padding-block-start: 14px;
+    padding-block-end: 14px;
+
+    &:not(.cell-actions):not(.#{$prefix}--table-column-checkbox) > div {
+      display: flex;
+      flex-direction: column;
+    }
+
+    &.cell-time, .tkn--table--sub {
+      @include type-style('helper-text-01');
+    }
+
+    &.#{$prefix}--table-column-checkbox {
+      padding-block-start: 12px;
+      vertical-align: baseline;
+    }
+
+    &.cell-actions {
+      padding-block-start: 2px;
+    }
+
+    &.cell-status .tkn--table--sub {
+      margin-inline-start: 1.7rem;
+    }
+
+    .tkn--table--sub {
+      margin-block-start: 2px;
+    }
+  }
+
+  a.#{$prefix}--link:not(.#{$prefix}--btn) {
+    display: inline;
+  }
+}

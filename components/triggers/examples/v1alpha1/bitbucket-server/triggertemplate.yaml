@@ -1,0 +1,21 @@
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: bitbucket-server-template
+spec:
+  params:
+    - name: gitrevision
+    - name: gitrepositoryurl
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: TaskRun
+      metadata:
+        generateName: bitbucket-run-
+      spec:
+        taskSpec:
+          steps:
+            - image: ubuntu
+              script: |
+                #! /bin/bash
+                echo "Revision is : $(tt.params.gitrevision). RepoURL is $(tt.params.gitrepositoryurl)"

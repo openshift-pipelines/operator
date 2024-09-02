@@ -1,0 +1,216 @@
+# Copyright 2021 Red Hat
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: repositories.pipelinesascode.tekton.dev
+  labels:
+    app.kubernetes.io/version: "devel"
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: pipelines-as-code
+spec:
+  group: pipelinesascode.tekton.dev
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - jsonPath: .spec.url
+          name: URL
+          type: string
+        - name: Succeeded
+          type: string
+          jsonPath: '.pipelinerun_status[-1].conditions[?(@.type=="Succeeded")].status'
+        - name: Reason
+          type: string
+          jsonPath: '.pipelinerun_status[-1].conditions[?(@.type=="Succeeded")].reason'
+        - name: StartTime
+          type: date
+          jsonPath: ".pipelinerun_status[-1].startTime"
+        - name: CompletionTime
+          type: date
+          jsonPath: ".pipelinerun_status[-1].completionTime"
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          x-kubernetes-preserve-unknown-fields: true
+          description: Schema for the repository API
+          properties:
+            apiVersion:
+              description:
+                "APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/  api-conventions.md#resources"
+              type: string
+            kind:
+              description:
+                "Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: Spec defines the desired state of Repository
+              properties:
+                settings:
+                  description: Settings relative to the Repository
+                  type: object
+                  properties:
+                    policy:
+                      type: object
+                      description: Set policy on actions allowing only some teams
+                      properties:
+                        ok_to_test:
+                          type: array
+                          items:
+                            description: list of teams allowed to run /ok-to-test
+                            type: string
+                        pull_request:
+                          type: array
+                          items:
+                            description: list of teams allowed to have ci run on pull/merge requests.
+                            type: string
+                    github_app_token_scope_repos:
+                      type: array
+                      items:
+                        description: list of repositories where Github token can be scoped
+                        type: string
+                    pipelinerun_provenance:
+                      description: From where the PipelineRun definitions will be coming from
+                      type: string
+                      enum:
+                        - source
+                        - default_branch
+                concurrency_limit:
+                  description: Number of maximum pipelinerun running at any moment
+                  type: integer
+                url:
+                  description: Repository URL
+                  type: string
+                type:
+                  description: Git repository provider
+                  type: string
+                  enum:
+                    - github
+                    - gitea
+                    - bitbucket
+                    - gitlab
+                    - bitbucket-enteprise
+                params:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        description: The name of the params for the pipelinerun variable
+                        type: string
+                      value:
+                        description: The value of the params as injected into pipelinerun
+                        type: string
+                      filter:
+                        description: A CEL filter to set condition on param
+                        type: string
+                      secret_ref:
+                        description: The value as coming from secret
+                        type: object
+                        required:
+                          - name
+                          - key
+                        properties:
+                          key:
+                            description: Key of the secret
+                            type: string
+                            default: "secret"
+                          name:
+                            description: Name of the secret
+                            type: string
+                incoming:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        description: Type of webhook
+                        type: string
+                        enum:
+                          - webhook-url
+                      params:
+                        description: Parameters accepted to be overwritten when posting to the webhook
+                        type: array
+                        items:
+                          description: Parameter
+                          type: string
+                      targets:
+                        description: List of target branches or ref to trigger webhooks on
+                        type: array
+                        items:
+                          description: Branch name
+                          type: string
+                      secret:
+                        description: Secret to use for the webhook
+                        type: object
+                        properties:
+                          key:
+                            description: Key of the secret
+                            type: string
+                            default: "secret"
+                          name:
+                            description: Name of the secret
+                            type: string
+                git_provider:
+                  type: object
+                  properties:
+                    url:
+                      description: The Git provider api url
+                      type: string
+                    user:
+                      description: The Git provider api user
+                      type: string
+                    type:
+                      description: The Git provider type
+                      type: string
+                    secret:
+                      type: object
+                      properties:
+                        key:
+                          type: string
+                          description: "Key inside the secret"
+                          default: "provider.token"
+                        name:
+                          type: string
+                          description: "The secret name"
+                    webhook_secret:
+                      type: object
+                      properties:
+                        key:
+                          type: string
+                          description: "Key inside the secret"
+                          default: "webhook.secret"
+                        name:
+                          type: string
+                          description: "The secret name"
+              type: object
+          type: object
+  scope: Namespaced
+  names:
+    plural: repositories
+    singular: repository
+    kind: Repository
+    shortNames:
+      - repo

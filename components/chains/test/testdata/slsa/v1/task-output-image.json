@@ -1,0 +1,55 @@
+{
+    "_type": "https://in-toto.io/Statement/v0.1",
+    "predicateType": "https://slsa.dev/provenance/v0.2",
+    "subject": [
+        {
+            "name": "gcr.io/foo/bar",
+            "digest": {
+                "sha256": "05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5"
+            }
+        }
+    ],
+    "predicate": {
+        "builder": {
+            "id": "https://tekton.dev/chains/v2"
+        },
+        "buildType": "tekton.dev/v1beta1/TaskRun",
+        "invocation": {
+            "configSource": {},
+            "parameters": {}
+        },
+        "buildConfig": {
+            "steps": [
+                {
+                    "entryPoint": "#!/usr/bin/env sh\necho 'gcr.io/foo/bar' | tee /tekton/results/IMAGE_URL\necho 'sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5' | tee /tekton/results/IMAGE_DIGEST",
+                    "arguments": null,
+                    "environment": {
+                        "container": "{{index .ContainerNames 0}}",
+                        "image": "oci://{{index .StepImages 0}}"
+                    },
+                    "annotations": null
+                }
+            ]
+        },
+        "metadata": {
+            "buildStartedOn": "{{index .BuildStartTimes 0}}",
+            "buildFinishedOn": "{{index .BuildFinishedTimes 0}}",
+            "completeness": {
+                "parameters": false,
+                "environment": false,
+                "materials": false
+            },
+            "reproducible": false
+        },
+        "materials": [
+	    {{range .URIDigest}}
+	    {
+		"uri": "{{.URI}}",
+		"digest": {
+		    "sha256": "{{.Digest}}"
+		}
+	    }
+	    {{end}}
+        ]
+    }
+}

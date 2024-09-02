@@ -1,0 +1,487 @@
+// Copyright © 2020 The Tekton Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package types
+
+import (
+	. "goa.design/goa/v3/dsl"
+)
+
+var PipelinesVersionRegex = `^\d+(?:\.\d+){0,2}$`
+
+var TagDef = Type("Tag", func() {
+	Attribute("id", UInt, "ID is the unique id of tag", func() {
+		Example("id", 1)
+	})
+	Attribute("name", String, "Name of tag", func() {
+		Example("name", "image-build")
+	})
+
+	Required("id", "name")
+})
+
+var Tags = ArrayOf(TagDef)
+
+var Platform = Type("Platform", func() {
+	Attribute("id", UInt, "ID is the unique id of platform", func() {
+		Example("id", 1)
+	})
+	Attribute("name", String, "Name of platform", func() {
+		Example("name", "linux/amd64")
+	})
+
+	Required("id", "name")
+})
+
+var Platforms = ArrayOf(Platform)
+
+var Category = Type("Category", func() {
+	Attribute("id", UInt, "ID is the unique id of the category", func() {
+		Example("id", 1)
+	})
+	Attribute("name", String, "Name of category", func() {
+		Example("name", "Image Builder")
+	})
+
+	Required("id", "name")
+})
+
+var Categories = ArrayOf(Category)
+
+var Catalog = ResultType("application/vnd.hub.catalog", "Catalog", func() {
+	Attribute("id", UInt, "ID is the unique id of the catalog", func() {
+		Example("id", 1)
+	})
+	Attribute("name", String, "Name of catalog", func() {
+		Example("name", "Tekton")
+	})
+	Attribute("type", String, "Type of catalog", func() {
+		Enum("official", "community")
+		Example("type", "community")
+	})
+	Attribute("url", String, "URL of catalog", func() {
+		Example("url", "https://github.com/tektoncd/hub")
+	})
+	Attribute("provider", String, "Provider of catalog", func() {
+		Example("provider", "github")
+	})
+
+	View("min", func() {
+		Attribute("id")
+		Attribute("name")
+		Attribute("type")
+	})
+
+	View("default", func() {
+		Attribute("id")
+		Attribute("name")
+		Attribute("type")
+		Attribute("url")
+		Attribute("provider")
+	})
+
+	Required("id", "name", "type", "url", "provider")
+})
+
+var ResourceContent = ResultType("application/vnd.hub.resourcecontent", "ResourceContent", func() {
+	Attribute("readme", String, "Readme", func() {
+		Example("readme", "#Readme\n Sample readme content")
+	})
+	Attribute("yaml", String, "Yaml", func() {
+		Example("yaml", "#YAML\n Sample yaml content")
+	})
+
+	View("readme", func() {
+		Attribute("readme")
+	})
+
+	View("yaml", func() {
+		Attribute("yaml")
+	})
+})
+
+var ResourceVersionData = ResultType("application/vnd.hub.resource.version.data", "ResourceVersionData", func() {
+	Description("The Version result type describes resource's version information.")
+
+	Attribute("id", UInt, "ID is the unique id of resource's version", func() {
+		Example("id", 1)
+	})
+	Attribute("version", String, "Version of resource", func() {
+		Example("version", "0.1")
+	})
+	Attribute("displayName", String, "Display name of version", func() {
+		Example("displayName", "Buildah")
+	})
+	Attribute("deprecated", Boolean, "Deprecation status of a version", func() {
+		Example("deprecated", true)
+	})
+	Attribute("description", String, "Description of version", func() {
+		Example("descripiton", "Buildah task builds source into a container image and then pushes it to a container registry.")
+	})
+	Attribute("minPipelinesVersion", String, "Minimum pipelines version the resource's version is compatible with", func() {
+		Example("minPipelinesVersion", "0.12.1")
+	})
+	Attribute("rawURL", String, "Raw URL of resource's yaml file of the version", func() {
+		Format(FormatURI)
+		Example("rawURL", "https://raw.githubusercontent.com/tektoncd/catalog/main/task/buildah/0.1/buildah.yaml")
+	})
+	Attribute("webURL", String, "Web URL of resource's yaml file of the version", func() {
+		Format(FormatURI)
+		Example("webURL", "https://github.com/tektoncd/catalog/blob/main/task/buildah/0.1/buildah.yaml")
+	})
+	Attribute("hubRawURLPath", String, "Path of the api to get the raw yaml of resource from hub apiserver", func() {
+		Example("hubRawURLPath", "/tekton/task/buildah/raw")
+	})
+	Attribute("updatedAt", String, "Timestamp when version was last updated", func() {
+		Format(FormatDateTime)
+		Example("updatedAt", "2020-01-01 12:00:00 +0000 UTC")
+	})
+	Attribute("platforms", Platforms, "Platforms related to resource version", func() {
+		Example("platforms", func() {
+			Value([]Val{
+				{"id": 1, "name": "linux/s390x"},
+			})
+		})
+	})
+	Attribute("hubURLPath", String, "Url path of the resource in hub", func() {
+		Example("hubURLPath", "tekton/task/buildah")
+	})
+	Attribute("resource", ResourceData, "Resource to which the version belongs", func() {
+		View("info")
+		Example("resource", func() {
+			Value(Val{
+				"id":         1,
+				"name":       "buildah",
+				"catalog":    Val{"id": 1, "type": "community"},
+				"categories": []Val{{"id": 1, "name": "Build Tools"}},
+				"kind":       "task",
+				"tags":       []Val{{"id": 1, "name": "image-build"}},
+				"platforms":  []Val{{"id": 1, "name": "linux/amd64"}},
+				"rating":     4.3,
+			})
+		})
+	})
+
+	View("tiny", func() {
+		Attribute("id")
+		Attribute("version")
+	})
+
+	View("min", func() {
+		Attribute("id")
+		Attribute("version")
+		Attribute("rawURL")
+		Attribute("webURL")
+		Attribute("hubRawURLPath")
+		Attribute("hubURLPath")
+		Attribute("platforms")
+	})
+
+	View("withoutResource", func() {
+		Attribute("id")
+		Attribute("version")
+		Attribute("displayName")
+		Attribute("deprecated")
+		Attribute("description")
+		Attribute("minPipelinesVersion")
+		Attribute("rawURL")
+		Attribute("webURL")
+		Attribute("hubRawURLPath")
+		Attribute("hubURLPath")
+		Attribute("updatedAt")
+		Attribute("platforms")
+	})
+
+	View("default", func() {
+		Attribute("id")
+		Attribute("version")
+		Attribute("displayName")
+		Attribute("deprecated")
+		Attribute("description")
+		Attribute("minPipelinesVersion")
+		Attribute("rawURL")
+		Attribute("webURL")
+		Attribute("hubURLPath")
+		Attribute("hubRawURLPath")
+		Attribute("updatedAt")
+		Attribute("resource")
+		Attribute("platforms")
+	})
+
+	Required("id", "version", "displayName", "description", "minPipelinesVersion", "rawURL", "webURL", "updatedAt", "platforms", "resource", "hubURLPath", "hubRawURLPath")
+})
+
+var ResourceData = ResultType("application/vnd.hub.resource.data", "ResourceData", func() {
+	Description("The resource type describes resource information.")
+
+	Attribute("id", UInt, "ID is the unique id of the resource", func() {
+		Example("id", 1)
+	})
+	Attribute("name", String, "Name of resource", func() {
+		Example("name", "buildah")
+	})
+	Attribute("catalog", Catalog, "Type of catalog to which resource belongs", func() {
+		View("min")
+		Example("catalog", func() {
+			Value(Val{"id": 1, "name": "tekton", "type": "community"})
+		})
+	})
+	Attribute("categories", Categories, "Categories related to resource", func() {
+		Example("categories", func() {
+			Value([]Val{
+				{"id": 1, "name": "image-build"},
+			})
+		})
+	})
+	Attribute("kind", String, "Kind of resource", func() {
+		Example("kind", "task")
+	})
+	Attribute("hubURLPath", String, "Url path of the resource in hub", func() {
+		Example("hubURLPath", "tekton/task/buildah")
+	})
+	Attribute("hubRawURLPath", String, "Path of the api to get the raw yaml of resource from hub apiserver", func() {
+		Example("hubRawURLPath", "/tekton/task/buildah/raw")
+	})
+	Attribute("latestVersion", "ResourceVersionData", "Latest version of resource", func() {
+		View("withoutResource")
+		Example("latestVersion", func() {
+			Value(Val{
+				"id":                  1,
+				"version":             "0.1",
+				"description":         "Buildah task builds source into a container image and then pushes it to a container registry.",
+				"displayName":         "Buildah",
+				"minPipelinesVersion": "0.12.1",
+				"rawURL":              "https://raw.githubusercontent.com/tektoncd/catalog/main/task/buildah/0.1/buildah.yaml",
+				"webURL":              "https://github.com/tektoncd/catalog/blob/main/task/buildah/0.1/buildah.yaml",
+				"hubRawURLPath":       "/tekton/task/buildah/latest/raw",
+				"updatedAt":           "2020-01-01 12:00:00 +0000 UTC",
+				"platforms":           []Val{{"id": 1, "name": "linux/amd64"}},
+			})
+		})
+	})
+	Attribute("tags", Tags, "Tags related to resource", func() {
+		Example("tags", func() {
+			Value([]Val{
+				{"id": 1, "name": "image-build"},
+			})
+		})
+	})
+
+	Attribute("platforms", Platforms, "Platforms related to resource", func() {
+		Example("platforms", func() {
+			Value([]Val{
+				{"id": 1, "name": "linux/amd64"},
+			})
+		})
+	})
+	Attribute("rating", Float64, "Rating of resource", func() {
+		Example("rating", 4.3)
+	})
+	Attribute("versions", ArrayOf("ResourceVersionData"), "List of all versions of a resource", func() {
+		Example("versions", func() {
+			Value([]Val{{
+				"id":      1,
+				"version": "0.1",
+			}, {
+				"id":      2,
+				"version": "0.2",
+			}})
+		})
+	})
+
+	View("info", func() {
+		Attribute("id")
+		Attribute("name")
+		Attribute("catalog")
+		Attribute("categories")
+		Attribute("kind")
+		Attribute("hubURLPath")
+		Attribute("tags")
+		Attribute("platforms")
+		Attribute("rating")
+	})
+
+	View("withoutVersion", func() {
+		Attribute("id")
+		Attribute("name")
+		Attribute("catalog", func() {
+			View("min")
+		})
+		Attribute("categories")
+		Attribute("kind")
+		Attribute("hubURLPath")
+		Attribute("hubRawURLPath")
+		Attribute("latestVersion")
+		Attribute("tags")
+		Attribute("platforms")
+		Attribute("rating")
+	})
+
+	View("default", func() {
+		Attribute("id")
+		Attribute("name")
+		Attribute("catalog")
+		Attribute("categories")
+		Attribute("kind")
+		Attribute("hubURLPath")
+		Attribute("hubRawURLPath")
+		Attribute("latestVersion")
+		Attribute("tags")
+		Attribute("platforms")
+		Attribute("rating")
+		Attribute("versions", func() {
+			View("tiny")
+		})
+	})
+
+	Required("id", "name", "catalog", "categories", "kind", "hubURLPath", "latestVersion", "tags", "platforms", "rating", "versions", "hubRawURLPath")
+})
+
+var Versions = ResultType("application/vnd.hub.versions", "Versions", func() {
+	Description("The Versions type describes response for versions by resource id API.")
+
+	Attribute("latest", ResourceVersionData, "Latest Version of resource", func() {
+		Example("latest", func() {
+			Value(Val{
+				"id":            2,
+				"version":       "0.2",
+				"rawURL":        "https://raw.githubusercontent.com/tektoncd/catalog/main/task/buildah/0.2/buildah.yaml",
+				"webURL":        "https://github.com/tektoncd/catalog/blob/main/task/buildah/0.2/buildah.yaml",
+				"hubRawURLPath": "/resource/tektoncd/task/buildah/raw",
+			})
+		})
+	})
+	Attribute("versions", ArrayOf(ResourceVersionData), "List of all versions of resource", func() {
+		Example("versions", func() {
+			Value([]Val{{
+				"id":            1,
+				"version":       "0.1",
+				"rawURL":        "https://raw.githubusercontent.com/tektoncd/catalog/main/task/buildah/0.1/buildah.yaml",
+				"webURL":        "https://github.com/tektoncd/catalog/blob/main/task/buildah/0.1/buildah.yaml",
+				"hubRawURLPath": "/resource/tektoncd/task/buildah/0.1/raw",
+			}, {
+				"id":            2,
+				"version":       "0.2",
+				"rawURL":        "https://raw.githubusercontent.com/tektoncd/catalog/main/task/buildah/0.2/buildah.yaml",
+				"webURL":        "https://github.com/tektoncd/catalog/blob/main/task/buildah/0.2/buildah.yaml",
+				"hubRawURLPath": "/resource/tektoncd/task/buildah/0.2/raw",
+			}})
+		})
+	})
+
+	View("default", func() {
+		Attribute("latest", func() {
+			View("min")
+		})
+		Attribute("versions", func() {
+			View("min")
+		})
+	})
+
+	Required("latest", "versions")
+})
+
+var JWTAuth = JWTSecurity("jwt", func() {
+	Description("Secures endpoint by requiring a valid JWT retrieved via the /auth/login endpoint.")
+	Scope("rating:read", "Read-only access to rating")
+	Scope("rating:write", "Read and write access to rating")
+	Scope("agent:create", "Access to create or update an agent")
+	Scope("catalog:refresh", "Access to refresh catalog")
+	Scope("config:refresh", "Access to refresh config file")
+	Scope("refresh:token", "Access to refresh user access token")
+})
+
+var HubService = Type("HubService", func() {
+	Description("Describes the services and their status")
+	Attribute("name", String, "Name of the service", func() {
+		Example("name", "api")
+	})
+	Attribute("status", String, "Status of the service", func() {
+		Enum("ok", "error")
+		Example("status", "ok")
+	})
+	Attribute("error", String, "Details of the error if any", func() {
+		Example("error", "unable to reach db")
+	})
+
+	Required("name", "status")
+})
+
+var Job = ResultType("application/vnd.hub.job", "Job", func() {
+	Description("The Job type describes a catalog refresh job that is run asynchronously")
+	Attribute("id", UInt, "id of the job", func() {
+		Example("id", 1)
+	})
+	Attribute("catalogName", String, "Name of the catalog", func() {
+		Example("catalogName", "tekton")
+	})
+	Attribute("status", String, "status of the job", func() {
+		Example("status", "queued")
+	})
+	Required("id", "catalogName", "status")
+})
+
+var Resources = ResultType("application/vnd.hub.resources", "Resources", func() {
+	Attribute("data", CollectionOf(ResourceData), func() {
+		View("withoutVersion")
+	})
+	Required("data")
+})
+
+var ResourceVersions = ResultType("application/vnd.hub.resource.versions", "ResourceVersions", func() {
+	Attribute("data", Versions)
+	Required("data")
+})
+
+var ResourceVersion = ResultType("application/vnd.hub.resource.version", "ResourceVersion", func() {
+	Attribute("data", ResourceVersionData, func() {
+		View("default")
+	})
+	Required("data")
+})
+
+var Resource = ResultType("application/vnd.hub.resource", "Resource", func() {
+	Attribute("data", ResourceData, func() {
+		View("default")
+	})
+	Required("data")
+})
+
+var ResourceVersionReadme = ResultType("application/vnd.hub.resource.version.readme", "ResourceVersionReadme", func() {
+	Description("README of a particular version of a Resource")
+	Attribute("data", ResourceContent, func() {
+		View("readme")
+	})
+	Required("data")
+})
+
+var ResourceVersionYaml = ResultType("application/vnd.hub.resource.version.yaml", "ResourceVersionYaml", func() {
+	Description("YAML of a particular version of a Resource")
+	Attribute("data", ResourceContent, func() {
+		View("yaml")
+	})
+	Required("data")
+})
+
+var CatalogErrors = Type("CatalogErrors", func() {
+	Description("CatalogErrors define the errors that occurred during catalog refresh")
+	Attribute("type", String, "Catalog Errror type", func() {
+		Example("type", "warning")
+
+	})
+	Attribute("errors", ArrayOf(String), "Catalog Error message", func() {
+		Example("errors", []string{"Resource tekton.dev/v1beta1, Kind=Task - buildah has no display name", "Resource tekton.dev/v1beta1, Kind=task - curl has no display name"})
+	})
+	Required("type", "errors")
+})

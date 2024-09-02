@@ -1,0 +1,34 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: pipeline-in-tekton-dir
+spec:
+  tasks:
+    - name: task-spec
+      taskSpec:
+        steps:
+          - name: task-spec
+            image: registry.access.redhat.com/ubi9/ubi-micro
+            script: |
+              echo "Hello from taskSpec"
+              exit 0
+
+    - name: \\ .RemoteTaskName //
+      taskRef:
+        name: \\ .RemoteTaskName //
+
+    - name: task-referenced-internally
+      taskRef:
+        name: task-referenced-internally
+
+    - name: task-from-custom-hub
+      taskRef:
+        name: curl
+      params:
+        - name: url
+          value: https://icanhazip.com
+        - name: options
+          value:
+          - "-f"
+          - "--fail-early"

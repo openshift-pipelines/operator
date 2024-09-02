@@ -1,0 +1,104 @@
+/*
+Copyright 2019-2024 The Tekton Authors
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+@use '@carbon/react/scss/theme' as *;
+
+header.tkn--step-details-header {
+  background-color: $layer;
+  padding-block-start: 1rem;
+  padding-block-end: 0;
+  padding-inline: 1rem;
+
+  h2.tkn--details-header--heading {
+    block-size: 1.7rem;
+    font-size: 1.3rem;
+    font-weight: 400;
+    display: flex;
+    line-height: 1.5rem;
+    align-items: baseline;
+
+    svg {
+      flex-shrink: 0;
+      align-self: normal;
+    }
+
+    .tkn--run-details-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    > .skeleton-placeholder {
+      block-size: 100%;
+      inline-size: 12rem;
+    }
+
+    > .tkn--status-icon {
+      vertical-align: top;
+      margin-inline-end: 0.75rem;
+      inline-size: 24px;
+      block-size: 24px;
+
+      &.tkn--spinner {
+        position: relative;
+        inset-block-start: -1px;
+        inset-inline-start: -1px;
+      }
+
+      &.tkn--status-icon--warning.tkn--status-icon--type-normal {
+        inline-size: 28px;
+        block-size: 28px;
+        margin-inline-end: 0.5rem;
+      }
+    }
+
+    > .tkn--status-label {
+      font-size: 0.9rem;
+      margin-inline-start: 0.75rem;
+    }
+  }
+
+  .tkn--run-details-time {
+    display: inline-block;
+    margin-block: 0.5rem;
+    margin-inline-start: 2.25rem;
+    margin-inline-end: 0;
+    font-size: 0.75rem;
+  }
+
+  &[data-status] {
+    .tkn--status-label {
+      color: $text-secondary;
+    }
+  }
+  &[data-status='running'] {
+    .tkn--status-label {
+      color: $support-info;
+    }
+  }
+  &[data-status='terminated'][data-reason='Completed'],
+  &[data-status='True'] {
+    .tkn--status-label {
+      color: $support-success;
+    }
+  }
+  &[data-status='terminated'][data-reason='Error'],
+  &[data-status='False'],
+  &[data-status='cancelled'],
+  &[data-reason='TaskRunCancelled'],
+  &[data-reason='TaskRunTimeout'] {
+    .tkn--status-label {
+      color: $support-error;
+    }
+  }
+}

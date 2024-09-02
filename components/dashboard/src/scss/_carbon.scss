@@ -1,0 +1,110 @@
+/*
+Copyright 2020-2024 The Tekton Authors
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+@use '@carbon/react/scss/config' with (
+  $font-path: '@ibm/plex'
+);
+
+@use '@carbon/react/scss/reset';
+
+// Emit the Plex font-face declarations
+@use '@carbon/react/scss/fonts' with (
+  $fonts: (
+    IBM-Plex-Serif: false
+  )
+);
+
+@use '@carbon/react/scss/themes';
+@use '@carbon/react/scss/theme' with (
+  $theme: themes.$g10
+);
+@use '@carbon/react/scss/zone';
+
+@use '@carbon/react/scss/grid';
+@use '@carbon/react/scss/grid/flexbox';
+@use '@carbon/react/scss/layer';
+
+// Emit individual component styles
+@use '@carbon/react/scss/components/accordion';
+@use '@carbon/react/scss/components/button';
+@use '@carbon/react/scss/components/checkbox';
+@use '@carbon/react/scss/components/code-snippet';
+@use '@carbon/react/scss/components/combo-box';
+@use '@carbon/react/scss/components/content-switcher';
+@use '@carbon/react/scss/components/copy-button';
+@use '@carbon/react/scss/components/data-table';
+@use '@carbon/react/scss/components/data-table/action';
+@use '@carbon/react/scss/components/data-table/expandable';
+@use '@carbon/react/scss/components/data-table/skeleton';
+@use '@carbon/react/scss/components/data-table/sort';
+@use '@carbon/react/scss/components/dropdown';
+@use '@carbon/react/scss/components/form';
+@use '@carbon/react/scss/components/inline-loading';
+@use '@carbon/react/scss/components/link';
+@use '@carbon/react/scss/components/list';
+@use '@carbon/react/scss/components/loading';
+@use '@carbon/react/scss/components/menu';
+@use '@carbon/react/scss/components/modal';
+@use '@carbon/react/scss/components/notification';
+@use '@carbon/react/scss/components/overflow-menu';
+@use '@carbon/react/scss/components/pagination';
+@use '@carbon/react/scss/components/radio-button';
+@use '@carbon/react/scss/components/search';
+@use '@carbon/react/scss/components/skeleton-styles';
+@use '@carbon/react/scss/components/stack';
+@use '@carbon/react/scss/components/tabs';
+@use '@carbon/react/scss/components/tag';
+@use '@carbon/react/scss/components/text-input';
+@use '@carbon/react/scss/components/tile';
+@use '@carbon/react/scss/components/toggle';
+@use '@carbon/react/scss/components/tooltip';
+@use '@carbon/react/scss/components/ui-shell';
+
+:root {
+  // Carbon no longer exposes certain variables directly without also pulling in
+  // the component styles. So declare a CSS custom property here using the value
+  // from the button component's SASS variables so it can be used later without
+  // duplicating the button styles and causing issues with modal footer buttons
+  // and overflow menus due to the style order in the output.
+  --tkn-button-border-width: #{button.$button-border-width};
+}
+
+:root, .tkn--theme-light {
+  @include theme.theme(themes.$g10);
+}
+
+@mixin tkn--theme-dark {
+  @include theme.theme(themes.$g90);
+}
+
+.tkn--theme-dark {
+  @include tkn--theme-dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tkn--theme-system {
+    @include tkn--theme-dark;
+  }
+}
+
+.#{config.$prefix}--actionable-notification,
+.#{config.$prefix}--actionable-notification--toast,
+.#{config.$prefix}--inline-notification {
+  margin-block-start: 1rem;
+  margin-block-end: 1rem;
+}
+
+.#{config.$prefix}--actionable-notification--toast a {
+  display: inline-block;
+  margin-block-start: 1rem;
+}

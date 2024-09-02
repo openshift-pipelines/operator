@@ -1,0 +1,78 @@
+run:
+  modules-download-mode: vendor
+  build-tags:
+  - e2e
+  skip-dirs:
+  - vendor
+  - tools
+linters-settings:
+  errcheck:
+    exclude: .errcheck.txt
+linters:
+  enable:
+  - unused
+  - errcheck
+  - gofmt
+  - goimports
+  - gomodguard
+  - gosec
+  - gocritic
+  - revive
+  - misspell
+  - unconvert
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+    # TODO: should be fixed by community
+    - path: pkg/api/server/config/config.go
+      linters:
+        - revive
+    - path: pkg/api/server/v1alpha2/result/result.go
+      linters:
+        - staticcheck
+    - path: pkg/api/server/v1alpha2/record/record.go
+      linters:
+        - staticcheck
+    - path: pkg/api/server/v1alpha2/records_test.go
+      linters:
+        - staticcheck
+    - path: cmd/api/main.go
+      linters:
+        - gocritic
+        - gosec
+    - path: cmd/watcher/main.go
+      linters:
+        - gocritic
+        - staticcheck
+    - path: pkg/watcher/logs/client.go
+      linters:
+        - staticcheck
+    - path: pkg/internal/test/clients.go
+      linters:
+        - gosec
+    - path: pkg/api/server/cel2sql/type_coercion.go
+      linters:
+        - gocritic
+    - path: pkg/api/server/v1alpha2/results_test.go
+      linters:
+        - staticcheck
+    - path: pkg/api/server/v1alpha2/results.go
+      linters:
+        - staticcheck
+    - path: pkg/api/server/v1alpha2/records.go
+      linters:
+        - staticcheck
+    - path: pkg/api/server/cel2sql/interpreter.go
+      linters:
+        - staticcheck
+        - revive
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  include:
+  # Enable off-by-default rules for revive requiring that all exported elements have a properly formatted comment.
+  - EXC0012 # https://golangci-lint.run/usage/false-positives/#exc0012
+  - EXC0014 # https://golangci-lint.run/usage/false-positives/#exc0014
+  timeout: 20m

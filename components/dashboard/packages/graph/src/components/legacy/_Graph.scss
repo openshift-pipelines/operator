@@ -1,0 +1,152 @@
+/*
+Copyright 2019-2024 The Tekton Authors
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+@use '@carbon/react/scss/theme' as *;
+
+.graph {
+  #edge-arrow path {
+    fill: $border-strong;
+    stroke: $border-strong;
+  }
+
+  .visx-network-link path {
+    stroke: $border-strong;
+    marker-end: url(#edge-arrow);
+  }
+
+  .Task {
+    rect {
+      fill: #FFFFFF;
+      stroke: $border-strong;
+    }
+
+    .label-hitbox {
+      stroke: transparent;
+    }
+
+    text {
+      fill: $toggle-off;
+    }
+
+    .chevron, .status-icon {
+      fill: $toggle-off;
+    }
+  }
+
+  .Start, .End {
+    rect {
+      fill: #F3F3F3;
+      stroke: #F3F3F3;
+      rx: 50%;
+      ry: 50%;
+    }
+
+    text {
+      fill: #6F6F6F;
+      font-weight: bold;
+    }
+  }
+
+  .Step {
+    rect {
+      fill: transparent;
+      stroke: transparent;
+    }
+  }
+
+  .Task g .label, .Step {
+    &:hover {
+      cursor: pointer;
+    }
+  }
+
+  .Task:not([data-status]) .label:hover {
+    .label-hitbox {
+      fill: #646565;
+    }
+    text, .chevron, .status-icon {
+      fill: #FFFFFF;
+    }
+  }
+
+  [data-status='error'] {
+    rect {
+      fill: #FFF0F1;
+      stroke: #FFF0F1;
+    }
+    &.Task text {
+      fill: #DA1E28;
+      font-weight: bold;
+    }
+    .chevron, .status-icon {
+      fill: #DA1E28;
+    }
+
+    .label:hover .label-hitbox {
+      fill: #FDC9CD;
+      stroke: #FDC9CD;
+    }
+  }
+
+  [data-status='running'] {
+    rect {
+      fill: #EDF4FF;
+      stroke: #EDF4FF;
+    }
+    &.Task text {
+      fill: #282828;
+      font-weight: bold;
+    }
+    .status-icon {
+      stroke: #0062FF;
+    }
+    .chevron {
+      fill: #000000;
+    }
+
+    .label:hover .label-hitbox {
+      fill: #C5DBEE;
+      stroke: #C5DBEE;
+    }
+  }
+
+  [data-status='success'] {
+    rect {
+      fill: #DAFBE4;
+      stroke: #DAFBE4;
+    }
+    &.Task text {
+      fill: #054719;
+      font-weight: bold;
+    }
+    .status-icon {
+      fill: #24A249;
+    }
+    .chevron {
+      fill: #0C5824;
+    }
+
+    .label:hover .label-hitbox {
+      fill: #BCDFBB;
+      stroke: #BCDFBB;
+    }
+  }
+
+  .Step .label text {
+    font-weight: normal;
+  }
+
+  .selected > g > .label .label-hitbox {
+    stroke: #0062FF;
+  }
+}

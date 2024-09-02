@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+
+# Copyright 2020-2024 The Tekton Authors
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -e
+
+CLUSTERNAME=tekton-dashboard
+DEFAULT_OPTIONS="--log-format console --read-write"
+ENABLE_INGRESS="false"
+KUBERNETES_NODE_IMAGE="docker.io/kindest/node:v1.30.0@sha256:047357ac0cfea04663786a612ba1eaba9702bef25227a794b52890dd8bcd692e"
+
+create_cluster() {
+if [ "$ENABLE_INGRESS" == "false" ]; then
+  kind create cluster --name $CLUSTERNAME --config - <<EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  image: $KUBERNETES_NODE_IMAGE
+EOF
+else
+  kind create cluster --name $CLUSTERNAME --config - <<EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  image: $KUBERNETES_NODE_IMAGE
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: 80
+    protocol: TCP
+  - containerPort: 443
+    hostPort: 443
+    protocol: TCP
+EOF
+fi
+}
+
+# Display a box banner.
+# Parameters: $1 - character to use for the box.
+#             $2 - banner message.
+make_banner() {
+  local msg="$1$1$1$1 $2 $1$1$1$1"
+  local border="${msg//[-0-9A-Za-z _.,\/()]/$1}"
+  echo -e "${border}\n${msg}\n${border}"
+}
+
+header() {
+  make_banner "=" "$1"
+}
+
+install_ingress_nginx() {
+  header 'Installing ingress controller'
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.3.1/deploy/static/provider/kind/deploy.yaml
+  sleep 20
+  kubectl wait -n ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s
+}
+
+install_pipelines() {
+  header 'Installing Tekton Pipelines'
+  kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
+  sleep 10
+  kubectl wait -n tekton-pipelines --for=condition=ready pod --selector=app.kubernetes.io/part-of=tekton-pipelines,app.kubernetes.io/component=controller --timeout=90s
+}
+
+install_triggers() {
+  header 'Installing Tekton Triggers'
+  kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml
+  kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
+  sleep 10
+  kubectl wait -n tekton-pipelines --for=condition=ready pod --selector=app.kubernetes.io/part-of=tekton-triggers,app.kubernetes.io/component=controller --timeout=90s
+}
+
+install_dashboard() {
+  header 'Installing Tekton Dashboard'
+  KO_DOCKER_REPO=kind.local KIND_CLUSTER_NAME=$CLUSTERNAME ./scripts/installer install $DEFAULT_OPTIONS $@
+}
+
+delete_cluster() {
+  kind delete cluster --name $CLUSTERNAME
+}
+
+case $1 in
+  'create'|c)
+    shift
+    create_cluster
+    install_pipelines
+    install_triggers
+    install_dashboard $@
+    ;;
+  'create-with-ingress'|i)
+    shift
+    ENABLE_INGRESS="true"
+    create_cluster
+    install_ingress_nginx
+    install_pipelines
+    install_triggers
+    install_dashboard --ingress-url tekton-dashboard.127.0.0.1.nip.io --ingress-default-class $@
+    ;;
+  'update'|u)
+    shift
+    install_pipelines
+    install_triggers
+    install_dashboard $@
+    ;;
+  'delete'|d)
+    delete_cluster
+    ;;
+  *)
+    echo "ERROR: Unknown action $1"
+    exit 1
+    ;;
+esac

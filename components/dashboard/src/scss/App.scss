@@ -1,0 +1,130 @@
+/*
+Copyright 2019-2024 The Tekton Authors
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+@use './carbon';
+@use '@carbon/react/scss/config' as *;
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/type' as *;
+
+@use './Definitions';
+@use './Triggers';
+@use './Create';
+@use '../containers/About/About';
+@use '../containers/Settings/Settings';
+@use '../containers/NotFound/NotFound';
+@use '../containers/EventListener/EventListener';
+@use '../containers/Header/Header';
+@use '../containers/ImportResources/ImportResources';
+@use '../containers/SideNav/SideNav';
+@use '../containers/LoadingShell/LoadingShell';
+
+@use '@tektoncd/dashboard-components/src/scss/common';
+@use '@tektoncd/dashboard-components/src/scss/Run';
+@use '@tektoncd/dashboard-components/src/components/DeleteModal/DeleteModal';
+@use '@tektoncd/dashboard-components/src/components/DetailsHeader/DetailsHeader';
+@use '@tektoncd/dashboard-components/src/components/DotSpinner/DotSpinner';
+@use '@tektoncd/dashboard-components/src/components/KeyValueList/KeyValueList';
+@use '@tektoncd/dashboard-components/src/components/LabelFilter/LabelFilter';
+@use '@tektoncd/dashboard-components/src/components/Loading/Loading';
+@use '@tektoncd/dashboard-components/src/components/Log/Log';
+@use '@tektoncd/dashboard-components/src/components/LogFormat/LogFormat';
+@use '@tektoncd/dashboard-components/src/components/Param/Param';
+@use '@tektoncd/dashboard-components/src/components/PipelineRuns/PipelineRuns';
+@use '@tektoncd/dashboard-components/src/components/RunHeader/RunHeader';
+@use '@tektoncd/dashboard-components/src/components/Spinner/Spinner';
+@use '@tektoncd/dashboard-components/src/components/StatusIcon/StatusIcon';
+@use '@tektoncd/dashboard-components/src/components/Step/Step';
+@use '@tektoncd/dashboard-components/src/components/StepDetails/StepDetails';
+@use '@tektoncd/dashboard-components/src/components/Table/Table';
+@use '@tektoncd/dashboard-components/src/components/Task/Task';
+@use '@tektoncd/dashboard-components/src/components/TaskRunDetails/TaskRunDetails';
+@use '@tektoncd/dashboard-components/src/components/TaskTree/TaskTree';
+@use '@tektoncd/dashboard-components/src/components/Trigger/Trigger';
+@use '@tektoncd/dashboard-components/src/components/ViewYAML/ViewYAML';
+
+html,
+#root,
+.tkn--main-content {
+  block-size: 100%;
+}
+
+body {
+  // to prevent unwanted scroll when content doesn't fill full height
+  block-size: calc(100% - 3rem);
+}
+
+#main-content {
+  // height of the main header, added for accessibility of skip to main content link
+  scroll-margin-block-start: 3rem;
+}
+
+.#{$prefix}--btn.link-btn.#{$prefix}--btn--ghost {
+  text-decoration: none;
+}
+
+.#{$prefix}--header ~ {
+  .#{$prefix}--content {
+    position: relative;
+    background-color: $background;
+    transform: none;
+    padding-block-start: $spacing-06;
+
+    h1 {
+      @include type-style('heading-04');
+      margin-block-end: $spacing-06;
+    }
+
+    h2 {
+      @include type-style('heading-01');
+    }
+  }
+}
+
+.#{$prefix}--header:has(.#{$prefix}--side-nav--expanded) ~ .#{$prefix}--content {
+  margin-inline-start: 16rem;
+}
+
+.#{$prefix}--modal-header,
+.#{$prefix}--modal-content {
+  inline-size: 100%;
+}
+
+.#{$prefix}--table-header-label {
+  white-space: nowrap;
+}
+
+.#{$prefix}--list--unordered {
+  margin-block-start: 1rem;
+}
+
+#tkn--maximized-logs-container {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: 100%;
+  block-size: 100vb;
+  z-index: -1;
+
+  &:not(:empty) {
+    z-index: 9999;
+  }
+
+  .tkn--log {
+    min-block-size: 100%;
+  }
+}
+
+.#{$prefix}--overflow-menu-options:after {
+  display: none;
+}

@@ -1,0 +1,124 @@
+/*
+Copyright 2019-2024 The Tekton Authors
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+@use '@carbon/react/scss/config' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/type' as *;
+
+pre.tkn--log {
+  position: relative;
+  padding-block-start: 2rem;
+  padding-block-end: 1.3rem;
+  padding-inline: 1.6rem;
+  @include font-family('mono');
+  font-size: 0.75rem;
+  @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 2dppx) {
+    font-size: 0.6875rem;
+  }
+
+  line-height: 0.95rem; // Update the react-window List itemSize if changing this
+  overflow: hidden;
+  background-color: $background;
+  color: $text-primary;
+
+  word-break: normal;
+  word-wrap: normal;
+
+  .#{$prefix}--skeleton__text {
+    background-color: $skeleton-background;
+
+    &::before {
+      background-color: $skeleton-element;
+    }
+  }
+
+  a {
+    color: $link-primary;
+  }
+
+  code {
+    white-space: pre;
+    overflow-wrap: normal;
+  }
+
+  .#{$prefix}--btn-set {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+  }
+
+  .button-container {
+    position: absolute;
+    clip-path: inset(0); // ensure the children with position:fixed are not shown outside this element.
+    inset-block-start: 3.125rem; //equals the maximum between padding-block-start of pre.tkn--log and between the page header height
+    inset-block-end: 0;
+    inset-inline-end: 0;
+    inline-size: 1.6rem; //equals the padding-inline-end of pre.tkn--log
+  }
+
+  #log-scroll-to-start-btn, #log-scroll-to-end-btn {
+    position: fixed;
+    inset-inline-end: var(--tkn-log-element-right);
+
+    &::before { // the tooltip is not shown because it is outside of its parent .button-container (which has clip-path inset) But fin still appears.
+      content: none; // To remove fin of truncated tooltip. To  obtain higher specificity than Carbon css, id selector is needed.
+    }
+  }
+  
+  #log-scroll-to-start-btn {
+    inset-block-start: calc(var(--tkn-scroll-button-top) + 3.125rem); //3.125 rem is the maximum between padding-block-start of pre.tkn--log and between the page header height
+  }
+
+  #log-scroll-to-end-btn {
+    inset-block-end: var(--tkn-scroll-button-bottom);
+  }
+
+  .#{$prefix}--copy-btn {
+    inline-size: 2rem;
+    block-size: 2rem;
+    min-block-size: 2rem;
+    background-color: $background;
+
+    &:hover {
+      background-color: $layer-hover;
+    }
+
+    &:focus {
+      outline-color: white;
+    }
+
+    svg {
+      fill: $icon-primary;
+    }
+  }
+
+  .tkn--log-trailer {
+    font-family: ibm-plex-sans, sans-serif;
+    font-weight: bold;
+
+    &[data-status='Completed'] {
+      color: $support-success;
+    }
+    &[data-status='Error'] {
+      color: $support-error;
+    }
+  }
+
+  .tkn--log-container {
+    overflow-x: auto;
+  }
+
+  .tkn--log-container:not(:empty) + .tkn--log-trailer {
+    margin-block-start: 1rem;
+  }
+}

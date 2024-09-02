@@ -1,0 +1,22 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    acme.cert-manager.io/http01-edit-in-place: 'true'
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    dns.gardener.cloud/dnsnames: 'api.hub.tekton.dev'
+    dns.gardener.cloud/ttl: "3600"
+  name: tekton-hub-api
+spec:
+  rules:
+  - host: api.hub.tekton.dev
+    http:
+      paths:
+      - backend:
+          serviceName: tekton-hub-api
+          servicePort: 8000
+        path: /*
+  tls:
+  - hosts:
+    - api.hub.tekton.dev
+    secretName: api-hub-tekton-dev-tls

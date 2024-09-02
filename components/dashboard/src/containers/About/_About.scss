@@ -1,0 +1,248 @@
+/*
+Copyright 2020-2024 The Tekton Authors
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+@use '@carbon/react/scss/config' as *;
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/type' as *;
+
+$tkn--breakpoint-md: 672px;
+$tkn--breakpoint-lg: 1056px;
+$tkn--breakpoint-max: 1584px;
+
+:root {
+  --tkn-grid-columns: 4;
+  --tkn-grid-column-size: 1fr;
+  --tkn-grid-gutter: 2rem;
+  --tkn-grid-margin: 0;
+
+  @media (min-width: $tkn--breakpoint-md) {
+    --tkn-grid-columns: 8;
+    --tkn-grid-margin: 1rem;
+  }
+
+  @media (min-width: $tkn--breakpoint-lg) {
+    --tkn-grid-columns: 16;
+  }
+
+  @media (min-width: $tkn--breakpoint-max) {
+    --tkn-grid-margin: 1.5rem;
+  }
+}
+
+.tkn--css-grid {
+  display: grid;
+  max-inline-size: 99rem;
+  padding-inline: calc(var(--tkn-grid-margin) + var(--tkn-grid-gutter) / 2);
+  margin-inline-end: auto;
+  column-gap: var(--tkn-grid-gutter);
+  grid-template-columns: repeat(
+    var(--tkn-grid-columns),
+    minmax(0, var(--tkn-grid-column-size))
+  );
+}
+
+.tkn--about {
+  margin-block-start: -1.5rem;
+  margin-block-end: 0;
+  margin-inline: -2rem;
+
+  .tkn--css-grid {
+    row-gap: calc(var(--tkn-grid-gutter) / 2);
+  }
+
+  .tkn--about-header {
+    background-color: $layer;
+    block-size: 15rem;
+    overflow: hidden;
+
+    header {
+      grid-column: 2 / span 2;
+
+      @media (min-width: $tkn--breakpoint-md) {
+        grid-column: 2 / span 5;
+      }
+
+      @media (min-width: $tkn--breakpoint-lg) {
+        grid-column: 2 / span 6;
+      }
+
+      h1 {
+        @include type-style('heading-04');
+        color: $text-primary;
+        margin-block-start: 2rem;
+        margin-block-end: 1rem;
+      }
+
+      p {
+        @include type-style('body-01');
+        color: $text-secondary;
+      }
+    }
+
+    img {
+      block-size: 30rem;
+      margin-block-start: -2rem;
+      margin-inline-end: -2rem;
+      grid-column: span 2 / -1;
+
+      @media (min-width: $tkn--breakpoint-lg) {
+        grid-column: span 6 / -1;
+      }
+    }
+  }
+
+  section {
+    margin-block-start: 2rem;
+
+    &::after {
+      content: '';
+      display: block;
+      grid-column: 1 / 2;
+      grid-row: 1 / 5;
+
+      @media (min-width: $tkn--breakpoint-md) {
+        grid-row: 1 / 4;
+      }
+
+      @media (min-width: $tkn--breakpoint-lg) {
+        grid-row: 1 / 3;
+      }
+    }
+
+    &.tkn--about-docs {
+      margin-block-start: 3rem;
+
+      &::after {
+        grid-row: 1 / 6;
+
+        @media (min-width: $tkn--breakpoint-lg) {
+          grid-row: 1 / 4;
+        }
+      }
+    }
+
+    header {
+      grid-column: 2 / -1;
+
+      h2.tkn--section-title {
+        @include type-style('heading-03');
+        color: $text-secondary;
+      }
+    }
+  }
+
+  .#{$prefix}--tile {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
+    min-block-size: 14rem;
+    grid-column-end: span 2;
+    margin-inline-start: -1rem;
+
+    @media (min-width: $tkn--breakpoint-md) {
+      grid-column-end: span 3;
+    }
+
+    @media (min-width: $tkn--breakpoint-lg) {
+      grid-column-end: span 5;
+    }
+
+    &:first-of-type {
+      grid-row-start: 2;
+      grid-column-start: 2;
+    }
+
+    h3 {
+      @include type-style('heading-01');
+      color: $text-primary;
+      margin-block-end: 1rem;
+    }
+
+    dt {
+      @include type-style('label-01');
+      color: $text-secondary;
+      margin-block-end: 0.25rem;
+    }
+
+    dd {
+      @include type-style('body-compact-01');
+      color: $text-primary;
+      margin-block-end: $spacing-05;
+
+      &:last-child {
+        margin-block-end: $spacing-03;
+      }
+    }
+
+    &.tkn--tile--docs {
+      .tkn--about-pictogram {
+        display: flex;
+        justify-content: center;
+        // pull background out to edges of tile but leave gap below
+        margin-block-start: -1rem;
+        margin-block-end: 1rem;
+        margin-inline: -1rem;
+        padding-block: 3rem;
+        padding-inline: 0;
+        background-color: $background-inverse;
+
+        svg {
+          fill: $icon-inverse;
+          inline-size: clamp(48px, 20%, 64px);
+        }
+      }
+
+      .tkn--about-docs-description {
+        display: flex;
+        flex-direction: column;
+      }
+
+      h3 {
+        margin-block-end: 1rem;
+      }
+
+      p {
+        @include type-style('body-compact-01');
+        color: $text-primary;
+        margin-block-end: 1rem;
+        min-block-size: 2rem;
+      }
+
+      .tkn--about-arrow {
+        align-self: end;
+        flex-shrink: 0;
+      }
+    }
+  }
+
+  .tkn--about--content {
+    display: flex;
+
+    .tkn--about--tables {
+      flex-grow: 1;
+    }
+
+    .tkn--about--image-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      img {
+        inline-size: 200px;
+        margin: $spacing-07;
+      }
+    }
+  }
+}

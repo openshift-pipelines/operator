@@ -1,0 +1,90 @@
+{
+    "_type": "https://in-toto.io/Statement/v0.1",
+    "predicateType": "https://slsa.dev/provenance/v0.2",
+    "subject": [
+        {
+            "name": "gcr.io/foo/bar",
+            "digest": {
+                "sha256": "05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5"
+            }
+        }
+    ],
+    "predicate": {
+        "builder": {
+            "id": "https://tekton.dev/chains/v2"
+        },
+        "buildType": "https://chains.tekton.dev/format/slsa/v2alpha1/type/tekton.dev/v1beta1/TaskRun",
+        "invocation": {
+            "configSource": {},
+            "parameters": {
+       		"ComputeResources": null,
+       		"Debug":            null,
+       		"Params":           null,
+       		"PodTemplate":      null,
+       		"Resources":        null,
+       		"Retries":            0,
+       		"ServiceAccountName": "default",
+       		"SidecarOverrides":   null,
+       		"Status":             "",
+       		"StatusMessage":      "",
+       		"StepOverrides":      null,
+       		"Timeout":            "1h0m0s",
+       		"Workspaces":         null
+	    }
+        },
+        "buildConfig": {
+            "taskSpec": {
+        "steps": [
+          {
+            "name": "create-image",
+            "image": "busybox",
+            "resources": {},
+            "script": "#!/usr/bin/env sh\necho 'gcr.io/foo/bar' | tee /tekton/results/IMAGE_URL\necho 'sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5' | tee /tekton/results/IMAGE_DIGEST"
+          }
+        ],
+        "results": [
+          {
+            "name": "IMAGE_URL",
+            "type": "string"
+          },
+          {
+            "name": "IMAGE_DIGEST",
+            "type": "string"
+          }
+        ]
+	    },
+      "taskRunResults": [
+        {
+          "name": "IMAGE_DIGEST",
+          "type": "string",
+          "value": "sha256:05f95b26ed10668b7183c1e2da98610e91372fa9f510046d4ce5812addad86b5\n"
+        },
+        {
+          "name": "IMAGE_URL",
+          "type": "string",
+          "value": "gcr.io/foo/bar\n"
+        }
+      ]
+        },
+        "metadata": {
+            "buildStartedOn": "{{index .BuildStartTimes 0}}",
+            "buildFinishedOn": "{{index .BuildFinishedTimes 0}}",
+            "completeness": {
+                "parameters": true,
+                "environment": false,
+                "materials": false
+            },
+            "reproducible": false
+        },
+        "materials": [
+	    {{range .URIDigest}}
+	    {
+		"uri": "{{.URI}}",
+		"digest": {
+		    "sha256": "{{.Digest}}"
+		}
+	    }
+	    {{end}}
+        ]
+    }
+}

@@ -1,0 +1,40 @@
+version: 2
+updates:
+  - package-ecosystem: "docker"
+    directory: "/packages/e2e/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    labels:
+    - "area/dependency"
+    - "dependencies"
+    - "kind/misc"
+    - "ok-to-test"
+    - "docker"
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    labels:
+    - "area/dependency"
+    - "dependencies"
+    - "kind/misc"
+    - "ok-to-test"
+    - "go"
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    groups:
+      storybook:
+        patterns:
+          - "storybook"
+          - "@storybook/*"
+    labels:
+    - "area/dependency"
+    - "dependencies"
+    - "kind/misc"
+    - "ok-to-test"
+    - "javascript"

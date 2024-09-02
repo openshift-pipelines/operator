@@ -1,0 +1,34 @@
+name: 'woke'
+
+permissions:
+  contents: read
+
+on:
+  - pull_request
+jobs:
+  woke:
+    name: 'woke'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0d381219ddf674d61a7572ddd19d7941e271515c # v2.9.0
+        with:
+          egress-policy: audit
+      - name: 'Checkout'
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@cc733854b1f224978ef800d29e4709d5ee2883e4 # v44.5.5
+        with:
+          write_output_files: true
+          files: |
+            **
+
+      - name: 'woke'
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: get-woke/woke-action@b2ec032c4a2c912142b38a6a453ad62017813ed0 # v0
+        with:
+          # Cause the check to fail on any broke rules
+          fail-on-error: true
+          woke-args: ${{ steps.changed_files.outputs.all_changed_files }}

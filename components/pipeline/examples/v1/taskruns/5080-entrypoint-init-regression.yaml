@@ -1,0 +1,27 @@
+apiVersion: tekton.dev/v1
+kind: TaskRun
+metadata:
+  generateName: tkn-arg-test-
+spec:
+  params:
+  - name: ARGS
+    value:
+    - init
+    - foo
+    - bar
+  taskSpec:
+    description: >-
+      Test consuming args, acts as a regression test for bug 5080
+    params:
+    - name: ARGS
+      description: The terraform cli commands to run
+      type: array
+      default:
+      - "--help"
+    steps:
+      - name: echo-cli
+        image: cgr.dev/chainguard/busybox
+        workingDir: /tekton/home
+        args:
+        - "$(params.ARGS)"
+        command: ["echo"]

@@ -1,0 +1,100 @@
+/*
+Copyright 2020-2024 The Tekton Authors
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+@use '@carbon/react/scss/colors';
+@use '@carbon/react/scss/config' as *;
+
+.#{$prefix}--snippet--multi.tkn--view-yaml--dark {
+  background-color: colors.$gray-90; // TODO: $background-inverse - see Log.scss
+  color: colors.$gray-10;            //       $text-inverse
+}
+
+.tkn--view-yaml--title {
+  display: inline-block;
+  margin-block-end: .5rem;
+
+  &:not(:first-child) {
+    margin-block-start: 1rem;
+  }
+}
+
+pre.tkn--syntax-highlighter {
+  white-space: pre-wrap;
+}
+
+.tkn--code-line {
+  counter-increment: tkn--code-line;
+  display: inline-flex;
+  inline-size: 100%;
+}
+
+.tkn--code-line::before {
+  box-sizing: content-box;
+  content: counter(tkn--code-line);
+  display: inline-block;
+  text-align: end;
+  min-inline-size: var(--tkn--line-number--min-width, 1rem);
+  padding-inline-end: 1rem;
+  user-select: none;
+}
+
+.tkn--code-line-content {
+  display: inline-block;
+  flex-grow: 1;
+}
+
+.#{$prefix}--snippet--multi {
+  max-inline-size: none;
+
+  // Styles based on a11y-dark by @ericwbailey
+  &.hljs {
+    background: #2b2b2b;
+    color: #f8f8f2;
+
+    .tkn--code-line::before {
+      color: #b8b8b8;
+    }
+
+    .hljs-comment {
+      color: #d4d0ab;
+    }
+
+    .hljs-template-variable {
+      color: #ffa07a;
+    }
+
+    .hljs-number,
+    .hljs-literal,
+    .hljs-type,
+    .hljs-meta {
+      color: #f5ab35;
+    }
+
+    .hljs-string,
+    .hljs-bullet {
+      color: #abe338;
+    }
+  }
+}
+
+@media screen and (-ms-high-contrast: active) {
+  .hljs-bullet,
+  .hljs-comment,
+  .hljs-literal,
+  .hljs-meta,
+  .hljs-number,
+  .hljs-string,
+  .hljs-type {
+    color: highlight;
+  }
+}

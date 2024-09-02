@@ -1,0 +1,140 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: release-pipeline
+  annotations:
+    pipelinesascode.tekton.dev/on-event: "[push]"
+    pipelinesascode.tekton.dev/on-target-branch: "[refs/tags/*]"
+    pipelinesascode.tekton.dev/task: "[.tekton/tasks/goreleaser.yaml]"
+    pipelinesascode.tekton.dev/task-1: "[git-clone]"
+    pipelinesascode.tekton.dev/max-keep-runs: "2"
+spec:
+  params:
+    - name: repo_url
+      value: "{{repo_url}}"
+    - name: revision
+      value: "{{revision}}"
+  pipelineSpec:
+    params:
+      - name: repo_url
+      - name: revision
+    workspaces:
+      - name: source
+    tasks:
+      - name: fetch-repository
+        taskRef:
+          name: git-clone
+        workspaces:
+          - name: output
+            workspace: source
+        params:
+          - name: depth
+            value: "0"
+          - name: url
+            value: $(params.repo_url)
+          - name: revision
+            value: $(params.revision)
+      - name: release-yaml
+        runAfter:
+          - fetch-repository
+        workspaces:
+          - name: source
+            workspace: source
+        taskSpec:
+          workspaces:
+            - name: source
+          steps:
+            - name: push-release-to-branch
+              image: registry.access.redhat.com/ubi9/python-311
+              workingDir: $(workspaces.source.path)
+              env:
+                - name: HUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: "nightly-ci-github-hub-token"
+                      key: "hub-token"
+              script: |
+                #!/usr/bin/env bash
+                # Grab the latest tag we release in
+                # Generate release.yaml for that version, for stable and for
+                # stable version release
+                # ie:
+                # if we tag 0.5.6
+                # It will generate release yamls and upload to branch
+                # release-0.5.6, release-0.5.x and stable
+                set -eufx
+                git config --global --add safe.directory $(workspaces.source.path)
+                git fetch --tag -v
+                version=$(git  --no-pager tag --points-at HEAD)
+                [[ -z ${version} ]] && {
+                    echo "No tags detected"
+                    exit
+                }
+                stable_tag=${version%.*}.x
+
+                # Keep all the latest major versions
+                # i.e: i have v0.5.1, v0.5.2, v0.6.1, v0.6.2, v0.7.1, v0.7.2
+                # it will keep v0.5.2, v0.6.2, v0.7.2
+                declare -A hashmap=()
+                for i in $(git tag -l | grep '^v' | sort -V); do
+                  semanticVersion=${i//v/}
+                  if [[ ${semanticVersion} =~ ^([0-9]+\.[0-9]+)\.[0-9]+$ ]]; then
+                    major_version=${BASH_REMATCH[1]}
+                  fi
+                  hashmap["$major_version"]=$semanticVersion
+                done
+                output=$(for i in "${!hashmap[@]}"; do
+                  echo v"${hashmap[$i]}"
+                done | sort -rV | tr "\n" ", ")
+                alltags=${output%,}
+
+                allversions="nightly,stable,$alltags"
+                git config --global user.email "pac-dev@redhat.com"
+                git config --global user.name "Pipelines as Code CI Robot"
+
+                target_tags="release-${version} release-${stable_tag}"
+                # if the current version is higher than all the other ones then tag it as the current stable
+                pip3 install packaging
+                [[ $(./hack/compare-versions.py $version $alltags) == true ]] && target_tags="${target_tags} stable"
+                for target in ${target_tags};do
+                  export PAC_VERSION=${version}
+                  export TARGET_BRANCH=${target//release-}
+                  ./hack/generate-releaseyaml.sh > release.k8s.yaml
+                  env TARGET_OPENSHIFT=true bash hack/generate-releaseyaml.sh > release.yaml
+                  msg="pac release ${version} on branch ${target}"
+                  git checkout -B $target {{ revision }}
+                  echo ${TARGET_BRANCH} > docs/content/VERSION
+                  echo ${allversions} > docs/content/ALLVERSIONS
+                  echo "$version" > pkg/params/version/version.txt
+                  git add release.yaml release.k8s.yaml docs/content/VERSION docs/content/ALLVERSIONS pkg/params/version/version.txt
+                  git commit -m "Release yaml generated from {{repo_url}}/commit/{{revision}} for release ${version}"
+                  echo git push "https://git:\$HUB_TOKEN@github.com/{{ repo_owner }}/{{ repo_name }} refs/heads/${target}"
+                  git push --force https://git:$HUB_TOKEN@github.com/{{ repo_owner }}/{{ repo_name }} refs/heads/${target}
+                  set -x
+                  git checkout -
+                done
+      - name: gorelease
+        runAfter:
+          - release-yaml
+        taskRef:
+          name: goreleaser
+        params:
+          - name: package
+            value: github.com/openshift-pipelines/pipelines-as-code
+          - name: github-token-secret
+            value: "nightly-ci-github-hub-token"
+          - name: github-token-secret-key
+            value: "hub-token"
+        workspaces:
+          - name: source
+            workspace: source
+  workspaces:
+    - name: source
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

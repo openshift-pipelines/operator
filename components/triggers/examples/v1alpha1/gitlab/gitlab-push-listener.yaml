@@ -1,0 +1,43 @@
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: gitlab-listener
+spec:
+  serviceAccountName: tekton-triggers-example-sa
+  triggers:
+    - name: gitlab-push-events-trigger
+      interceptors:
+        - name: "verify-gitlab-payload"
+          ref:
+            name: "gitlab"
+            kind: ClusterInterceptor
+          params:
+            - name: secretRef
+              value:
+                secretName: "gitlab-secret"
+                secretKey: "secretToken"
+            - name: eventTypes
+              value:
+                - "Push Hook"
+      bindings:
+        - name: gitrevision
+          value: $(body.checkout_sha)
+        - name: gitrepositoryurl
+          value: $(body.repository.git_http_url)
+      template:
+        spec:
+          params:
+            - name: gitrevision
+            - name: gitrepositoryurl
+          resourcetemplates:
+            - apiVersion: tekton.dev/v1beta1
+              kind: TaskRun
+              metadata:
+                generateName: gitlab-run-
+              spec:
+                taskSpec:
+                  steps:
+                    - image: ubuntu
+                      script: |
+                        #! /bin/bash
+                        echo "Revision is : $(tt.params.gitrevision). RepoURL is $(tt.params.gitrepositoryurl)"

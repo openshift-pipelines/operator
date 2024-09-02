@@ -1,0 +1,121 @@
+name: E2E Tests on Kind
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        type: boolean
+        description: "Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)"
+        required: false
+        default: false
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "**.go"
+jobs:
+  e2e-tests:
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    name: e2e tests
+    runs-on: ubuntu-latest
+    env:
+      KO_DOCKER_REPO: localhost:5000
+      CONTROLLER_DOMAIN_URL: controller.paac-127-0-0-1.nip.io
+      TEST_GITHUB_REPO_OWNER_GITHUBAPP: openshift-pipelines/pipelines-as-code-e2e-tests
+      KUBECONFIG: /home/runner/.kube/config.kind
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+
+      - uses: ko-build/setup-ko@v0.7
+
+      - name: Install gosmee
+        uses: jaxxstorm/action-install-gh-release@v1.12.0
+        with:
+          repo: chmouel/gosmee
+
+      - name: Run gosmee
+        run: |
+          nohup gosmee client --saveDir /tmp/gosmee-replay ${{ secrets.PYSMEE_URL }} "http://${CONTROLLER_DOMAIN_URL}" &
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+        with:
+          detached: true
+          limit-access-to-actor: true
+
+      - name: Start installing cluster
+        run: |
+          export PAC_DIR=${PWD}
+          export TEST_GITEA_SMEEURL="${{ secrets.TEST_GITEA_SMEEURL }}"
+          bash -x ./hack/dev/kind/install.sh
+
+      - name: Create PAC github-app-secret
+        run: |
+          ./hack/gh-workflow-ci.sh create_pac_github_app_secret \
+             "${{ secrets.APP_PRIVATE_KEY }}" \
+             "${{ secrets.APPLICATION_ID }}" \
+             "${{secrets.WEBHOOK_SECRET }}"
+
+      - name: Create second Github APP Controller on GHE
+        run: |
+          ./hack/gh-workflow-ci.sh create_second_github_app_controller_on_ghe \
+           "${{ secrets.TEST_GITHUB_SECOND_SMEE_URL }}" \
+           "${{ secrets.TEST_GITHUB_SECOND_PRIVATE_KEY }}" \
+           "${{ secrets.TEST_GITHUB_SECOND_WEBHOOK_SECRET }}"
+
+      - name: Run E2E Tests on pull_request
+        if: ${{ github.event_name != 'schedule' }}
+        run: |
+          ./hack/gh-workflow-ci.sh run_e2e_tests \
+           "${{ secrets.BITBUCKET_CLOUD_TOKEN }}" \
+           "${{ secrets.WEBHOOK_SECRET }}" \
+           "${{ secrets.TEST_GITEA_SMEEURL }}" \
+           "${{ secrets.INSTALLATION_ID }}" \
+           "${{ secrets.GH_APPS_TOKEN }}" \
+           "${{ secrets.TEST_GITHUB_SECOND_TOKEN }}" \
+           "${{ secrets.GITLAB_TOKEN }}"
+
+      - name: Run E2E Tests on pull_request
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          export NIGHTLY_E2E_TEST="true"
+          ./hack/gh-workflow-ci.sh run_e2e_tests \
+           "${{ secrets.BITBUCKET_CLOUD_TOKEN }}" \
+           "${{ secrets.WEBHOOK_SECRET }}" \
+           "${{ secrets.TEST_GITEA_SMEEURL }}" \
+           "${{ secrets.INSTALLATION_ID }}" \
+           "${{ secrets.GH_APPS_TOKEN }}" \
+           "${{ secrets.TEST_GITHUB_SECOND_TOKEN }}" \
+           "${{ secrets.GITLAB_TOKEN }}"
+
+      - name: Collect logs
+        if: ${{ always() }}
+        run: |
+          ./hack/gh-workflow-ci.sh collect_logs
+
+      - name: Upload artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: /tmp/logs
+
+      - name: Report Status
+        if: ${{ always() && github.ref_name == 'main' && github.event_name == 'schedule' }}
+        uses: ravsamhq/notify-slack-action@v2
+        with:
+          status: ${{ job.status }}
+          notify_when: "failure"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
