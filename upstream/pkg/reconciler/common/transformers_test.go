@@ -18,6 +18,7 @@ package common
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"path"
 	"testing"
@@ -1146,6 +1147,138 @@ func TestReplaceNamespace(t *testing.T) {
 					}
 				}
 
+			}
+		})
+	}
+}
+
+func TestAddSecretData(t *testing.T) {
+	tests := []struct {
+		name        string
+		inputObj    *unstructured.Unstructured
+		inputData   map[string][]byte
+		inputAnnot  map[string]string
+		expectedObj *unstructured.Unstructured
+		expectError bool
+	}{
+		{
+			name: "Add data to empty Secret",
+			inputObj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Secret",
+					"metadata":   map[string]interface{}{},
+				},
+			},
+			inputData:  map[string][]byte{"key": []byte("value")},
+			inputAnnot: map[string]string{"anno": "value"},
+			expectedObj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Secret",
+					"metadata": map[string]interface{}{
+						"annotations": map[string]interface{}{
+							"anno": "value",
+						},
+					},
+					"data": map[string]interface{}{
+						"key": base64.StdEncoding.EncodeToString([]byte("value")),
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Do not overwrite existing data",
+			inputObj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Secret",
+					"metadata":   map[string]interface{}{},
+					"data": map[string]interface{}{
+						"existingKey": []byte("existingValue"),
+					},
+				},
+			},
+			inputData:  map[string][]byte{"newKey": []byte("newValue")},
+			inputAnnot: map[string]string{"anno": "value"},
+			expectedObj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Secret",
+					"metadata": map[string]interface{}{
+						"annotations": map[string]interface{}{
+							"anno": "value",
+						},
+					},
+					"data": map[string]interface{}{
+						"existingKey": base64.StdEncoding.EncodeToString([]byte("existingValue")),
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Non-Secret resource",
+			inputObj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "ConfigMap",
+					"metadata":   map[string]interface{}{},
+				},
+			},
+			inputData:  map[string][]byte{"key": []byte("value")},
+			inputAnnot: map[string]string{"anno": "value"},
+			expectedObj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "ConfigMap",
+					"metadata":   map[string]interface{}{},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Empty input data",
+			inputObj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Secret",
+					"metadata":   map[string]interface{}{},
+				},
+			},
+			inputData:  map[string][]byte{},
+			inputAnnot: map[string]string{"anno": "value"},
+			expectedObj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Secret",
+					"metadata":   map[string]interface{}{},
+				},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := AddSecretData(test.inputData, test.inputAnnot)(test.inputObj)
+
+			if test.expectError {
+				t.Errorf("Error %v", err)
+			} else {
+				assertNoEror(t, err)
+				// Remove creationTimestamp from both expected and actual objects
+				if metadata, ok := test.expectedObj.Object["metadata"].(map[string]interface{}); ok {
+					delete(metadata, "creationTimestamp")
+				}
+				if metadata, ok := test.inputObj.Object["metadata"].(map[string]interface{}); ok {
+					delete(metadata, "creationTimestamp")
+				}
+
+				if diff := cmp.Diff(test.expectedObj.Object, test.inputObj.Object); diff != "" {
+					t.Errorf("Objects do not match (-expected +actual):\n%s", diff)
+				}
 			}
 		})
 	}
