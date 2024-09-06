@@ -967,3 +967,49 @@ func ReplaceNamespace(newNamespace string) mf.Transformer {
 		return nil
 	}
 }
+
+// AddSecretData adds the given data and annotations to the Secret object.
+func AddSecretData(data map[string][]byte, annotations map[string]string) mf.Transformer {
+	return func(u *unstructured.Unstructured) error {
+		// If input data is empty, do not transform
+		if len(data) == 0 {
+			return nil
+		}
+
+		// Check if the resource is a Secret
+		if u.GetKind() != "Secret" {
+			return nil
+		}
+
+		// Convert unstructured to Secret
+		secret := &corev1.Secret{}
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, secret)
+		if err != nil {
+			return err
+		}
+
+		// Update the Secret's data only if it is nil or empty
+		if len(secret.Data) == 0 {
+			secret.Data = data
+		}
+
+		// Update the Secret's annotations
+		if secret.Annotations == nil {
+			secret.Annotations = make(map[string]string)
+		}
+		for key, value := range annotations {
+			secret.Annotations[key] = value
+		}
+
+		// Convert back to unstructured
+		unstrObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(secret)
+		if err != nil {
+			return err
+		}
+
+		// Update the original unstructured object
+		u.SetUnstructuredContent(unstrObj)
+
+		return nil
+	}
+}
