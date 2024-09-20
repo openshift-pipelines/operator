@@ -1,4 +1,4 @@
-name: update-sources-main
+name: update-sources-release-v1.17.x
 
 on:
   workflow_dispatch: {}
@@ -17,7 +17,7 @@ jobs:
     - name: Checkout the current repo
       uses: actions/checkout@v4
       with:
-        ref: main
+        ref: release-v1.17.x
 
     - name: Clone tektoncd/operator
       run: |
@@ -31,7 +31,7 @@ jobs:
       run: |
         git config user.name github-actions
         git config user.email github-actions@github.com
-        git checkout -b actions/update/sources-main
+        git checkout -b actions/update/sources-release-v1.17.x
         pushd upstream
         OLD_COMMIT=$(cat ../head)
         NEW_COMMIT=$(git rev-parse HEAD)
@@ -59,11 +59,11 @@ jobs:
         https://github.com/tektoncd/operator/compare/${NEW_COMMIT}..${OLD_COMMIT}
         EOF
         
-        git push -f origin actions/update/sources-main
+        git push -f origin actions/update/sources-release-v1.17.x
 
-        if [ "$(gh pr list --base main --head actions/update/sources-main --json url --jq 'length')" = "0" ]; then
+        if [ "$(gh pr list --base release-v1.17.x --head actions/update/sources-release-v1.17.x --json url --jq 'length')" = "0" ]; then
           echo "creating PR..."
-          gh pr create -B main -H actions/update/sources-main --fill
+          gh pr create -B release-v1.17.x -H actions/update/sources-release-v1.17.x --fill
         else
           echo "a PR already exists, skipping..."
         fi

@@ -1,0 +1,22 @@
+---
+apiVersion: appstudio.redhat.com/v1beta2
+kind: IntegrationTestScenario
+metadata:
+  name: operator-enterprise-contract
+spec:
+  application: operator-release-v1.17.x
+  contexts:
+    - description: Application testing
+      name: application
+  params:
+    - name: POLICY_CONFIGURATION
+      value: rhtap-releng-tenant/registry-standard
+  resolverRef:
+    params:
+      - name: url
+        value: "https://github.com/konflux-ci/build-definitions"
+      - name: revision
+        value: main
+      - name: pathInRepo
+        value: pipelines/enterprise-contract.yaml
+    resolver: git
