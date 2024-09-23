@@ -1,0 +1,56 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
+      == "main" &&
+      ("upstream/***".pathChanged() || "openshift/***".pathChanged() ||
+      ".tekton/operator-pull-request.yaml".pathChanged() ||
+      ".tekton/operator-push.yaml".pathChanged() ||
+      ".tekton/docker-build.yaml".pathChanged())
+  creationTimestamp: null
+  labels:
+    appstudio.openshift.io/application: operator-main
+    appstudio.openshift.io/component: operator-main-operator
+    pipelines.appstudio.openshift.io/type: build
+  name: operator-main-operator-on-push
+  namespace: tekton-ecosystem-tenant
+spec:
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: output-image
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-main/operator-main-operator:{{revision}}
+  - name: dockerfile
+    value: openshift/dockerfiles/operator.Dockerfile
+  - name: build-source-image
+    value: "true"
+  - name: hermetic
+    value: "true"
+  - name: prefetch-input
+    value: |
+      {"type": "rpm", "path": "openshift/rpms"}
+  pipelineRef:
+    name: docker-build
+  workspaces:
+  - name: workspace
+    volumeClaimTemplate:
+      metadata:
+        creationTimestamp: null
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+      status: {}
+  - name: git-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
+status: {}
