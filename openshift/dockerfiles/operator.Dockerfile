@@ -30,7 +30,9 @@ LABEL \
       summary="Red Hat OpenShift Pipelines Operator" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator" \
-      io.k8s.display-name="Red Hat OpenShift Pipelines Operator"
+      io.k8s.display-name="Red Hat OpenShift Pipelines Operator" \
+      io.k8s.description="Red Hat OpenShift Pipelines Operator" \
+      io.openshift.tags="operator,tekton,openshift"
 
 RUN microdnf install -y shadow-utils
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
