@@ -3,16 +3,13 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    image.redhat.com/generate: "true"
-    appstudio.openshift.io/pac-provision: request
     build.appstudio.openshift.io/pipeline: '{"name":"docker-build","bundle":"latest"}'
-    build.appstudio.openshift.io/request: configure-pac
-  name: openshift-pipelines-bundle
+  name: operator-main-bundle
 spec:
-  componentName: openshift-pipelines-bundle
-  application: openshift-pipelines-operator
-  build-nudges-ref:
-    - openshift-pipelines-index
+  componentName: bundle
+  application: operator-main
+  # build-nudges-ref:
+  #   - openshift-pipelines-index
   source:
     git:
       url: https://github.com/openshift-pipelines/operator.git
