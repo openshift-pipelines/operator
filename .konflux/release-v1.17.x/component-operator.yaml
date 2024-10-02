@@ -3,13 +3,13 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Component
 metadata:
   annotations:
-    image.redhat.com/generate: "true"
     build.appstudio.openshift.io/pipeline: '{"name":"docker-build","bundle":"latest"}'
-    image.redhat.com/generate: '{"visibility": "public"}'
   name: operator-1-17-operator
 spec:
   componentName: operator
   application: operator-release-v1-17-x
+  build-nudges-ref:
+  - operator-release-v1-17-x-bundle
   source:
     git:
       url: https://github.com/openshift-pipelines/operator
