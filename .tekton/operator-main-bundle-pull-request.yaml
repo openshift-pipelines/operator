@@ -4,20 +4,22 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" &&
-      (".tekton/openshift-pipelines-bundle-push.yaml".pathChanged() ||
-      ".tekton/openshift-pipelines-bundle-pull-request.yaml".pathChanged() ||
+      (".tekton/operator-main-bundle-push.yaml".pathChanged() ||
+      ".tekton/operator-main-bundle-pull-request.yaml".pathChanged() ||
+      "openshift/image-mapping.yaml".pathChanged() ||
       "olm-catalog/openshift-pipelines/Dockerfile".pathChanged() ||
       "olm-catalog/openshift-pipelines/metadata/***".pathChanged() ||
       "olm-catalog/openshift-pipelines/manifests/***".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: openshift-pipelines-operator
-    appstudio.openshift.io/component: openshift-pipelines-bundle
+    appstudio.openshift.io/component: operator-main-bundle
     pipelines.appstudio.openshift.io/type: build
-  name: openshift-pipelines-bundle-on-push
+  name: operator-main-bundle-on-pull-request
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -26,7 +28,9 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/openshift-pipelines-operator/openshift-pipelines-bundle:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/openshift-pipelines-operator/bundle:on-pr-{{revision}}
+  - name: image-expires-after
+    value: 5d
   - name: dockerfile
     value: olm-catalog/openshift-pipelines/Dockerfile
   pipelineSpec:
