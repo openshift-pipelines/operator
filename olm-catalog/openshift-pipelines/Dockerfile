@@ -2,8 +2,8 @@
 FROM registry.redhat.io/ubi8/ubi-micro:latest
 FROM scratch
 
-COPY olm-catalog/serverless-operator/manifests /manifests
-COPY olm-catalog/serverless-operator/metadata/annotations.yaml /metadata/annotations.yaml
+COPY openshift/olm-catalog/openshift-pipelines/manifests /manifests
+COPY openshift/olm-catalog/openshift-pipelines/metadata/annotations.yaml /metadata/annotations.yaml
 
 LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
