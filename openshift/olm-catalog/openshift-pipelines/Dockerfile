@@ -20,7 +20,13 @@ LABEL \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Bundle" \
       io.k8s.display-name="Red Hat OpenShift Pipelines Operator Bundle" \
+      io.k8s.description="Red Hat OpenShift Pipelines Operator Bundle" \
       com.redhat.delivery.operator.bundle=true \
-      com.redhat.delivery.backport=false
+      com.redhat.delivery.backport=false \
+      io.openshift.tags="pipelines,tekton,openshift" \
+      vendor="Red Hat, Inc." \
+      distribution-scope="public" \
+      url="https://access.redhat.com/containers/#/registry.access.redhat.com/ubi9-minimal/images/9.4-1227.1725849298" \
+      release="1227.1725849298"
 
 USER 65532
