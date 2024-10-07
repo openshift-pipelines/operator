@@ -90,6 +90,10 @@ done
 OPENSHIFT_PIPELINES_MINOR_VERSION=${CURRENT_VERSION%.*}
 sed -i 's/OPENSHIFT_PIPELINES_MINOR_VERSION/'"$OPENSHIFT_PIPELINES_MINOR_VERSION"'/g' openshift/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
+yq --inplace ".metadata.annotations[\"features.operators.openshift.io/cnf\"] = \"false\"" openshift/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+yq --inplace ".metadata.annotations[\"features.operators.openshift.io/cni\"] = \"false\"" openshift/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+yq --inplace ".metadata.annotations[\"features.operators.openshift.io/csi\"] = \"false\"" openshift/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+
 # For making sure any patches apply correctly on operator based containers
 # cp -fR ./distgit/containers/openshift-pipelines-operator/kodata ./distgit/containers/openshift-pipelines-operator-proxy
 # cp -fR ./distgit/containers/openshift-pipelines-operator/kodata ./distgit/containers/openshift-pipelines-operator-webhook
