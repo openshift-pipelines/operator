@@ -2,8 +2,9 @@
 FROM registry.redhat.io/ubi8/ubi-micro:latest
 FROM scratch
 
-COPY openshift/olm-catalog/openshift-pipelines/manifests /manifests
-COPY openshift/olm-catalog/openshift-pipelines/metadata/annotations.yaml /metadata/annotations.yaml
+COPY openshift/olm-catalog/bundle/kodata /kodata
+COPY openshift/olm-catalog/bundle/manifests /manifests
+COPY openshift/olm-catalog/bundle/metadata/annotations.yaml /metadata/annotations.yaml
 
 LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
@@ -15,7 +16,7 @@ LABEL operators.operatorframework.io.bundle.channels.v1="latest,pipelines-5.0"
 LABEL \
       com.redhat.component="openshift-pipelines-operator-bundle-container" \
       name="openshift-pipelines/pipelines-operator-bundle-container" \
-      version="${CI_CONTAINER_VERSION}" \
+      version="5.0.5-000" \
       summary="Red Hat OpenShift Pipelines Operator Bundle" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Bundle" \
