@@ -113,4 +113,4 @@ sed -i -E 's%LABEL operators.operatorframework.io.bundle.channels.v1=".*%LABEL o
 
 # Make sure we reset upstream (probably condition this)
 rm -fR upstream
-git co HEAD upstream
+git checkout HEAD upstream
