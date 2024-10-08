@@ -111,6 +111,3 @@ sed -i -E 's%LABEL com.redhat.openshift.versions=".*%LABEL com.redhat.openshift.
 sed -i -E 's%LABEL operators.operatorframework.io.bundle.channels.v1=".*%LABEL operators.operatorframework.io.bundle.channels.v1="'latest,${CHANNEL_NAME}'"%' \
     openshift/olm-catalog/bundle/Dockerfile
 
-# Make sure we reset upstream (probably condition this)
-rm -fR upstream
-git checkout HEAD upstream
