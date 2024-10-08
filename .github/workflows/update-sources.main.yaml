@@ -44,6 +44,10 @@ jobs:
     
         # Update operator's payload and stuff
         make fetch-payload update-reference
+        pushd upstream
+        rm -fR cmd/openshift/operator/kodata operatorhub
+        git checkout HEAD .
+        popd
     
 
     - name: Commit new changes
