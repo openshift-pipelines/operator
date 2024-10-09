@@ -21,7 +21,7 @@ ENV OPERATOR=/usr/local/bin/openshift-pipelines-operator-webhook \
 
 COPY --from=builder /tmp/openshift-pipelines-operator-webhook ${OPERATOR}
 COPY --from=builder /go/src/github.com/tektoncd/operator/cmd/openshift/webhook/kodata/ ${KO_DATA_PATH}/
-COPY openshift/olm-catalog/bundle/kodata/* /kodata/
+COPY openshift/olm-catalog/bundle/kodata /kodata
 
 LABEL \
       com.redhat.component="openshift-pipelines-operator-webhook-rhel8-container" \
