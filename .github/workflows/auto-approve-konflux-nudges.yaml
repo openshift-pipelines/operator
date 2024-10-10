@@ -1,0 +1,22 @@
+name: auto-approve-konflux-nudges
+
+# 
+on:
+  workflow_dispatch: {}
+#  schedule:
+#  - cron: "*/30 * * * *" # At every 30 minutes
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
+    permissions:
+      pull-requests: write
+    steps:
+    - name: auto-approve
+      run: |
+        for p in $(gh pr list --search "author:app/red-hat-konflux chore(deps) .*"  --json "title,labels,number" | jq ".[] | select((.labels | length) == 0) | .number"); do
+          gh pr review $p --approve --body "/lgtm"
+        done
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
