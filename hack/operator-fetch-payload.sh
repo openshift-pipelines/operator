@@ -12,12 +12,12 @@ SOURCE=upstream
 # minor release example: new release: 1.14.0, PREVIOUS_VERSION will be 1.13.0
 # patch release example: new release: 1.13.2, PREVIOUS_VERSION will be 1.13.1SOURCE=upstream/tektoncd-operator
 # FIXME: figure out CURRENT_VERSION vs PREVIOUS_VERSION
-CURRENT_VERSION=5.0.5-479
-PREVIOUS_VERSION=5.0.5-478
-PREVIOUS_VERSION_RANGE=1.15.0
-CHANNEL_NAME=pipelines-5.0
-LATEST_OPENSHIFT_VERSION=4.17   # latest OCP GAed version
-MIN_OPENSHIFT_VERSION=4.16      # minimum OCP supported version
+CURRENT_VERSION=$(yq e '.versions.current' project.yaml)
+PREVIOUS_VERSION=$(yq e '.versions.previous' project.yaml)
+PREVIOUS_VERSION_RANGE=$(yq e '.versions.previous_range' project.yaml)
+CHANNEL_NAME=$(yq e '.versions.channel' project.yaml)
+LATEST_OPENSHIFT_VERSION=$(yq e '.versions.openshift.latest' project.yaml)
+MIN_OPENSHIFT_VERSION=$(yq e '.versions.openshift.min' project.yaml)
 
 # Check for binaries required in the script
 for binary in operator-sdk kustomize yq; do
