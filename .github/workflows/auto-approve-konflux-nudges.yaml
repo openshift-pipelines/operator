@@ -1,10 +1,9 @@
 name: auto-approve-konflux-nudges
 
-# 
 on:
   workflow_dispatch: {}
-#  schedule:
-#  - cron: "*/30 * * * *" # At every 30 minutes
+  schedule:
+  - cron: "*/30 * * * *" # At every 30 minutes
 
 jobs:
   auto-approve:
@@ -13,9 +12,16 @@ jobs:
     permissions:
       pull-requests: write
     steps:
+    - name: Checkout the current repo
+      uses: actions/checkout@v4
     - name: auto-approve
       run: |
+        # Approve and merge pull-request with no reviews
         for p in $(gh pr list --search "author:app/red-hat-konflux chore(deps) .*"  --json "title,labels,number" | jq ".[] | select((.labels | length) == 0) | .number"); do
+          gh pr review $p --approve --body "/lgtm"
+        done
+        # LGTM pull requests that might have one review but no more lgtm
+        for p in $(gh pr list --search "author:app/red-hat-konflux chore(deps) .*"  --json "title,labels,number" | jq ".[] | select((.labels | length) == 1) | .number"); do
           gh pr review $p --approve --body "/lgtm"
         done
       env:
