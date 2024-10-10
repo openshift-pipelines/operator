@@ -19,7 +19,6 @@ jobs:
         gh auth status
         git config user.name openshift-pipelines-bot
         git config user.email pipelines-extcomm@redhat.com
-        echo $GH_TOKEN | gh auth login --with-token
         # Approve and merge pull-request with no reviews
         for p in $(gh pr list --search "author:app/red-hat-konflux chore(deps) .*"  --json "title,labels,number" | jq ".[] | select((.labels | length) == 0) | .number"); do
           gh pr review $p --approve --body "/lgtm"
@@ -29,4 +28,4 @@ jobs:
           gh pr review $p --approve --body "/lgtm"
         done
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.OPENSHIFT_PIPELINES_ROBOT }}
