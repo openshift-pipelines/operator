@@ -16,6 +16,7 @@ jobs:
       uses: actions/checkout@v4
     - name: auto-approve
       run: |
+        gh auth status
         git config user.name openshift-pipelines-bot
         git config user.email pipelines-extcomm@redhat.com
         echo $GH_TOKEN | gh auth login --with-token
