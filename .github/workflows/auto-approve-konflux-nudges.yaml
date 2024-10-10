@@ -16,6 +16,8 @@ jobs:
       uses: actions/checkout@v4
     - name: auto-approve
       run: |
+        git config user.name openshift-pipelines-bot
+        git config user.email pipelines-extcomm@redhat.com
         # Approve and merge pull-request with no reviews
         for p in $(gh pr list --search "author:app/red-hat-konflux chore(deps) .*"  --json "title,labels,number" | jq ".[] | select((.labels | length) == 0) | .number"); do
           gh pr review $p --approve --body "/lgtm"
