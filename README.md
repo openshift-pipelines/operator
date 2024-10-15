@@ -36,8 +36,9 @@ In addition, some of the configuration of this repository are generated from the
 
 TBD
 
-![arch1](./docs/image/2024-10-15-185726.png)
 ![arch2](./docs/image/2024-10-15-185737.png)
+
+![arch1](./docs/image/2024-10-15-185726.png)
 
 ## What "needs to happen" here
 
