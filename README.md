@@ -36,6 +36,9 @@ In addition, some of the configuration of this repository are generated from the
 
 TBD
 
+![arch1](./docs/2024-10-15-185726.png)
+![arch2](./docs/2024-10-15-185737.png)
+
 ## What "needs to happen" here
 
 - We need to be able to re-build everything from scratch
