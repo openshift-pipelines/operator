@@ -80,10 +80,13 @@ func Test_updateApiConfig(t *testing.T) {
 			DBName:                              "test",
 			ServerPort:                          &intVal,
 			DBSSLMode:                           "enable",
+			DBSSLRootCert:                       "/etc/tls/db/ca.crt",
 			DBEnableAutoMigration:               &boolVal,
 			TLSHostnameOverride:                 "localhostTest",
 			AuthDisable:                         &boolVal,
 			AuthImpersonate:                     &boolVal,
+			PrometheusPort:                      &intVal,
+			PrometheusHistogram:                 &boolVal,
 			LogLevel:                            "warn",
 			LogsAPI:                             &boolVal,
 			LogsPath:                            "/logs/test",
@@ -105,9 +108,11 @@ func Test_updateApiConfig(t *testing.T) {
 	assert.Equal(t, cm.Data["config"], `DB_HOST=localhost
 DB_PORT=5432
 SERVER_PORT=12345
-PROMETHEUS_PORT=9090
+PROMETHEUS_PORT=12345
+PROMETHEUS_HISTOGRAM=true
 DB_NAME=test
 DB_SSLMODE=enable
+DB_SSLROOTCERT=/etc/tls/db/ca.crt
 DB_ENABLE_AUTO_MIGRATION=true
 TLS_HOSTNAME_OVERRIDE=localhostTest
 TLS_PATH=/etc/tls
