@@ -10,8 +10,8 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
       == "main" &&
-      ("upstream/***".pathChanged() || "openshift/patches/***".pathChanged() || "openshift/rpms/***".pathChanged() ||
-      "openshift/dockerfiles/proxy.Dockerfile".pathChanged() ||
+      ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
+      ".konflux/dockerfiles/proxy.Dockerfile".pathChanged() ||
       ".tekton/operator-main-proxy-pull-request.yaml".pathChanged() ||
       ".tekton/docker-build-ta.yaml".pathChanged())
   creationTimestamp: null
@@ -32,13 +32,13 @@ spec:
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: openshift/dockerfiles/proxy.Dockerfile
+    value: .konflux/dockerfiles/proxy.Dockerfile
   - name: build-platforms
     value:
       - linux/x86_64
   - name: prefetch-input
     value: |
-      {"type": "rpm", "path": "openshift/rpms"}
+      {"type": "rpm", "path": ".konflux/rpms"}
   pipelineRef:
     name: docker-build-ta
   workspaces:
