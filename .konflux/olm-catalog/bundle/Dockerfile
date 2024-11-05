@@ -2,9 +2,9 @@
 FROM registry.redhat.io/ubi8/ubi-micro:latest
 FROM scratch
 
-COPY openshift/olm-catalog/bundle/kodata /kodata
-COPY openshift/olm-catalog/bundle/manifests /manifests
-COPY openshift/olm-catalog/bundle/metadata/annotations.yaml /metadata/annotations.yaml
+COPY .konflux/olm-catalog/bundle/kodata /kodata
+COPY .konflux/olm-catalog/bundle/manifests /manifests
+COPY .konflux/olm-catalog/bundle/metadata/annotations.yaml /metadata/annotations.yaml
 
 LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/

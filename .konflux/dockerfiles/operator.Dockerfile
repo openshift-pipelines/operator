@@ -21,7 +21,7 @@ ENV OPERATOR=/usr/local/bin/openshift-pipelines-operator \
 
 COPY --from=builder /tmp/openshift-pipelines-operator ${OPERATOR}
 COPY --from=builder /go/src/github.com/tektoncd/operator/cmd/openshift/operator/kodata/ ${KO_DATA_PATH}/
-COPY openshift/olm-catalog/bundle/kodata /kodata
+COPY .konflux/olm-catalog/bundle/kodata /kodata
 
 LABEL \
       com.redhat.component="openshift-pipelines-rhel8-operator-container" \

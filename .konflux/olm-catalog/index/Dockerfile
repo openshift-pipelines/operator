@@ -4,7 +4,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal AS builder
 COPY --from=opm /bin/opm /bin/opm
 
 # Copy declarative config root into image at /configs
-COPY openshift/olm-catalog/index/configs /configs
+COPY .konflux/olm-catalog/index/configs /configs
 
 # RUN /bin/opm init openshift-pipelines-operator --default-channel=latest --output yaml >> /configs/index.yaml
 RUN /bin/opm render --skip-tls-verify -o yaml quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-main/bundle@sha256:65eaf1e2cc1f53963455d194a9d53eb41bf8d64f8e94c612c61742f6f1e50801 > /configs/nightly-bundle.yaml

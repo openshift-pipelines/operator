@@ -11,10 +11,11 @@ metadata:
       (".tekton/operator-main-bundle-push.yaml".pathChanged() ||
       ".tekton/operator-main-bundle-pull-request.yaml".pathChanged() ||
       "project.yaml".pathChanged() ||
-      "openshift/olm-catalog/bundle/Dockerfile".pathChanged() ||
-      "openshift/olm-catalog/bundle/kodata/***".pathChanged() ||
-      "openshift/olm-catalog/bundle/metadata/***".pathChanged() ||
-      "openshift/olm-catalog/bundle/manifests/***".pathChanged() ||
+      ".konflux/patches/***".pathChanged() ||
+      ".konflux/olm-catalog/bundle/Dockerfile".pathChanged() ||
+      ".konflux/olm-catalog/bundle/kodata/***".pathChanged() ||
+      ".konflux/olm-catalog/bundle/metadata/***".pathChanged() ||
+      ".konflux/olm-catalog/bundle/manifests/***".pathChanged() ||
       ".tekton/docker-build.yaml".pathChanged())
   creationTimestamp: null
   labels:
@@ -34,14 +35,14 @@ spec:
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: openshift/olm-catalog/bundle/Dockerfile
+    value: .konflux/olm-catalog/bundle/Dockerfile
   - name: build-source-image
     value: "true"
   - name: hermetic
     value: "true"
   - name: prefetch-input
     value: |
-      {"type": "rpm", "path": "openshift/rpms"}
+      {"type": "rpm", "path": ".konflux/rpms"}
   pipelineRef:
     name: docker-build
   workspaces:

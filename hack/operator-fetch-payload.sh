@@ -30,10 +30,10 @@ echo "Fetch payloads…"
 make -C ${SOURCE} TARGET=openshift get-releases
 
 echo "Clean existings payloads…"
-rm -fRv openshift/olm-catalog/bundle/kodata
+rm -fRv .konflux/olm-catalog/bundle/kodata
 
-echo "Copy payloads to openshift/olm-catalog/bundle…"
-cp -rv ${SOURCE}/cmd/openshift/operator/kodata openshift/olm-catalog/bundle/kodata
+echo "Copy payloads to .konflux/olm-catalog/bundle…"
+cp -rv ${SOURCE}/cmd/openshift/operator/kodata .konflux/olm-catalog/bundle/kodata
 
 echo "Generate bundle data…"
 rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/metadata/*
@@ -49,14 +49,14 @@ export BUNDLE_ARGS="--workspace ./openshift \
 make -C ${SOURCE} OPERATOR_SDK=$(which operator-sdk) operator-bundle
 
 echo "Clean existing generated bundle data…"
-rm -fRv openshift/olm-catalog/bundle/metadata/*
-rm -fRv openshift/olm-catalog/bundle/manifests/*
+rm -fRv .konflux/olm-catalog/bundle/metadata/*
+rm -fRv .konflux/olm-catalog/bundle/manifests/*
 
 echo "Copy generated bundle data to this onebundle…"
-cp -rv ${SOURCE}/operatorhub/openshift/release-artifacts/bundle/metadata openshift/olm-catalog/bundle
-cp -rv ${SOURCE}/operatorhub/openshift/release-artifacts/bundle/manifests openshift/olm-catalog/bundle
+cp -rv ${SOURCE}/operatorhub/openshift/release-artifacts/bundle/metadata .konflux/olm-catalog/bundle
+cp -rv ${SOURCE}/operatorhub/openshift/release-artifacts/bundle/manifests .konflux/olm-catalog/bundle
 
-for f in openshift/olm-catalog/bundle/manifests/*.yaml; do
+for f in .konflux/olm-catalog/bundle/manifests/*.yaml; do
     if [[ $(yq e '.metadata.labels.version' ${f}) == null ]]; then
         continue
     fi
@@ -65,34 +65,34 @@ done
 
 # Remove label matchselector app
 yq e -i 'del(.spec.install.spec.deployments[0].spec.selector.matchLabels.app)' \
-   openshift/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+   .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
 # Add valid-subscription annotation
 yq e -i '.metadata.annotations["operators.openshift.io/valid-subscription"] = "[\"OpenShift Container Platform\", \"OpenShift Platform Plus\"]"' \
-   openshift/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+   .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
 # Update VERSION env variable to use ${VERSION=}
 yq e -i "(.spec.install.spec.deployments[] | select (.name == \"openshift-pipelines-operator\") | .spec.template.spec.containers[0].env[] | select (.name == \"VERSION\") | .value) = \"${CURRENT_VERSION}\"" \
-   openshift/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+   .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 # FIXME: we *may* need to clean some of those generated files
 
 # Mutate pipelines-as-code payload
 for d in controller watcher webhook; do
-    yq e -i "(select (.kind == \"Deployment\") | select (.metadata.name == \"pipelines-as-code-${d}\") | .spec.template.spec.containers[0].command) = [\"/ko-app/pipelines-as-code-${d}\"]" openshift/olm-catalog/bundle/kodata/tekton-addon/pipelines-as-code/*/release.yaml
+    yq e -i "(select (.kind == \"Deployment\") | select (.metadata.name == \"pipelines-as-code-${d}\") | .spec.template.spec.containers[0].command) = [\"/ko-app/pipelines-as-code-${d}\"]" .konflux/olm-catalog/bundle/kodata/tekton-addon/pipelines-as-code/*/release.yaml
 done
 
 # Mutate manual-approval-gate payload
 for d in controller webhook; do
-    yq e -i "(select (.kind == \"Deployment\") | select (.metadata.name == \"manual-approval-gate-${d}\") | .spec.template.spec.containers[0].command) = [\"/ko-app/manual-approval-gate-${d}\"]" openshift/olm-catalog/bundle/kodata/manual-approval-gate/*/release-openshift.yaml
+    yq e -i "(select (.kind == \"Deployment\") | select (.metadata.name == \"manual-approval-gate-${d}\") | .spec.template.spec.containers[0].command) = [\"/ko-app/manual-approval-gate-${d}\"]" .konflux/olm-catalog/bundle/kodata/manual-approval-gate/*/release-openshift.yaml
 done
 
 # Update the OpenShift Pipelines version in the getting started documentation link in the CSV file
 OPENSHIFT_PIPELINES_MINOR_VERSION=${CURRENT_VERSION%.*}
-sed -i 's/OPENSHIFT_PIPELINES_MINOR_VERSION/'"$OPENSHIFT_PIPELINES_MINOR_VERSION"'/g' openshift/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+sed -i 's/OPENSHIFT_PIPELINES_MINOR_VERSION/'"$OPENSHIFT_PIPELINES_MINOR_VERSION"'/g' .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
-yq --inplace ".metadata.annotations[\"features.operators.openshift.io/cnf\"] = \"false\"" openshift/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
-yq --inplace ".metadata.annotations[\"features.operators.openshift.io/cni\"] = \"false\"" openshift/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
-yq --inplace ".metadata.annotations[\"features.operators.openshift.io/csi\"] = \"false\"" openshift/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+yq --inplace ".metadata.annotations[\"features.operators.openshift.io/cnf\"] = \"false\"" .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+yq --inplace ".metadata.annotations[\"features.operators.openshift.io/cni\"] = \"false\"" .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+yq --inplace ".metadata.annotations[\"features.operators.openshift.io/csi\"] = \"false\"" .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
 # For making sure any patches apply correctly on operator based containers
 # cp -fR ./distgit/containers/openshift-pipelines-operator/kodata ./distgit/containers/openshift-pipelines-operator-proxy
@@ -101,13 +101,13 @@ yq --inplace ".metadata.annotations[\"features.operators.openshift.io/csi\"] = \
 # remove maxOpenShiftVersion from properties.yaml
 # TODO: this change should be updated in upstream operator code
 yq --inplace 'del(.properties[] | select(.type == "olm.maxOpenShiftVersion"))' \
-    openshift/olm-catalog/bundle/metadata/properties.yaml
+    .konflux/olm-catalog/bundle/metadata/properties.yaml
 
 # update OCP minimum verson
 sed -i -E 's%LABEL com.redhat.openshift.versions=".*%LABEL com.redhat.openshift.versions="'v${MIN_OPENSHIFT_VERSION}'"%' \
-    openshift/olm-catalog/bundle/Dockerfile
+    .konflux/olm-catalog/bundle/Dockerfile
 
 # update channels in operator bundle dockerfile
 sed -i -E 's%LABEL operators.operatorframework.io.bundle.channels.v1=".*%LABEL operators.operatorframework.io.bundle.channels.v1="'latest,${CHANNEL_NAME}'"%' \
-    openshift/olm-catalog/bundle/Dockerfile
+    .konflux/olm-catalog/bundle/Dockerfile
 

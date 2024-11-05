@@ -9,10 +9,10 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" &&
       (".tekton/operator-main-index-push.yaml".pathChanged() ||
       ".tekton/operator-main-index-pull-request.yaml".pathChanged() ||
-      "openshift/olm-catalog/index/Dockerfile".pathChanged() ||
-      "openshift/olm-catalog/index/kodata/***".pathChanged() ||
-      "openshift/olm-catalog/index/metadata/***".pathChanged() ||
-      "openshift/olm-catalog/index/manifests/***".pathChanged() ||
+      ".konflux/olm-catalog/index/Dockerfile".pathChanged() ||
+      ".konflux/olm-catalog/index/kodata/***".pathChanged() ||
+      ".konflux/olm-catalog/index/metadata/***".pathChanged() ||
+      ".konflux/olm-catalog/index/manifests/***".pathChanged() ||
       ".tekton/fbc-build.yaml".pathChanged())
   creationTimestamp: null
   labels:
@@ -30,7 +30,7 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-main-index:{{revision}}
   - name: dockerfile
-    value: openshift/olm-catalog/index/Dockerfile
+    value: .konflux/olm-catalog/index/Dockerfile
   pipelineRef:
     name: fbc-build
   taskRunTemplate: {}
