@@ -27,7 +27,7 @@ done
 echo "Fetch payloads…"
 # Use our own for now
 # TODO: replace with our own components.yaml
-make -C ${SOURCE} TARGET=openshift get-releases
+make -C ${SOURCE} TARGET=openshift COMPONENT=components.nightly.yaml get-releases
 
 echo "Clean existings payloads…"
 rm -fRv .konflux/olm-catalog/bundle/kodata
