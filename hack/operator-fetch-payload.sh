@@ -66,6 +66,8 @@ done
 # Remove label matchselector app
 yq e -i 'del(.spec.install.spec.deployments[0].spec.selector.matchLabels.app)' \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+yq e -i 'del(.metadata.annotations["createdAt"])' \
+   .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
 # Add valid-subscription annotation
 yq e -i '.metadata.annotations["operators.openshift.io/valid-subscription"] = "[\"OpenShift Container Platform\", \"OpenShift Platform Plus\"]"' \
