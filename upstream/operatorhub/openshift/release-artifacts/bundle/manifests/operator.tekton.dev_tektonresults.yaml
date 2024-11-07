@@ -11,25 +11,25 @@ spec:
   names:
     kind: TektonResult
     listKind: TektonResultList
-    plural: tektonresults
     singular: tektonresult
+    plural: tektonresults
+  preserveUnknownFields: false
   scope: Cluster
   versions:
-  - additionalPrinterColumns:
+    additionalPrinterColumns:
     - jsonPath: .status.version
       name: Version
       type: string
     - jsonPath: .status.conditions[?(@.type=="Ready")].status
       name: Ready
       type: string
-    - jsonPath: .status.conditions[?(@.type=="Ready")].message
+    - jsonPath: .status.conditions[?(@.type=="Ready")].reason
       name: Reason
       type: string
-    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Schema for the TektonResults API
         type: object
+        description: Schema for the TektonResults API
         x-kubernetes-preserve-unknown-fields: true
     served: true
     storage: true

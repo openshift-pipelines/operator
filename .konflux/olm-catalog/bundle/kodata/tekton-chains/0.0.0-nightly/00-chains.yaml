@@ -63,8 +63,8 @@ metadata:
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-chains
-    pipeline.tekton.dev/release: "v20241105-1e43c8cef4"
-    version: "v20241105-1e43c8cef4"
+    pipeline.tekton.dev/release: "v20241107-227b3119c6"
+    version: "v20241107-227b3119c6"
 spec:
   replicas: 1
   selector:
@@ -84,13 +84,13 @@ spec:
         app.kubernetes.io/instance: default
         app.kubernetes.io/part-of: tekton-chains
         # # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-        pipeline.tekton.dev/release: "v20241105-1e43c8cef4"
-        version: "v20241105-1e43c8cef4"
+        pipeline.tekton.dev/release: "v20241107-227b3119c6"
+        version: "v20241107-227b3119c6"
     spec:
       serviceAccountName: tekton-chains-controller
       containers:
         - name: tekton-chains-controller
-          image: ghcr.io/tektoncd/chains/controller-92006fd957c0afd31de6a40b3e33b39f:v20241105-1e43c8cef4@sha256:50c10261aac65a6240cac8f63790e0ffc96ab05c128c34bda9aca21e4d5c5097
+          image: ghcr.io/tektoncd/chains/controller-92006fd957c0afd31de6a40b3e33b39f:v20241107-227b3119c6@sha256:da486fa187cb2329aab9a328a031f784714a1b6845d36701a8856eb7d755316e
           volumeMounts:
             - name: signing-secrets
               mountPath: /etc/signing-secrets
@@ -342,7 +342,7 @@ data:
   # this ConfigMap such that even if we don't have access to
   # other resources in the namespace, we can still access
   # this ConfigMap.
-  version: "v20241105-1e43c8cef4"
+  version: "v20241107-227b3119c6"
 
 ---
 # Copyright 2023 Tekton Authors LLC
