@@ -1,0 +1,28 @@
+apiVersion: appstudio.redhat.com/v1beta2
+kind: IntegrationTestScenario
+metadata:
+  labels:
+    test.appstudio.openshift.io/optional: "true"
+  name: operator-main-e2e-tektoncd-pipelines
+  namespace: tekton-ecosystem-tenant
+  ownerReferences:
+    - apiVersion: appstudio.redhat.com/v1alpha1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Application
+      name: operator-main
+      uid: 473319ef-2b19-4bed-a7ef-c8bcd73af111
+spec:
+  application: operator-main
+  contexts:
+    - description: Application testing
+      name: component_operator-main-bundle
+  resolverRef:
+    params:
+      - name: url
+        value: https://github.com/pramodbindal/demo
+      - name: revision
+        value: main
+      - name: pathInRepo
+        value: e2e/pipeline/tektoncd-pipeline-main-e2e.yaml
+    resolver: git
