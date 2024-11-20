@@ -79,24 +79,13 @@ func NewExtendedController(generator common.ExtensionGenerator) injection.Contro
 		metrics, _ := NewRecorder()
 
 		resolverTaskManifest := &mf.Manifest{}
-		if err := applyAddons(resolverTaskManifest, "07-ecosystem/tasks"); err != nil {
+		if err := applyAddons(resolverTaskManifest, "06-ecosystem/tasks"); err != nil {
 			logger.Fatalf("failed to read namespaced tasks from kodata: %v", err)
 		}
 
 		resolverStepActionManifest := &mf.Manifest{}
-		if err := applyAddons(resolverStepActionManifest, "07-ecosystem/stepactions"); err != nil {
+		if err := applyAddons(resolverStepActionManifest, "06-ecosystem/stepactions"); err != nil {
 			logger.Fatalf("failed to read namespaced stepactions from kodata: %v", err)
-		}
-
-		clusterTaskManifest := &mf.Manifest{}
-		if err := applyAddons(clusterTaskManifest, "02-clustertasks"); err != nil {
-			logger.Fatalf("failed to read clustertask from kodata: %v", err)
-		}
-
-		communityClusterTaskManifest := &mf.Manifest{}
-		if err := fetchCommunityTasks(communityClusterTaskManifest); err != nil {
-			// if unable to fetch community task, don't fail
-			logger.Errorf("failed to read community task: %v", err)
 		}
 
 		triggersResourcesManifest := &mf.Manifest{}
@@ -105,7 +94,7 @@ func NewExtendedController(generator common.ExtensionGenerator) injection.Contro
 		}
 
 		pipelineTemplateManifest := &mf.Manifest{}
-		if err := applyAddons(pipelineTemplateManifest, "03-pipelines"); err != nil {
+		if err := applyAddons(pipelineTemplateManifest, "02-pipelines"); err != nil {
 			logger.Fatalf("failed to read pipeline template from kodata: %v", err)
 		}
 		if err := addPipelineTemplates(pipelineTemplateManifest); err != nil {
@@ -113,7 +102,7 @@ func NewExtendedController(generator common.ExtensionGenerator) injection.Contro
 		}
 
 		openShiftConsoleManifest := &mf.Manifest{Client: mfclient}
-		if err := applyAddons(openShiftConsoleManifest, "05-tkncliserve"); err != nil {
+		if err := applyAddons(openShiftConsoleManifest, "04-tkncliserve"); err != nil {
 			logger.Fatalf("failed to read openshift console resources from kodata: %v", err)
 		}
 		if err := getOptionalAddons(openShiftConsoleManifest); err != nil {
@@ -121,27 +110,25 @@ func NewExtendedController(generator common.ExtensionGenerator) injection.Contro
 		}
 
 		consoleCLIManifest := &mf.Manifest{}
-		if err := applyAddons(consoleCLIManifest, "04-consolecli"); err != nil {
+		if err := applyAddons(consoleCLIManifest, "03-consolecli"); err != nil {
 			logger.Fatalf("failed to read console cli from kodata: %v", err)
 		}
 
 		c := &Reconciler{
-			crdClientSet:                 crdClient,
-			installerSetClient:           client.NewInstallerSetClient(tisClient, version, "addon", v1alpha1.KindTektonAddon, metrics),
-			operatorClientSet:            operatorclient.Get(ctx),
-			extension:                    generator(ctx),
-			pipelineInformer:             tektonPipelineinformer.Get(ctx),
-			triggerInformer:              tektonTriggerinformer.Get(ctx),
-			manifest:                     manifest,
-			operatorVersion:              version,
-			resolverTaskManifest:         resolverTaskManifest,
-			resolverStepActionManifest:   resolverStepActionManifest,
-			clusterTaskManifest:          clusterTaskManifest,
-			triggersResourcesManifest:    triggersResourcesManifest,
-			pipelineTemplateManifest:     pipelineTemplateManifest,
-			communityClusterTaskManifest: communityClusterTaskManifest,
-			openShiftConsoleManifest:     openShiftConsoleManifest,
-			consoleCLIManifest:           consoleCLIManifest,
+			crdClientSet:               crdClient,
+			installerSetClient:         client.NewInstallerSetClient(tisClient, version, "addon", v1alpha1.KindTektonAddon, metrics),
+			operatorClientSet:          operatorclient.Get(ctx),
+			extension:                  generator(ctx),
+			pipelineInformer:           tektonPipelineinformer.Get(ctx),
+			triggerInformer:            tektonTriggerinformer.Get(ctx),
+			manifest:                   manifest,
+			operatorVersion:            version,
+			resolverTaskManifest:       resolverTaskManifest,
+			resolverStepActionManifest: resolverStepActionManifest,
+			triggersResourcesManifest:  triggersResourcesManifest,
+			pipelineTemplateManifest:   pipelineTemplateManifest,
+			openShiftConsoleManifest:   openShiftConsoleManifest,
+			consoleCLIManifest:         consoleCLIManifest,
 		}
 		impl := tektonAddonreconciler.NewImpl(ctx, c)
 
