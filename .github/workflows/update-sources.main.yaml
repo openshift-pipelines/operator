@@ -87,9 +87,10 @@ jobs:
 
         if [ "$(gh pr list --base main --head actions/update/sources-main --json url --jq 'length')" = "0" ]; then
           echo "creating PR..."
-          gh pr create -B main -H actions/update/sources-main --fill
+          gh pr create -B main -H actions/update/sources-main --label=automated --label=upstream --fill
         else
-          echo "a PR already exists, skipping..."
+          echo "a PR already exists, editing..."
+          gh pr edit --title "[bot] Update from tektoncd/operator to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /')"
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
