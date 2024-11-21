@@ -5,21 +5,20 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
-    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "main" &&
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
+      == "next" &&
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
-      ".konflux/dockerfiles/operator.Dockerfile".pathChanged() ||
-      ".tekton/operator-main-operator-pull-request.yaml".pathChanged() ||
+      ".konflux/dockerfiles/proxy.Dockerfile".pathChanged() ||
+      ".tekton/operator-next-proxy-push.yaml".pathChanged() ||
       ".tekton/docker-build-ta.yaml".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: operator-main
-    appstudio.openshift.io/component: operator-main-operator
+    appstudio.openshift.io/application: operator-next
+    appstudio.openshift.io/component: operator-next-proxy
     pipelines.appstudio.openshift.io/type: build
-  name: operator-main-operator-on-pull-request
+  name: operator-next-proxy-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -28,14 +27,9 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-main/operator:on-pr-{{revision}}
-  - name: image-expires-after
-    value: 5d
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-next/proxy:{{revision}}
   - name: dockerfile
-    value: .konflux/dockerfiles/operator.Dockerfile
-  - name: build-platforms
-    value:
-      - linux/x86_64
+    value: .konflux/dockerfiles/proxy.Dockerfile
   - name: prefetch-input
     value: |
       {"type": "rpm", "path": ".konflux/rpms"}

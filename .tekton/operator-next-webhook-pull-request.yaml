@@ -9,17 +9,17 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "main" &&
+      == "next" &&
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
-      ".konflux/dockerfiles/proxy.Dockerfile".pathChanged() ||
-      ".tekton/operator-main-proxy-pull-request.yaml".pathChanged() ||
+      ".konflux/dockerfiles/webhook.Dockerfile".pathChanged() ||
+      ".tekton/operator-next-webhook-pull-request.yaml".pathChanged() ||
       ".tekton/docker-build-ta.yaml".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: operator-main
-    appstudio.openshift.io/component: operator-main-proxy
+    appstudio.openshift.io/application: operator-next
+    appstudio.openshift.io/component: operator-next-webhook
     pipelines.appstudio.openshift.io/type: build
-  name: operator-main-proxy-on-pull-request
+  name: operator-next-webhook-on-pull-request
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -28,11 +28,11 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-main/proxy:on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-next/webhook:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: .konflux/dockerfiles/proxy.Dockerfile
+    value: .konflux/dockerfiles/webhook.Dockerfile
   - name: build-platforms
     value:
       - linux/x86_64

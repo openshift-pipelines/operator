@@ -4,11 +4,12 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "main" &&
-      (".tekton/operator-main-index-push.yaml".pathChanged() ||
-      ".tekton/operator-main-index-pull-request.yaml".pathChanged() ||
+    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "next" &&
+      (".tekton/operator-next-index-push.yaml".pathChanged() ||
+      ".tekton/operator-next-index-pull-request.yaml".pathChanged() ||
       ".konflux/olm-catalog/index/Dockerfile".pathChanged() ||
       ".konflux/olm-catalog/index/kodata/***".pathChanged() ||
       ".konflux/olm-catalog/index/metadata/***".pathChanged() ||
@@ -16,10 +17,10 @@ metadata:
       ".tekton/fbc-build.yaml".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: operator-main
-    appstudio.openshift.io/component: operator-main-index
+    appstudio.openshift.io/application: operator-next
+    appstudio.openshift.io/component: operator-next-index
     pipelines.appstudio.openshift.io/type: build
-  name: operator-main-index-on-push
+  name: operator-next-index-on-pull-request
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -28,7 +29,9 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-main-index:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-next-index:on-pr-{{revision}}
+  - name: image-expires-after
+    value: 5d
   - name: dockerfile
     value: .konflux/olm-catalog/index/Dockerfile
   pipelineRef:
