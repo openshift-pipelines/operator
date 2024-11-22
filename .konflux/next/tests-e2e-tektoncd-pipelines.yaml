@@ -1,0 +1,27 @@
+apiVersion: appstudio.redhat.com/v1beta2
+kind: IntegrationTestScenario
+metadata:
+  labels:
+    test.appstudio.openshift.io/optional: "true"
+  name: operator-next-e2e-tektoncd-pipelines
+  namespace: tekton-ecosystem-tenant
+  ownerReferences:
+    - apiVersion: appstudio.redhat.com/v1alpha1
+      controller: true
+      kind: Application
+      name: operator-next
+      uid: 472c0eaf-3421-4592-a18d-c7f4ef357503
+spec:
+  application: operator-next
+  contexts:
+    - description: Application testing
+      name: component_operator-next-bundle
+  resolverRef:
+    params:
+      - name: url
+        value: https://github.com/pramodbindal/demo
+      - name: revision
+        value: main
+      - name: pathInRepo
+        value: e2e/pipeline/tektoncd-pipeline-main-e2e.yaml
+    resolver: git
