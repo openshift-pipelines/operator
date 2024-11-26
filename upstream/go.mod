@@ -18,8 +18,8 @@ require (
 	github.com/sigstore/cosign/v2 v2.4.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
-	github.com/stretchr/testify v1.9.0
-	github.com/tektoncd/pipeline v0.65.1
+	github.com/stretchr/testify v1.10.0
+	github.com/tektoncd/pipeline v0.65.2
 	github.com/tektoncd/plumbing v0.0.0-20231109154454-9ef46b417293
 	github.com/tektoncd/triggers v0.30.0
 	go.opencensus.io v0.24.0
@@ -30,7 +30,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.4.0
 	gotest.tools/v3 v3.5.1
 	k8s.io/api v0.30.0
-	k8s.io/apiextensions-apiserver v0.29.10
+	k8s.io/apiextensions-apiserver v0.29.11
 	k8s.io/apimachinery v0.30.0
 	k8s.io/client-go v1.5.2
 	k8s.io/code-generator v0.30.0
