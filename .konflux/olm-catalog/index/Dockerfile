@@ -6,8 +6,8 @@ COPY --from=opm /bin/opm /bin/opm
 # Copy declarative config root into image at /configs
 COPY .konflux/olm-catalog/index/configs /configs
 
-## RUN /bin/opm init openshift-pipelines-operator --default-channel=latest --output yaml >> /configs/index.yaml
-RUN /bin/opm render --skip-tls-verify -o yaml quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-main/bundle@sha256:b09db43d7119e6903035efb6cf3940b8ee9c62ef40598edff1c390e844aa9e00 > /configs/nightly-bundle.yaml
+# RUN /bin/opm init openshift-pipelines-operator --default-channel=latest --output yaml >> /configs/index.yaml
+RUN /bin/opm render --skip-tls-verify -o yaml quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-main/bundle@sha256:1b54bd39feff83a2e9bcf5a036d17d62ce805e2251a718266a1e252a4e6ede81 > /configs/nightly-bundle.yaml
 RUN export BUNDLE_VERSION=$(cat /configs/nightly-bundle.yaml | grep 'name: openshift-pipelines-operator-rh' | awk '{print $2}') && \
     echo $BUNDLE_VERSION && \
     sed -i "s%name: \"openshift-pipelines-operator-rh.*\"%name: \"${BUNDLE_VERSION}\"%g" /configs/index.yaml && \
