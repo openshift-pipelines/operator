@@ -7,7 +7,7 @@ COPY --from=opm /bin/opm /bin/opm
 COPY .konflux/olm-catalog/index/configs /configs
 
 # RUN /bin/opm init openshift-pipelines-operator --default-channel=latest --output yaml >> /configs/index.yaml
-RUN /bin/opm render --skip-tls-verify -o yaml quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-main/bundle@sha256:48405ceb706408f8bd2dcf05d081df8cad379c89f391a4e63505d81d1b46ed28 > /configs/nightly-bundle.yaml
+RUN /bin/opm render --skip-tls-verify -o yaml quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-main/bundle@sha256:ecbad7d0500062b752eaea65097d025af12c62fd5436e5a97bc23528180b295f > /configs/nightly-bundle.yaml
 RUN export BUNDLE_VERSION=$(cat /configs/nightly-bundle.yaml | grep 'name: openshift-pipelines-operator-rh' | awk '{print $2}') && \
     echo $BUNDLE_VERSION && \
     sed -i "s%name: \"openshift-pipelines-operator-rh.*\"%name: \"${BUNDLE_VERSION}\"%g" /configs/index.yaml && \
