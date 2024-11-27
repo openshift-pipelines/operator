@@ -76,7 +76,7 @@ jobs:
         fi
 
         git commit -F- <<EOF
-        [bot] Update from tektoncd/operator to ${NEW_COMMIT}
+        [bot] Update main from tektoncd/operator to ${NEW_COMMIT}
 
             $ git diff --stat ${NEW_COMMIT}..${OLD_COMMIT}
         $(cat /tmp/diff.txt | sed 's/^/    /')
@@ -91,7 +91,7 @@ jobs:
           gh pr create -B main -H actions/update/sources-main --label=automated --label=upstream --fill
         else
           echo "a PR already exists, editing..."
-          gh pr edit --title "[bot] Update from tektoncd/operator to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /')"
+          gh pr edit --title "[bot] Update main from tektoncd/operator to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /')"
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
