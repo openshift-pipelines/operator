@@ -9,9 +9,9 @@ COPY .konflux/olm-catalog/bundle/metadata/annotations.yaml /metadata/annotations
 LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
 LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
-LABEL operators.operatorframework.io.bundle.package.v1=serverless-operator
-LABEL operators.operatorframework.io.bundle.channel.default.v1="latest"
-LABEL operators.operatorframework.io.bundle.channels.v1="latest,pipelines-5.0"
+LABEL operators.operatorframework.io.bundle.package.v1=openshift-pipelines-operator-rh
+LABEL operators.operatorframework.io.bundle.channel.default.v1="pipelines-main"
+LABEL operators.operatorframework.io.bundle.channels.v1="pipelines-main"
 
 LABEL \
       com.redhat.component="openshift-pipelines-operator-bundle-container" \
