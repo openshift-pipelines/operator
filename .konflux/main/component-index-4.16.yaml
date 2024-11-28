@@ -1,0 +1,15 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: Component
+metadata:
+  annotations:
+    build.appstudio.openshift.io/pipeline: '{"name":"fbc-builder","bundle":"latest"}'
+  name: operator-main-index-4-16
+spec:
+  componentName: operator-main-index-4-16
+  application: operator-main
+  source:
+    git:
+      url: https://github.com/openshift-pipelines/operator.git
+      dockerfileUrl: .konflux/olm-catalog/openshift-pipelines/index/v4.16/Dockerfile.catalog
+      revision: main
