@@ -24,9 +24,13 @@ jobs:
       uses: actions/checkout@v4
     - id: set-matrix
       run: |
-        echo "versions=$(cd .konflux/olm-catalog/index && ls -d v* | jq -R -s -c 'split("\n")[:-1]')" >> $GITHUB_OUTPUT
+        pushd
+        VERSIONS=$(ls -d v* | jq -R -s -c 'split("\n")[:-1]')
+        popd
+        echo "Versions: ${VERSIONS}"
+        echo "versions=${VERSIONS}" >> $GITHUB_OUTPUT
     outputs:
-      versions: ${{ steps.set-matrix.outputs.projects }}
+      versions: ${{ steps.set-matrix.outputs.versions }}
   generate-catalog:
     needs: build-matrix
     if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
