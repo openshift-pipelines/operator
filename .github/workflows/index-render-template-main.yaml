@@ -1,0 +1,66 @@
+name: index-render-template-main
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - .konflux/olm-catalog/index/**
+  push:
+    paths:
+    paths:
+      - .konflux/olm-catalog/index/**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-matrix:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+    - id: set-matrix
+      run: |
+        echo "versions=$(cd .konflux/olm-catalog/index && ls -d v*)" >> $GITHUB_OUTPUT
+    outputs:
+      versions: ${{ steps.set-matrix.outputs.projects }}
+  generate-catalog:
+    needs: build-matrix
+    if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.build-matrix.outputs.version) }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+    - name: Generate ${{matrix.version}} catalog
+      run: |
+        echo ${{matrix.version}}
+        curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
+        chmod +x /usr/local/bin/opm
+        opm alpha render-template basic .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json > .konflux/olm-catalog/index/${{matrix.version}}/catalog/openshift-pipelines-operator-rh/catalog.json
+    - name: Commit new changes
+      run: |
+        git config user.name openshift-pipelines-bot
+        git config user.email pipelines-extcomm@redhat.com
+        git checkout -b actions/index/${{matrix.version}}
+
+        git add .konflux/olm-catalog/index/${{matrix.version}}/catalog
+        git commit -F- <<EOF
+        [bot:main] Update ${{matrix.version}} generate catalog
+        EOF
+
+        git push -f origin actions/index/${{matrix.version}}
+        if [ "$(gh pr list --base main --head actions/index/${{matrix.version}} --json url --jq 'length')" = "0" ]; then
+          echo "creating PR..."
+          gh pr create -B main -H actions/index/${{matrix.version}} --label=automated --fill
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
