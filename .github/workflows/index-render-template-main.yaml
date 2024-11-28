@@ -24,7 +24,7 @@ jobs:
       uses: actions/checkout@v4
     - id: set-matrix
       run: |
-        pushd
+        pushd .konflux/olm-catalog/index
         VERSIONS=$(ls -d v* | jq -R -s -c 'split("\n")[:-1]')
         popd
         echo "Versions: ${VERSIONS}"
@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: ${{ fromJSON(needs.build-matrix.outputs.version) }}
+        version: ${{ fromJSON(needs.build-matrix.outputs.versions) }}
     permissions:
       contents: write
       pull-requests: write
