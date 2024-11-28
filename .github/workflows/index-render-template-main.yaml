@@ -46,6 +46,13 @@ jobs:
         echo ${{matrix.version}}
         curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
         chmod +x /usr/local/bin/opm
+
+        BUNDLE_IMAGE=$(jq -r '.entries[] | select(.schema == "olm.bundle") | .image' .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json)
+        BUNDLE_VERSION=$(opm render --skip-tls-verify -o json ${BUNDLE_IMAGE} | jq -r '.name' | awk -F 'v' '{ print $2 }')
+
+        # Update catalog-template
+        sed "s%5.0.5-[0-9]\+%${BUNDLE_VERSION}%g" .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json
+
         opm alpha render-template basic .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json > .konflux/olm-catalog/index/${{matrix.version}}/catalog/openshift-pipelines-operator-rh/catalog.json
     - name: Commit new changes
       run: |
