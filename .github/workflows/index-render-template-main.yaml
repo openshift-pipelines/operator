@@ -62,7 +62,7 @@ jobs:
       run: |
         git config user.name openshift-pipelines-bot
         git config user.email pipelines-extcomm@redhat.com
-        git checkout -b actions/index/${{matrix.version}}
+        git checkout -b actions/index-main/${{matrix.version}}
 
         git add .konflux/olm-catalog/index/${{matrix.version}}/catalog
 
@@ -75,10 +75,10 @@ jobs:
         [bot:main] Update ${{matrix.version}} generate catalog
         EOF
 
-        git push -f origin actions/index/${{matrix.version}}
-        if [ "$(gh pr list --base main --head actions/index/${{matrix.version}} --json url --jq 'length')" = "0" ]; then
+        git push -f origin actions/index-main/${{matrix.version}}
+        if [ "$(gh pr list --base main --head actions/index-main/${{matrix.version}} --json url --jq 'length')" = "0" ]; then
           echo "creating PR..."
-          gh pr create -B main -H actions/index/${{matrix.version}} --label=automated --fill
+          gh pr create -B main -H actions/index-main/${{matrix.version}} --label=automated --fill
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
