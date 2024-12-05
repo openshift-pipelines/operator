@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set -ex
-current_version=$(cat hack/version)
+current_version=$(yq e '.versions.current' project.yaml)
 echo $current_version
 current_version_number=${current_version##*-}
 echo $current_version_number
@@ -10,9 +10,8 @@ echo $new_version_number
 new_version1=(${current_version//-/ })
 new_version2=$new_version1-$new_version_number
 echo "$new_version2"
-echo "$new_version2" > "hack/version"
+yq -i e ".versions.current = \"$new_version2\"" project.yaml
+yq -i e ".versions.previous = \"$current_version\"" project.yaml
 
 # update version and previous_version in operator-fetch-payload
-
-sed -i "s/CURRENT_VERSION=.*/CURRENT_VERSION=$new_version2/" hack/operator-fetch-payload.sh
-sed -i "s/PREVIOUS_VERSION=.*/PREVIOUS_VERSION=$current_version/" hack/operator-fetch-payload.sh
+sed -i "s/version=.*/version=\"$new_version2\"/" .konflux/olm-catalog/bundle/Dockerfile
