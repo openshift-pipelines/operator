@@ -3,6 +3,11 @@ REMOTE        = 127.0.0.1
 TAG           = latest
 RUNTIME       = docker
 
+update-payload-and-version: ## Update tektoncd operator build number, payloads, bundle manifests, image referenc
+	@./hack/update-version.sh
+	@./hack/operator-fetch-payload.sh
+	@./hack/operator-update-images.sh
+
 fetch-payload: ## Update tektoncd operator payloads and bundle manifests
 	@./hack/operator-fetch-payload.sh
 
