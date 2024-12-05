@@ -28,6 +28,29 @@ jobs:
         git checkout -B main origin/main
         popd
 
+    - name: fetch-payload
+      run: |
+        # Operator SDK
+        export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.37.0/operator-sdk_linux_amd64
+        curl -LO ${OPERATOR_SDK_DL_URL}
+        chmod +x operator-sdk_linux_amd64 && sudo mv operator-sdk_linux_amd64 /usr/local/bin/operator-sdk
+    
+        operator-sdk version
+    
+        # Python with requirements (yaml here)
+        # We could migrate to go...
+        python3 -m venv sync-sources
+        source sync-sources/bin/activate
+        pip3 install -r requirements.txt
+    
+        # Update operator's payload and stuff
+        make update-payload-and-version
+        pushd upstream
+        rm -fR cmd/openshift/operator/kodata operatorhub
+        git checkout HEAD .
+        popd
+    
+
 
     - name: Commit new changes
       run: |
