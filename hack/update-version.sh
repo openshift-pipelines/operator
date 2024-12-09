@@ -14,4 +14,4 @@ yq -i e ".versions.current = \"$new_version2\"" project.yaml
 yq -i e ".versions.previous = \"$current_version\"" project.yaml
 
 # update version and previous_version in operator-fetch-payload
-sed -i "s/version=.*/version=\"$new_version2\"/" .konflux/olm-catalog/bundle/Dockerfile
+sed -i "s%version=.*\\\%version=\"$new_version2\" \\\%g" .konflux/olm-catalog/bundle/Dockerfile
