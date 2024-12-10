@@ -18,8 +18,8 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.16.0 <6.0.6-4'
-    operators.operatorframework.io/builder: operator-sdk-v1.37.0
+    olm.skipRange: '>=1.16.0 <6.0.6-3'
+    operators.operatorframework.io/builder: operator-sdk-unknown
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
     repository: https://github.com/tektoncd/operator
@@ -30,7 +30,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v6.0.6-4
+  name: openshift-pipelines-operator-rh.v6.0.6-3
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -1180,7 +1180,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 6.0.6-4
+                        value: 6.0.6-3
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1284,11 +1284,11 @@ spec:
                       - name: IMAGE_MAG_MANUAL_APPROVAL
                         value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/manual-approval-gate-main/webhook@sha256:c1c1e4b728bbbd23b878f7eb1a6c7811893980e108ef84a60feb9ce22392d26b
                       - name: IMAGE_PAC_PAC_CONTROLLER
-                        value: quay.io/openshift-pipeline/openshift-pipelines-pipelines-as-code:1.16
+                        value: quay.io/openshift-pipeline/openshift-pipelines-pipelines-as-code@sha256:33180f3dd97bdcf83e4ff67ebb307efe08d0751a31481b5f130eaf09ffd61cfc
                       - name: IMAGE_PAC_PAC_WEBHOOK
-                        value: quay.io/openshift-pipeline/openshift-pipelines-pipelines-as-code:1.16
+                        value: quay.io/openshift-pipeline/openshift-pipelines-pipelines-as-code@sha256:33180f3dd97bdcf83e4ff67ebb307efe08d0751a31481b5f130eaf09ffd61cfc
                       - name: IMAGE_PAC_PAC_WATCHER
-                        value: quay.io/openshift-pipeline/openshift-pipelines-pipelines-as-code:1.16
+                        value: quay.io/openshift-pipeline/openshift-pipelines-pipelines-as-code@sha256:33180f3dd97bdcf83e4ff67ebb307efe08d0751a31481b5f130eaf09ffd61cfc
                       - name: IMAGE_RESULTS_WATCHER
                         value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-results-main/watcher@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
                       - name: IMAGE_RESULTS_API
@@ -1521,11 +1521,11 @@ spec:
       name: IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER
     - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/manual-approval-gate-main/webhook@sha256:c1c1e4b728bbbd23b878f7eb1a6c7811893980e108ef84a60feb9ce22392d26b
       name: IMAGE_MAG_MANUAL_APPROVAL
-    - image: quay.io/openshift-pipeline/openshift-pipelines-pipelines-as-code:1.16
+    - image: quay.io/openshift-pipeline/openshift-pipelines-pipelines-as-code@sha256:33180f3dd97bdcf83e4ff67ebb307efe08d0751a31481b5f130eaf09ffd61cfc
       name: IMAGE_PAC_PAC_CONTROLLER
-    - image: quay.io/openshift-pipeline/openshift-pipelines-pipelines-as-code:1.16
+    - image: quay.io/openshift-pipeline/openshift-pipelines-pipelines-as-code@sha256:33180f3dd97bdcf83e4ff67ebb307efe08d0751a31481b5f130eaf09ffd61cfc
       name: IMAGE_PAC_PAC_WEBHOOK
-    - image: quay.io/openshift-pipeline/openshift-pipelines-pipelines-as-code:1.16
+    - image: quay.io/openshift-pipeline/openshift-pipelines-pipelines-as-code@sha256:33180f3dd97bdcf83e4ff67ebb307efe08d0751a31481b5f130eaf09ffd61cfc
       name: IMAGE_PAC_PAC_WATCHER
     - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-results-main/watcher@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
       name: IMAGE_RESULTS_WATCHER
@@ -1539,5 +1539,5 @@ spec:
       name: IMAGE_ADDONS_MAVEN_GOALS
     - image: registry.redhat.io/openshift-pipelines/pipelines-console-plugin-rhel8@
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
-  replaces: openshift-pipelines-operator-rh.v6.0.6-3
-  version: 6.0.6-4
+  replaces: openshift-pipelines-operator-rh.v6.0.6-2
+  version: 6.0.6-3
