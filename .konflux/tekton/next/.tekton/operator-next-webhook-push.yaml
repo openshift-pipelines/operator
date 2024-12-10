@@ -10,15 +10,15 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "main" &&
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
-      ".konflux/dockerfiles/proxy.Dockerfile".pathChanged() ||
-      ".tekton/operator-main-proxy-push.yaml".pathChanged() ||
+      ".konflux/dockerfiles/webhook.Dockerfile".pathChanged() ||
+      ".tekton/operator-next-webhook-push.yaml".pathChanged() ||
       ".tekton/docker-build-ta.yaml".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: operator-main
-    appstudio.openshift.io/component: operator-main-proxy
+    appstudio.openshift.io/application: operator-next
+    appstudio.openshift.io/component: operator-next-webhook
     pipelines.appstudio.openshift.io/type: build
-  name: operator-main-proxy-on-push
+  name: operator-next-webhook-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -27,9 +27,9 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-main/proxy:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-next/webhook:{{revision}}
   - name: dockerfile
-    value: .konflux/dockerfiles/proxy.Dockerfile
+    value: .konflux/dockerfiles/webhook.Dockerfile
   - name: build-platforms
     value:
     - linux/arm64
