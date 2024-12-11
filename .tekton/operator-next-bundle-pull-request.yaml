@@ -36,6 +36,9 @@ spec:
     value: 5d
   - name: dockerfile
     value: .konflux/olm-catalog/bundle/Dockerfile
+  - name: build-platforms
+    value:
+      - linux/x86_64
   - name: build-source-image
     value: "true"
   - name: hermetic
@@ -44,19 +47,8 @@ spec:
     value: |
       {"type": "rpm", "path": ".konflux/rpms"}
   pipelineRef:
-    name: docker-build
+    name: docker-build-ta
   workspaces:
-  - name: workspace
-    volumeClaimTemplate:
-      metadata:
-        creationTimestamp: null
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-      status: {}
   - name: git-auth
     secret:
       secretName: '{{ git_auth_secret }}'
