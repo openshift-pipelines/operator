@@ -54,7 +54,7 @@ jobs:
         BUNDLE_VERSION=$(opm render --skip-tls-verify -o json ${BUNDLE_IMAGE} | jq -r '.name' | awk -F 'v' '{ print $2 }')
 
         # Update catalog-template
-        sed -i "s%5.0.5-[0-9]\+%${BUNDLE_VERSION}%g" .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json
+        sed -i "s%6.0.6-[0-9]\+%${BUNDLE_VERSION}%g" .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json
 
         opm alpha render-template basic .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json > .konflux/olm-catalog/index/${{matrix.version}}/catalog/openshift-pipelines-operator-rh/catalog.json
     - name: Commit new changes
