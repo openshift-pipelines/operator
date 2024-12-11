@@ -30,7 +30,11 @@ jobs:
 
     - name: fetch-payload
       run: |
-        if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
+        pushd upstream
+        BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+        popd
+    
+        if [[ "$BRANCH_NAME" != "main" ]] && [[ -z $(git status --porcelain --untracked-files=no) ]]; then
           echo "No change, do nothing"
           exit 0
         fi
