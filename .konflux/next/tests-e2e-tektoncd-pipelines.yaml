@@ -1,6 +1,8 @@
 apiVersion: appstudio.redhat.com/v1beta2
 kind: IntegrationTestScenario
 metadata:
+  labels:
+    test.appstudio.openshift.io/optional: "true"
   name: operator-next-e2e-tektoncd-pipelines
 spec:
   application: operator-next
@@ -10,9 +12,9 @@ spec:
   resolverRef:
     params:
       - name: url
-        value: https://github.com/pramodbindal/demo
+        value: https://github.com/openshift-pipelines/operator
       - name: revision
         value: main
       - name: pathInRepo
-        value: e2e/pipeline/tektoncd-pipeline-main-e2e.yaml
+        value: .konflux/tekton/bundle-e2e-pipeline.yaml
     resolver: git
