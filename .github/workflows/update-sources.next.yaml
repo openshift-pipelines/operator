@@ -99,7 +99,7 @@ jobs:
           gh pr create -B next -H actions/update/sources-next --label=automated --label=upstream --fill
         else
           echo "a PR already exists, editing..."
-          gh pr edit --title "[bot] Update next from tektoncd/operator to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /')"
+          gh pr edit --title "[bot] Update next from tektoncd/operator to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)"
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
