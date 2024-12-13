@@ -4,7 +4,6 @@ metadata:
   labels:
     test.appstudio.openshift.io/optional: "true"
   name: operator-main-e2e-tektoncd-pipelines
-  namespace: tekton-ecosystem-tenant
 spec:
   application: operator-main
   contexts:
@@ -13,9 +12,9 @@ spec:
   resolverRef:
     params:
       - name: url
-        value: https://github.com/pramodbindal/demo
+        value: https://github.com/openshift-pipelines/operator
       - name: revision
         value: main
       - name: pathInRepo
-        value: e2e/pipeline/tektoncd-pipeline-main-e2e.yaml
+        value: .konflux/tekton/bundle-e2e-pipeline.yaml
     resolver: git
