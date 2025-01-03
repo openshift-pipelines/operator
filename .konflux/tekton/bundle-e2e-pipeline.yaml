@@ -158,7 +158,6 @@ spec:
               - "$(params.namespace)"
               - "$(params.bundleImage)"
     - name: e2e-test
-      description: Placeholder task that prints the Snapshot and outputs standard TEST_OUTPUT
       runAfter:
         - deploy-operator
       params:
@@ -189,13 +188,13 @@ spec:
               resolver: http
               params:
                 - name: url
-                  value: https://raw.githubusercontent.com/tektoncd/catalog/main/stepaction/git-clone/0.1/git-clone.yaml
+                  value: https://raw.githubusercontent.com/openshift-pipelines/tektoncd-catalog/p/stepactions/stepaction-git-clone/0.4.1/stepaction-git-clone.yaml
             params:
-              - name: output-path
+              - name: OUTPUT_PATH
                 value: /source/repo
-              - name: url
+              - name: URL
                 value: $(params.repo_url)
-              - name: revision
+              - name: REVISION
                 value: $(params.revision)
 
           - name: get-kubeconfig
@@ -229,8 +228,6 @@ spec:
                     name: github
                     optional: true
             script: |
-              set -x
-              echo "GITHUB_TOKEN > $GITHUB_TOKEN"
               gauge run --tags="" --log-level=debug --verbose specs/konflux-olm.spec
 
           - name: run-e2e-tests
@@ -241,3 +238,4 @@ spec:
                 value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
             script: |
               gauge run --tags="" --log-level=debug --verbose specs/pipelines/
+              gauge run --tags="" --log-level=debug --verbose specs/metrics/
