@@ -236,6 +236,16 @@ spec:
             env:
               - name: KUBECONFIG
                 value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+              - name: CHAINS_DOCKER_CONFIG_JSON
+                valueFrom:
+                  secretKeyRef:
+                    key: config.json
+                    name: quay-io-dockerconfig
             script: |
+              
+              export CHAINS_REPOSITORY=quay.io/openshift-pipeline/chainstest
+
               gauge run --tags="" --log-level=debug --verbose specs/pipelines/
               gauge run --tags="" --log-level=debug --verbose specs/metrics/
+              gauge run --tags="" --log-level=debug --verbose specs/chains/
+              gauge run --tags="" --log-level=debug --verbose specs/manualapprovalgate/
