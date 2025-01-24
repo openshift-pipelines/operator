@@ -1,10 +1,15 @@
 # use non-scratch parent image as dummy for https://issues.redhat.com/browse/KFLUXBUGS-10
-FROM registry.redhat.io/ubi8/ubi-micro:latest
+FROM alpine as base
+
+COPY . .
+RUN  uname -a && apk update && apk add yq bash -y && ./hack/operator-update-images.sh
+
+##
 FROM scratch
 
-COPY .konflux/olm-catalog/bundle/kodata /kodata
-COPY .konflux/olm-catalog/bundle/manifests /manifests
-COPY .konflux/olm-catalog/bundle/metadata/annotations.yaml /metadata/annotations.yaml
+COPY --from=base .konflux/olm-catalog/bundle/kodata /kodata
+COPY --from=base .konflux/olm-catalog/bundle/manifests /manifests
+COPY --from=base .konflux/olm-catalog/bundle/metadata/annotations.yaml /metadata/annotations.yaml
 
 LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
