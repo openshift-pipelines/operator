@@ -11,7 +11,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "next" &&
-      ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
+      ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/prefetch/***".pathChanged() ||
       ".konflux/dockerfiles/proxy.Dockerfile".pathChanged() ||
       ".tekton/operator-next-proxy-push.yaml".pathChanged())
   creationTimestamp: null
@@ -37,7 +37,7 @@ spec:
     - linux/x86_64
   - name: prefetch-input
     value: |
-      {"type": "rpm", "path": ".konflux/rpms"}
+      {"type": "rpm", "path": ".konflux/prefetch"}
   pipelineRef:
     name: docker-build-ta
   workspaces:
