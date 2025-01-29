@@ -2,7 +2,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:latest as base
 COPY . /src/
 
 WORKDIR /src/
-RUN cp /cachi2/output/deps/generic/yq /usr/local/bin/yq && chmod +x /usr/local/bin/yq && yq --version
+RUN cp /cachi2/output/deps/generic/yq_$(uname -m) /usr/local/bin/yq && chmod +x /usr/local/bin/yq && yq --version
 RUN ./hack/operator-update-images.sh
 
 FROM scratch
