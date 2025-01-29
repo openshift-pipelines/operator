@@ -1,10 +1,14 @@
 # use non-scratch parent image as dummy for https://issues.redhat.com/browse/KFLUXBUGS-10
-FROM registry.redhat.io/ubi8/ubi-micro:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest as base
+COPY . /src/
+RUN env &&  pwd && ls -la && ls -la /cachi2/* && ls -la /cachi2/output/* && ls -la /cachi2/output/deps/*
+RUN cp /cachi2/output/deps/generic/yq /usr/local/bin/yq && chmod +x /usr/local/bin/yq && yq --version
+
 FROM scratch
 
-COPY .konflux/olm-catalog/bundle/kodata /kodata
-COPY .konflux/olm-catalog/bundle/manifests /manifests
-COPY .konflux/olm-catalog/bundle/metadata/annotations.yaml /metadata/annotations.yaml
+COPY --from=base /src/.konflux/olm-catalog/bundle/kodata /kodata
+COPY --from=base /src/.konflux/olm-catalog/bundle/manifests /manifests
+COPY --from=base /src/.konflux/olm-catalog/bundle/metadata/annotations.yaml /metadata/annotations.yaml
 
 LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
