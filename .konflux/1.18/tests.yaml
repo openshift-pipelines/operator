@@ -3,17 +3,23 @@
 apiVersion: appstudio.redhat.com/v1beta2
 kind: IntegrationTestScenario
 metadata:
-  name: operator-1-18-enterprise-contract-group
+  name: operator-1-18-enterprise-contract
 spec:
   application: operator-1-18
   contexts:
-    - description: Application testing
-      name: group
+    - description: Application testing for operator-1.18-operator
+      name: component_operator-1.18-operator
+    - description: Application testing for operator-1.18-webhook
+      name: component_operator-1.18-webhook
+    - description: Application testing for operator-1.18-proxy
+      name: component_operator-1.18-proxy
   params:
     - name: POLICY_CONFIGURATION
       value: tekton-ecosystem-tenant/tekton-ecosystem-tenant-containers
     - name: TIMEOUT
       value: "15m0s"
+    - name: SINGLE_COMPONENT
+      value: "true"
   resolverRef:
     params:
       - name: url
