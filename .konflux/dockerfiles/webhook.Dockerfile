@@ -26,7 +26,7 @@ COPY .konflux/olm-catalog/bundle/kodata /kodata
 LABEL \
       com.redhat.component="openshift-pipelines-operator-webhook-rhel8-container" \
       name="openshift-pipelines/pipelines-operator-webhook-rhel8" \
-      version="1.16.0" \
+      version="1.18.0" \
       summary="Red Hat OpenShift Pipelines Operator Webhook" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Webhook" \

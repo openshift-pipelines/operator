@@ -25,7 +25,7 @@ COPY --from=builder /tmp/openshift-pipelines-operator-proxy ${OPERATOR_PROXY}
 LABEL \
       com.redhat.component="openshift-pipelines-operator-proxy-rhel8-container" \
       name="openshift-pipelines/pipelines-operator-proxy-rhel8" \
-      version="${CI_CONTAINER_VERSION}" \
+      version="1.18.0" \
       summary="Red Hat OpenShift Pipelines Operator Proxy" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Proxy" \
