@@ -4,22 +4,22 @@ kind: PipelineRun
 metadata:
   annotations:
     pipelinesascode.tekton.dev/cancel-in-progress: "true" # Cancel in-progress pipelines
-    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/next/.tekton/docker-build-ta.yaml"
+    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/release-v1.18.x/.tekton/docker-build-ta.yaml"
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "next" &&
-      ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/prefetch/***".pathChanged() ||
-      ".konflux/dockerfiles/operator.Dockerfile".pathChanged() ||
-      ".tekton/operator-next-operator-push.yaml".pathChanged())
+      == "release-v1.18.x" &&
+      ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
+      ".konflux/dockerfiles/proxy.Dockerfile".pathChanged() ||
+      ".tekton/operator-1-18-proxy-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: operator-next
-    appstudio.openshift.io/component: operator-next-operator
+    appstudio.openshift.io/application: operator-1.18
+    appstudio.openshift.io/component: operator-1-18-proxy
     pipelines.appstudio.openshift.io/type: build
-  name: operator-next-operator-on-push
+  name: operator-1-18-proxy-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -28,16 +28,16 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-next/operator:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-1-18/proxy:{{revision}}
   - name: dockerfile
-    value: .konflux/dockerfiles/operator.Dockerfile
+    value: .konflux/dockerfiles/proxy.Dockerfile
   - name: build-platforms
     value:
     - linux-m2xlarge/arm64
     - linux/x86_64
   - name: prefetch-input
     value: |
-      {"type": "rpm", "path": ".konflux/prefetch"}
+      {"type": "rpm", "path": ".konflux/rpms"}
   pipelineRef:
     name: docker-build-ta
   workspaces:
