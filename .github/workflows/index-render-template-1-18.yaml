@@ -1,0 +1,88 @@
+name: index-render-template-1-18
+
+on:
+  workflow_dispatch: {}
+  push:
+    branch:
+      - "release-v1.18.x"
+    branches-ignore:
+      - "konflux/**/1-18**"
+    paths:
+      - .konflux/olm-catalog/index/**/Dockerfile.catalog
+      - .konflux/olm-catalog/index/**/catalog-template.json
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-matrix:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+      with:
+        ref: release-v1.18.x
+    - id: set-matrix
+      run: |
+        pushd .konflux/olm-catalog/index
+        VERSIONS=$(ls -d v* | jq -R -s -c 'split("\n")[:-1]')
+        popd
+        echo "Versions: ${VERSIONS}"
+        echo "versions=${VERSIONS}" >> $GITHUB_OUTPUT
+    outputs:
+      versions: ${{ steps.set-matrix.outputs.versions }}
+  generate-catalog:
+    needs: build-matrix
+    if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.build-matrix.outputs.versions) }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+      with:
+        ref: release-v1.18.x
+    - name: Generate ${{matrix.version}} catalog
+      run: |
+        echo ${{matrix.version}}
+        curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
+        chmod +x /usr/local/bin/opm
+
+        BUNDLE_IMAGE=$(jq -r '.entries[] | select(.schema == "olm.bundle") | .image' .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json)
+        BUNDLE_VERSION=$(opm render --skip-tls-verify -o json ${BUNDLE_IMAGE} | jq -r '.name' | awk -F 'v' '{ print $2 }')
+
+        # Update catalog-template
+        sed -i "s%5.0.5-[0-9]\+%${BUNDLE_VERSION}%g" .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json
+
+        opm alpha render-template basic .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json > .konflux/olm-catalog/index/${{matrix.version}}/catalog/openshift-pipelines-operator-rh/catalog.json
+    - name: Commit new changes
+      run: |
+        git config user.name openshift-pipelines-bot
+        git config user.email pipelines-extcomm@redhat.com
+        git checkout -b actions/index-1.18/${{matrix.version}}
+
+        git add .konflux/olm-catalog/index/${{matrix.version}}/catalog
+
+        if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
+          echo "No change, exiting"
+          exit 0
+        fi
+
+        git commit -F- <<EOF
+        [bot:1.18] Update ${{matrix.version}} generate catalog
+        EOF
+
+        git push -f origin actions/index-1.18/${{matrix.version}}
+        if [ "$(gh pr list --base 1.18 --head actions/index-1.18/${{matrix.version}} --json url --jq 'length')" = "0" ]; then
+          echo "creating PR..."
+          gh pr create -B release-v1.18.x -H actions/index-1.18/${{matrix.version}} --label=automated --fill
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
