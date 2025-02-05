@@ -6,19 +6,20 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true" # Cancel in-progress pipelines
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
+    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
       == "main" &&
-      ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
-      ".konflux/dockerfiles/proxy.Dockerfile".pathChanged() ||
-      ".tekton/operator-main-proxy-push.yaml".pathChanged())
+      (( "project.yaml".pathChanged() ||  ".konflux/patches/***".pathChanged() || ".konflux/olm-catalog/bundle/***".pathChanged() ) ||
+      ".konflux/dockerfiles/bundle2.Dockerfile".pathChanged() ||
+      ".tekton/operator-main-bundle2-pull-request.yaml".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: operator-main
-    appstudio.openshift.io/component: operator-main-proxy
+    appstudio.openshift.io/component: operator-main-bundle2
     pipelines.appstudio.openshift.io/type: build
-  name: operator-main-proxy-on-push
+  name: operator-main-bundle2-on-pull-request
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -27,12 +28,13 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-main/proxy:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-main/bundle2:on-pr-{{revision}}
+  - name: image-expires-after
+    value: 5d
   - name: dockerfile
-    value: .konflux/dockerfiles/proxy.Dockerfile
+    value: .konflux/dockerfiles/bundle2.Dockerfile
   - name: build-platforms
     value:
-    - linux-m2xlarge/arm64
     - linux/x86_64
   - name: prefetch-input
     value: |
