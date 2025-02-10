@@ -2,7 +2,7 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
-    alm-examples: "[\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"ManualApprovalGate\",\n    \"metadata\": {\n      \"name\": \"manual-approval-gate\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"OpenShiftPipelinesAsCode\",\n    \"metadata\": {\n      \"name\": \"pipelines-as-code\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonAddon\",\n    \"metadata\": {\n      \"name\": \"addon\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonChain\",\n    \"metadata\": {\n      \"name\": \"chain\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonConfig\",\n    \"metadata\": {\n      \"name\": \"config\"\n    },\n    \"spec\": {\n      \"addon\": {\n        \"params\": [\n          {\n            \"name\": \"pipelineTemplates\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverTasks\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverStepActions\",\n            \"value\": \"true\"\n          }\n        ]\n      },\n      \"params\": [\n        {\n          \"name\": \"createRbacResource\",\n          \"value\": \"true\"\n        }\n      ],\n      \"profile\": \"all\",\n      \"pruner\": {\n        \"keep\": 100,\n        \"resources\": [\n          \"pipelinerun\",\n          \"taskrun\"\n        ],\n        \"schedule\": \"0 8 * * *\"\n      },\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonHub\",\n    \"metadata\": {\n      \"name\": \"hub\"\n    },\n    \"spec\": {\n      \"api\": {\n        \"catalogRefreshInterval\": \"30m\"\n      }\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonInstallerSet\",\n    \"metadata\": {\n      \"name\": \"foo\"\n    },\n    \"spec\": {\n      \"manifests\": []\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonPipeline\",\n    \"metadata\": {\n      \"name\": \"pipeline\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonResult\",\n    \"metadata\": {\n      \"name\": \"result\"\n    },\n    \"spec\": {\n      \"auth_disable\": true,\n      \"db_enable_auto_migration\": true,\n      \"db_host\": \"tekton-results-postgres-service.openshift-pipelines.svc.cluster.local\",\n      \"db_port\": 5432,\n      \"log_level\": \"debug\",\n      \"logging_pvc_name\": \"tekton-logs\",\n      \"logs_api\": true,\n      \"logs_buffer_size\": 32768,\n      \"logs_path\": \"/logs\",\n      \"logs_type\": \"File\",\n      \"prometheus_port\": 9090,\n      \"server_port\": 8080,\n      \"targetNamespace\": \"openshift-pipelines\",\n      \"tls_hostname_override\": \"tekton-results-api-service.openshift-pipelines.svc.cluster.local\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonTrigger\",\n    \"metadata\": {\n      \"name\": \"trigger\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  }\n]"
+    alm-examples: "[\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"ManualApprovalGate\",\n    \"metadata\": {\n      \"name\": \"manual-approval-gate\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"OpenShiftPipelinesAsCode\",\n    \"metadata\": {\n      \"name\": \"pipelines-as-code\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonAddon\",\n    \"metadata\": {\n      \"name\": \"addon\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonChain\",\n    \"metadata\": {\n      \"name\": \"chain\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonConfig\",\n    \"metadata\": {\n      \"name\": \"config\"\n    },\n    \"spec\": {\n      \"addon\": {\n        \"params\": [\n          {\n            \"name\": \"pipelineTemplates\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverTasks\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverStepActions\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"communityResolverTasks\",\n            \"value\": \"true\"\n          }\n        ]\n      },\n      \"params\": [\n        {\n          \"name\": \"createRbacResource\",\n          \"value\": \"true\"\n        }\n      ],\n      \"profile\": \"all\",\n      \"pruner\": {\n        \"keep\": 100,\n        \"resources\": [\n          \"pipelinerun\",\n          \"taskrun\"\n        ],\n        \"schedule\": \"0 8 * * *\"\n      },\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonHub\",\n    \"metadata\": {\n      \"name\": \"hub\"\n    },\n    \"spec\": {\n      \"api\": {\n        \"catalogRefreshInterval\": \"30m\"\n      }\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonInstallerSet\",\n    \"metadata\": {\n      \"name\": \"foo\"\n    },\n    \"spec\": {\n      \"manifests\": []\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonPipeline\",\n    \"metadata\": {\n      \"name\": \"pipeline\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonResult\",\n    \"metadata\": {\n      \"name\": \"result\"\n    },\n    \"spec\": {\n      \"auth_disable\": true,\n      \"db_enable_auto_migration\": true,\n      \"db_host\": \"tekton-results-postgres-service.openshift-pipelines.svc.cluster.local\",\n      \"db_port\": 5432,\n      \"log_level\": \"debug\",\n      \"logging_pvc_name\": \"tekton-logs\",\n      \"logs_api\": true,\n      \"logs_buffer_size\": 32768,\n      \"logs_path\": \"/logs\",\n      \"logs_type\": \"File\",\n      \"prometheus_port\": 9090,\n      \"server_port\": 8080,\n      \"targetNamespace\": \"openshift-pipelines\",\n      \"tls_hostname_override\": \"tekton-results-api-service.openshift-pipelines.svc.cluster.local\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonTrigger\",\n    \"metadata\": {\n      \"name\": \"trigger\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  }\n]"
     capabilities: Full Lifecycle
     categories: Developer Tools, Integration & Delivery
     certified: 'false'
@@ -327,7 +327,7 @@ spec:
     ### Components
 
 
-    - Tekton Pipelines: v0.66.0
+    - Tekton Pipelines: v0.68.0
 
     - Tekton Triggers: v0.30.1
 
@@ -1176,7 +1176,7 @@ spec:
                       - name: IMAGE_PIPELINES_PROXY
                         value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-next/proxy@sha256:087bf312358841ffd9c6507490e6f247d2d3db0c36400a6f395ef92d4a715f57
                       - name: IMAGE_JOB_PRUNER_TKN
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-cli-next/tkn@sha256:91c75c86d65818104edc8e36e30f9a7239ae9b84c28760295ef48bd4044a8117
+                        value: quay.io/openshift-pipeline/tektoncd-cli-next-tkn@sha256:91c75c86d65818104edc8e36e30f9a7239ae9b84c28760295ef48bd4044a8117
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
@@ -1214,39 +1214,43 @@ spec:
                       - name: IMAGE_ADDONS_OC
                         value: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
                       - name: IMAGE_PIPELINES_TEKTON_PIPELINES_CONTROLLER
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/controller@sha256:6016e29912f53e059ee0688b603bef22b8bd48aac15443efc1ac1380b1b52233
+                        value: quay.io/openshift-pipeline/tektoncd-pipeline-next-controller@sha256:6016e29912f53e059ee0688b603bef22b8bd48aac15443efc1ac1380b1b52233
                       - name: IMAGE_PIPELINES_WEBHOOK
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/webhook@sha256:5e888baf93c94c97c72ee2239d2484cbed09345f705bb55e5aa000a0bc7d66d3
+                        value: quay.io/openshift-pipeline/tektoncd-pipeline-next-webhook@sha256:5e888baf93c94c97c72ee2239d2484cbed09345f705bb55e5aa000a0bc7d66d3
                       - name: IMAGE_PIPELINES_CONTROLLER
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/resolvers@sha256:e961823ed3b236d3daf9f55ee7e1ca24921584b78eca8a7d53d04f5625f55b8c
+                        value: quay.io/openshift-pipeline/tektoncd-pipeline-next-resolvers@sha256:e961823ed3b236d3daf9f55ee7e1ca24921584b78eca8a7d53d04f5625f55b8c
                       - name: IMAGE_PIPELINES_TEKTON_EVENTS_CONTROLLER
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/events@sha256:cc4660c020020a4fdd68d85de16bf13e4c05b0edcbaa81563c21c58973a6933c
+                        value: quay.io/openshift-pipeline/tektoncd-pipeline-next-events@sha256:cc4660c020020a4fdd68d85de16bf13e4c05b0edcbaa81563c21c58973a6933c
                       - name: IMAGE_PIPELINES_ARG__ENTRYPOINT_IMAGE
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/entrypoint@sha256:71c2f872c0a2103652f1b5f0267ca98dacf7e6711ec4a134775796c0c75089f8
+                        value: quay.io/openshift-pipeline/tektoncd-pipeline-next-entrypoint@sha256:71c2f872c0a2103652f1b5f0267ca98dacf7e6711ec4a134775796c0c75089f8
                       - name: IMAGE_PIPELINES_ARG__GIT_IMAGE
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/ecosystem-images/git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
+                        value: quay.io/openshift-pipeline/ecosystem-images-git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
                       - name: IMAGE_ADDONS_PARAM_GITINITIMAGE
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/ecosystem-images/git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
+                        value: quay.io/openshift-pipeline/ecosystem-images-git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
                       - name: IMAGE_ADDONS_GIT_RUN
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/ecosystem-images/git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
+                        value: quay.io/openshift-pipeline/ecosystem-images-git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
                       - name: IMAGE_ADDONS_REPORT
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/ecosystem-images/git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
+                        value: quay.io/openshift-pipeline/ecosystem-images-git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
                       - name: IMAGE_ADDONS_GIT_CLONE
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/ecosystem-images/git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
+                        value: quay.io/openshift-pipeline/ecosystem-images-git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
+                      - name: IMAGE_ADDONS_CACHE_UPLOAD
+                        value: quay.io/openshift-pipeline/tekton-caches-next-cache@sha256:b0d95cccd145f7f00f82510c1b8f7bca6a923f6f4a53fb037d05b9c17a46f5f2
+                      - name: IMAGE_ADDONS_CACHE_FETCH
+                        value: quay.io/openshift-pipeline/tekton-caches-next-cache@sha256:b0d95cccd145f7f00f82510c1b8f7bca6a923f6f4a53fb037d05b9c17a46f5f2
                       - name: IMAGE_PIPELINES_ARG__WORKINGDIRINIT_IMAGE
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/workingdirinit@sha256:fe8a7f740aea1fb2811e85626299d0a77e4c858d63bb6abb93fc861e7d2a0650
+                        value: quay.io/openshift-pipeline/tektoncd-pipeline-next-workingdirinit@sha256:fe8a7f740aea1fb2811e85626299d0a77e4c858d63bb6abb93fc861e7d2a0650
                       - name: IMAGE_PIPELINES_ARG__NOP_IMAGE
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/nop@sha256:223677066f008a606d11a8e4311ef41239315a2a69f1d06b9153efb68ee39eb1
+                        value: quay.io/openshift-pipeline/tektoncd-pipeline-next-nop@sha256:223677066f008a606d11a8e4311ef41239315a2a69f1d06b9153efb68ee39eb1
                       - name: IMAGE_PIPELINES_ARG__SHELL_IMAGE
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/entrypoint@sha256:71c2f872c0a2103652f1b5f0267ca98dacf7e6711ec4a134775796c0c75089f8
+                        value: quay.io/openshift-pipeline/tektoncd-pipeline-next-entrypoint@sha256:71c2f872c0a2103652f1b5f0267ca98dacf7e6711ec4a134775796c0c75089f8
                       - name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CONTROLLER
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-triggers-next/controller@sha256:625370775717083d0f2c0c2152d51f01652c2684dde7afa93e469b0a521890f6
+                        value: quay.io/openshift-pipeline/tektoncd-triggers-next-controller@sha256:625370775717083d0f2c0c2152d51f01652c2684dde7afa93e469b0a521890f6
                       - name: IMAGE_TRIGGERS_WEBHOOK
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-triggers-next/webhook@sha256:8621d4a9c0b5d5d388c1cc82903b17487cf9c2226ceb72bbd6002a8de4346a96
+                        value: quay.io/openshift-pipeline/tektoncd-triggers-next-webhook@sha256:8621d4a9c0b5d5d388c1cc82903b17487cf9c2226ceb72bbd6002a8de4346a96
                       - name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CORE_INTERCEPTORS
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-triggers-next/core-interceptors@sha256:b5cb1f395f2eaadda13ee3a3263f6525a0c35f7bd0922357c5b34d7ebee22e79
+                        value: quay.io/openshift-pipeline/tektoncd-triggers-next-core-interceptors@sha256:b5cb1f395f2eaadda13ee3a3263f6525a0c35f7bd0922357c5b34d7ebee22e79
                       - name: IMAGE_TRIGGERS_ARG__EL_IMAGE
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-triggers-next/eventlistenersink@sha256:face2369a9932049234c2357ad94d1c9dddf550d18600a83e8eb1795bfdea790
+                        value: quay.io/openshift-pipeline/tektoncd-triggers-next-eventlistenersink@sha256:face2369a9932049234c2357ad94d1c9dddf550d18600a83e8eb1795bfdea790
                       - name: IMAGE_ADDONS_KN
                         value: registry.redhat.io/openshift-serverless-1/client-kn-rhel8@sha256:a5a7b2be50f211d4d9d555b2a2e2302096c139ff5011d984cc386f1530007f16
                       - name: IMAGE_ADDONS_SKOPEO_RESULTS
@@ -1264,37 +1268,37 @@ spec:
                       - name: IMAGE_ADDONS_PREPARE
                         value: registry.redhat.io/ubi8/ubi-minimal@sha256:a47c89f02b39a98290f88204ed3d162845db0a0c464b319c2596cfd1e94b444e
                       - name: IMAGE_ADDONS_PARAM_TKN_IMAGE
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-cli-next/tkn@sha256:91c75c86d65818104edc8e36e30f9a7239ae9b84c28760295ef48bd4044a8117
+                        value: quay.io/openshift-pipeline/tektoncd-cli-next-tkn@sha256:91c75c86d65818104edc8e36e30f9a7239ae9b84c28760295ef48bd4044a8117
                       - name: IMAGE_ADDONS_TKN
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-cli-next/tkn@sha256:91c75c86d65818104edc8e36e30f9a7239ae9b84c28760295ef48bd4044a8117
+                        value: quay.io/openshift-pipeline/tektoncd-cli-next-tkn@sha256:91c75c86d65818104edc8e36e30f9a7239ae9b84c28760295ef48bd4044a8117
                       - name: IMAGE_ADDONS_TKN_CLI_SERVE
                         value: registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel8@sha256:cc5234d6a6afc213d24786253c8ea70bb77f3f5c3e1ea1526debb8a1776e4ffc
                       - name: IMAGE_CHAINS_TEKTON_CHAINS_CONTROLLER
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-chains-next/controller@sha256:6ada102e9419150c34dcd9ffda67bc9734fcfcb6dfbf340b215396b7c9620c0d
+                        value: quay.io/openshift-pipeline/tektoncd-chains-next-controller@sha256:6ada102e9419150c34dcd9ffda67bc9734fcfcb6dfbf340b215396b7c9620c0d
                       - name: IMAGE_RESULTS_POSTGRES
                         value: registry.redhat.io/rhel8/postgresql-13@sha256:42eed05d0f681deb8d9198bf483bbeda02016c23515f061b828aec71f0ae142f
                       - name: IMAGE_HUB_TEKTON_HUB_DB_MIGRATION
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-hub-next/db-migration@sha256:dd3efb02df2df5234649d8dc46904cec2dfaa70cfafeb62171c638e3089ae91d
+                        value: quay.io/openshift-pipeline/tektoncd-hub-next-db-migration@sha256:dd3efb02df2df5234649d8dc46904cec2dfaa70cfafeb62171c638e3089ae91d
                       - name: IMAGE_HUB_TEKTON_HUB_API
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-hub-next/hub-api@sha256:e9e01d1a298f73ea3cbcbaf11edadabe0dd1068fc1c91a7f935e20c541185130
+                        value: quay.io/openshift-pipeline/tektoncd-hub-next-hub-api@sha256:e9e01d1a298f73ea3cbcbaf11edadabe0dd1068fc1c91a7f935e20c541185130
                       - name: IMAGE_HUB_TEKTON_HUB_UI
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-hub-next/hub-ui@sha256:9ac62ef5dc97f189a47e41b4f219efd300f39be81f2c9175119caadafbce2fc9
+                        value: quay.io/openshift-pipeline/tektoncd-hub-next-hub-ui@sha256:9ac62ef5dc97f189a47e41b4f219efd300f39be81f2c9175119caadafbce2fc9
                       - name: IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/manual-approval-gate-next/controller@sha256:bce87934a88196995a6fc0138451b65b480523b9a22eaa0261b272f6c9ec9403
+                        value: quay.io/openshift-pipeline/manual-approval-gate-next-controller@sha256:bce87934a88196995a6fc0138451b65b480523b9a22eaa0261b272f6c9ec9403
                       - name: IMAGE_MAG_MANUAL_APPROVAL
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/manual-approval-gate-next/webhook@sha256:f2c51fca18c06e14b10644f786a04a3ce10235c9b26175ff36d153aa5419615d
+                        value: quay.io/openshift-pipeline/manual-approval-gate-next-webhook@sha256:f2c51fca18c06e14b10644f786a04a3ce10235c9b26175ff36d153aa5419615d
                       - name: IMAGE_PAC_PAC_CONTROLLER
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pac-downstream-next/controller@sha256:13297160a5e5570d4c1ba60adbcb94a116ec0341bd77c93a56a20d3d0f016617
+                        value: quay.io/openshift-pipeline/pac-downstream-next-controller@sha256:13297160a5e5570d4c1ba60adbcb94a116ec0341bd77c93a56a20d3d0f016617
                       - name: IMAGE_PAC_PAC_WEBHOOK
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pac-downstream-next/webhook@sha256:dc41a3a932e705aaf6d7efeeb5f8c95ef7b550a077ef5d2c6c8e1bfdf9303b9a
+                        value: quay.io/openshift-pipeline/pac-downstream-next-webhook@sha256:dc41a3a932e705aaf6d7efeeb5f8c95ef7b550a077ef5d2c6c8e1bfdf9303b9a
                       - name: IMAGE_PAC_PAC_WATCHER
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pac-downstream-next/watcher@sha256:1fca21bb056daab6b9cd2715cd9378d1ac53a564e240e2ca2823c65e65591665
+                        value: quay.io/openshift-pipeline/pac-downstream-next-watcher@sha256:1fca21bb056daab6b9cd2715cd9378d1ac53a564e240e2ca2823c65e65591665
                       - name: IMAGE_RESULTS_WATCHER
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-results-next/watcher@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
+                        value: quay.io/openshift-pipeline/tektoncd-results-next-watcher@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
                       - name: IMAGE_RESULTS_API
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-results-next/api@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
+                        value: quay.io/openshift-pipeline/tektoncd-results-next-api@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
                       - name: IMAGE_RESULTS_RETENTION_POLICY_AGENT
-                        value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-results-next/retention-policy-agent@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
+                        value: quay.io/openshift-pipeline/tektoncd-results-next-retention-policy-agent@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
                       - name: IMAGE_ADDONS_MAVEN_GOALS
                         value: registry.redhat.io/ubi8/openjdk-17@sha256:632e78989471859ca4ed1148b951a911f7e3b6e6516482be20967c4171612c55
                       - name: IMAGE_PIPELINES_CONSOLE_PLUGIN
@@ -1427,45 +1431,49 @@ spec:
   provider:
     name: Red Hat
   relatedImages:
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-next/operator@sha256:4bad6ebf57cebcc50fc9e76f1faf7575bb760c26527c4f201018f44abe08be4d
+    - image: quay.io/openshift-pipeline/operator-next-operator@sha256:4bad6ebf57cebcc50fc9e76f1faf7575bb760c26527c4f201018f44abe08be4d
       name: OPENSHIFT_PIPELINES_OPERATOR_LIFECYCLE
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-next/operator@sha256:4bad6ebf57cebcc50fc9e76f1faf7575bb760c26527c4f201018f44abe08be4d
+    - image: quay.io/openshift-pipeline/operator-next-operator@sha256:4bad6ebf57cebcc50fc9e76f1faf7575bb760c26527c4f201018f44abe08be4d
       name: OPENSHIFT_PIPELINES_OPERATOR_CLUSTER_OPERATIONS
     - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-next/proxy@sha256:087bf312358841ffd9c6507490e6f247d2d3db0c36400a6f395ef92d4a715f57
       name: IMAGE_PIPELINES_PROXY
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/controller@sha256:6016e29912f53e059ee0688b603bef22b8bd48aac15443efc1ac1380b1b52233
+    - image: quay.io/openshift-pipeline/tektoncd-pipeline-next-controller@sha256:6016e29912f53e059ee0688b603bef22b8bd48aac15443efc1ac1380b1b52233
       name: IMAGE_PIPELINES_TEKTON_PIPELINES_CONTROLLER
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/webhook@sha256:5e888baf93c94c97c72ee2239d2484cbed09345f705bb55e5aa000a0bc7d66d3
+    - image: quay.io/openshift-pipeline/tektoncd-pipeline-next-webhook@sha256:5e888baf93c94c97c72ee2239d2484cbed09345f705bb55e5aa000a0bc7d66d3
       name: IMAGE_PIPELINES_WEBHOOK
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/resolvers@sha256:e961823ed3b236d3daf9f55ee7e1ca24921584b78eca8a7d53d04f5625f55b8c
+    - image: quay.io/openshift-pipeline/tektoncd-pipeline-next-resolvers@sha256:e961823ed3b236d3daf9f55ee7e1ca24921584b78eca8a7d53d04f5625f55b8c
       name: IMAGE_PIPELINES_CONTROLLER
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/events@sha256:cc4660c020020a4fdd68d85de16bf13e4c05b0edcbaa81563c21c58973a6933c
+    - image: quay.io/openshift-pipeline/tektoncd-pipeline-next-events@sha256:cc4660c020020a4fdd68d85de16bf13e4c05b0edcbaa81563c21c58973a6933c
       name: IMAGE_PIPELINES_TEKTON_EVENTS_CONTROLLER
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/entrypoint@sha256:71c2f872c0a2103652f1b5f0267ca98dacf7e6711ec4a134775796c0c75089f8
+    - image: quay.io/openshift-pipeline/tektoncd-pipeline-next-entrypoint@sha256:71c2f872c0a2103652f1b5f0267ca98dacf7e6711ec4a134775796c0c75089f8
       name: IMAGE_PIPELINES_ARG__ENTRYPOINT_IMAGE
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/ecosystem-images/git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
+    - image: quay.io/openshift-pipeline/ecosystem-images-git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
       name: IMAGE_PIPELINES_ARG__GIT_IMAGE
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/ecosystem-images/git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
+    - image: quay.io/openshift-pipeline/ecosystem-images-git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
       name: IMAGE_ADDONS_PARAM_GITINITIMAGE
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/ecosystem-images/git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
+    - image: quay.io/openshift-pipeline/ecosystem-images-git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
       name: IMAGE_ADDONS_GIT_RUN
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/ecosystem-images/git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
+    - image: quay.io/openshift-pipeline/ecosystem-images-git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
       name: IMAGE_ADDONS_REPORT
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/ecosystem-images/git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
+    - image: quay.io/openshift-pipeline/ecosystem-images-git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
       name: IMAGE_ADDONS_GIT_CLONE
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/workingdirinit@sha256:fe8a7f740aea1fb2811e85626299d0a77e4c858d63bb6abb93fc861e7d2a0650
+    - image: quay.io/openshift-pipeline/tekton-caches-next-cache@sha256:b0d95cccd145f7f00f82510c1b8f7bca6a923f6f4a53fb037d05b9c17a46f5f2
+      name: IMAGE_ADDONS_CACHE_UPLOAD
+    - image: quay.io/openshift-pipeline/tekton-caches-next-cache@sha256:b0d95cccd145f7f00f82510c1b8f7bca6a923f6f4a53fb037d05b9c17a46f5f2
+      name: IMAGE_ADDONS_CACHE_FETCH
+    - image: quay.io/openshift-pipeline/tektoncd-pipeline-next-workingdirinit@sha256:fe8a7f740aea1fb2811e85626299d0a77e4c858d63bb6abb93fc861e7d2a0650
       name: IMAGE_PIPELINES_ARG__WORKINGDIRINIT_IMAGE
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/nop@sha256:223677066f008a606d11a8e4311ef41239315a2a69f1d06b9153efb68ee39eb1
+    - image: quay.io/openshift-pipeline/tektoncd-pipeline-next-nop@sha256:223677066f008a606d11a8e4311ef41239315a2a69f1d06b9153efb68ee39eb1
       name: IMAGE_PIPELINES_ARG__NOP_IMAGE
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-pipeline-next/entrypoint@sha256:71c2f872c0a2103652f1b5f0267ca98dacf7e6711ec4a134775796c0c75089f8
+    - image: quay.io/openshift-pipeline/tektoncd-pipeline-next-entrypoint@sha256:71c2f872c0a2103652f1b5f0267ca98dacf7e6711ec4a134775796c0c75089f8
       name: IMAGE_PIPELINES_ARG__SHELL_IMAGE
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-triggers-next/controller@sha256:625370775717083d0f2c0c2152d51f01652c2684dde7afa93e469b0a521890f6
+    - image: quay.io/openshift-pipeline/tektoncd-triggers-next-controller@sha256:625370775717083d0f2c0c2152d51f01652c2684dde7afa93e469b0a521890f6
       name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CONTROLLER
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-triggers-next/webhook@sha256:8621d4a9c0b5d5d388c1cc82903b17487cf9c2226ceb72bbd6002a8de4346a96
+    - image: quay.io/openshift-pipeline/tektoncd-triggers-next-webhook@sha256:8621d4a9c0b5d5d388c1cc82903b17487cf9c2226ceb72bbd6002a8de4346a96
       name: IMAGE_TRIGGERS_WEBHOOK
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-triggers-next/core-interceptors@sha256:b5cb1f395f2eaadda13ee3a3263f6525a0c35f7bd0922357c5b34d7ebee22e79
+    - image: quay.io/openshift-pipeline/tektoncd-triggers-next-core-interceptors@sha256:b5cb1f395f2eaadda13ee3a3263f6525a0c35f7bd0922357c5b34d7ebee22e79
       name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CORE_INTERCEPTORS
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-triggers-next/eventlistenersink@sha256:face2369a9932049234c2357ad94d1c9dddf550d18600a83e8eb1795bfdea790
+    - image: quay.io/openshift-pipeline/tektoncd-triggers-next-eventlistenersink@sha256:face2369a9932049234c2357ad94d1c9dddf550d18600a83e8eb1795bfdea790
       name: IMAGE_TRIGGERS_ARG__EL_IMAGE
     - image: registry.redhat.io/openshift-serverless-1/client-kn-rhel8@sha256:37109f6de75dda750496f6668164d0dceaf9db5278e8c034708436f39de3276e
       name: IMAGE_ADDONS_PARAM_KN_IMAGE
@@ -1495,43 +1503,43 @@ spec:
       name: IMAGE_ADDONS_MAVEN_GENERATE
     - image: registry.redhat.io/ubi8/ubi-minimal@sha256:a47c89f02b39a98290f88204ed3d162845db0a0c464b319c2596cfd1e94b444e
       name: IMAGE_ADDONS_PREPARE
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-cli-next/tkn@sha256:91c75c86d65818104edc8e36e30f9a7239ae9b84c28760295ef48bd4044a8117
+    - image: quay.io/openshift-pipeline/tektoncd-cli-next-tkn@sha256:91c75c86d65818104edc8e36e30f9a7239ae9b84c28760295ef48bd4044a8117
       name: IMAGE_JOB_PRUNER_TKN
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-cli-next/tkn@sha256:91c75c86d65818104edc8e36e30f9a7239ae9b84c28760295ef48bd4044a8117
+    - image: quay.io/openshift-pipeline/tektoncd-cli-next-tkn@sha256:91c75c86d65818104edc8e36e30f9a7239ae9b84c28760295ef48bd4044a8117
       name: IMAGE_ADDONS_PARAM_TKN_IMAGE
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-cli-next/tkn@sha256:91c75c86d65818104edc8e36e30f9a7239ae9b84c28760295ef48bd4044a8117
+    - image: quay.io/openshift-pipeline/tektoncd-cli-next-tkn@sha256:91c75c86d65818104edc8e36e30f9a7239ae9b84c28760295ef48bd4044a8117
       name: IMAGE_ADDONS_TKN
     - image: registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel8@sha256:cc5234d6a6afc213d24786253c8ea70bb77f3f5c3e1ea1526debb8a1776e4ffc
       name: IMAGE_ADDONS_TKN_CLI_SERVE
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-next/webhook@sha256:94303a5bfa88ab29f26a2ba01dd580d11c9e5d8e0c4bef1d570f9d5ab7f3028c
+    - image: quay.io/openshift-pipeline/operator-next-webhook@sha256:94303a5bfa88ab29f26a2ba01dd580d11c9e5d8e0c4bef1d570f9d5ab7f3028c
       name: TEKTON_OPERATOR_WEBHOOK
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-chains-next/controller@sha256:6ada102e9419150c34dcd9ffda67bc9734fcfcb6dfbf340b215396b7c9620c0d
+    - image: quay.io/openshift-pipeline/tektoncd-chains-next-controller@sha256:6ada102e9419150c34dcd9ffda67bc9734fcfcb6dfbf340b215396b7c9620c0d
       name: IMAGE_CHAINS_TEKTON_CHAINS_CONTROLLER
     - image: registry.redhat.io/rhel9/postgresql-13@sha256:de7e735a5717eb0d2fffa31c3c2ffe1b03143b3ce830d1397ea3373d5926953e
       name: IMAGE_HUB_TEKTON_HUB_DB
     - image: registry.redhat.io/rhel8/postgresql-13@sha256:42eed05d0f681deb8d9198bf483bbeda02016c23515f061b828aec71f0ae142f
       name: IMAGE_RESULTS_POSTGRES
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-hub-next/db-migration@sha256:dd3efb02df2df5234649d8dc46904cec2dfaa70cfafeb62171c638e3089ae91d
+    - image: quay.io/openshift-pipeline/tektoncd-hub-next-db-migration@sha256:dd3efb02df2df5234649d8dc46904cec2dfaa70cfafeb62171c638e3089ae91d
       name: IMAGE_HUB_TEKTON_HUB_DB_MIGRATION
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-hub-next/hub-api@sha256:e9e01d1a298f73ea3cbcbaf11edadabe0dd1068fc1c91a7f935e20c541185130
+    - image: quay.io/openshift-pipeline/tektoncd-hub-next-hub-api@sha256:e9e01d1a298f73ea3cbcbaf11edadabe0dd1068fc1c91a7f935e20c541185130
       name: IMAGE_HUB_TEKTON_HUB_API
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-hub-next/hub-ui@sha256:9ac62ef5dc97f189a47e41b4f219efd300f39be81f2c9175119caadafbce2fc9
+    - image: quay.io/openshift-pipeline/tektoncd-hub-next-hub-ui@sha256:9ac62ef5dc97f189a47e41b4f219efd300f39be81f2c9175119caadafbce2fc9
       name: IMAGE_HUB_TEKTON_HUB_UI
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/manual-approval-gate-next/controller@sha256:bce87934a88196995a6fc0138451b65b480523b9a22eaa0261b272f6c9ec9403
+    - image: quay.io/openshift-pipeline/manual-approval-gate-next-controller@sha256:bce87934a88196995a6fc0138451b65b480523b9a22eaa0261b272f6c9ec9403
       name: IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/manual-approval-gate-next/webhook@sha256:f2c51fca18c06e14b10644f786a04a3ce10235c9b26175ff36d153aa5419615d
+    - image: quay.io/openshift-pipeline/manual-approval-gate-next-webhook@sha256:f2c51fca18c06e14b10644f786a04a3ce10235c9b26175ff36d153aa5419615d
       name: IMAGE_MAG_MANUAL_APPROVAL
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pac-downstream-next/controller@sha256:13297160a5e5570d4c1ba60adbcb94a116ec0341bd77c93a56a20d3d0f016617
+    - image: quay.io/openshift-pipeline/pac-downstream-next-controller@sha256:13297160a5e5570d4c1ba60adbcb94a116ec0341bd77c93a56a20d3d0f016617
       name: IMAGE_PAC_PAC_CONTROLLER
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pac-downstream-next/webhook@sha256:dc41a3a932e705aaf6d7efeeb5f8c95ef7b550a077ef5d2c6c8e1bfdf9303b9a
+    - image: quay.io/openshift-pipeline/pac-downstream-next-webhook@sha256:dc41a3a932e705aaf6d7efeeb5f8c95ef7b550a077ef5d2c6c8e1bfdf9303b9a
       name: IMAGE_PAC_PAC_WEBHOOK
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pac-downstream-next/watcher@sha256:1fca21bb056daab6b9cd2715cd9378d1ac53a564e240e2ca2823c65e65591665
+    - image: quay.io/openshift-pipeline/pac-downstream-next-watcher@sha256:1fca21bb056daab6b9cd2715cd9378d1ac53a564e240e2ca2823c65e65591665
       name: IMAGE_PAC_PAC_WATCHER
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-results-next/watcher@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
+    - image: quay.io/openshift-pipeline/tektoncd-results-next-watcher@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
       name: IMAGE_RESULTS_WATCHER
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-results-next/api@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
+    - image: quay.io/openshift-pipeline/tektoncd-results-next-api@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
       name: IMAGE_RESULTS_API
-    - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-results-next/retention-policy-agent@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
+    - image: quay.io/openshift-pipeline/tektoncd-results-next-retention-policy-agent@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
       name: IMAGE_RESULTS_RETENTION_POLICY_AGENT
     - image: registry.redhat.io/ubi9/openjdk-17@sha256:dca1dec9331efd56320b658b931e53b234e19b545b8c130ea40155c72fea8ab4
       name: IMAGE_ADDONS_PARAM_MAVEN_IMAGE
