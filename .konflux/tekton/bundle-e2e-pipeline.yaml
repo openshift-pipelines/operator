@@ -125,6 +125,11 @@ spec:
         volumes:
           - name: credentials
             emptyDir: { }
+        stepTemplate:
+          image: $(params.image)
+          volumeMounts:
+            - name: credentials
+              mountPath: /credentials
         steps:
           - name: get-kubeconfig
             ref:
@@ -143,20 +148,46 @@ spec:
                 value: "$(tasks.provision-cluster.results.clusterName)"
               - name: credentials
                 value: credentials
-          - name: operator-sdk-run-bundle
-            image: quay.io/operator-framework/operator-sdk:latest
+          - name: create-catalog
             env:
               - name: KUBECONFIG
                 value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
-            volumeMounts:
-              - name: credentials
-                mountPath: /credentials
-            args:
-              - run
-              - bundle
-              - --namespace
-              - "$(params.namespace)"
-              - "$(params.bundleImage)"
+            script: |
+              #!/usr/bin/env bash
+              export INDEX_IMAGE=$(params.bundleImage)
+              cat <<EOF | oc apply -f-
+                apiVersion: operators.coreos.com/v1alpha1
+                kind: CatalogSource
+                metadata:
+                  name: "custom-osp-nightly"
+                  namespace: openshift-marketplace
+                spec:
+                  sourceType: grpc
+                  image: $INDEX_IMAGE
+                  displayName: "Custom OSP Nightly"
+                  publisher: Red Hat Local
+                  updateStrategy:
+                  registryPoll:
+                  interval: 30m
+              EOF
+          - name: create-subscription
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+            script: |
+              #!/usr/bin/env bash
+              oc delete subscription openshift-pipelines-operator -n openshift-operators || true
+              cat <<EOF | oc apply -f-
+                apiVersion: operators.coreos.com/v1alpha1
+                kind: Subscription
+                metadata:
+                  name: openshift-pipelines-operator
+                  namespace: openshift-operators
+                spec:
+                  name: openshift-pipelines-operator-rh
+                  source: "custom-osp-nightly"
+                  sourceNamespace: openshift-marketplace
+              EOF
     - name: e2e-test
       runAfter:
         - deploy-operator
@@ -172,6 +203,7 @@ spec:
           - name: source
             emptyDir: { }
         stepTemplate:
+          image: $(params.image)
           volumeMounts:
             - name: source
               mountPath: /source
