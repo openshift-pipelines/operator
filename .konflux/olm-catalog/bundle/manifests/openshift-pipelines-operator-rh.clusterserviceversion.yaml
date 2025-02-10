@@ -2,7 +2,7 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
-    alm-examples: "[\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"ManualApprovalGate\",\n    \"metadata\": {\n      \"name\": \"manual-approval-gate\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"OpenShiftPipelinesAsCode\",\n    \"metadata\": {\n      \"name\": \"pipelines-as-code\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonAddon\",\n    \"metadata\": {\n      \"name\": \"addon\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonChain\",\n    \"metadata\": {\n      \"name\": \"chain\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonConfig\",\n    \"metadata\": {\n      \"name\": \"config\"\n    },\n    \"spec\": {\n      \"addon\": {\n        \"params\": [\n          {\n            \"name\": \"pipelineTemplates\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverTasks\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverStepActions\",\n            \"value\": \"true\"\n          }\n        ]\n      },\n      \"params\": [\n        {\n          \"name\": \"createRbacResource\",\n          \"value\": \"true\"\n        }\n      ],\n      \"profile\": \"all\",\n      \"pruner\": {\n        \"keep\": 100,\n        \"resources\": [\n          \"pipelinerun\",\n          \"taskrun\"\n        ],\n        \"schedule\": \"0 8 * * *\"\n      },\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonHub\",\n    \"metadata\": {\n      \"name\": \"hub\"\n    },\n    \"spec\": {\n      \"api\": {\n        \"catalogRefreshInterval\": \"30m\"\n      }\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonInstallerSet\",\n    \"metadata\": {\n      \"name\": \"foo\"\n    },\n    \"spec\": {\n      \"manifests\": []\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonPipeline\",\n    \"metadata\": {\n      \"name\": \"pipeline\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonResult\",\n    \"metadata\": {\n      \"name\": \"result\"\n    },\n    \"spec\": {\n      \"auth_disable\": true,\n      \"db_enable_auto_migration\": true,\n      \"db_host\": \"tekton-results-postgres-service.openshift-pipelines.svc.cluster.local\",\n      \"db_port\": 5432,\n      \"log_level\": \"debug\",\n      \"logging_pvc_name\": \"tekton-logs\",\n      \"logs_api\": true,\n      \"logs_buffer_size\": 32768,\n      \"logs_path\": \"/logs\",\n      \"logs_type\": \"File\",\n      \"prometheus_port\": 9090,\n      \"server_port\": 8080,\n      \"targetNamespace\": \"openshift-pipelines\",\n      \"tls_hostname_override\": \"tekton-results-api-service.openshift-pipelines.svc.cluster.local\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonTrigger\",\n    \"metadata\": {\n      \"name\": \"trigger\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  }\n]"
+    alm-examples: "[\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"ManualApprovalGate\",\n    \"metadata\": {\n      \"name\": \"manual-approval-gate\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"OpenShiftPipelinesAsCode\",\n    \"metadata\": {\n      \"name\": \"pipelines-as-code\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonAddon\",\n    \"metadata\": {\n      \"name\": \"addon\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonChain\",\n    \"metadata\": {\n      \"name\": \"chain\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonConfig\",\n    \"metadata\": {\n      \"name\": \"config\"\n    },\n    \"spec\": {\n      \"addon\": {\n        \"params\": [\n          {\n            \"name\": \"pipelineTemplates\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverTasks\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverStepActions\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"communityResolverTasks\",\n            \"value\": \"true\"\n          }\n        ]\n      },\n      \"params\": [\n        {\n          \"name\": \"createRbacResource\",\n          \"value\": \"true\"\n        }\n      ],\n      \"profile\": \"all\",\n      \"pruner\": {\n        \"keep\": 100,\n        \"resources\": [\n          \"pipelinerun\",\n          \"taskrun\"\n        ],\n        \"schedule\": \"0 8 * * *\"\n      },\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonHub\",\n    \"metadata\": {\n      \"name\": \"hub\"\n    },\n    \"spec\": {\n      \"api\": {\n        \"catalogRefreshInterval\": \"30m\"\n      }\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonInstallerSet\",\n    \"metadata\": {\n      \"name\": \"foo\"\n    },\n    \"spec\": {\n      \"manifests\": []\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonPipeline\",\n    \"metadata\": {\n      \"name\": \"pipeline\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonResult\",\n    \"metadata\": {\n      \"name\": \"result\"\n    },\n    \"spec\": {\n      \"auth_disable\": true,\n      \"db_enable_auto_migration\": true,\n      \"db_host\": \"tekton-results-postgres-service.openshift-pipelines.svc.cluster.local\",\n      \"db_port\": 5432,\n      \"log_level\": \"debug\",\n      \"logging_pvc_name\": \"tekton-logs\",\n      \"logs_api\": true,\n      \"logs_buffer_size\": 32768,\n      \"logs_path\": \"/logs\",\n      \"logs_type\": \"File\",\n      \"prometheus_port\": 9090,\n      \"server_port\": 8080,\n      \"targetNamespace\": \"openshift-pipelines\",\n      \"tls_hostname_override\": \"tekton-results-api-service.openshift-pipelines.svc.cluster.local\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonTrigger\",\n    \"metadata\": {\n      \"name\": \"trigger\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  }\n]"
     capabilities: Full Lifecycle
     categories: Developer Tools, Integration & Delivery
     certified: 'false'
@@ -327,19 +327,19 @@ spec:
     ### Components
 
 
-    - Tekton Pipelines: v0.66.0
+    - Tekton Pipelines: v0.68.0
 
-    - Tekton Triggers: v0.30.1
+    - Tekton Triggers: v0.31.0
 
     - Pipelines as Code: v0.32.0
 
     - Tekton Chains: v0.23.1
 
-    - Tekton Hub (tech-preview): v1.19.2
+    - Tekton Hub (tech-preview): v1.20.0
 
     - Tekton Results (tech-preview): v0.13.3
 
-    - Manual Approval Gate (tech-preview): v0.4.1
+    - Manual Approval Gate (tech-preview): v0.5.0
 
 
     ## Getting Started
@@ -1233,6 +1233,10 @@ spec:
                         value: quay.io/openshift-pipeline/ecosystem-images-git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
                       - name: IMAGE_ADDONS_GIT_CLONE
                         value: quay.io/openshift-pipeline/ecosystem-images-git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
+                      - name: IMAGE_ADDONS_CACHE_UPLOAD
+                        value: quay.io/openshift-pipeline/tekton-caches-next-cache@sha256:b0d95cccd145f7f00f82510c1b8f7bca6a923f6f4a53fb037d05b9c17a46f5f2
+                      - name: IMAGE_ADDONS_CACHE_FETCH
+                        value: quay.io/openshift-pipeline/tekton-caches-next-cache@sha256:b0d95cccd145f7f00f82510c1b8f7bca6a923f6f4a53fb037d05b9c17a46f5f2
                       - name: IMAGE_PIPELINES_ARG__WORKINGDIRINIT_IMAGE
                         value: quay.io/openshift-pipeline/tektoncd-pipeline-next-workingdirinit@sha256:fe8a7f740aea1fb2811e85626299d0a77e4c858d63bb6abb93fc861e7d2a0650
                       - name: IMAGE_PIPELINES_ARG__NOP_IMAGE
@@ -1289,8 +1293,6 @@ spec:
                         value: quay.io/openshift-pipeline/pac-downstream-next-webhook@sha256:dc41a3a932e705aaf6d7efeeb5f8c95ef7b550a077ef5d2c6c8e1bfdf9303b9a
                       - name: IMAGE_PAC_PAC_WATCHER
                         value: quay.io/openshift-pipeline/pac-downstream-next-watcher@sha256:1fca21bb056daab6b9cd2715cd9378d1ac53a564e240e2ca2823c65e65591665
-                      - name: IMAGE_PAC_PAC_CLI
-                        value: quay.io/openshift-pipeline/pac-downstream-next-cli@sha256:53e576b71dfe990aa68e14a9b70793d93ff2156c6d35ad95f81c8dcc439c5358
                       - name: IMAGE_RESULTS_WATCHER
                         value: quay.io/openshift-pipeline/tektoncd-results-next-watcher@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
                       - name: IMAGE_RESULTS_API
@@ -1455,6 +1457,10 @@ spec:
       name: IMAGE_ADDONS_REPORT
     - image: quay.io/openshift-pipeline/ecosystem-images-git-init@sha256:30e4dd2f4907c1602769a7347080db3b96b527cb13a7ef696b8d6b388b783e4f
       name: IMAGE_ADDONS_GIT_CLONE
+    - image: quay.io/openshift-pipeline/tekton-caches-next-cache@sha256:b0d95cccd145f7f00f82510c1b8f7bca6a923f6f4a53fb037d05b9c17a46f5f2
+      name: IMAGE_ADDONS_CACHE_UPLOAD
+    - image: quay.io/openshift-pipeline/tekton-caches-next-cache@sha256:b0d95cccd145f7f00f82510c1b8f7bca6a923f6f4a53fb037d05b9c17a46f5f2
+      name: IMAGE_ADDONS_CACHE_FETCH
     - image: quay.io/openshift-pipeline/tektoncd-pipeline-next-workingdirinit@sha256:fe8a7f740aea1fb2811e85626299d0a77e4c858d63bb6abb93fc861e7d2a0650
       name: IMAGE_PIPELINES_ARG__WORKINGDIRINIT_IMAGE
     - image: quay.io/openshift-pipeline/tektoncd-pipeline-next-nop@sha256:223677066f008a606d11a8e4311ef41239315a2a69f1d06b9153efb68ee39eb1
@@ -1529,8 +1535,6 @@ spec:
       name: IMAGE_PAC_PAC_WEBHOOK
     - image: quay.io/openshift-pipeline/pac-downstream-next-watcher@sha256:1fca21bb056daab6b9cd2715cd9378d1ac53a564e240e2ca2823c65e65591665
       name: IMAGE_PAC_PAC_WATCHER
-    - image: quay.io/openshift-pipeline/pac-downstream-next-cli@sha256:53e576b71dfe990aa68e14a9b70793d93ff2156c6d35ad95f81c8dcc439c5358
-      name: IMAGE_PAC_PAC_CLI
     - image: quay.io/openshift-pipeline/tektoncd-results-next-watcher@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
       name: IMAGE_RESULTS_WATCHER
     - image: quay.io/openshift-pipeline/tektoncd-results-next-api@sha256:85d472af9437cc1553f1521ef550246cfef368132b61ef0fd01fbe96b4e6f577
