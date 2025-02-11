@@ -4,20 +4,20 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "release-v1.18.x" &&
-      (".tekton/operator-1-18-index-4-17-push.yaml".pathChanged() ||
-      ".tekton/operator-1-18-index-4-17-pull-request.yaml".pathChanged() ||
-      ".konflux/olm-catalog/index/v4.17/***".pathChanged() ||
+    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "release-v1.18.x" &&
+      (".tekton/operator-1-18-index-4-18-push.yaml".pathChanged() ||
+      ".tekton/operator-1-18-index-4-18-pull-request.yaml".pathChanged() ||
+      ".konflux/olm-catalog/index/v4.18/***".pathChanged() ||
       ".tekton/fbc-build.yaml".pathChanged())
-    build.appstudio.openshift.io/build-nudge-files: ".*Dockerfile.*, .*.yaml, .*Containerfile.*, .*catalog-template.json.*"
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: operator-1-18-index-4-17-application
-    appstudio.openshift.io/component: operator-1-18-index-4-17
+    appstudio.openshift.io/application: operator-1-18-index-4-18-application
+    appstudio.openshift.io/component: operator-1-18-index-4-18
     pipelines.appstudio.openshift.io/type: build
-  name: operator-1-18-index-4-17-on-push
+  name: operator-1-18-index-4-18-on-pull-request
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -26,9 +26,11 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-1-18-index-4-17-application/index-4.17:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-1-18-index-4-18-application/index-4.18:on-pr-{{revision}}
+  - name: image-expires-after
+    value: 5d
   - name: dockerfile
-    value: .konflux/olm-catalog/index/v4.17/Dockerfile.catalog
+    value: .konflux/olm-catalog/index/v4.18/Dockerfile.catalog
   pipelineRef:
     name: fbc-build
   taskRunTemplate: {}
