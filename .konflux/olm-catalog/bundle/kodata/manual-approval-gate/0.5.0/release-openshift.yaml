@@ -380,7 +380,7 @@ metadata:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: openshift-pipelines-manual-approval-gates
     pipeline.tekton.dev/release: "devel"
-    version: "v0.4.1"
+    version: "v0.5.0"
 spec:
   group: openshift-pipelines.org
   preserveUnknownFields: false
@@ -506,12 +506,12 @@ metadata:
     app.kubernetes.io/name: controller
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v0.4.1"
+    app.kubernetes.io/version: "v0.5.0"
     app.kubernetes.io/part-of: openshift-pipelines-manual-approval-gates
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
     pipeline.tekton.dev/release: "devel"
     # labels below are related to istio and should not be used for resource lookup
-    version: "v0.4.1"
+    version: "v0.5.0"
 spec:
   replicas: 1
   selector:
@@ -528,18 +528,18 @@ spec:
         app.kubernetes.io/name: controller
         app.kubernetes.io/component: controller
         app.kubernetes.io/instance: default
-        app.kubernetes.io/version: "v0.4.1"
+        app.kubernetes.io/version: "v0.5.0"
         app.kubernetes.io/part-of: openshift-pipelines-manual-approval-gates
         # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
         pipeline.tekton.dev/release: "devel"
         # labels below are related to istio and should not be used for resource lookup
         app: tekton-taskgroup-controller
-        version: "v0.4.1"
+        version: "v0.5.0"
     spec:
       serviceAccountName: manual-approval-gate-controller
       containers:
         - name: tekton-taskgroup-controller
-          image: ghcr.io/openshift-pipelines/manual-approval-gate/controller-b21cda49f4c608e77b59fc6a3bf67c9e:v0.4.1@sha256:691cebbc2c781c72ab95dcb6277bcff140e0aa4ba507455b082ab50f85c6fef0
+          image: ghcr.io/openshift-pipelines/manual-approval-gate/controller-b21cda49f4c608e77b59fc6a3bf67c9e:v0.5.0@sha256:8cdcc7ce72657595e7e79dc5ffba643fe37e145167493ec3f268e70c546e0a7b
           env:
             - name: SYSTEM_NAMESPACE
               valueFrom:
@@ -584,7 +584,7 @@ metadata:
   name: manual-approval-gate-webhook
   namespace: openshift-pipelines
   labels:
-    version: "v0.4.1"
+    version: "v0.5.0"
 spec:
   replicas: 1
   selector:
@@ -599,7 +599,7 @@ spec:
       serviceAccountName: manual-approval-gate-webhook
       containers:
         - name: manual-approval
-          image: "ghcr.io/openshift-pipelines/manual-approval-gate/webhook-3d5568be3d188037c7bf9bfde2cf1321:v0.4.1@sha256:ccf6b97afe77d33e462766776cb45e10969d6a256db9dba4f1bf3125a8ac7a18"
+          image: "ghcr.io/openshift-pipelines/manual-approval-gate/webhook-3d5568be3d188037c7bf9bfde2cf1321:v0.5.0@sha256:5018db643c9069bab2ecf1d42ed6c95e08e38aef0fa60f691ede9cf41f4d6e4f"
           env:
             - name: SYSTEM_NAMESPACE
               valueFrom:
@@ -632,7 +632,7 @@ metadata:
   name: manual-approval-webhook
   namespace: openshift-pipelines
   labels:
-    version: "v0.4.1"
+    version: "v0.5.0"
 spec:
   ports:
     - name: https-webhook
@@ -663,7 +663,7 @@ metadata:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: manual-approval-gate
 data:
-  version: "v0.4.1"
+  version: "v0.5.0"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
