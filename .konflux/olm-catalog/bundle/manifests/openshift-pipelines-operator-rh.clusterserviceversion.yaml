@@ -18,7 +18,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.14.0 <5.0.5-482'
+    olm.skipRange: '>=1.17.0 <1.18.0'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
@@ -30,7 +30,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v5.0.5-482
+  name: openshift-pipelines-operator-rh.v1.18.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -333,7 +333,7 @@ spec:
 
     - Pipelines as Code: v0.32.0
 
-    - Tekton Chains: v0.23.1
+    - Tekton Chains: v0.24.0
 
     - Tekton Hub (tech-preview): v1.20.0
 
@@ -345,7 +345,7 @@ spec:
     ## Getting Started
 
 
-    In order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/pipelines/5.0/create/creating-applications-with-cicd-pipelines.html).
+    In order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/pipelines/1.18/create/creating-applications-with-cicd-pipelines.html).
 
 
     ## CLI (tkn)
@@ -1180,7 +1180,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 5.0.5-482
+                        value: 1.18.0
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1555,5 +1555,5 @@ spec:
       name: IMAGE_ADDONS_MAVEN_GOALS
     - image: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/console-plugin-1-18/console-plugin@sha256:b04589b0d8d28230f32e347715a33ec2876fd5dad3611864c6e98d883bcd7422
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
-  replaces: openshift-pipelines-operator-rh.v5.0.5-481
-  version: 5.0.5-482
+  replaces: openshift-pipelines-operator-rh.v1.17.1
+  version: 1.18.0
