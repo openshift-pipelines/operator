@@ -8,11 +8,11 @@ COPY upstream .
 # FIXME: handle patches (maybe ? probably not needed though)
 # COPY patches patches/
 # RUN set -e; for f in patches/*.patch; do echo ${f}; [[ -f ${f} ]] || continue; git apply ${f}; done
-# ENV CHANGESET_REV=$CI_OPERATOR_UPSTREAM_COMMIT
+COPY head HEAD
 ENV GODEBUG="http2server=0"
-RUN go build -ldflags="-X 'knative.dev/pkg/changeset.rev=${CHANGESET_REV:0:7}'" -mod=vendor -o /tmp/openshift-pipelines-operator-webhook \
+ENV GOEXPERIMENT=strictfipsruntime
+RUN go build -tags strictfipsruntime -ldflags="-X 'knative.dev/pkg/changeset.rev=$(cat HEAD)'" -mod=vendor -o /tmp/openshift-pipelines-operator-webhook \
     ./cmd/openshift/webhook
-# RUN /bin/sh -c 'echo $CI_PIPELINE_UPSTREAM_COMMIT > /tmp/HEAD'
 
 FROM $RUNTIME
 
@@ -22,10 +22,11 @@ ENV OPERATOR=/usr/local/bin/openshift-pipelines-operator-webhook \
 COPY --from=builder /tmp/openshift-pipelines-operator-webhook ${OPERATOR}
 COPY --from=builder /go/src/github.com/tektoncd/operator/cmd/openshift/webhook/kodata/ ${KO_DATA_PATH}/
 COPY .konflux/olm-catalog/bundle/kodata /kodata
+COPY head ${KO_DATA_PATH}/HEAD
 
 LABEL \
-      com.redhat.component="openshift-pipelines-operator-webhook-rhel8-container" \
-      name="openshift-pipelines/pipelines-operator-webhook-rhel8" \
+      com.redhat.component="openshift-pipelines-operator-webhook-rhel9-container" \
+      name="openshift-pipelines/pipelines-operator-webhook-rhel9" \
       version="1.18.0" \
       summary="Red Hat OpenShift Pipelines Operator Webhook" \
       maintainer="pipelines-extcomm@redhat.com" \
