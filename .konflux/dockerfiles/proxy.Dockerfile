@@ -8,11 +8,11 @@ COPY upstream .
 # fixme: handle patches (maybe ? probably not needed though)
 # COPY patches patches/
 # RUN set -e; for f in patches/*.patch; do echo ${f}; [[ -f ${f} ]] || continue; git apply ${f}; done
-# ENV CHANGESET_REV=$CI_OPERATOR_UPSTREAM_COMMIT
+COPY head HEAD
 ENV GODEBUG="http2server=0"
-RUN go build -ldflags="-X 'knative.dev/pkg/changeset.rev=${CHANGESET_REV:0:7}'" -mod=vendor -o /tmp/openshift-pipelines-operator-proxy \
+ENV GOEXPERIMENT=strictfipsruntime
+RUN go build -tags strictfipsruntime -ldflags="-X 'knative.dev/pkg/changeset.rev=$(cat HEAD)'" -mod=vendor -o /tmp/openshift-pipelines-operator-proxy \
     ./cmd/openshift/proxy-webhook
-# RUN /bin/sh -c 'echo $CI_PIPELINE_UPSTREAM_COMMIT > /tmp/HEAD'
 
 FROM $RUNTIME
 
@@ -20,11 +20,11 @@ ENV OPERATOR_PROXY=/usr/local/bin/openshift-pipelines-operator-proxy \
     KO_DATA_PATH=/kodata
 
 COPY --from=builder /tmp/openshift-pipelines-operator-proxy ${OPERATOR_PROXY}
-# COPY --from=builder /tmp/HEAD ${KO_DATA_PATH}/HEAD
+COPY head ${KO_DATA_PATH}/HEAD
 
 LABEL \
-      com.redhat.component="openshift-pipelines-operator-proxy-rhel8-container" \
-      name="openshift-pipelines/pipelines-operator-proxy-rhel8" \
+      com.redhat.component="openshift-pipelines-operator-proxy-rhel9-container" \
+      name="openshift-pipelines/pipelines-operator-proxy-rhel9" \
       version="1.18.0" \
       summary="Red Hat OpenShift Pipelines Operator Proxy" \
       maintainer="pipelines-extcomm@redhat.com" \
