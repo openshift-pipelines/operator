@@ -38,12 +38,7 @@ jobs:
         fi
 
         git commit -F- <<EOF
-        [bot] update-CSV-images as per project.yaml
-
-            $ git diff --stat ${NEW_COMMIT}..${OLD_COMMIT}
-        $(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)
-        
-        https://github.com/tektoncd/operator/compare/${NEW_COMMIT}..${OLD_COMMIT}
+          [bot:next] Update  generate Cluster Service Version (CSV)
         EOF
         
         git push -f origin actions/update/operator-update-images-next
@@ -53,7 +48,7 @@ jobs:
           gh pr create -B next -H actions/update/operator-update-images-next --label=automated --fill
         else
           echo "a PR already exists, editing..."
-          gh pr edit --title "[bot] Updating CSVs" --body "$(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)"
+          gh pr edit --title "[bot:next] Update  generate Cluster Service Version (CSV)" --body "$(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)"
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
