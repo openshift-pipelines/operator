@@ -84,7 +84,7 @@ jobs:
         git push -f origin actions/index-next/${{matrix.version}}
         if [ "$(gh pr list --base next --head actions/index-next/${{matrix.version}} --json url --jq 'length')" = "0" ]; then
           echo "creating PR..."
-          gh pr create -B next -H actions/index-next/${{matrix.version}} --label=automated --fill
+          gh pr create -B next -H actions/index-next/${{matrix.version}} --label=automated --label=lgtm --label=approved --fill
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
