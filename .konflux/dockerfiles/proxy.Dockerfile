@@ -33,7 +33,6 @@ LABEL \
       io.k8s.description="Red Hat OpenShift Pipelines Operator Proxy" \
       io.openshift.tags="operator,tekton,openshift,proxy"
 
-RUN microdnf install -y shadow-utils
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
 
