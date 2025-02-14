@@ -2,6 +2,9 @@ name: index-render-template-1-18
 
 on:
   workflow_dispatch: {}
+  schedule:
+    - cron: "0 2 * * *" # At 2AM everyday
+
   push:
     branch:
       - "release-v1.18.x"
@@ -82,7 +85,7 @@ jobs:
         git push -f origin actions/index-1.18/${{matrix.version}}
         if [ "$(gh pr list --base 1.18 --head actions/index-1.18/${{matrix.version}} --json url --jq 'length')" = "0" ]; then
           echo "creating PR..."
-          gh pr create -B release-v1.18.x -H actions/index-1.18/${{matrix.version}} --label=automated --fill
+          gh pr create -B release-v1.18.x -H actions/index-1.18/${{matrix.version}} --label=automated --label=lgtm --label=approved  --fill
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
