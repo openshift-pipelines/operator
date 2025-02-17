@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Update images from project.yaml to "generated" files
-
+TARGET_REGISTRY=${1:-"registry.stage.redhat.io/openshift-pipelines"}
 function update_image_reference() {
-SOURCE_REGISTRY="quay.io/redhat-user-workloads/tekton-ecosystem-tenant"
-TARGET_REGISTRY="registry.stage.redhat.io/openshift-pipelines"
+    SOURCE_PATTEN="quay.io/.*/(pipeline-)?(.*@sha256:.+)"
+    TARGET_PATTEN="${TARGET_REGISTRY}/pipelines-\2"
+    input=$1
+    output=$(echo "$input" | sed -E "s|$SOURCE_PATTEN|$TARGET_PATTEN|g")
 
-REFERENCE=$1
-    if [[ $REFERENCE == *${KONFLUX_TENANT_IMAGE_REPO}*  ]]; then
-          REFERENCE=$(echo $REFERENCE | sed  -E "s|$SOURCE_REGISTRY/([^/]+)/([^/@]+)(@sha:[0-9a-f]+)?|$TARGET_REGISTRY/pipelines-\2-rhel9\3|g" )
-    fi
-    echo $REFERENCE
+     #Update Operator Image operator-operator to operator
+     output=$(echo "$output" | sed -E "s/operator-operator-rhel9/rhel9-operator/g")
+
+      echo "$output"
 }
 CSV_FILE=".konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml"
 LENGTH=$(yq e '.images | length' project.yaml)
