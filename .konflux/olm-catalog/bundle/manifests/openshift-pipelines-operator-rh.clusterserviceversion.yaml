@@ -1139,8 +1139,8 @@ spec:
           serviceAccountName: openshift-pipelines-operator
       deployments:
         - label:
-            operator.tekton.dev/release: devel
-            version: devel
+            operator.tekton.dev/release: v0.75.0
+            version: v0.75.0
           name: openshift-pipelines-operator
           spec:
             replicas: 1
@@ -1290,13 +1290,13 @@ spec:
                       - name: IMAGE_MAG_MANUAL_APPROVAL
                         value: registry.stage.redhat.io/openshift-pipelines/pipelines-manual-approval-gate-webhook-rhel9@sha256:47e979886e2d8337afce13320acaa2cfa11f9346893873824331b37d92c103f0
                       - name: IMAGE_PAC_PAC_CONTROLLER
-                        value: registry.stage.redhat.io/openshift-pipelines/pipelines-as-code-controller-rhel9@sha256:eee794a1745119129f7550768b9849650260d02b952209dc822a354381b9d003
+                        value: registry.stage.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-controller-rhel9@sha256:4c8cd02b16a16b86b4a2dbc8b4372890d9b3e41bfb16bb7de253f7cdc89305de
                       - name: IMAGE_PAC_PAC_WEBHOOK
-                        value: registry.stage.redhat.io/openshift-pipelines/pipelines-as-code-webhook-rhel9@sha256:4b8701f4f43b75b5e7752d3b61fc0106fa472b1b710d049bc9b1348c961d3fbf
+                        value: registry.stage.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-webhook-rhel9@sha256:fcc4b89adb791a60217b19c74ca55e30750eb78b607efcb5ebb4fd5929acd3b1
                       - name: IMAGE_PAC_PAC_WATCHER
-                        value: registry.stage.redhat.io/openshift-pipelines/pipelines-as-code-watcher-rhel9@sha256:09ebe8b449ab1eeca3aab0b5425b90e45eb026f439a8aa07e34d7d3e116251fd
+                        value: registry.stage.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-watcher-rhel9@sha256:90ee1e94d638a00956b113dbc5855eb5686f5863b013df81fb6a764b15bdf9d7
                       - name: IMAGE_PAC_PAC_CLI
-                        value: registry.stage.redhat.io/openshift-pipelines/pipelines-as-code-cli-rhel9@sha256:501a80346d830b58c0e1f2a8597925d63aec9d78790c40d5d08cece9411651aa
+                        value: registry.stage.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-cli-rhel9@sha256:df99b2ce110c059435081309ec9da806422eaf0bed4d7ca9cdca474d121b2e1b
                       - name: IMAGE_RESULTS_WATCHER
                         value: registry.stage.redhat.io/openshift-pipelines/pipelines-results-watcher-rhel9@sha256:c2edecd690b185de1a6d2d0c42282a3f13ff9e25ecd70692c6b1ec2dcaaab154
                       - name: IMAGE_RESULTS_API
@@ -1335,7 +1335,7 @@ spec:
                       - name: PROFILING_PORT
                         value: '9009'
                       - name: VERSION
-                        value: devel
+                        value: v0.75.0
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: CONFIG_LEADERELECTION_NAME
@@ -1355,8 +1355,8 @@ spec:
                     type: RuntimeDefault
                 serviceAccountName: openshift-pipelines-operator
         - label:
-            operator.tekton.dev/release: devel
-            version: devel
+            operator.tekton.dev/release: v0.75.0
+            version: v0.75.0
           name: tekton-operator-webhook
           spec:
             replicas: 1
@@ -1535,13 +1535,13 @@ spec:
       name: IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER
     - image: registry.stage.redhat.io/openshift-pipelines/pipelines-manual-approval-gate-webhook-rhel9@sha256:47e979886e2d8337afce13320acaa2cfa11f9346893873824331b37d92c103f0
       name: IMAGE_MAG_MANUAL_APPROVAL
-    - image: registry.stage.redhat.io/openshift-pipelines/pipelines-as-code-controller-rhel9@sha256:eee794a1745119129f7550768b9849650260d02b952209dc822a354381b9d003
+    - image: registry.stage.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-controller-rhel9@sha256:4c8cd02b16a16b86b4a2dbc8b4372890d9b3e41bfb16bb7de253f7cdc89305de
       name: IMAGE_PAC_PAC_CONTROLLER
-    - image: registry.stage.redhat.io/openshift-pipelines/pipelines-as-code-webhook-rhel9@sha256:4b8701f4f43b75b5e7752d3b61fc0106fa472b1b710d049bc9b1348c961d3fbf
+    - image: registry.stage.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-webhook-rhel9@sha256:fcc4b89adb791a60217b19c74ca55e30750eb78b607efcb5ebb4fd5929acd3b1
       name: IMAGE_PAC_PAC_WEBHOOK
-    - image: registry.stage.redhat.io/openshift-pipelines/pipelines-as-code-watcher-rhel9@sha256:09ebe8b449ab1eeca3aab0b5425b90e45eb026f439a8aa07e34d7d3e116251fd
+    - image: registry.stage.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-watcher-rhel9@sha256:90ee1e94d638a00956b113dbc5855eb5686f5863b013df81fb6a764b15bdf9d7
       name: IMAGE_PAC_PAC_WATCHER
-    - image: registry.stage.redhat.io/openshift-pipelines/pipelines-as-code-cli-rhel9@sha256:501a80346d830b58c0e1f2a8597925d63aec9d78790c40d5d08cece9411651aa
+    - image: registry.stage.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-cli-rhel9@sha256:df99b2ce110c059435081309ec9da806422eaf0bed4d7ca9cdca474d121b2e1b
       name: IMAGE_PAC_PAC_CLI
     - image: registry.stage.redhat.io/openshift-pipelines/pipelines-results-watcher-rhel9@sha256:c2edecd690b185de1a6d2d0c42282a3f13ff9e25ecd70692c6b1ec2dcaaab154
       name: IMAGE_RESULTS_WATCHER
