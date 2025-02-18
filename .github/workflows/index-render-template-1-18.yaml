@@ -52,13 +52,34 @@ jobs:
       uses: actions/checkout@v4
       with:
         ref: release-v1.18.x
+    - name: Configure Docker authentication
+      env:
+        DOCKER_CONFIG: /home/runner/.docker
+        DOCKER_JSON: ${{ secrets.DOCKER_REGISTRY_SECRET }}
+      run: |
+          echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json
     - name: Generate ${{matrix.version}} catalog
       run: |
         echo ${{matrix.version}}
         curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
         chmod +x /usr/local/bin/opm
+        
+        VERSION=${{matrix.version}}
+  
+        CATALOG_JSON=".konflux/olm-catalog/index/${VERSION}/catalog-template.json"
+        BUNDLE_IMAGE=$(yq '.images[] | select(.name == "IMAGE_OPERATOR_BUNDLE") | .value' project.yaml)
+      
+        echo "Bundle Image from project.yaml : $BUNDLE_IMAGE"
+        TARGET_REGISTRY="registry.stage.redhat.io/openshift-pipelines"
+        SOURCE_PATTEN="quay.io/.*/(.*)-rhel9(@sha256:.+)"
+        TARGET_PATTEN="$TARGET_REGISTRY/pipelines-\1\2"
+        BUNDLE_IMAGE=$(echo "${BUNDLE_IMAGE}" | sed -E "s|$SOURCE_PATTEN|$TARGET_PATTEN|g")
+        echo "Bundle Image updated for index images : $BUNDLE_IMAGE"
 
-        BUNDLE_IMAGE=$(jq -r '.entries[] | select(.schema == "olm.bundle") | .image' .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json)
+        ##Update the image field with $BUNDLE_IMAGE
+        jq "(.entries[] | select(.schema == \"olm.bundle\")).image = \"$BUNDLE_IMAGE\""  $CATALOG_JSON >  temp.json && mv temp.json $CATALOG_JSON
+        echo "Update bundle Image in $CATALOG_JSON"
+        
         BUNDLE_VERSION=$(opm render --skip-tls-verify -o json ${BUNDLE_IMAGE} | jq -r '.name' | awk -F 'v' '{ print $2 }')
 
         # Update catalog-template
