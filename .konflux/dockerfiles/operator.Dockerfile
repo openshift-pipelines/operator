@@ -24,9 +24,9 @@ COPY --from=builder /go/src/github.com/tektoncd/operator/cmd/openshift/operator/
 COPY .konflux/olm-catalog/bundle/kodata /kodata
 
 LABEL \
-      com.redhat.component="openshift-pipelines-rhel8-operator-container" \
-      name="openshift-pipelines/pipelines-rhel8-operator" \
-      version="1.16.0" \
+      com.redhat.component="openshift-pipelines-rhel9-operator-container" \
+      name="openshift-pipelines/pipelines-rhel9-operator" \
+      version="next" \
       summary="Red Hat OpenShift Pipelines Operator" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator" \
@@ -34,7 +34,6 @@ LABEL \
       io.k8s.description="Red Hat OpenShift Pipelines Operator" \
       io.openshift.tags="operator,tekton,openshift"
 
-RUN microdnf install -y shadow-utils
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
 

@@ -23,9 +23,9 @@ COPY --from=builder /tmp/openshift-pipelines-operator-proxy ${OPERATOR_PROXY}
 # COPY --from=builder /tmp/HEAD ${KO_DATA_PATH}/HEAD
 
 LABEL \
-      com.redhat.component="openshift-pipelines-operator-proxy-rhel8-container" \
-      name="openshift-pipelines/pipelines-operator-proxy-rhel8" \
-      version="${CI_CONTAINER_VERSION}" \
+      com.redhat.component="openshift-pipelines-operator-proxy-rhel9-container" \
+      name="openshift-pipelines/pipelines-operator-proxy-rhel9" \
+      version="next" \
       summary="Red Hat OpenShift Pipelines Operator Proxy" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Proxy" \
@@ -33,7 +33,6 @@ LABEL \
       io.k8s.description="Red Hat OpenShift Pipelines Operator Proxy" \
       io.openshift.tags="operator,tekton,openshift,proxy"
 
-RUN microdnf install -y shadow-utils
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
 

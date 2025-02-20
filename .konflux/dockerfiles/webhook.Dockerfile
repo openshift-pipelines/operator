@@ -12,7 +12,6 @@ COPY upstream .
 ENV GODEBUG="http2server=0"
 RUN go build -ldflags="-X 'knative.dev/pkg/changeset.rev=${CHANGESET_REV:0:7}'" -mod=vendor -o /tmp/openshift-pipelines-operator-webhook \
     ./cmd/openshift/webhook
-# RUN /bin/sh -c 'echo $CI_PIPELINE_UPSTREAM_COMMIT > /tmp/HEAD'
 
 FROM $RUNTIME
 
@@ -24,9 +23,9 @@ COPY --from=builder /go/src/github.com/tektoncd/operator/cmd/openshift/webhook/k
 COPY .konflux/olm-catalog/bundle/kodata /kodata
 
 LABEL \
-      com.redhat.component="openshift-pipelines-operator-webhook-rhel8-container" \
-      name="openshift-pipelines/pipelines-operator-webhook-rhel8" \
-      version="1.16.0" \
+      com.redhat.component="openshift-pipelines-operator-webhook-rhel9-container" \
+      name="openshift-pipelines/pipelines-operator-webhook-rhel9" \
+      version="next" \
       summary="Red Hat OpenShift Pipelines Operator Webhook" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Webhook" \
@@ -34,7 +33,6 @@ LABEL \
       io.k8s.description="Red Hat OpenShift Pipelines Operator Webhook" \
       io.openshift.tags="operator,tekton,openshift,webhook"
 
-RUN microdnf install -y shadow-utils
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
 
