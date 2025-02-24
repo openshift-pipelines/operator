@@ -1,6 +1,7 @@
 module github.com/tektoncd/operator
 
-go 1.23
+go 1.23.4
+
 toolchain go1.23.6
 
 require (
@@ -16,7 +17,7 @@ require (
 	github.com/openshift/apiserver-library-go v0.0.0-20230816171015-6bfafa975bfb
 	github.com/openshift/client-go v0.0.0-20240523113335-452272e0496d
 	github.com/sigstore/cosign/v2 v2.4.2
-	github.com/spf13/cobra v1.8.1
+	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	github.com/tektoncd/pipeline v0.68.0
@@ -30,7 +31,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.4.0
 	gotest.tools/v3 v3.5.2
 	k8s.io/api v0.30.0
-	k8s.io/apiextensions-apiserver v0.29.13
+	k8s.io/apiextensions-apiserver v0.29.14
 	k8s.io/apimachinery v0.30.0
 	k8s.io/client-go v1.5.2
 	k8s.io/code-generator v0.30.0
