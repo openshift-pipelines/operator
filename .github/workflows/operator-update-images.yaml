@@ -26,7 +26,7 @@ jobs:
       run: |
         git config user.name openshift-pipelines-bot
         git config user.email pipelines-extcomm@redhat.com
-        git checkout -b actions/update/operator-update-images-next
+        git checkout -b actions/update/operator-update-images-release-v1.18.x
 
         git add -f  head .konflux
 
@@ -36,17 +36,17 @@ jobs:
         fi
 
         git commit -F- <<EOF
-          [bot:next] Update  generate Cluster Service Version (CSV)
+          [bot:release-v1.18.x] Update  generate Cluster Service Version (CSV)
         EOF
         
-        git push -f origin actions/update/operator-update-images-next
+        git push -f origin actions/update/operator-update-images-release-v1.18.x
 
-        if [ "$(gh pr list --base next --head actions/update/operator-update-images-next --json url --jq 'length')" = "0" ]; then
+        if [ "$(gh pr list --base release-v1.18.x --head actions/update/operator-update-images-release-v1.18.x --json url --jq 'length')" = "0" ]; then
           echo "creating PR..."
-          gh pr create -B next -H actions/update/operator-update-images-next --label=automated --label=lgtm --label=approved  --fill
+          gh pr create -B release-v1.18.x -H actions/update/operator-update-images-release-v1.18.x --label=automated --label=lgtm --label=approved  --fill
         else
           echo "a PR already exists, editing..."
-          gh pr edit --title "[bot:next] Update  generate Cluster Service Version (CSV)" --fill
+          gh pr edit --title "[bot:release-v1.18.x] Update  generate Cluster Service Version (CSV)" --fill
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
