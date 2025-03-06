@@ -77,7 +77,9 @@ jobs:
         echo "Bundle Image updated for index images : $BUNDLE_IMAGE"
 
         ##Update the image field with $BUNDLE_IMAGE
-        jq "(.entries[] | select(.schema == \"olm.bundle\")).image = \"$BUNDLE_IMAGE\""  $CATALOG_JSON >  temp.json && mv temp.json $CATALOG_JSON
+        ## There are multiple olm.bundle entries for all previously released versions.
+        ## The releasing version is placed first to ensure proper replacement.
+        jq --arg BUNDLE_IMAGE "$BUNDLE_IMAGE" '( .entries | to_entries | map(select(.value.schema == "olm.bundle")) | .[0].key ) as $firstIndex | if $firstIndex then .entries[$firstIndex].image = $BUNDLE_IMAGE else . end' "$CATALOG_JSON" > temp.json && mv temp.json "$CATALOG_JSON"
         echo "Update bundle Image in $CATALOG_JSON"
         
         BUNDLE_VERSION=$(opm render --skip-tls-verify -o json ${BUNDLE_IMAGE} | jq -r '.name' | awk -F 'v' '{ print $2 }')
