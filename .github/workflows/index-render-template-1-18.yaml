@@ -89,7 +89,7 @@ jobs:
         # Starting with OCP 4.17 we need the --migrate-level=bundle-object-to-csv-metadata flag. For rendering to older versions of OCP.
         NUMERIC_VERSION=${VERSION#v} # Removes "v" prefix
         if (( $(echo "$NUMERIC_VERSION >= 4.17" | bc -l) )); then        
-          opm alpha render-template basic .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json [--migrate-level=bundle-object-to-csv-metadata] > .konflux/olm-catalog/index/${{matrix.version}}/catalog/openshift-pipelines-operator-rh/catalog.json
+          opm alpha render-template basic .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json --migrate-level=bundle-object-to-csv-metadata > .konflux/olm-catalog/index/${{matrix.version}}/catalog/openshift-pipelines-operator-rh/catalog.json
         else
           opm alpha render-template basic .konflux/olm-catalog/index/${{matrix.version}}/catalog-template.json > .konflux/olm-catalog/index/${{matrix.version}}/catalog/openshift-pipelines-operator-rh/catalog.json
         fi
