@@ -68,18 +68,22 @@ jobs:
   
         CATALOG_JSON=".konflux/olm-catalog/index/${VERSION}/catalog-template.json"
         BUNDLE_IMAGE=$(yq '.images[] | select(.name == "IMAGE_OPERATOR_BUNDLE") | .value' project.yaml)
-      
         echo "Bundle Image from project.yaml : $BUNDLE_IMAGE"
+
         TARGET_REGISTRY="registry.stage.redhat.io/openshift-pipelines"
         SOURCE_PATTEN="quay.io/.*/(.*)-rhel9(@sha256:.+)"
         TARGET_PATTEN="$TARGET_REGISTRY/pipelines-\1\2"
         BUNDLE_IMAGE=$(echo "${BUNDLE_IMAGE}" | sed -E "s|$SOURCE_PATTEN|$TARGET_PATTEN|g")
         echo "Bundle Image updated for index images : $BUNDLE_IMAGE"
 
-        ##Update the image field with $BUNDLE_IMAGE
+        # Update BUNDLE_NAME for each release according to the corresponding 'name' value specified in the catalog-template.json file.
+        # ex: for 1.19 it will be openshift-pipelines-operator-rh.v1.19.0, for 1.17.2 it will be openshift-pipelines-operator-rh.v1.17.2
+        BUNDLE_NAME=openshift-pipelines-operator-rh.v1.18.0
+
+        ## Update the image field with $BUNDLE_IMAGE
         ## There are multiple olm.bundle entries for all previously released versions.
-        ## The releasing version is placed first to ensure proper replacement.
-        jq --arg BUNDLE_IMAGE "$BUNDLE_IMAGE" '( .entries | to_entries | map(select(.value.schema == "olm.bundle")) | .[0].key ) as $firstIndex | if $firstIndex then .entries[$firstIndex].image = $BUNDLE_IMAGE else . end' "$CATALOG_JSON" > temp.json && mv temp.json "$CATALOG_JSON"
+        ## jq query ensure proper replacement based on BUNDLE_NAME.
+        jq --arg BUNDLE_IMAGE "$BUNDLE_IMAGE" --arg BUNDLE_NAME "$BUNDLE_NAME" '.entries |= map(if .schema == "olm.bundle" and .name == $BUNDLE_NAME then .image = $BUNDLE_IMAGE else . end)' "$CATALOG_JSON" > temp.json && mv temp.json "$CATALOG_JSON"
         echo "Update bundle Image in $CATALOG_JSON"
         
         BUNDLE_VERSION=$(opm render --skip-tls-verify -o json ${BUNDLE_IMAGE} | jq -r '.name' | awk -F 'v' '{ print $2 }')
