@@ -2,7 +2,7 @@ DATE         ?= $(shell date +%FT%T%z)
 REMOTE        = 127.0.0.1
 TAG           = latest
 RUNTIME       = docker
-
+ENVIRONMENT="devel"
 update-payload-and-version: ## Update tektoncd operator build number, payloads, bundle manifests, image references
 	@./hack/update-version.sh
 	@./hack/operator-fetch-payload.sh
@@ -16,7 +16,7 @@ fetch-payload: ## Update tektoncd operator payloads and bundle manifests
 	@./hack/operator-fetch-payload.sh
 
 update-reference: ## Update references in the generate clusterserviceversion.yaml
-	@./hack/operator-update-images.sh
+	@./hack/operator-update-images.sh ${ENVIRONMENT}
 
 # update/version/update-payload:
 # 	@./hack/update-version.sh

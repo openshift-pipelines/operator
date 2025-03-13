@@ -1,0 +1,85 @@
+name: index-render-template
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Select Environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-matrix:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+    - id: set-matrix
+      run: |
+        pushd .konflux/olm-catalog/index
+        VERSIONS=$(ls -d v* | jq -R -s -c 'split("\n")[:-1]')
+        popd
+        echo "Versions: ${VERSIONS}"
+        echo "versions=${VERSIONS}" >> $GITHUB_OUTPUT
+    outputs:
+      versions: ${{ steps.set-matrix.outputs.versions }}
+  generate-catalog:
+    needs: build-matrix
+    if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.build-matrix.outputs.versions) }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v4
+      with:
+        ref: release-v1.18.x
+    - name: Configure Docker authentication
+      env:
+        DOCKER_CONFIG: /home/runner/.docker
+        DOCKER_JSON: ${{ secrets.DOCKER_REGISTRY_SECRET }}
+      run: |
+          echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json
+    - name: Generate ${{matrix.version}} catalog
+      run: |
+        curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
+        chmod +x /usr/local/bin/opm
+        ./hack/index-render-template.sh ${{matrix.version}} ${{github.event.inputs.environment}}
+
+    - name: Commit new changes
+      run: |
+        git config user.name openshift-pipelines-bot
+        git config user.email pipelines-extcomm@redhat.com
+        git checkout -b actions/index-1.18/${{matrix.version}}
+
+        git add .konflux/olm-catalog/index/${{matrix.version}}/
+
+        if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
+          echo "No change, exiting"
+          exit 0
+        fi
+
+        git commit -F- <<EOF
+        [bot:1.18] Update ${{matrix.version}} generate catalog
+        EOF
+
+        git push -f origin actions/index-1.18/${{matrix.version}}
+        if [ "$(gh pr list --base 1.18 --head actions/index-1.18/${{matrix.version}} --json url --jq 'length')" = "0" ]; then
+          echo "creating PR..."
+          gh pr create -B release-v1.18.x -H actions/index-1.18/${{matrix.version}} --label=automated --label=lgtm --label=approved  --fill
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
