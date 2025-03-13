@@ -1,6 +1,22 @@
 #!/usr/bin/env bash
 # Update images from project.yaml to "generated" files
-TARGET_REGISTRY=${1:-"registry.stage.redhat.io/openshift-pipelines"}
+ENVIRONMENT=${1:-"devel"}
+case "$ENVIRONMENT" in
+  "devel")
+    TARGET_REGISTRY="quay.io/openshift-pipeline"
+    ;;
+  "staging")
+    TARGET_REGISTRY="registry.stage.redhat.io/openshift-pipelines"
+    ;;
+  "production")
+    TARGET_REGISTRY="registry.redhat.io/openshift-pipelines"
+    ;;
+  *)
+    echo "Invalid selection!"
+    exit 1
+    ;;
+esac
+
 function update_image_reference() {
     SOURCE_PATTEN="quay.io/.*/(pipeline-)?(.*@sha256:.+)"
     TARGET_PATTEN="${TARGET_REGISTRY}/pipelines-\2"

@@ -1,12 +1,22 @@
 name: operator-update-images
 
 on:
-  workflow_dispatch: {}
-  schedule:
-  - cron: "0 1 * * *" # At 1AM everyday
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Select Environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+#  Disable Schedule for this workflow as this is Release branch
+#  schedule:
+#  - cron: "0 1 * * *" # At 1AM everyday
 
 jobs:
-
   update-csv:
     runs-on: ubuntu-latest
     if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
@@ -20,13 +30,15 @@ jobs:
     - name: update-image-references
       run: |
         # Update operator's payload and stuff
-        make update-reference   
+        make ENVIRONMENT=${{github.event.inputs.environment}} update-reference  
 
     - name: Commit new changes
       run: |
+        BASE_BRANCH=${GITHUB_REF#refs/heads/}
+        SOURCE_BRANCH=actions/update/operator-update-images-${BASE_BRANCH}
         git config user.name openshift-pipelines-bot
         git config user.email pipelines-extcomm@redhat.com
-        git checkout -b actions/update/operator-update-images-release-v1.18.x
+        git checkout -b ${SOURCE_BRANCH}
 
         git add -f  head .konflux
 
@@ -36,17 +48,17 @@ jobs:
         fi
 
         git commit -F- <<EOF
-          [bot:release-v1.18.x] Update  generate Cluster Service Version (CSV)
+          [bot:${BASE_BRANCH}] Update  generate Cluster Service Version (CSV)
         EOF
         
-        git push -f origin actions/update/operator-update-images-release-v1.18.x
+        git push -f origin ${SOURCE_BRANCH}
 
-        if [ "$(gh pr list --base release-v1.18.x --head actions/update/operator-update-images-release-v1.18.x --json url --jq 'length')" = "0" ]; then
+        if [ "$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json url --jq 'length')" = "0" ]; then
           echo "creating PR..."
-          gh pr create -B release-v1.18.x -H actions/update/operator-update-images-release-v1.18.x --label=automated --label=lgtm --label=approved  --fill
+          gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
         else
           echo "a PR already exists, editing..."
-          gh pr edit --title "[bot:release-v1.18.x] Update  generate Cluster Service Version (CSV)" --fill
+          gh pr edit --title "[bot:${BASE_BRANCH}] Update  generate Cluster Service Version (CSV)" --fill
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
