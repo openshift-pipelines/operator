@@ -1,12 +1,22 @@
 name: operator-update-images
 
 on:
-  workflow_dispatch: {}
-  schedule:
-  - cron: "0 1 * * *" # At 1AM everyday
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Select Environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+#  Disable Schedule for this workflow as this is Release branch
+#  schedule:
+#  - cron: "0 1 * * *" # At 1AM everyday
 
 jobs:
-
   update-csv:
     runs-on: ubuntu-latest
     if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
@@ -20,7 +30,7 @@ jobs:
     - name: update-image-references
       run: |
         # Update operator's payload and stuff
-        make update-reference   
+        make ENVIRONMENT=${{github.event.inputs.environment}} update-reference  
 
     - name: Commit new changes
       run: |
