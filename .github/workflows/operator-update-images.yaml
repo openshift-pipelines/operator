@@ -1,12 +1,20 @@
 name: operator-update-images
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Select Environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - devel
+
   schedule:
-  - cron: "0 0 * * *" # At 12 AM everyday
+  - cron: "0 1 * * *" # At 1AM everyday
 
 jobs:
-
   update-csv:
     runs-on: ubuntu-latest
     if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
@@ -16,19 +24,19 @@ jobs:
     steps:
     - name: Checkout the current repo
       uses: actions/checkout@v4
-      with:
-        ref: next
 
     - name: update-image-references
       run: |
         # Update operator's payload and stuff
-        make update-reference   
+        make ENVIRONMENT=${{github.event.inputs.environment}} update-reference  
 
     - name: Commit new changes
       run: |
+        BASE_BRANCH=${GITHUB_REF#refs/heads/}
+        SOURCE_BRANCH=actions/update/operator-update-images-${BASE_BRANCH}
         git config user.name openshift-pipelines-bot
         git config user.email pipelines-extcomm@redhat.com
-        git checkout -b actions/update/operator-update-images-next
+        git checkout -b ${SOURCE_BRANCH}
 
         git add -f  head .konflux
 
@@ -38,17 +46,17 @@ jobs:
         fi
 
         git commit -F- <<EOF
-          [bot:next] Update  generate Cluster Service Version (CSV)
+          [bot:${BASE_BRANCH}] Update  generate Cluster Service Version (CSV)
         EOF
         
-        git push -f origin actions/update/operator-update-images-next
+        git push -f origin ${SOURCE_BRANCH}
 
-        if [ "$(gh pr list --base next --head actions/update/operator-update-images-next --json url --jq 'length')" = "0" ]; then
+        if [ "$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json url --jq 'length')" = "0" ]; then
           echo "creating PR..."
-          gh pr create -B next -H actions/update/operator-update-images-next --label=automated --label=lgtm --label=approved  --fill
+          gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
         else
           echo "a PR already exists, editing..."
-          gh pr edit --title "[bot:next] Update  generate Cluster Service Version (CSV)" --fill
+          gh pr edit --title "[bot:${BASE_BRANCH}] Update  generate Cluster Service Version (CSV)" --fill
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
