@@ -9,8 +9,7 @@ on:
         default: 'staging'
         type: choice
         options:
-          - staging
-          - production
+          - devel
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -45,8 +44,6 @@ jobs:
     steps:
     - name: Checkout the repository
       uses: actions/checkout@v4
-      with:
-        ref: release-v1.18.x
     - name: Configure Docker authentication
       env:
         DOCKER_CONFIG: /home/runner/.docker
