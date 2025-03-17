@@ -19,10 +19,10 @@ FROM $RUNTIME
 ENV OPERATOR=/usr/local/bin/openshift-pipelines-operator-webhook \
     KO_DATA_PATH=/kodata
 
-COPY --from=builder /tmp/openshift-pipelines-operator-webhook ${OPERATOR} \
-     --from=builder /go/src/github.com/tektoncd/operator/cmd/openshift/webhook/kodata/ ${KO_DATA_PATH}/ \
-     .konflux/olm-catalog/bundle/kodata /kodata \
-     head ${KO_DATA_PATH}/HEAD
+COPY --from=builder /tmp/openshift-pipelines-operator-webhook ${OPERATOR}
+COPY --from=builder /go/src/github.com/tektoncd/operator/cmd/openshift/webhook/kodata/ ${KO_DATA_PATH}/
+COPY .konflux/olm-catalog/bundle/kodata /kodata
+COPY head ${KO_DATA_PATH}/HEAD
 
 LABEL \
       com.redhat.component="openshift-pipelines-operator-webhook-rhel9-container" \
