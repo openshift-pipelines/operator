@@ -58,9 +58,11 @@ jobs:
 
     - name: Commit new changes
       run: |
+        BASE_BRANCH=${GITHUB_REF#refs/heads/}
+        SOURCE_BRANCH=actions/update/${{matrix.version}}/operator-update-images-${BASE_BRANCH}
         git config user.name openshift-pipelines-bot
         git config user.email pipelines-extcomm@redhat.com
-        git checkout -b actions/index-1.18/${{matrix.version}}
+        git checkout -b ${SOURCE_BRANCH}
 
         git add .konflux/olm-catalog/index/${{matrix.version}}/
 
@@ -70,13 +72,13 @@ jobs:
         fi
 
         git commit -F- <<EOF
-        [bot:1.18] Update ${{matrix.version}} generate catalog
+        [bot:${BASE_BRANCH}] Update ${{matrix.version}} generate catalog
         EOF
 
-        git push -f origin actions/index-1.18/${{matrix.version}}
-        if [ "$(gh pr list --base 1.18 --head actions/index-1.18/${{matrix.version}} --json url --jq 'length')" = "0" ]; then
+        git push -f origin ${SOURCE_BRANCH}
+        if [ "$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json url --jq 'length')" = "0" ]; then
           echo "creating PR..."
-          gh pr create -B release-v1.18.x -H actions/index-1.18/${{matrix.version}} --label=automated --label=lgtm --label=approved  --fill
+          gh pr create -B ${${BASE_BRANCH}} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
