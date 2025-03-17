@@ -19,8 +19,8 @@ FROM $RUNTIME
 ENV OPERATOR_PROXY=/usr/local/bin/openshift-pipelines-operator-proxy \
     KO_DATA_PATH=/kodata
 
-COPY --from=builder /tmp/openshift-pipelines-operator-proxy ${OPERATOR_PROXY}
-COPY head ${KO_DATA_PATH}/HEAD
+COPY --from=builder /tmp/openshift-pipelines-operator-proxy ${OPERATOR_PROXY} \
+     head ${KO_DATA_PATH}/HEAD
 
 LABEL \
       com.redhat.component="openshift-pipelines-operator-proxy-rhel9-container" \
