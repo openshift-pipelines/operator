@@ -2,7 +2,7 @@ DATE         ?= $(shell date +%FT%T%z)
 REMOTE        = 127.0.0.1
 TAG           = latest
 RUNTIME       = docker
-
+ENVIRONMENT="devel"
 update-payload-and-version: ## Update tektoncd operator build number, payloads, bundle manifests, image references
 	@./hack/update-version.sh
 	@./hack/operator-fetch-payload.sh
@@ -16,7 +16,7 @@ fetch-payload: ## Update tektoncd operator payloads and bundle manifests
 	@./hack/operator-fetch-payload.sh
 
 update-reference: ## Update references in the generate clusterserviceversion.yaml
-	@./hack/operator-update-images.sh
+	@./hack/operator-update-images.sh ${ENVIRONMENT}
 
 # update/version/update-payload:
 # 	@./hack/update-version.sh
@@ -28,7 +28,7 @@ update-reference: ## Update references in the generate clusterserviceversion.yam
 # 	operator-sdk run bundle -n openshift-operators ${REMOTE}/openshift-pipelines-operator-bundle:${TAG}
 # bundle/cleanup: ## Clean up a bundle installed in your cluster
 # 	operator-sdk cleanup -n openshift-operators openshift-pipelines-operator-rh
-# 
+#
 # index: bundle/push ## Create an index image for this bundle
 # 	./hack/build-index.sh index/openshift-pipelines-operator-rh/package.yaml ${REMOTE} ${REMOTE}/openshift-pipelines-operator-bundle:${TAG} ${REMOTE}/openshift-pipelines-operator-index:${TAG} ${RUNTIME} ${DOCKER_BUILD_ARGS}
 # index/push: index ## Build and push the index image for this bundle
