@@ -52,8 +52,6 @@ images:
     value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/results-api-rhel9@sha256:cc7b7716686285623467e28528290292c741b237dc0dbfe833a062d3c4a20b2a
   - name: IMAGE_RESULTS_RETENTION_POLICY_AGENT
     value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/results-retention-policy-agent-rhel9@sha256:65a3d8b016905f03e23a111e091eb3998179ff9c7f0c932b1bde2d22e9f694a0
-  - name: IMAGE_RESULTS_POSTGRES
-    value: registry.redhat.io/rhel8/postgresql-13@sha256:42eed05d0f681deb8d9198bf483bbeda02016c23515f061b828aec71f0ae142f
   # tektoncd-cli
   - name: IMAGE_JOB_PRUNER_TKN
     value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/cli-tkn-rhel9@sha256:61dc77ab93f67ad9af72cb2af7a93a3febc81a77b831618651d1c9b016cc201a
@@ -62,8 +60,7 @@ images:
   - name: IMAGE_ADDONS_TKN
     value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/cli-tkn-rhel9@sha256:61dc77ab93f67ad9af72cb2af7a93a3febc81a77b831618651d1c9b016cc201a
   - name: IMAGE_ADDONS_TKN_CLI_SERVE # FIXME: we need to figure how to manage this in konflux. For now, using released version (1.16)
-    # value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/tektoncd-cli-nextyhbqwBheJN2EN BN SSCJD  DLH @sha256:42eed05d0f681deb8d9198bf483bbeda02016c23515f061b828aec71f0ae142f
-    value: registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel8@sha256:cc5234d6a6afc213d24786253c8ea70bb77f3f5c3e1ea1526debb8a1776e4ffc
+    value: registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel9@sha256:d055d2b35a663aef3e1aafdbed0b12957867c0670c946ebae66e9c44a768bda2
   # manual-approval-gate
   - name: IMAGE_MAG_MANUAL_APPROVAL
     value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/manual-approval-gate-webhook-rhel9@sha256:32416df654c142f9f5ace228c25eb6f0edc9f1aa49dd55caf65d1a4102e722b4
@@ -103,25 +100,11 @@ images:
     value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/git-init-rhel9@sha256:a5212e90140427eb5c9328e8710be2121d207683ebb47cee95b8d76252e4839b
   - name: IMAGE_ADDONS_GIT_CLONE
     value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/git-init-rhel9@sha256:a5212e90140427eb5c9328e8710be2121d207683ebb47cee95b8d76252e4839b
-  - name: IMAGE_ADDONS_KN
-    value: registry.redhat.io/openshift-serverless-1/client-kn-rhel8@sha256:a5a7b2be50f211d4d9d555b2a2e2302096c139ff5011d984cc386f1530007f16
-  - name: IMAGE_ADDONS_SKOPEO_RESULTS
-    value: registry.redhat.io/rhel8/skopeo@sha256:1dcb4189c92da21ee58b3ca5433615e0208194c8412f7f1fb45fa491179aaf9b
-  - name: IMAGE_ADDONS_BUILD
-    value: registry.redhat.io/rhel8/buildah@sha256:5c7cd7c9a3d49e8905fc98693f6da605aeafae36bde5622dc78e12f31db3cd59
-  - name: IMAGE_ADDONS_S2I_BUILD
-    value: registry.redhat.io/rhel8/buildah@sha256:5c7cd7c9a3d49e8905fc98693f6da605aeafae36bde5622dc78e12f31db3cd59
-  - name: IMAGE_ADDONS_S2I_GENERATE
-    value: registry.redhat.io/source-to-image/source-to-image-rhel8@sha256:6a6025914296a62fdf2092c3a40011bd9b966a6806b094d51eec5e1bd5026ef4
-  - name: IMAGE_ADDONS_LOAD_SCRIPTS
-    value: registry.redhat.io/ubi8/ubi-minimal@sha256:a47c89f02b39a98290f88204ed3d162845db0a0c464b319c2596cfd1e94b444e
-  - name: IMAGE_ADDONS_MAVEN_GENERATE
-    value: registry.redhat.io/ubi8/ubi-minimal@sha256:a47c89f02b39a98290f88204ed3d162845db0a0c464b319c2596cfd1e94b444e
-  - name: IMAGE_ADDONS_PREPARE
-    value: registry.redhat.io/ubi8/ubi-minimal@sha256:a47c89f02b39a98290f88204ed3d162845db0a0c464b319c2596cfd1e94b444e
-  - name: IMAGE_ADDONS_MAVEN_GOALS
-    value: registry.redhat.io/ubi8/openjdk-17@sha256:632e78989471859ca4ed1148b951a911f7e3b6e6516482be20967c4171612c55
+  - name: IMAGE_ADDONS_PREPARE_AND_RUN
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/git-init-rhel9@sha256:a5212e90140427eb5c9328e8710be2121d207683ebb47cee95b8d76252e4839b
+  # console-plugin
   - name: IMAGE_PIPELINES_CONSOLE_PLUGIN
     value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/console-plugin-rhel9@sha256:d7721f5c3c7ed4bc0a0961e2c4b5ec3416d62e5cfbd2704488e063b22c23a141
+  # operator-bundle
   - name: IMAGE_OPERATOR_BUNDLE
     value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/operator-bundle-rhel9@sha256:b915f25f8155420700187574ef4d3e953cb14e1e1e8bb6c3e6223bd794bc7d04
