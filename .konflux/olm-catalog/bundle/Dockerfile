@@ -1,4 +1,6 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest as base
+ARG RUNTIME=registry.access.redhat.com/ubi8/ubi-minimal@sha256:e4ca1025efad7cc944fb991c716067b12e25ecbe05e6e81715a337179e417aa8
+
+FROM RUNTIME as base
 FROM scratch
 
 COPY .konflux/olm-catalog/bundle/kodata /kodata
