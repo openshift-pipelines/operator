@@ -103,20 +103,18 @@ tekton-operator
   {{- $image = .Values.operator.image.repository }}
 {{- else -}}
 {{- if .Values.openshift.enabled -}}
-  {{- $image = "ghcr.io/tektoncd/operator/operator-303303c315a48490ba6517859ef65b77" -}}
+  {{- $image = "ghcr.io/tektoncd/operator/github.com/tektoncd/operator/cmd/openshift/operator" -}}
 {{- else -}}
-  {{- $image = "ghcr.io/tektoncd/operator/operator-303303c315a48490ba6517859ef65b77" -}}
+  {{- $image = "ghcr.io/tektoncd/operator/github.com/tektoncd/operator/cmd/kubernetes/operator" -}}
 {{- end -}}
 {{- end -}}
 {{- printf "%s:%s" $image $tag -}}
 {{- end -}}
 
 {{- define "tekton-operator.pruner-image" -}}
-{{- if contains "sha256:" .Values.pruner.image.tag -}}
-{{- printf "%s@%s" .Values.pruner.image.repository .Values.pruner.image.tag -}}
-{{- else -}}
-{{- printf "%s:%s" .Values.pruner.image.repository .Values.pruner.image.tag -}}
-{{- end -}}
+{{- $tag := .Values.pruner.image.tag -}}
+{{- $image := .Values.pruner.image.repository -}}
+{{- printf "%s:%s" $image $tag -}}
 {{- end -}}
 
 {{- define "tekton-operator.webhook-image" -}}
@@ -126,9 +124,9 @@ tekton-operator
   {{- $image = .Values.webhook.image.repository }}
 {{- else -}}
 {{- if .Values.openshift.enabled -}}
-  {{- $image = "ghcr.io/tektoncd/operator/webhook-f2bb711aa8f0c0892856a4cbf6d9ddd8" -}}
+  {{- $image = "ghcr.io/tektoncd/operator/github.com/tektoncd/operator/cmd/openshift/webhook" -}}
 {{- else -}}
-  {{- $image = "ghcr.io/tektoncd/operator/webhook-f2bb711aa8f0c0892856a4cbf6d9ddd8" -}}
+  {{- $image = "ghcr.io/tektoncd/operator/github.com/tektoncd/operator/cmd/kubernetes/webhook" -}}
 {{- end -}}
 {{- end -}}
 {{- printf "%s:%s" $image $tag -}}
@@ -142,9 +140,9 @@ tekton-operator
   {{- $image = .Values.webhookProxy.image.repository }}
 {{- else -}}
 {{- if .Values.openshift.enabled -}}
-  {{- $image = "ghcr.io/tektoncd/operator/proxy-webhook-f6167da7bc41b96a27c5529f850e63d1" -}}
+  {{- $image = "ghcr.io/tektoncd/operator/github.com/tektoncd/operator/cmd/openshift/proxy-webhook" -}}
 {{- else -}}
-  {{- $image = "ghcr.io/tektoncd/operator/proxy-webhook-f6167da7bc41b96a27c5529f850e63d1" -}}
+  {{- $image = "ghcr.io/tektoncd/operator/github.com/tektoncd/operator/cmd/kubernetes/proxy-webhook" -}}
 {{- end -}}
 {{- end -}}
 {{- printf "%s:%s" $image $tag -}}

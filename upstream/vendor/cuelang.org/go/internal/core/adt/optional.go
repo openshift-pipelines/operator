@@ -92,8 +92,6 @@ func (o *StructInfo) MatchAndInsert(c *OpContext, arc *Vertex) {
 // matchBulk reports whether feature f matches the filter of x. It evaluation of
 // the filter is erroneous, it returns false and the error will  be set in c.
 func matchBulk(c *OpContext, env *Environment, p *BulkOptionalField, f Feature, label Value) bool {
-	unreachableForDev(c)
-
 	v := env.evalCached(c, p.Filter)
 	v = Unwrap(v)
 
@@ -106,8 +104,7 @@ func matchBulk(c *OpContext, env *Environment, p *BulkOptionalField, f Feature, 
 				err.AddPosition(c.Elem())
 			}
 			c.AddBottom(&Bottom{
-				Err:  err,
-				Node: c.vertex,
+				Err: err,
 			})
 		}
 		if c.errs == nil {

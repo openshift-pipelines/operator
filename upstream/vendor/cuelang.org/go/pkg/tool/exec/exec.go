@@ -101,43 +101,45 @@ func (c *execCmd) Run(ctx *task.Context) (res interface{}, err error) {
 	return nil, fmt.Errorf("command %q failed: %v", doc, err)
 }
 
-// mkCommand builds an [exec.Cmd] from a CUE task value,
-// also returning the full list of arguments as a string slice
-// so that it can be used in error messages.
-func mkCommand(ctx *task.Context) (c *exec.Cmd, doc []string, err error) {
-	v := ctx.Lookup("cmd")
-	if ctx.Err != nil {
-		return nil, nil, ctx.Err
-	}
-
+func mkCommand(ctx *task.Context) (c *exec.Cmd, doc string, err error) {
 	var bin string
 	var args []string
+
+	v := ctx.Lookup("cmd")
+	if ctx.Err != nil {
+		return nil, "", ctx.Err
+	}
+
 	switch v.Kind() {
 	case cue.StringKind:
-		str, _ := v.String()
+		str := ctx.String("cmd")
+		doc = str
 		list := strings.Fields(str)
-		bin, args = list[0], list[1:]
+		bin = list[0]
+		args = append(args, list[1:]...)
 
 	case cue.ListKind:
 		list, _ := v.List()
 		if !list.Next() {
-			return nil, nil, errors.New("empty command list")
+			return nil, "", errors.New("empty command list")
 		}
 		bin, err = list.Value().String()
 		if err != nil {
-			return nil, nil, err
+			return nil, "", err
 		}
+		doc += bin
 		for list.Next() {
 			str, err := list.Value().String()
 			if err != nil {
-				return nil, nil, err
+				return nil, "", err
 			}
 			args = append(args, str)
+			doc += " " + str
 		}
 	}
 
 	if bin == "" {
-		return nil, nil, errors.New("empty command")
+		return nil, "", errors.New("empty command")
 	}
 
 	cmd := exec.CommandContext(ctx.Context, bin, args...)
@@ -151,7 +153,7 @@ func mkCommand(ctx *task.Context) (c *exec.Cmd, doc []string, err error) {
 		v, _ := iter.Value().Default()
 		str, err := v.String()
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, v.Pos(),
+			return nil, "", errors.Wrapf(err, v.Pos(),
 				"invalid environment variable value %q", v)
 		}
 		cmd.Env = append(cmd.Env, str)
@@ -159,7 +161,7 @@ func mkCommand(ctx *task.Context) (c *exec.Cmd, doc []string, err error) {
 
 	// Struct case.
 	for iter, _ := env.Fields(); iter.Next(); {
-		label := iter.Selector().Unquoted()
+		label := iter.Label()
 		v, _ := iter.Value().Default()
 		var str string
 		switch v.Kind() {
@@ -168,11 +170,11 @@ func mkCommand(ctx *task.Context) (c *exec.Cmd, doc []string, err error) {
 		case cue.IntKind, cue.FloatKind, cue.NumberKind:
 			str = fmt.Sprint(v)
 		default:
-			return nil, nil, errors.Newf(v.Pos(),
+			return nil, "", errors.Newf(v.Pos(),
 				"invalid environment variable value %q", v)
 		}
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", label, str))
 	}
 
-	return cmd, append([]string{bin}, args...), nil
+	return cmd, doc, nil
 }

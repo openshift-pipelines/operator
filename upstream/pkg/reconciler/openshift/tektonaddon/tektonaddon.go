@@ -41,20 +41,19 @@ type Reconciler struct {
 	// installer Set client to do CRUD operations for components
 	installerSetClient *client.InstallerSetClient
 	// crdClientSet allows us to talk to the k8s for core APIs
-	crdClientSet                  *apiextensionsclient.Clientset
-	manifest                      mf.Manifest
-	operatorClientSet             clientset.Interface
-	extension                     common.Extension
-	pipelineInformer              informer.TektonPipelineInformer
-	triggerInformer               informer.TektonTriggerInformer
-	operatorVersion               string
-	resolverTaskManifest          *mf.Manifest
-	resolverStepActionManifest    *mf.Manifest
-	triggersResourcesManifest     *mf.Manifest
-	pipelineTemplateManifest      *mf.Manifest
-	openShiftConsoleManifest      *mf.Manifest
-	consoleCLIManifest            *mf.Manifest
-	communityResolverTaskManifest *mf.Manifest
+	crdClientSet               *apiextensionsclient.Clientset
+	manifest                   mf.Manifest
+	operatorClientSet          clientset.Interface
+	extension                  common.Extension
+	pipelineInformer           informer.TektonPipelineInformer
+	triggerInformer            informer.TektonTriggerInformer
+	operatorVersion            string
+	resolverTaskManifest       *mf.Manifest
+	resolverStepActionManifest *mf.Manifest
+	triggersResourcesManifest  *mf.Manifest
+	pipelineTemplateManifest   *mf.Manifest
+	openShiftConsoleManifest   *mf.Manifest
+	consoleCLIManifest         *mf.Manifest
 }
 
 const (
@@ -65,7 +64,6 @@ const (
 	providerTypeRedHat                    = "redhat"
 	installerSetNameForResolverTasks      = "addon-versioned-resolvertasks"
 	installerSetNameForResolverStepAction = "addon-versioned-resolverstepactions"
-	providerTypeCommunity                 = "community"
 )
 
 // Check that our Reconciler implements controller.Reconciler
@@ -133,7 +131,6 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, ta *v1alpha1.TektonAddon
 	ptVal, _ := findValue(ta.Spec.Params, v1alpha1.PipelineTemplatesParam)
 	rtVal, _ := findValue(ta.Spec.Params, v1alpha1.ResolverTasks)
 	rsaVal, _ := findValue(ta.Spec.Params, v1alpha1.ResolverStepActions)
-	ctVal, _ := findValue(ta.Spec.Params, v1alpha1.CommunityResolverTasks)
 
 	if ptVal == "true" && rtVal == "false" {
 		ta.Status.MarkNotReady("pipelineTemplates cannot be true if ResolverTask is false")
@@ -204,12 +201,6 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, ta *v1alpha1.TektonAddon
 			errorMsg = fmt.Sprintf("console cli not yet ready:  %v", err)
 			logger.Error(errorMsg)
 		}
-	}
-
-	if err := r.EnsureCommunityResolverTask(ctx, ctVal, ta); err != nil {
-		ready = false
-		errorMsg = fmt.Sprintf("community tasks not yet ready:  %v", err)
-		logger.Error(errorMsg)
 	}
 
 	if !ready {

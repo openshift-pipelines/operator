@@ -237,7 +237,7 @@ func LabelFromValue(c *OpContext, src Expr, v Value) Feature {
 		return InvalidLabel
 	}
 	switch v.Kind() {
-	case IntKind, NumberKind:
+	case IntKind, NumKind:
 		x, _ := Unwrap(v).(*Num)
 		if x == nil {
 			c.addErrf(IncompleteError, pos(v), msgGround, v, "int")

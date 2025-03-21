@@ -311,11 +311,6 @@ func (ot *OptionsTransformer) updateDeployments(u *unstructured.Unstructured) er
 		targetDeployment.Spec.Template.Spec.TopologySpreadConstraints = deploymentOptions.Spec.Template.Spec.TopologySpreadConstraints
 	}
 
-	// update runTimeClassName
-	if deploymentOptions.Spec.Template.Spec.RuntimeClassName != nil {
-		targetDeployment.Spec.Template.Spec.RuntimeClassName = deploymentOptions.Spec.Template.Spec.RuntimeClassName
-	}
-
 	// update volumes
 	targetDeployment.Spec.Template.Spec.Volumes = ot.updateVolumes(targetDeployment.Spec.Template.Spec.Volumes, deploymentOptions.Spec.Template.Spec.Volumes)
 
@@ -353,16 +348,12 @@ func (ot *OptionsTransformer) updateVolumes(sourceVolumes, additionalVolumes []c
 }
 
 func (ot *OptionsTransformer) updateContainers(targetContainers, containersOptions []corev1.Container) []corev1.Container {
-	containersToAdd := []corev1.Container{}
 	for _, containerOptions := range containersOptions {
-		containerFound := false
 		for containerIndex := range targetContainers {
 			targetContainer := targetContainers[containerIndex]
 			if containerOptions.Name != targetContainer.Name {
 				continue
 			}
-
-			containerFound = true
 
 			// update resource requirements
 			if containerOptions.Resources.Size() != 0 {
@@ -413,14 +404,7 @@ func (ot *OptionsTransformer) updateContainers(targetContainers, containersOptio
 			targetContainers[containerIndex].Args = append(targetContainers[containerIndex].Args, containerOptions.Args...)
 
 		}
-
-		// add the new container from the options list
-		if !containerFound {
-			containersToAdd = append(containersToAdd, containerOptions)
-		}
 	}
-
-	targetContainers = append(targetContainers, containersToAdd...)
 
 	return targetContainers
 }
@@ -555,11 +539,6 @@ func (ot *OptionsTransformer) updateStatefulSets(u *unstructured.Unstructured) e
 				targetStatefulSet.Spec.VolumeClaimTemplates = append(targetStatefulSet.Spec.VolumeClaimTemplates, newVolumeClaimTpl)
 			}
 		}
-	}
-
-	// update runTimeClassName
-	if statefulSetOptions.Spec.Template.Spec.RuntimeClassName != nil {
-		targetStatefulSet.Spec.Template.Spec.RuntimeClassName = statefulSetOptions.Spec.Template.Spec.RuntimeClassName
 	}
 
 	// update volumes

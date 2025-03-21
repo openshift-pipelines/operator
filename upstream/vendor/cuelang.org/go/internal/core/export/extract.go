@@ -56,8 +56,9 @@ func extractDocs(v *adt.Vertex) (docs []*ast.CommentGroup) {
 			}
 
 		case *ast.File:
-			fdocs, _ := internal.FileComments(f)
-			docs = append(docs, fdocs...)
+			if c := internal.FileComment(f); c != nil {
+				docs = append(docs, c)
+			}
 		}
 
 		return true
@@ -178,7 +179,8 @@ func extractDeclAttrs(attrs []*ast.Attribute, n ast.Node) []*ast.Attribute {
 	switch x := n.(type) {
 	case nil:
 	case *ast.File:
-		attrs = appendDeclAttrs(attrs, x.Decls[len(x.Preamble()):])
+		info := internal.GetPackageInfo(x)
+		attrs = appendDeclAttrs(attrs, x.Decls[info.Index:])
 	case *ast.StructLit:
 		attrs = appendDeclAttrs(attrs, x.Elts)
 	}

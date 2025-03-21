@@ -85,13 +85,8 @@ func processExpr(ctx *OpContext, t *task, mode runMode) {
 	x := t.x.(Expr)
 
 	state := combineMode(concreteKnown, mode)
-	v, ci := ctx.evalStateCI(x, state)
-	if ci.CycleType == IsCyclic && t.node.node.IsPatternConstraint {
-		// This is an optional cycle that we will ignore.
-		return
-	}
-	ci = t.updateCI(ci)
-	t.node.insertValueConjunct(t.env, v, ci)
+	v := ctx.evalState(x, state)
+	t.node.insertValueConjunct(t.env, v, t.id)
 }
 
 func processResolver(ctx *OpContext, t *task, mode runMode) {
@@ -102,8 +97,7 @@ func processResolver(ctx *OpContext, t *task, mode runMode) {
 	// would be a pretty significant rework, though.
 
 	arc := r.resolve(ctx, oldOnly(0))
-	// TODO: ensure that resolve always returns one of these two.
-	if arc == nil || arc == emptyNode {
+	if arc == nil {
 		// TODO: yield instead?
 		return
 	}
@@ -113,26 +107,14 @@ func processResolver(ctx *OpContext, t *task, mode runMode) {
 	// TODO: consider moving after markCycle or removing.
 	d := arc.DerefDisjunct()
 
-	ci := t.updateCI(ctx.ci)
-
 	// A reference that points to itself indicates equality. In that case
 	// we are done computing and we can return the arc as is.
-	ci, skip := t.node.detectCycleV3(d, t.env, r, ci)
+	ci, skip := t.node.markCycle(d, t.env, r, t.id)
 	if skip {
-		// Either we have a structure cycle or we are unifying with another
-		// conjunct. In either case, we are no longer structure sharing here.
-		t.node.unshare()
 		return
 	}
 
 	if t.defunct {
-		return
-	}
-
-	// TODO: consider moving this to within if arc.nonRooted below.
-	if b, ok := d.BaseValue.(*Bottom); ok && b.Code == StructuralCycleError {
-		// TODO: ensure better positioning information.
-		ctx.AddBottom(b)
 		return
 	}
 
@@ -153,7 +135,6 @@ func processDynamic(ctx *OpContext, t *task, mode runMode) {
 	if v.Concreteness() != Concrete {
 		n.addBottom(&Bottom{
 			Code: IncompleteError,
-			Node: n.node,
 			Err: ctx.NewPosf(pos(field.Key),
 				"key value of dynamic field must be concrete, found %v", v),
 		})
@@ -167,14 +148,9 @@ func processDynamic(ctx *OpContext, t *task, mode runMode) {
 		return
 	}
 
-	// Do not update the CloseInfo, as we are passing the field value
-	// unevaluated.
-	ci := t.id
-
-	c := MakeConjunct(t.env, field, ci)
-	// TODO(evalv3): this does not seem to be necessary and even treacherous.
+	c := MakeConjunct(t.env, field, t.id)
 	c.CloseInfo.cc = nil
-	n.insertArc(f, field.ArcType, c, ci, true)
+	n.insertArc(f, field.ArcType, c, t.id, true)
 }
 
 func processPatternConstraint(ctx *OpContext, t *task, mode runMode) {
@@ -189,11 +165,7 @@ func processPatternConstraint(ctx *OpContext, t *task, mode runMode) {
 		return
 	}
 
-	// Do not update the CloseInfo, as we are passing the constraint value
-	// unevaluated.
-	ci := t.id
-
-	n.insertPattern(v, MakeConjunct(t.env, t.x, ci))
+	n.insertPattern(v, MakeConjunct(t.env, t.x, t.id))
 }
 
 func processComprehension(ctx *OpContext, t *task, mode runMode) {
@@ -228,7 +200,7 @@ func processListLit(c *OpContext, t *task, mode runMode) {
 
 	l := t.x.(*ListLit)
 
-	n.updateCyclicStatusV3(t.id)
+	n.updateCyclicStatus(t.id)
 
 	var ellipsis Node
 
@@ -243,10 +215,8 @@ func processListLit(c *OpContext, t *task, mode runMode) {
 				label, err := MakeLabel(x.Source(), index, IntLabel)
 				n.addErr(err)
 				index++
-				id := t.id
-				// id.setOptional(t.node)
-				c := MakeConjunct(e, x.Value, id)
-				n.insertArc(label, ArcMember, c, id, true)
+				c := MakeConjunct(e, x.Value, t.id)
+				n.insertArc(label, ArcMember, c, t.id, true)
 			})
 			hasComprehension = true
 			if err != nil {
@@ -255,9 +225,6 @@ func processListLit(c *OpContext, t *task, mode runMode) {
 			}
 
 		case *Ellipsis:
-			// TODO(openlist): this will work once we have the same closedness
-			// semantics for lists as for structs.
-			// t.id.cc.isTotal = true
 			if j != len(l.Elems)-1 {
 				n.addErr(c.Newf("ellipsis must be last element in list"))
 				return
@@ -268,10 +235,7 @@ func processListLit(c *OpContext, t *task, mode runMode) {
 				elem = &Top{}
 			}
 
-			id := t.id
-			id.setOptionalV3(t.node)
-
-			c := MakeConjunct(t.env, elem, id)
+			c := MakeConjunct(t.env, elem, t.id)
 			pat := &BoundValue{
 				Op:    GreaterEqualOp,
 				Value: n.ctx.NewInt64(index, x),
@@ -368,7 +332,7 @@ func (n *nodeContext) updateListType(list Expr, id CloseInfo, isClosed bool, ell
 		m = &ListMarker{
 			IsOpen: true,
 		}
-		n.setBaseValue(m)
+		n.node.setValue(n.ctx, conjuncts, m)
 	}
 	m.IsOpen = m.IsOpen && !isClosed
 

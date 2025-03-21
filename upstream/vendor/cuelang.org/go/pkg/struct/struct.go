@@ -30,7 +30,7 @@ import (
 func MinFields(object pkg.Struct, n int) (bool, error) {
 	count := object.Len()
 	code := adt.EvalError
-	if object.IsOpen() || count+object.NumConstraintFields() >= n {
+	if object.IsOpen() {
 		code = adt.IncompleteError
 	}
 	if count < n {

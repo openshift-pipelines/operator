@@ -19,7 +19,6 @@ import (
 	"encoding"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"reflect"
 	"slices"
@@ -37,6 +36,7 @@ import (
 	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/compile"
+	internaljson "cuelang.org/go/internal/encoding/json"
 	"cuelang.org/go/internal/types"
 )
 
@@ -52,33 +52,11 @@ func GoValueToValue(ctx *adt.OpContext, x interface{}, nilIsTop bool) adt.Value 
 }
 
 func GoTypeToExpr(ctx *adt.OpContext, x interface{}) (adt.Expr, errors.Error) {
-	v := newGoConverter(ctx).convertGoType(reflect.TypeOf(x))
+	v := convertGoType(ctx, reflect.TypeOf(x))
 	if err := ctx.Err(); err != nil {
 		return v, err.Err
 	}
 	return v, nil
-}
-
-type goConverter struct {
-	ctx    *adt.OpContext
-	tfile  *token.File
-	offset int
-}
-
-func newGoConverter(ctx *adt.OpContext) *goConverter {
-	return &goConverter{
-		ctx: ctx,
-		// Code in *[token.File] uses size+1 in a few places. So do
-		// MaxInt-2 to be sure to avoid wrap-around issues.
-		tfile:  token.NewFile(pkgID(), -1, math.MaxInt-2),
-		offset: 1,
-	}
-}
-
-func (c *goConverter) setNextPos(n ast.Node) ast.Node {
-	ast.SetPos(n, c.tfile.Pos(c.offset, 0))
-	c.offset++
-	return n
 }
 
 func toValue(e adt.Expr) adt.Value {
@@ -93,14 +71,13 @@ func toValue(e adt.Expr) adt.Value {
 func compileExpr(ctx *adt.OpContext, expr ast.Expr) adt.Value {
 	c, err := compile.Expr(nil, ctx, pkgID(), expr)
 	if err != nil {
-		return &adt.Bottom{
-			Err: errors.Promote(err, "compile")}
+		return &adt.Bottom{Err: errors.Promote(err, "compile")}
 	}
 	return adt.Resolve(ctx, c)
 }
 
 // parseTag parses a CUE expression from a cue tag.
-func parseTag(ctx *adt.OpContext, field, tag string) ast.Expr {
+func parseTag(ctx *adt.OpContext, obj *ast.StructLit, field, tag string) ast.Expr {
 	tag, _ = splitTag(tag)
 	if tag == "" {
 		return topSentinel
@@ -206,8 +183,17 @@ func isOmitEmpty(f *reflect.StructField) bool {
 	return isOmitEmpty
 }
 
+// parseJSON parses JSON into a CUE value. b must be valid JSON.
+func parseJSON(ctx *adt.OpContext, b []byte) adt.Value {
+	expr, err := parser.ParseExpr("json", b)
+	if err != nil {
+		panic(err) // cannot happen
+	}
+	return compileExpr(ctx, expr)
+}
+
 func GoValueToExpr(ctx *adt.OpContext, nilIsTop bool, x interface{}) adt.Expr {
-	e := newGoConverter(ctx).convertRec(nilIsTop, x)
+	e := convertRec(ctx, nilIsTop, x)
 	if e == nil {
 		return ctx.AddErrf("unsupported Go type (%T)", x)
 	}
@@ -223,41 +209,36 @@ func isNil(x reflect.Value) bool {
 	return false
 }
 
-func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value) {
+func convertRec(ctx *adt.OpContext, nilIsTop bool, x interface{}) adt.Value {
 	if t := (&types.Value{}); types.CastValue(t, x) {
-		// TODO: panic if not the same runtime.
+		// TODO: panic if nto the same runtime.
 		return t.V
 	}
-	src := c.ctx.Source()
-
+	src := ctx.Source()
 	switch v := x.(type) {
 	case nil:
 		if nilIsTop {
-			ident, _ := src.(*ast.Ident)
+			ident, _ := ctx.Source().(*ast.Ident)
 			return &adt.Top{Src: ident}
 		}
-		return &adt.Null{Src: src}
+		return &adt.Null{Src: ctx.Source()}
 
 	case *ast.File:
-		x, err := compile.Files(nil, c.ctx, pkgID(), v)
+		x, err := compile.Files(nil, ctx, pkgID(), v)
 		if err != nil {
 			return &adt.Bottom{Err: errors.Promote(err, "compile")}
 		}
-		if _, n := x.SingleConjunct(); n != 1 {
+		if len(x.Conjuncts) != 1 {
 			panic("unexpected length")
 		}
 		return x
 
 	case ast.Expr:
-		return compileExpr(c.ctx, v)
+		return compileExpr(ctx, v)
 
 	case *big.Int:
 		v2 := new(apd.BigInt).SetMathBigInt(v)
-		return &adt.Num{
-			Src: src,
-			K:   adt.IntKind,
-			X:   *apd.NewWithBigInt(v2, 0),
-		}
+		return &adt.Num{Src: src, K: adt.IntKind, X: *apd.NewWithBigInt(v2, 0)}
 
 	case *big.Rat:
 		// should we represent this as a binary operation?
@@ -267,7 +248,7 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 			apd.NewWithBigInt(new(apd.BigInt).SetMathBigInt(v.Denom()), 0),
 		)
 		if err != nil {
-			return c.ctx.AddErrf("could not convert *big.Rat: %v", err)
+			return ctx.AddErrf("could not convert *big.Rat: %v", err)
 		}
 		if !v.IsInt() {
 			n.K = adt.FloatKind
@@ -278,7 +259,7 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 		n := &adt.Num{Src: src, K: adt.FloatKind}
 		_, _, err := n.X.SetString(v.String())
 		if err != nil {
-			return c.ctx.AddErr(errors.Promote(err, "invalid float"))
+			return ctx.AddErr(errors.Promote(err, "invalid float"))
 		}
 		return n
 
@@ -296,28 +277,28 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 			kind = adt.IntKind
 			v = &d
 		}
-		n := &adt.Num{Src: src, K: kind}
+		n := &adt.Num{Src: ctx.Source(), K: kind}
 		n.X = *v
 		return n
 
 	case json.Marshaler:
 		b, err := v.MarshalJSON()
 		if err != nil {
-			return c.ctx.AddErr(errors.Promote(err, "json.Marshaler"))
+			return ctx.AddErr(errors.Promote(err, "json.Marshaler"))
 		}
-		expr, err := parser.ParseExpr("json", b)
-		if err != nil {
-			panic(err) // cannot happen
-		}
-		return compileExpr(c.ctx, expr)
+
+		return parseJSON(ctx, b)
 
 	case encoding.TextMarshaler:
 		b, err := v.MarshalText()
 		if err != nil {
-			return c.ctx.AddErr(errors.Promote(err, "encoding.TextMarshaler"))
+			return ctx.AddErr(errors.Promote(err, "encoding.TextMarshaler"))
 		}
-		s, _ := unicode.UTF8.NewEncoder().String(string(b))
-		return &adt.String{Src: src, Str: s}
+		b, err = internaljson.Marshal(string(b))
+		if err != nil {
+			return ctx.AddErr(errors.Promote(err, "json"))
+		}
+		return parseJSON(ctx, b)
 
 	case error:
 		var errs errors.Error
@@ -325,43 +306,43 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 		case errors.Error:
 			errs = x
 		default:
-			errs = c.ctx.Newf("%s", x.Error())
+			errs = ctx.Newf("%s", x.Error())
 		}
 		return &adt.Bottom{Err: errs}
 	case bool:
-		return &adt.Bool{Src: src, B: v}
+		return &adt.Bool{Src: ctx.Source(), B: v}
 	case string:
 		s, _ := unicode.UTF8.NewEncoder().String(v)
-		return &adt.String{Src: src, Str: s}
+		return &adt.String{Src: ctx.Source(), Str: s}
 	case []byte:
-		return &adt.Bytes{Src: src, B: v}
+		return &adt.Bytes{Src: ctx.Source(), B: v}
 	case int:
-		return c.toInt(int64(v))
+		return toInt(ctx, int64(v))
 	case int8:
-		return c.toInt(int64(v))
+		return toInt(ctx, int64(v))
 	case int16:
-		return c.toInt(int64(v))
+		return toInt(ctx, int64(v))
 	case int32:
-		return c.toInt(int64(v))
+		return toInt(ctx, int64(v))
 	case int64:
-		return c.toInt(int64(v))
+		return toInt(ctx, int64(v))
 	case uint:
-		return c.toUint(uint64(v))
+		return toUint(ctx, uint64(v))
 	case uint8:
-		return c.toUint(uint64(v))
+		return toUint(ctx, uint64(v))
 	case uint16:
-		return c.toUint(uint64(v))
+		return toUint(ctx, uint64(v))
 	case uint32:
-		return c.toUint(uint64(v))
+		return toUint(ctx, uint64(v))
 	case uint64:
-		return c.toUint(uint64(v))
+		return toUint(ctx, uint64(v))
 	case uintptr:
-		return c.toUint(uint64(v))
+		return toUint(ctx, uint64(v))
 	case float64:
 		n := &adt.Num{Src: src, K: adt.FloatKind}
 		_, err := n.X.SetFloat64(v)
 		if err != nil {
-			return c.ctx.AddErr(errors.Promote(err, "invalid float"))
+			return ctx.AddErr(errors.Promote(err, "invalid float"))
 		}
 		return n
 	case float32:
@@ -369,20 +350,20 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 		// apd.Decimal has a SetFloat64 method, but no SetFloat32.
 		_, _, err := n.X.SetString(strconv.FormatFloat(float64(v), 'E', -1, 32))
 		if err != nil {
-			return c.ctx.AddErr(errors.Promote(err, "invalid float"))
+			return ctx.AddErr(errors.Promote(err, "invalid float"))
 		}
 		return n
 
 	case reflect.Value:
 		if v.CanInterface() {
-			return c.convertRec(nilIsTop, v.Interface())
+			return convertRec(ctx, nilIsTop, v.Interface())
 		}
 
 	default:
 		value := reflect.ValueOf(v)
 		switch value.Kind() {
 		case reflect.Bool:
-			return &adt.Bool{Src: src, B: value.Bool()}
+			return &adt.Bool{Src: ctx.Source(), B: value.Bool()}
 
 		case reflect.String:
 			str := value.String()
@@ -391,32 +372,40 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 			// if !utf8.ValidString(str) {
 			// 	return ctx.AddErrf("cannot convert result to string: invalid UTF-8")
 			// }
-			return &adt.String{Src: src, Str: str}
+			return &adt.String{Src: ctx.Source(), Str: str}
 
 		case reflect.Int, reflect.Int8, reflect.Int16,
 			reflect.Int32, reflect.Int64:
-			return c.toInt(value.Int())
+			return toInt(ctx, value.Int())
 
 		case reflect.Uint, reflect.Uint8, reflect.Uint16,
 			reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			return c.toUint(value.Uint())
+			return toUint(ctx, value.Uint())
 
 		case reflect.Float32, reflect.Float64:
-			return c.convertRec(nilIsTop, value.Float())
+			return convertRec(ctx, nilIsTop, value.Float())
 
 		case reflect.Ptr:
 			if value.IsNil() {
 				if nilIsTop {
-					ident, _ := src.(*ast.Ident)
+					ident, _ := ctx.Source().(*ast.Ident)
 					return &adt.Top{Src: ident}
 				}
-				return &adt.Null{Src: src}
+				return &adt.Null{Src: ctx.Source()}
 			}
-			return c.convertRec(nilIsTop, value.Elem().Interface())
+			return convertRec(ctx, nilIsTop, value.Elem().Interface())
 
 		case reflect.Struct:
-			sl := &adt.StructLit{Src: c.setNextPos(ast.NewStruct())}
+			obj := &adt.StructLit{Src: src}
 			v := &adt.Vertex{}
+			env := ctx.Env(0)
+			if env == nil {
+				env = &adt.Environment{}
+			}
+			// There is no closedness or cycle info for Go structs, so we
+			// pass an empty CloseInfo.
+			v.AddStruct(obj, env, adt.CloseInfo{})
+			v.SetValue(ctx, &adt.StructMarker{})
 
 			t := value.Type()
 			for i := 0; i < value.NumField(); i++ {
@@ -434,7 +423,7 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 				if isOmitEmpty(&sf) && val.IsZero() {
 					continue
 				}
-				sub := c.convertRec(nilIsTop, val.Interface())
+				sub := convertRec(ctx, nilIsTop, val.Interface())
 				if sub == nil {
 					// mimic behavior of encoding/json: skip fields of unsupported types
 					continue
@@ -457,32 +446,32 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 					continue
 				}
 
-				f := c.ctx.StringLabel(name)
-				c.createField(f, sub, sl)
-				v.Arcs = append(v.Arcs, c.ensureArcVertex(sub, f))
+				f := ctx.StringLabel(name)
+				obj.Decls = append(obj.Decls, &adt.Field{Label: f, Value: sub})
+				arc, ok := sub.(*adt.Vertex)
+				if ok {
+					a := *arc
+					arc = &a
+					arc.Label = f
+				} else {
+					arc = &adt.Vertex{Label: f, BaseValue: sub}
+					arc.ForceDone()
+					arc.AddConjunct(adt.MakeRootConjunct(nil, sub))
+				}
+				v.Arcs = append(v.Arcs, arc)
 			}
-
-			env := c.ctx.Env(0)
-			if env == nil {
-				env = &adt.Environment{}
-			}
-			// There is no closedness or cycle info for Go structs, so we
-			// pass an empty CloseInfo.
-			v.AddStruct(sl, env, adt.CloseInfo{})
-			v.SetValue(c.ctx, &adt.StructMarker{})
-			v.ForceDone()
 
 			return v
 
 		case reflect.Map:
-			obj := &adt.StructLit{Src: c.setNextPos(ast.NewStruct())}
-			v := &adt.Vertex{}
+			v := &adt.Vertex{BaseValue: &adt.StructMarker{}}
+			v.SetValue(ctx, &adt.StructMarker{})
 
 			t := value.Type()
 			switch key := t.Key(); key.Kind() {
 			default:
 				if !key.Implements(textMarshaler) {
-					return c.ctx.AddErrf("unsupported Go type for map key (%v)", key)
+					return ctx.AddErrf("unsupported Go type for map key (%v)", key)
 				}
 				fallthrough
 			case reflect.String,
@@ -499,129 +488,80 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 					// 	continue
 					// }
 
-					sub := c.convertRec(nilIsTop, val.Interface())
+					sub := convertRec(ctx, nilIsTop, val.Interface())
 					// mimic behavior of encoding/json: report error of
 					// unsupported type.
 					if sub == nil {
-						return c.ctx.AddErrf("unsupported Go type (%T)", val.Interface())
+						return ctx.AddErrf("unsupported Go type (%T)", val.Interface())
 					}
 					if isBottom(sub) {
 						return sub
 					}
 
 					s := fmt.Sprint(k)
-					f := c.ctx.StringLabel(s)
-					v.Arcs = append(v.Arcs, c.ensureArcVertex(sub, f))
+					f := ctx.StringLabel(s)
+					arc, ok := sub.(*adt.Vertex)
+					if ok {
+						a := *arc
+						arc = &a
+						arc.Label = f
+					} else {
+						arc = &adt.Vertex{Label: f, BaseValue: sub}
+						arc.ForceDone()
+						arc.AddConjunct(adt.MakeRootConjunct(nil, sub))
+					}
+					v.Arcs = append(v.Arcs, arc)
 				}
 				slices.SortFunc(v.Arcs, func(a, b *adt.Vertex) int {
-					return strings.Compare(a.Label.IdentString(c.ctx), b.Label.IdentString(c.ctx))
+					return strings.Compare(a.Label.IdentString(ctx), b.Label.IdentString(ctx))
 				})
-				// Create all the adt/ast fields after sorting the arcs
-				for _, arc := range v.Arcs {
-					c.createField(arc.Label, arc, obj)
-				}
 			}
-
-			env := c.ctx.Env(0)
-			if env == nil {
-				env = &adt.Environment{}
-			}
-			v.AddStruct(obj, env, adt.CloseInfo{})
-			v.SetValue(c.ctx, &adt.StructMarker{})
-			v.ForceDone()
 
 			return v
 
 		case reflect.Slice, reflect.Array:
-			list := &adt.ListLit{Src: ast.NewList()}
-			c.setNextPos(list.Src)
-
-			v := &adt.Vertex{}
+			var values []adt.Value
 
 			for i := 0; i < value.Len(); i++ {
 				val := value.Index(i)
-				x := c.convertRec(nilIsTop, val.Interface())
+				x := convertRec(ctx, nilIsTop, val.Interface())
 				if x == nil {
-					return c.ctx.AddErrf("unsupported Go type (%T)",
+					return ctx.AddErrf("unsupported Go type (%T)",
 						val.Interface())
 				}
 				if isBottom(x) {
 					return x
 				}
-				list.Elems = append(list.Elems, x)
-				f := adt.MakeIntLabel(adt.IntLabel, int64(i))
-				v.Arcs = append(v.Arcs, c.ensureArcVertex(x, f))
+				values = append(values, x)
 			}
 
-			env := c.ctx.Env(0)
-			if env == nil {
-				env = &adt.Environment{}
-			}
-			v.AddConjunct(adt.MakeRootConjunct(env, list))
-			v.SetValue(c.ctx, &adt.ListMarker{})
-			v.ForceDone()
-
-			return v
+			return ctx.NewList(values...)
 		}
 	}
 	return nil
 }
 
-func (c *goConverter) ensureArcVertex(x adt.Value, l adt.Feature) *adt.Vertex {
-	env := c.ctx.Env(0)
-	if env == nil {
-		env = &adt.Environment{}
-	}
-	arc, ok := x.(*adt.Vertex)
-	if ok {
-		a := *arc
-		arc = &a
-		arc.Label = l
-	} else {
-		arc = &adt.Vertex{Label: l}
-		arc.AddConjunct(adt.MakeRootConjunct(env, x))
-		arc.SetValue(c.ctx, x)
-		arc.ForceDone()
-	}
-	return arc
-}
-
-func (c *goConverter) createField(l adt.Feature, sub adt.Value, sl *adt.StructLit) {
-	src := sl.Src.(*ast.StructLit)
-	astField := &ast.Field{
-		Label:      ast.NewIdent(l.IdentString(c.ctx)),
-		Constraint: token.ILLEGAL,
-	}
-	if expr, ok := sub.Source().(ast.Expr); ok {
-		astField.Value = expr
-	}
-	c.setNextPos(astField.Label)
-	src.Elts = append(src.Elts, astField)
-	field := &adt.Field{Label: l, Value: sub, Src: astField}
-	sl.Decls = append(sl.Decls, field)
-}
-
-func (c *goConverter) toInt(x int64) adt.Value {
-	n := &adt.Num{Src: c.ctx.Source(), K: adt.IntKind}
+func toInt(ctx *adt.OpContext, x int64) adt.Value {
+	n := &adt.Num{Src: ctx.Source(), K: adt.IntKind}
 	n.X = *apd.New(x, 0)
 	return n
 }
 
-func (c *goConverter) toUint(x uint64) adt.Value {
-	n := &adt.Num{Src: c.ctx.Source(), K: adt.IntKind}
+func toUint(ctx *adt.OpContext, x uint64) adt.Value {
+	n := &adt.Num{Src: ctx.Source(), K: adt.IntKind}
 	n.X.Coeff.SetUint64(x)
 	return n
 }
 
-func (c *goConverter) convertGoType(t reflect.Type) adt.Expr {
+func convertGoType(ctx *adt.OpContext, t reflect.Type) adt.Expr {
 	// TODO: this can be much more efficient.
 	// TODO: synchronize
-	return c.goTypeToValue(true, t)
+	return goTypeToValue(ctx, true, t)
 }
 
 var (
-	jsonMarshaler = reflect.TypeFor[json.Marshaler]()
-	textMarshaler = reflect.TypeFor[encoding.TextMarshaler]()
+	jsonMarshaler = reflect.TypeOf(new(json.Marshaler)).Elem()
+	textMarshaler = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
 	topSentinel   = ast.NewIdent("_")
 )
 
@@ -629,20 +569,20 @@ var (
 //
 // TODO: if this value will always be unified with a concrete type in Go, then
 // many of the fields may be omitted.
-func (c *goConverter) goTypeToValue(allowNullDefault bool, t reflect.Type) adt.Expr {
-	if _, t, ok := c.ctx.LoadType(t); ok {
+func goTypeToValue(ctx *adt.OpContext, allowNullDefault bool, t reflect.Type) adt.Expr {
+	if _, t, ok := ctx.LoadType(t); ok {
 		return t
 	}
 
-	_, v := c.goTypeToValueRec(allowNullDefault, t)
+	_, v := goTypeToValueRec(ctx, allowNullDefault, t)
 	if v == nil {
-		return c.ctx.AddErrf("unsupported Go type (%v)", t)
+		return ctx.AddErrf("unsupported Go type (%v)", t)
 	}
 	return v
 }
 
-func (c *goConverter) goTypeToValueRec(allowNullDefault bool, t reflect.Type) (e ast.Expr, expr adt.Expr) {
-	if src, t, ok := c.ctx.LoadType(t); ok {
+func goTypeToValueRec(ctx *adt.OpContext, allowNullDefault bool, t reflect.Type) (e ast.Expr, expr adt.Expr) {
+	if src, t, ok := ctx.LoadType(t); ok {
 		return src, t
 	}
 
@@ -675,7 +615,7 @@ func (c *goConverter) goTypeToValueRec(allowNullDefault bool, t reflect.Type) (e
 		for elem.Kind() == reflect.Ptr {
 			elem = elem.Elem()
 		}
-		e, _ = c.goTypeToValueRec(false, elem)
+		e, _ = goTypeToValueRec(ctx, false, elem)
 		if allowNullDefault {
 			e = wrapOrNull(e)
 		}
@@ -714,7 +654,7 @@ func (c *goConverter) goTypeToValueRec(allowNullDefault bool, t reflect.Type) (e
 		// TODO: dirty trick: set this to a temporary Vertex and then update the
 		// arcs and conjuncts of this vertex below. This will allow circular
 		// references. Maybe have a special kind of "hardlink" reference.
-		c.ctx.StoreType(t, obj, nil)
+		ctx.StoreType(t, obj, nil)
 
 		for i := 0; i < t.NumField(); i++ {
 			f := t.Field(i)
@@ -722,7 +662,7 @@ func (c *goConverter) goTypeToValueRec(allowNullDefault bool, t reflect.Type) (e
 				continue
 			}
 			_, ok := f.Tag.Lookup("cue")
-			elem, _ := c.goTypeToValueRec(!ok, f.Type)
+			elem, _ := goTypeToValueRec(ctx, !ok, f.Type)
 			if isBad(elem) {
 				continue // Ignore fields for unsupported types
 			}
@@ -735,7 +675,7 @@ func (c *goConverter) goTypeToValueRec(allowNullDefault bool, t reflect.Type) (e
 			}
 
 			if tag, ok := f.Tag.Lookup("cue"); ok {
-				v := parseTag(c.ctx, name, tag)
+				v := parseTag(ctx, obj, name, tag)
 				if isBad(v) {
 					return v, nil
 				}
@@ -747,7 +687,6 @@ func (c *goConverter) goTypeToValueRec(allowNullDefault bool, t reflect.Type) (e
 
 			// The GO JSON decoder always allows a value to be undefined.
 			d := &ast.Field{Label: ast.NewIdent(name), Value: elem}
-			c.setNextPos(d)
 			if isOptional(&f) {
 				internal.SetConstraint(d, token.OPTION)
 			}
@@ -763,20 +702,16 @@ func (c *goConverter) goTypeToValueRec(allowNullDefault bool, t reflect.Type) (e
 		if t.Elem().Kind() == reflect.Uint8 {
 			e = ast.NewIdent("__bytes")
 		} else {
-			elem, _ := c.goTypeToValueRec(allowNullDefault, t.Elem())
+			elem, _ := goTypeToValueRec(ctx, allowNullDefault, t.Elem())
 			if elem == nil {
-				b := c.ctx.AddErrf("unsupported Go type (%v)", t.Elem())
+				b := ctx.AddErrf("unsupported Go type (%v)", t.Elem())
 				return &ast.BadExpr{}, b
 			}
 
 			if t.Kind() == reflect.Array {
-				e = ast.NewCall(
-					ast.NewSel(&ast.Ident{
-						Name: "list",
-						Node: ast.NewImport(nil, "list")},
-						"Repeat"),
-					ast.NewList(elem),
-					ast.NewLit(token.INT, strconv.Itoa(t.Len())))
+				e = ast.NewBinExpr(token.MUL,
+					ast.NewLit(token.INT, strconv.Itoa(t.Len())),
+					ast.NewList(elem))
 			} else {
 				e = ast.NewList(&ast.Ellipsis{Type: elem})
 			}
@@ -791,13 +726,13 @@ func (c *goConverter) goTypeToValueRec(allowNullDefault bool, t reflect.Type) (e
 			reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8,
 			reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		default:
-			b := c.ctx.AddErrf("unsupported Go type for map key (%v)", key)
+			b := ctx.AddErrf("unsupported Go type for map key (%v)", key)
 			return &ast.BadExpr{}, b
 		}
 
-		v, x := c.goTypeToValueRec(allowNullDefault, t.Elem())
+		v, x := goTypeToValueRec(ctx, allowNullDefault, t.Elem())
 		if v == nil {
-			b := c.ctx.AddErrf("unsupported Go type (%v)", t.Elem())
+			b := ctx.AddErrf("unsupported Go type (%v)", t.Elem())
 			return &ast.BadExpr{}, b
 		}
 		if isBad(v) {
@@ -815,21 +750,20 @@ func (c *goConverter) goTypeToValueRec(allowNullDefault bool, t reflect.Type) (e
 store:
 	// TODO: store error if not nil?
 	if e != nil {
-		c.setNextPos(e)
 		f := &ast.File{Decls: []ast.Decl{&ast.EmbedDecl{Expr: e}}}
 		astutil.Resolve(f, func(_ token.Pos, msg string, args ...interface{}) {
-			c.ctx.AddErrf(msg, args...)
+			ctx.AddErrf(msg, args...)
 		})
 		var x adt.Expr
-		x2, err := compile.Expr(nil, c.ctx, pkgID(), e)
+		c, err := compile.Expr(nil, ctx, pkgID(), e)
 		if err != nil {
 			b := &adt.Bottom{Err: err}
-			c.ctx.AddBottom(b)
+			ctx.AddBottom(b)
 			x = b
 		} else {
-			x = x2.Expr()
+			x = c.Expr()
 		}
-		c.ctx.StoreType(t, e, x)
+		ctx.StoreType(t, e, x)
 		return e, x
 	}
 	return e, nil

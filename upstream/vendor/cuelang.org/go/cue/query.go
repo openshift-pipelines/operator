@@ -35,10 +35,6 @@ func getScopePrefix(v Value, p Path) Value {
 }
 
 // LookupPath reports the value for path p relative to v.
-//
-// Use [AnyString] and [AnyIndex] to find the value of undefined element types
-// for structs and lists respectively, for example for the patterns in
-// `{[string]: int}` and `[...string]`.
 func (v Value) LookupPath(p Path) Value {
 	if v.v == nil {
 		return Value{}
@@ -50,8 +46,7 @@ func (v Value) LookupPath(p Path) Value {
 outer:
 	for _, sel := range p.path {
 		f := sel.sel.feature(v.idx)
-		deref := n.DerefValue()
-		for _, a := range deref.Arcs {
+		for _, a := range n.Arcs {
 			if a.Label == f {
 				if a.IsConstraint() && !sel.sel.isConstraint() {
 					break
@@ -67,7 +62,7 @@ outer:
 				Label:  sel.sel.feature(ctx),
 			}
 			n.MatchAndInsert(ctx, x)
-			if x.HasConjuncts() {
+			if len(x.Conjuncts) > 0 {
 				x.Finalize(ctx)
 				parent = linkParent(parent, n, x)
 				n = x
@@ -79,7 +74,7 @@ outer:
 		if err, ok := sel.sel.(pathError); ok {
 			x = &adt.Bottom{Err: err.Error}
 		} else {
-			x = mkErr(n, adt.EvalError, "field not found: %v", sel.sel)
+			x = mkErr(v.idx, n, adt.EvalError, "field not found: %v", sel.sel)
 			if n.Accept(ctx, f) {
 				x.Code = adt.IncompleteError
 			}
