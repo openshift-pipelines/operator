@@ -5,9 +5,9 @@
 package compiler
 
 import (
-	"github.com/open-policy-agent/opa/v1/ast"
-	"github.com/open-policy-agent/opa/v1/schemas"
-	"github.com/open-policy-agent/opa/v1/util"
+	"github.com/open-policy-agent/opa/ast"
+	"github.com/open-policy-agent/opa/schemas"
+	"github.com/open-policy-agent/opa/util"
 )
 
 type SchemaFile string
@@ -32,10 +32,7 @@ func VerifyAuthorizationPolicySchema(compiler *ast.Compiler, ref ast.Ref) error 
 	schemaSet := ast.NewSchemaSet()
 	schemaSet.Put(ast.SchemaRootRef, schemaDefinitions[AuthorizationPolicySchema])
 
-	errs := ast.NewCompiler().
-		WithDefaultRegoVersion(compiler.DefaultRegoVersion()).
-		WithSchemas(schemaSet).
-		PassesTypeCheckRules(rules)
+	errs := ast.NewCompiler().WithSchemas(schemaSet).PassesTypeCheckRules(rules)
 
 	if len(errs) > 0 {
 		return errs

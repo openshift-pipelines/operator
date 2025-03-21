@@ -35,9 +35,7 @@ import (
 
 var ErrValidation = errors.New("validation error")
 var ErrUnsupportedMediaType = fmt.Errorf("%w: unsupported media type", ErrValidation)
-var ErrEmptyBundle = fmt.Errorf("%w: empty protobuf bundle", ErrValidation)
 var ErrMissingVerificationMaterial = fmt.Errorf("%w: missing verification material", ErrValidation)
-var ErrMissingBundleContent = fmt.Errorf("%w: missing bundle content", ErrValidation)
 var ErrUnimplemented = errors.New("unimplemented")
 var ErrInvalidAttestation = fmt.Errorf("%w: invalid attestation", ErrValidation)
 var ErrMissingEnvelope = fmt.Errorf("%w: missing valid envelope", ErrInvalidAttestation)
@@ -174,11 +172,11 @@ func getBundleVersion(mediaType string) (string, error) {
 
 func validateBundle(b *protobundle.Bundle) error {
 	if b == nil {
-		return ErrEmptyBundle
+		return fmt.Errorf("empty protobuf bundle")
 	}
 
 	if b.Content == nil {
-		return ErrMissingBundleContent
+		return fmt.Errorf("missing bundle content")
 	}
 
 	switch b.Content.(type) {
@@ -187,8 +185,12 @@ func validateBundle(b *protobundle.Bundle) error {
 		return fmt.Errorf("invalid bundle content: bundle content must be either a message signature or dsse envelope")
 	}
 
-	if b.VerificationMaterial == nil || b.VerificationMaterial.Content == nil {
-		return ErrMissingVerificationMaterial
+	if b.VerificationMaterial == nil {
+		return fmt.Errorf("missing verification material")
+	}
+
+	if b.VerificationMaterial.Content == nil {
+		return fmt.Errorf("missing verification material content")
 	}
 
 	switch b.VerificationMaterial.Content.(type) {
@@ -255,7 +257,7 @@ func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 			return nil, ErrValidationError(err)
 		}
 		cert := &Certificate{
-			certificate: parsedCert,
+			Certificate: parsedCert,
 		}
 		return cert, nil
 	case *protobundle.VerificationMaterial_Certificate:
@@ -267,7 +269,7 @@ func (b *Bundle) VerificationContent() (verify.VerificationContent, error) {
 			return nil, ErrValidationError(err)
 		}
 		cert := &Certificate{
-			certificate: parsedCert,
+			Certificate: parsedCert,
 		}
 		return cert, nil
 	case *protobundle.VerificationMaterial_PublicKey:

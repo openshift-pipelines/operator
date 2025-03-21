@@ -17,10 +17,8 @@ package verify
 import (
 	"crypto/x509"
 	"encoding/hex"
-	"errors"
 	"fmt"
 
-	ct "github.com/google/certificate-transparency-go"
 	"github.com/google/certificate-transparency-go/ctutil"
 	ctx509 "github.com/google/certificate-transparency-go/x509"
 	"github.com/google/certificate-transparency-go/x509util"
@@ -31,21 +29,16 @@ import (
 // leaf certificate, will extract SCTs from the leaf certificate and verify the
 // timestamps using the TrustedMaterial's FulcioCertificateAuthorities() and
 // CTLogs()
-func VerifySignedCertificateTimestamp(chains [][]*x509.Certificate, threshold int, trustedMaterial root.TrustedMaterial) error { // nolint: revive
-	if len(chains) == 0 || len(chains[0]) == 0 || chains[0][0] == nil {
-		return errors.New("no chains provided")
-	}
-	// The first certificate in the chain is always the leaf certificate
-	leaf := chains[0][0]
-
+func VerifySignedCertificateTimestamp(leafCert *x509.Certificate, threshold int, trustedMaterial root.TrustedMaterial) error { // nolint: revive
 	ctlogs := trustedMaterial.CTLogs()
+	fulcioCerts := trustedMaterial.FulcioCertificateAuthorities()
 
-	scts, err := x509util.ParseSCTsFromCertificate(leaf.Raw)
+	scts, err := x509util.ParseSCTsFromCertificate(leafCert.Raw)
 	if err != nil {
 		return err
 	}
 
-	leafCTCert, err := ctx509.ParseCertificates(leaf.Raw)
+	leafCTCert, err := ctx509.ParseCertificates(leafCert.Raw)
 	if err != nil {
 		return err
 	}
@@ -59,25 +52,17 @@ func VerifySignedCertificateTimestamp(chains [][]*x509.Certificate, threshold in
 			continue
 		}
 
-		// Ensure sct is within ctlog validity window
-		sctTime := ct.TimestampToTime(sct.Timestamp)
-		if !key.ValidityPeriodStart.IsZero() && sctTime.Before(key.ValidityPeriodStart) {
-			// skip entries that were before ctlog key start time
-			continue
-		}
-		if !key.ValidityPeriodEnd.IsZero() && sctTime.After(key.ValidityPeriodEnd) {
-			// skip entries that were after ctlog key end time
-			continue
-		}
-
-		for _, chain := range chains {
+		for _, fulcioCa := range fulcioCerts {
 			fulcioChain := make([]*ctx509.Certificate, len(leafCTCert))
 			copy(fulcioChain, leafCTCert)
 
-			if len(chain) < 2 {
-				continue
+			var parentCert []byte
+
+			if len(fulcioCa.Intermediates) == 0 {
+				parentCert = fulcioCa.Root.Raw
+			} else {
+				parentCert = fulcioCa.Intermediates[0].Raw
 			}
-			parentCert := chain[1].Raw
 
 			fulcioIssuer, err := ctx509.ParseCertificates(parentCert)
 			if err != nil {

@@ -21,7 +21,6 @@ import (
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/ast/astutil"
 	"cuelang.org/go/cue/errors"
-	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/eval"
@@ -184,14 +183,11 @@ func (p *Profile) Expr(r adt.Runtime, pkgID string, n adt.Expr) (ast.Expr, error
 }
 
 func (e *exporter) toFile(v *adt.Vertex, x ast.Expr) *ast.File {
-	fout := &ast.File{}
+	f := &ast.File{}
 
 	if e.cfg.AddPackage {
 		pkgName := ""
-		pkg := &ast.Package{
-			// prevent the file comment from attaching to pkg when there is no pkg comment
-			PackagePos: token.NoPos.WithRel(token.NewSection),
-		}
+		pkg := &ast.Package{}
 		v.VisitLeafConjuncts(func(c adt.Conjunct) bool {
 			f, _ := c.Source().(*ast.File)
 			if f == nil {
@@ -203,15 +199,8 @@ func (e *exporter) toFile(v *adt.Vertex, x ast.Expr) *ast.File {
 			}
 
 			if e.cfg.ShowDocs {
-				pkgComments, fileComments := internal.FileComments(f)
-
-				for _, c := range pkgComments {
-					// add a newline between previous file comment and the pkg comments
-					c.List[0].Slash = c.List[0].Slash.WithRel(token.NewSection)
-					ast.AddComment(pkg, c)
-				}
-				for _, c := range fileComments {
-					ast.AddComment(fout, c)
+				if doc := internal.FileComment(f); doc != nil {
+					ast.AddComment(pkg, doc)
 				}
 			}
 			return true
@@ -219,13 +208,7 @@ func (e *exporter) toFile(v *adt.Vertex, x ast.Expr) *ast.File {
 
 		if pkgName != "" {
 			pkg.Name = ast.NewIdent(pkgName)
-			fout.Decls = append(fout.Decls, pkg)
-			ast.SetComments(pkg, internal.MergeDocs(pkg.Comments()))
-		} else {
-			for _, c := range fout.Comments() {
-				ast.AddComment(pkg, c)
-			}
-			ast.SetComments(fout, internal.MergeDocs(pkg.Comments()))
+			f.Decls = append(f.Decls, pkg)
 		}
 	}
 
@@ -234,13 +217,13 @@ func (e *exporter) toFile(v *adt.Vertex, x ast.Expr) *ast.File {
 		panic("null input")
 
 	case *ast.StructLit:
-		fout.Decls = append(fout.Decls, st.Elts...)
+		f.Decls = append(f.Decls, st.Elts...)
 
 	default:
-		fout.Decls = append(fout.Decls, &ast.EmbedDecl{Expr: x})
+		f.Decls = append(f.Decls, &ast.EmbedDecl{Expr: x})
 	}
 
-	return fout
+	return f
 }
 
 // Vertex exports evaluated values (data mode).

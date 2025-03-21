@@ -15,13 +15,8 @@
 package pkg
 
 import (
-	"cuelang.org/go/cue"
 	"cuelang.org/go/internal/core/adt"
 )
-
-// A Schema represents an arbitrary cue.Value that can hold non-concrete values.
-// By default function arguments are checked to be concrete.
-type Schema = cue.Value
 
 // List represents a CUE list, which can be open or closed.
 type List struct {
@@ -62,7 +57,7 @@ func (s *Struct) Len() int {
 	return count
 }
 
-// IsOpen reports whether s is open or has pattern constraints.
+// IsOpen reports whether s allows more fields than are currently defined.
 func (s *Struct) IsOpen() bool {
 	if !s.node.IsClosedStruct() {
 		return true
@@ -74,19 +69,10 @@ func (s *Struct) IsOpen() bool {
 	}
 	// The equivalent code for the old implementation.
 	ot := s.node.OptionalTypes()
-	return ot&^adt.HasDynamic != 0
-}
-
-// NumConstraintFields reports the number of explicit optional and required
-// fields, excluding pattern constraints.
-func (s Struct) NumConstraintFields() (count int) {
-	// If we have any optional arcs, we allow more fields.
-	for _, a := range s.node.Arcs {
-		if a.ArcType != adt.ArcMember && a.Label.IsRegular() {
-			count++
-		}
+	if ot&^adt.HasDynamic != 0 {
+		return true
 	}
-	return count
+	return false
 }
 
 // A ValidationError indicates an error that is only valid if a builtin is used

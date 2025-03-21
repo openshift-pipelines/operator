@@ -38,7 +38,6 @@ func filterAndTransform(extension common.Extension) client.FilterAndTransform {
 			mf.InjectOwner(hubCR),
 			mf.InjectNamespace(hubCR.Spec.GetTargetNamespace()),
 			common.DeploymentImages(images),
-			common.DeploymentEnvVarKubernetesMinVersion(),
 			common.JobImages(images),
 			updateApiConfigMap(hubCR, apiConfigMapName),
 			addConfigMapKeyValue(uiConfigMapName, "API_URL", hubCR.Status.ApiRouteUrl),

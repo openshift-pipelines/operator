@@ -15,9 +15,8 @@
 package export
 
 import (
-	"cmp"
 	"fmt"
-	"slices"
+	"sort"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/token"
@@ -74,7 +73,7 @@ func (e *exporter) expr(env *adt.Environment, v adt.Elem) (result ast.Expr) {
 		return nil
 
 	case *adt.Vertex:
-		if x.IsData() {
+		if len(x.Conjuncts) == 0 || x.IsData() {
 			// Treat as literal value.
 			return e.value(x)
 		} // Should this be the arcs label?
@@ -170,9 +169,9 @@ func (x *exporter) mergeValues(label adt.Feature, src *adt.Vertex, a []conjunct,
 	}
 
 	// Unify values only for one level.
-	if e.values.HasConjuncts() {
+	if a := e.values.Conjuncts; len(a) > 0 {
 		e.values.Finalize(e.ctx)
-		e.embed = append(e.embed, e.value(e.values, e.values.Conjuncts...))
+		e.embed = append(e.embed, e.value(e.values, a...))
 	}
 
 	// Collect and order set of fields.
@@ -185,20 +184,21 @@ func (x *exporter) mergeValues(label adt.Feature, src *adt.Vertex, a []conjunct,
 	// Sort fields in case features lists are missing to ensure
 	// predictability. Also sort in reverse order, so that bugs
 	// are more likely exposed.
-	slices.SortFunc(fields, func(f1, f2 adt.Feature) int {
-		return -cmp.Compare(f1, f2)
+	sort.Slice(fields, func(i, j int) bool {
+		return fields[i] > fields[j]
 	})
 
-	m := sortArcs(extractFeatures(e.structs))
-	slices.SortStableFunc(fields, func(f1, f2 adt.Feature) int {
-		if m[f2] == 0 {
-			if m[f1] == 0 {
-				return +1
+	if adt.DebugSort == 0 {
+		m := sortArcs(extractFeatures(e.structs))
+		sort.SliceStable(fields, func(i, j int) bool {
+			if m[fields[j]] == 0 {
+				return m[fields[i]] != 0
 			}
-			return -1
-		}
-		return -cmp.Compare(m[f1], m[f2])
-	})
+			return m[fields[i]] > m[fields[j]]
+		})
+	} else {
+		adt.DebugSortFields(e.ctx, fields)
+	}
 
 	if len(e.fields) == 0 && !e.hasEllipsis {
 		switch len(e.embed) + len(e.conjuncts) {
@@ -297,12 +297,7 @@ func (x *exporter) mergeValues(label adt.Feature, src *adt.Vertex, a []conjunct,
 
 func (e *conjuncts) wrapCloseIfNecessary(s *ast.StructLit, v *adt.Vertex) ast.Expr {
 	if !e.hasEllipsis && v != nil {
-		if v.ClosedNonRecursive {
-			// Eval V3 logic
-			return ast.NewCall(ast.NewIdent("close"), s)
-		}
 		if st, ok := v.BaseValue.(*adt.StructMarker); ok && st.NeedClose {
-			// Eval V2 logic
 			return ast.NewCall(ast.NewIdent("close"), s)
 		}
 	}

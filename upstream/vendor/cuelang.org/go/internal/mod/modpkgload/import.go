@@ -249,20 +249,7 @@ func isDirWithCUEFiles(loc module.SourceLoc) (bool, error) {
 		return false, err
 	}
 	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".cue") {
-			continue
-		}
-		ftype := e.Type()
-		// If the directory entry is a symlink, stat it to obtain the info for the
-		// link target instead of the link itself.
-		if ftype&fs.ModeSymlink != 0 {
-			info, err := fs.Stat(loc.FS, filepath.Join(loc.Dir, e.Name()))
-			if err != nil {
-				continue // Ignore broken symlinks.
-			}
-			ftype = info.Mode()
-		}
-		if ftype.IsRegular() {
+		if strings.HasSuffix(e.Name(), ".cue") && e.Type().IsRegular() {
 			return true, nil
 		}
 	}

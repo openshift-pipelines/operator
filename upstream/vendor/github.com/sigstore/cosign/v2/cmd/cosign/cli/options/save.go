@@ -32,6 +32,6 @@ func (o *SaveOptions) AddFlags(cmd *cobra.Command) {
 	o.Registry.AddFlags(cmd)
 	cmd.Flags().StringVar(&o.Directory, "dir", "",
 		"path to dir where the signed image should be stored on disk")
-	_ = cmd.MarkFlagDirname("dir")
+	_ = cmd.Flags().SetAnnotation("dir", cobra.BashCompSubdirsInDir, []string{})
 	_ = cmd.MarkFlagRequired("dir")
 }

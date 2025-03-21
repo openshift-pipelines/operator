@@ -24,11 +24,7 @@ const (
 	// CheckStructural indicates that closedness information should be
 	// considered for equality. Equal may return false even when values are
 	// equal.
-	CheckStructural
-
-	// RegularOnly indicates that only regular fields should be considered,
-	// thus excluding hidden and definition fields.
-	RegularOnly
+	CheckStructural Flag = 1 << iota
 )
 
 func Equal(ctx *OpContext, v, w Value, flags Flag) bool {
@@ -91,11 +87,9 @@ func equalVertex(ctx *OpContext, x *Vertex, v Value, flags Flag) bool {
 		}
 	}
 
-	skipRegular := flags&RegularOnly != 0
-
 loop1:
 	for _, a := range x.Arcs {
-		if (skipRegular && !a.Label.IsRegular()) || a.ArcType > maxArcType {
+		if a.ArcType > maxArcType {
 			continue
 		}
 		for _, b := range y.Arcs {
@@ -111,7 +105,7 @@ loop1:
 
 loop2:
 	for _, b := range y.Arcs {
-		if (skipRegular && !b.Label.IsRegular()) || b.ArcType > maxArcType {
+		if b.ArcType > maxArcType {
 			continue
 		}
 		for _, a := range x.Arcs {

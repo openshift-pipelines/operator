@@ -15,7 +15,6 @@
 package token
 
 import (
-	"cmp"
 	"fmt"
 	"sort"
 	"sync"
@@ -75,10 +74,6 @@ func (p Pos) File() *File {
 	return p.file
 }
 
-// TODO(mvdan): The methods below don't need to build an entire Position
-// just to access some of the information. This could matter particularly for
-// Compare, as it is called many times when sorting by position.
-
 func (p Pos) Line() int {
 	if p.file == nil {
 		return 0
@@ -111,62 +106,44 @@ func (p Pos) String() string {
 	return p.Position().String()
 }
 
-// Compare returns an integer comparing two positions. The result will be 0 if p == p2,
-// -1 if p < p2, and +1 if p > p2. Note that [NoPos] is always larger than any valid position.
-func (p Pos) Compare(p2 Pos) int {
-	if p == p2 {
-		return 0
-	} else if p == NoPos {
-		return +1
-	} else if p2 == NoPos {
-		return -1
-	}
-	pos, pos2 := p.Position(), p2.Position()
-	if c := cmp.Compare(pos.Filename, pos2.Filename); c != 0 {
-		return c
-	}
-	// Note that CUE doesn't currently use any directives which alter
-	// position information, like Go's //line, so comparing by offset is enough.
-	return cmp.Compare(pos.Offset, pos2.Offset)
-
-}
-
-// NoPos is the zero value for [Pos]; there is no file and line information
-// associated with it, and [Pos.IsValid] is false.
-//
-// NoPos is always larger than any valid [Pos] value, as it tends to relate
-// to values produced from evaluating existing values with valid positions.
-// The corresponding [Position] value for NoPos is the zero value.
+// NoPos is the zero value for Pos; there is no file and line information
+// associated with it, and NoPos().IsValid() is false. NoPos is always
+// smaller than any other Pos value. The corresponding Position value
+// for NoPos is the zero value for Position.
 var NoPos = Pos{}
 
 // RelPos indicates the relative position of token to the previous token.
 type RelPos int
 
-//go:generate go run golang.org/x/tools/cmd/stringer -type=RelPos -linecomment
-
 const (
 	// NoRelPos indicates no relative position is specified.
-	NoRelPos RelPos = iota // invalid
+	NoRelPos RelPos = iota
 
 	// Elided indicates that the token for which this position is defined is
 	// not rendered at all.
-	Elided // elided
+	Elided
 
 	// NoSpace indicates there is no whitespace before this token.
-	NoSpace // nospace
+	NoSpace
 
 	// Blank means there is horizontal space before this token.
-	Blank // blank
+	Blank
 
 	// Newline means there is a single newline before this token.
-	Newline // newline
+	Newline
 
 	// NewSection means there are two or more newlines before this token.
-	NewSection // section
+	NewSection
 
 	relMask  = 0xf
 	relShift = 4
 )
+
+var relNames = []string{
+	"invalid", "elided", "nospace", "blank", "newline", "section",
+}
+
+func (p RelPos) String() string { return relNames[p] }
 
 func (p RelPos) Pos() Pos {
 	return Pos{nil, int(p)}

@@ -25,6 +25,7 @@ package format
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"text/tabwriter"
 
 	"cuelang.org/go/cue/ast"
@@ -79,8 +80,8 @@ func sortImportsOption() Option {
 
 // Node formats node in canonical cue fmt style and writes the result to dst.
 //
-// The node type must be [*ast.File], [][ast.Decl], [ast.Expr], [ast.Decl], or
-// [ast.Spec]. Node does not modify node. Imports are not sorted for nodes
+// The node type must be *ast.File, []syntax.Decl, syntax.Expr, syntax.Decl, or
+// syntax.Spec. Node does not modify node. Imports are not sorted for nodes
 // representing partial source files (for instance, if the node is not an
 // *ast.File).
 //
@@ -175,7 +176,7 @@ func (cfg *config) fprint(node interface{}) (out []byte, err error) {
 	return b, nil
 }
 
-// A formatter walks an [ast.Node], interspersed with comments and spacing
+// A formatter walks a syntax.Node, interspersed with comments and spacing
 // directives, in the order that they would occur in printed form.
 type formatter struct {
 	*printer
@@ -248,7 +249,7 @@ func (f *formatter) print(a ...interface{}) {
 	for _, x := range a {
 		f.Print(x)
 		switch x.(type) {
-		case string, token.Token: // , *ast.BasicLit, *ast.Ident:
+		case string, token.Token: // , *syntax.BasicLit, *syntax.Ident:
 			f.current.pos++
 		}
 	}
@@ -313,20 +314,27 @@ func (f *formatter) visitComments(until int8) {
 func (f *formatter) printComment(cg *ast.CommentGroup) {
 	f.Print(cg)
 
+	printBlank := false
 	if cg.Doc && len(f.output) > 0 {
 		f.Print(newline)
+		printBlank = true
 	}
 	for _, c := range cg.List {
-		if f.pos.Column > 1 {
-			// Vertically align inline comments.
-			f.Print(vtab)
+		isEnd := strings.HasPrefix(c.Text, "//")
+		if !printBlank {
+			if isEnd {
+				f.Print(vtab)
+			} else {
+				f.Print(blank)
+			}
 		}
 		f.Print(c.Slash)
 		f.Print(c)
-		f.printingComment = true
-		f.Print(newline)
-		if cg.Doc {
-			f.Print(nooverride)
+		if isEnd {
+			f.Print(newline)
+			if cg.Doc {
+				f.Print(nooverride)
+			}
 		}
 	}
 }

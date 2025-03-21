@@ -809,19 +809,19 @@ func readLimits(r io.Reader, l *module.Limit) error {
 		return err
 	}
 
-	minLim, err := leb128.ReadVarUint32(r)
+	min, err := leb128.ReadVarUint32(r)
 	if err != nil {
 		return err
 	}
 
-	l.Min = minLim
+	l.Min = min
 
 	if b == 1 {
-		maxLim, err := leb128.ReadVarUint32(r)
+		max, err := leb128.ReadVarUint32(r)
 		if err != nil {
 			return err
 		}
-		l.Max = &maxLim
+		l.Max = &max
 	} else if b != 0 {
 		return fmt.Errorf("illegal limit flag")
 	}
