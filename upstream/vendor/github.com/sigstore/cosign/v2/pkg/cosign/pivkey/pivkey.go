@@ -31,9 +31,10 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/go-piv/piv-go/v2/piv"
-	"github.com/sigstore/sigstore/pkg/signature"
+	"github.com/go-piv/piv-go/piv"
 	"golang.org/x/term"
+
+	"github.com/sigstore/sigstore/pkg/signature"
 )
 
 var (
@@ -112,7 +113,7 @@ func (k *Key) GetAttestationCertificate() (*x509.Certificate, error) {
 	return k.card.AttestationCertificate()
 }
 
-func (k *Key) SetManagementKey(old, new []byte) error {
+func (k *Key) SetManagementKey(old, new [24]byte) error {
 	if k.card == nil {
 		return KeyNotInitialized
 	}
@@ -152,7 +153,7 @@ func (k *Key) Unblock(puk, newPIN string) error {
 	return k.card.Unblock(puk, newPIN)
 }
 
-func (k *Key) GenerateKey(mgmtKey []byte, slot piv.Slot, opts piv.Key) (crypto.PublicKey, error) {
+func (k *Key) GenerateKey(mgmtKey [24]byte, slot piv.Slot, opts piv.Key) (crypto.PublicKey, error) {
 	if k.card == nil {
 		return nil, KeyNotInitialized
 	}

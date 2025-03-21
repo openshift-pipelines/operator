@@ -42,30 +42,44 @@ import (
 // control flow. No other aspects of an error may influence control flow.
 type ErrorCode int8
 
-//go:generate go run golang.org/x/tools/cmd/stringer -type=ErrorCode -linecomment
-
 const (
 	// An EvalError is a fatal evaluation error.
-	EvalError ErrorCode = iota // eval
+	EvalError ErrorCode = iota
 
 	// A UserError is a fatal error originating from the user.
-	UserError // user
+	UserError
 
 	// StructuralCycleError means a structural cycle was found. Structural
 	// cycles are permanent errors, but they are not passed up recursively,
 	// as a unification of a value with a structural cycle with one that
 	// doesn't may still give a useful result.
-	StructuralCycleError // structural cycle
+	StructuralCycleError
 
 	// IncompleteError means an evaluation could not complete because of
 	// insufficient information that may still be added later.
-	IncompleteError // incomplete
+	IncompleteError
 
 	// A CycleError indicates a reference error. It is considered to be
 	// an incomplete error, as reference errors may be broken by providing
 	// a concrete value.
-	CycleError // cycle
+	CycleError
 )
+
+func (c ErrorCode) String() string {
+	switch c {
+	case EvalError:
+		return "eval"
+	case UserError:
+		return "user"
+	case StructuralCycleError:
+		return "structural cycle"
+	case IncompleteError:
+		return "incomplete"
+	case CycleError:
+		return "cycle"
+	}
+	return "unknown"
+}
 
 // Bottom represents an error or bottom symbol.
 //
@@ -86,11 +100,6 @@ type Bottom struct {
 	ForCycle     bool // this is a for cycle
 	// Value holds the computed value so far in case
 	Value Value
-
-	// Node marks the node at which an error occurred. This is used to
-	// determine the package to which an error belongs.
-	// TODO: use a more precise mechanism for tracking the package.
-	Node *Vertex
 }
 
 func (x *Bottom) Source() ast.Node        { return x.Src }
@@ -136,8 +145,7 @@ func isIncomplete(v *Vertex) bool {
 //
 // If x is not already an error, the value is recorded in the error for
 // reference.
-func (n *nodeContext) AddChildError(recursive *Bottom) {
-	v := n.node
+func (v *Vertex) AddChildError(recursive *Bottom) {
 	v.ChildErrors = CombineErrors(nil, v.ChildErrors, recursive)
 	if recursive.IsIncomplete() {
 		return
@@ -145,14 +153,13 @@ func (n *nodeContext) AddChildError(recursive *Bottom) {
 	x := v.BaseValue
 	err, _ := x.(*Bottom)
 	if err == nil {
-		n.setBaseValue(&Bottom{
+		v.BaseValue = &Bottom{
 			Code:         recursive.Code,
 			Value:        v,
 			HasRecursive: true,
 			ChildError:   true,
 			Err:          recursive.Err,
-			Node:         n.node,
-		})
+		}
 		return
 	}
 
@@ -161,7 +168,7 @@ func (n *nodeContext) AddChildError(recursive *Bottom) {
 		err.Code = recursive.Code
 	}
 
-	n.setBaseValue(err)
+	v.BaseValue = err
 }
 
 // CombineErrors combines two errors that originate at the same Vertex.
@@ -169,22 +176,17 @@ func CombineErrors(src ast.Node, x, y Value) *Bottom {
 	a, _ := Unwrap(x).(*Bottom)
 	b, _ := Unwrap(y).(*Bottom)
 
+	if a == b && isCyclePlaceholder(a) {
+		return a
+	}
 	switch {
-	case a == nil && b == nil:
-		return nil
-	case a == nil:
+	case a != nil && b != nil:
+	case a != nil:
+		return a
+	case b != nil:
 		return b
-	case b == nil:
-		return a
-	case a == b && isCyclePlaceholder(a):
-		return a
-	case a == b:
-		// Don't return a (or b) because they may have other non-nil fields.
-		return &Bottom{
-			Src:  src,
-			Err:  a.Err,
-			Code: a.Code,
-		}
+	default:
+		return nil
 	}
 
 	if a.Code != b.Code {
@@ -223,20 +225,18 @@ func addPositions(err *ValueError, c Conjunct) {
 func NewRequiredNotPresentError(ctx *OpContext, v *Vertex) *Bottom {
 	saved := ctx.PushArc(v)
 	err := ctx.Newf("field is required but not present")
-	v.VisitLeafConjuncts(func(c Conjunct) bool {
+	for _, c := range v.Conjuncts {
 		if f, ok := c.x.(*Field); ok && f.ArcType == ArcRequired {
 			err.AddPosition(c.x)
 		}
 		if c.CloseInfo.closeInfo != nil {
 			err.AddPosition(c.CloseInfo.location)
 		}
-		return true
-	})
+	}
 
 	b := &Bottom{
 		Code: IncompleteError,
 		Err:  err,
-		Node: v,
 	}
 	ctx.PopArc(saved)
 	return b
@@ -245,10 +245,9 @@ func NewRequiredNotPresentError(ctx *OpContext, v *Vertex) *Bottom {
 func newRequiredFieldInComprehensionError(ctx *OpContext, x *ForClause, v *Vertex) *Bottom {
 	err := ctx.Newf("missing required field in for comprehension: %v", v.Label)
 	err.AddPosition(x.Src)
-	v.VisitLeafConjuncts(func(c Conjunct) bool {
+	for _, c := range v.Conjuncts {
 		addPositions(err, c)
-		return true
-	})
+	}
 	return &Bottom{
 		Code: IncompleteError,
 		Err:  err,
@@ -284,7 +283,6 @@ func (v *Vertex) reportFieldError(c *OpContext, pos token.Pos, f Feature, intMsg
 	b := &Bottom{
 		Code: code,
 		Err:  err,
-		Node: v,
 	}
 	// TODO: yield failure
 	c.AddBottom(b) // TODO: unify error mechanism.
@@ -351,10 +349,17 @@ func appendNodePositions(a []token.Pos, n Node) []token.Pos {
 		a = append(a, p)
 	}
 	if v, ok := n.(*Vertex); ok {
-		v.VisitLeafConjuncts(func(c Conjunct) bool {
-			a = appendNodePositions(a, c.Elem())
-			return true
-		})
+		for _, c := range v.Conjuncts {
+			switch x := c.x.(type) {
+			case *ConjunctGroup:
+				for _, c := range *x {
+					a = appendNodePositions(a, c.Elem())
+				}
+
+			default:
+				a = appendNodePositions(a, c.Elem())
+			}
+		}
 	}
 	return a
 }

@@ -16,7 +16,6 @@
 package json
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,7 +28,6 @@ import (
 	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
-	"cuelang.org/go/internal/source"
 )
 
 // Valid reports whether data is a valid JSON encoding.
@@ -62,8 +60,20 @@ func Extract(path string, data []byte) (ast.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	patchExpr(expr, nil)
+	patchExpr(expr)
 	return expr, nil
+}
+
+// Decode parses JSON-encoded data to a CUE value, using path for position
+// information.
+//
+// Deprecated: use Extract and build using cue.Context.BuildExpr.
+func Decode(r *cue.Runtime, path string, data []byte) (*cue.Instance, error) {
+	expr, err := extract(path, data)
+	if err != nil {
+		return nil, err
+	}
+	return r.CompileExpr(expr)
 }
 
 func extract(path string, b []byte) (ast.Expr, error) {
@@ -75,14 +85,6 @@ func extract(path string, b []byte) (ast.Expr, error) {
 		}
 		var x interface{}
 		err := json.Unmarshal(b, &x)
-
-		// If encoding/json has a position, prefer that, as it relates to json.Unmarshal's error message.
-		if synErr, ok := err.(*json.SyntaxError); ok && len(b) > 0 {
-			tokFile := token.NewFile(path, 0, len(b))
-			tokFile.SetLinesForContent(b)
-			p = tokFile.Pos(int(synErr.Offset-1), token.NoRelPos)
-		}
-
 		return nil, errors.Wrapf(err, p, "invalid JSON for file %q", path)
 	}
 	return expr, nil
@@ -92,41 +94,30 @@ func extract(path string, b []byte) (ast.Expr, error) {
 // information with each node. The runtime may be nil if the decoder
 // is only used to extract to CUE ast objects.
 //
-// The runtime argument is a historical remnant and unused.
+// The runtime may be nil if Decode isn't used.
 func NewDecoder(r *cue.Runtime, path string, src io.Reader) *Decoder {
-	b, err := source.ReadAll(path, src)
-	tokFile := token.NewFile(path, 0, len(b))
-	tokFile.SetLinesForContent(b)
 	return &Decoder{
-		path:       path,
-		dec:        json.NewDecoder(bytes.NewReader(b)),
-		tokFile:    tokFile,
-		readAllErr: err,
+		r:    r,
+		path: path,
+		dec:  json.NewDecoder(src),
 	}
 }
 
 // A Decoder converts JSON values to CUE.
 type Decoder struct {
+	r    *cue.Runtime
 	path string
 	dec  *json.Decoder
-
-	startOffset int
-	tokFile     *token.File
-	readAllErr  error
 }
 
 // Extract converts the current JSON value to a CUE ast. It returns io.EOF
 // if the input has been exhausted.
 func (d *Decoder) Extract() (ast.Expr, error) {
-	if d.readAllErr != nil {
-		return nil, d.readAllErr
-	}
-
 	expr, err := d.extract()
 	if err != nil {
 		return expr, err
 	}
-	patchExpr(expr, d.patchPos)
+	patchExpr(expr)
 	return expr, nil
 }
 
@@ -137,33 +128,34 @@ func (d *Decoder) extract() (ast.Expr, error) {
 		return nil, err
 	}
 	if err != nil {
-		pos := token.NoPos
-		// When decoding into a RawMessage, encoding/json should only error due to syntax errors.
-		if synErr, ok := err.(*json.SyntaxError); ok {
-			pos = d.tokFile.Pos(int(synErr.Offset-1), token.NoRelPos)
-		}
+		pos := token.NewFile(d.path, -1, len(raw)).Pos(0, 0)
 		return nil, errors.Wrapf(err, pos, "invalid JSON for file %q", d.path)
 	}
 	expr, err := parser.ParseExpr(d.path, []byte(raw))
+
 	if err != nil {
 		return nil, err
 	}
-
-	d.startOffset = int(d.dec.InputOffset()) - len(raw)
 	return expr, nil
 }
 
-func (d *Decoder) patchPos(n ast.Node) {
-	pos := n.Pos()
-	realPos := d.tokFile.Pos(pos.Offset()+d.startOffset, pos.RelPos())
-	ast.SetPos(n, realPos)
+// Decode converts the current JSON value to a CUE instance. It returns io.EOF
+// if the input has been exhausted.
+//
+// Deprecated: use Extract and build with cue.Context.BuildExpr.
+func (d *Decoder) Decode() (*cue.Instance, error) {
+	expr, err := d.Extract()
+	if err != nil {
+		return nil, err
+	}
+	return d.r.CompileExpr(expr)
 }
 
 // patchExpr simplifies the AST parsed from JSON.
 // TODO: some of the modifications are already done in format, but are
 // a package deal of a more aggressive simplify. Other pieces of modification
 // should probably be moved to format.
-func patchExpr(n ast.Node, patchPos func(n ast.Node)) {
+func patchExpr(n ast.Node) {
 	type info struct {
 		reflow bool
 	}
@@ -179,10 +171,6 @@ func patchExpr(n ast.Node, patchPos func(n ast.Node)) {
 	var beforeFn func(n ast.Node) bool
 
 	beforeFn = func(n ast.Node) bool {
-		if patchPos != nil {
-			patchPos(n)
-		}
-
 		isLarge := n.End().Offset()-n.Pos().Offset() > 50
 		descent := true
 

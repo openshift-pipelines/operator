@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"path/filepath"
 	"strings"
 	"time"
@@ -166,16 +165,16 @@ func Annotations(f partial.WithRawManifest, anns map[string]string) partial.With
 	if img, ok := f.(v1.Image); ok {
 		return &image{
 			base:        img,
-			annotations: maps.Clone(anns),
+			annotations: anns,
 		}
 	}
 	if idx, ok := f.(v1.ImageIndex); ok {
 		return &index{
 			base:        idx,
-			annotations: maps.Clone(anns),
+			annotations: anns,
 		}
 	}
-	return arbitraryRawManifest{a: f, anns: maps.Clone(anns)}
+	return arbitraryRawManifest{a: f, anns: anns}
 }
 
 type arbitraryRawManifest struct {

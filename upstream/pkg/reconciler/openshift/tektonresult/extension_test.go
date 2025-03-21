@@ -40,15 +40,15 @@ func TestGetRouteManifest(t *testing.T) {
 
 	os.Setenv(common.KoEnvKey, "testdata")
 	mf, err := getRouteManifest()
-	assertNoError(t, err)
+	assertNoEror(t, err)
 
 	cr := &rbac.ClusterRole{}
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(mf.Resources()[0].Object, cr)
-	assertNoError(t, err)
+	assertNoEror(t, err)
 
 }
 
-func assertNoError(t *testing.T, err error) {
+func assertNoEror(t *testing.T, err error) {
 	t.Helper()
 
 	if err != nil {

@@ -54,16 +54,6 @@ var intIndexRegex = regexp.MustCompile(intIndex)
 // - prefix: the prefix of the substitutable variable, e.g. "params" or "context.pipeline"
 // - vars: names of known variables
 func ValidateNoReferencesToUnknownVariables(value, prefix string, vars sets.String) *apis.FieldError {
-	return validateNoReferencesToUnknownVariables(value, prefix, vars, false)
-}
-
-// ValidateNoReferencesToUnknownVariablesWithDetail same as ValidateNoReferencesToUnknownVariables
-// but with more prefix detailed error message
-func ValidateNoReferencesToUnknownVariablesWithDetail(value, prefix string, vars sets.String) *apis.FieldError {
-	return validateNoReferencesToUnknownVariables(value, prefix, vars, true)
-}
-
-func validateNoReferencesToUnknownVariables(value, prefix string, vars sets.String, withDetail bool) *apis.FieldError {
 	if vs, present, errString := ExtractVariablesFromString(value, prefix); present {
 		if errString != "" {
 			return &apis.FieldError{
@@ -74,14 +64,8 @@ func validateNoReferencesToUnknownVariables(value, prefix string, vars sets.Stri
 		for _, v := range vs {
 			v = TrimArrayIndex(v)
 			if !vars.Has(v) {
-				var msg string
-				if withDetail {
-					msg = fmt.Sprintf("non-existent variable `%s` in %q", v, value)
-				} else {
-					msg = fmt.Sprintf("non-existent variable in %q", value)
-				}
 				return &apis.FieldError{
-					Message: msg,
+					Message: fmt.Sprintf("non-existent variable in %q", value),
 					// Empty path is required to make the `ViaField`, … work
 					Paths: []string{""},
 				}

@@ -32,7 +32,6 @@ func filterAndTransform(extension common.Extension) client.FilterAndTransform {
 		extra := []mf.Transformer{
 			common.InjectOperandNameLabelOverwriteExisting(v1alpha1.ManualApprovalGates),
 			common.DeploymentImages(magImages),
-			common.DeploymentEnvVarKubernetesMinVersion(),
 			common.AddDeploymentRestrictedPSA(),
 		}
 		extra = append(extra, extension.Transformers(magCR)...)

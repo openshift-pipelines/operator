@@ -56,26 +56,25 @@ func (o *SignBlobOptions) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(&o.Key, "key", "",
 		"path to the private key file, KMS URI or Kubernetes Secret")
-	_ = cmd.MarkFlagFilename("key", privateKeyExts...)
+	_ = cmd.Flags().SetAnnotation("key", cobra.BashCompFilenameExt, []string{})
 
 	cmd.Flags().BoolVar(&o.Base64Output, "b64", true,
 		"whether to base64 encode the output")
 
 	cmd.Flags().StringVar(&o.OutputSignature, "output-signature", "",
 		"write the signature to FILE")
-	_ = cmd.MarkFlagFilename("output-signature", signatureExts...)
+	_ = cmd.Flags().SetAnnotation("output-signature", cobra.BashCompFilenameExt, []string{})
 
 	// TODO: remove when output flag is fully deprecated
 	cmd.Flags().StringVar(&o.Output, "output", "", "write the signature to FILE")
-	_ = cmd.MarkFlagFilename("output", signatureExts...)
 
 	cmd.Flags().StringVar(&o.OutputCertificate, "output-certificate", "",
 		"write the certificate to FILE")
-	_ = cmd.MarkFlagFilename("output-certificate", certificateExts...)
+	_ = cmd.Flags().SetAnnotation("key", cobra.BashCompFilenameExt, []string{})
 
 	cmd.Flags().StringVar(&o.BundlePath, "bundle", "",
 		"write everything required to verify the blob to a FILE")
-	_ = cmd.MarkFlagFilename("bundle", bundleExts...)
+	_ = cmd.Flags().SetAnnotation("bundle", cobra.BashCompFilenameExt, []string{})
 
 	// TODO: have this default to true as a breaking change
 	cmd.Flags().BoolVar(&o.NewBundleFormat, "new-bundle-format", false,
@@ -89,15 +88,12 @@ func (o *SignBlobOptions) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(&o.TSAClientCACert, "timestamp-client-cacert", "",
 		"path to the X.509 CA certificate file in PEM format to be used for the connection to the TSA Server")
-	_ = cmd.MarkFlagFilename("timestamp-client-cacert", certificateExts...)
 
 	cmd.Flags().StringVar(&o.TSAClientCert, "timestamp-client-cert", "",
 		"path to the X.509 certificate file in PEM format to be used for the connection to the TSA Server")
-	_ = cmd.MarkFlagFilename("timestamp-client-cert", certificateExts...)
 
 	cmd.Flags().StringVar(&o.TSAClientKey, "timestamp-client-key", "",
 		"path to the X.509 private key file in PEM format to be used, together with the 'timestamp-client-cert' value, for the connection to the TSA Server")
-	_ = cmd.MarkFlagFilename("timestamp-client-key", privateKeyExts...)
 
 	cmd.Flags().StringVar(&o.TSAServerName, "timestamp-server-name", "",
 		"SAN name to use as the 'ServerName' tls.Config field to verify the mTLS connection to the TSA Server")
@@ -107,7 +103,7 @@ func (o *SignBlobOptions) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(&o.RFC3161TimestampPath, "rfc3161-timestamp", "",
 		"write the RFC3161 timestamp to a file")
-	// _ = cmd.MarkFlagFilename("rfc3161-timestamp") // no typical extensions
+	_ = cmd.Flags().SetAnnotation("rfc3161-timestamp", cobra.BashCompFilenameExt, []string{})
 
 	cmd.Flags().BoolVar(&o.IssueCertificate, "issue-certificate", false,
 		"issue a code signing certificate from Fulcio, even if a key is provided")

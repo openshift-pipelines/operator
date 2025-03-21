@@ -176,10 +176,10 @@ func (c *comments) SetComments(cgs []*CommentGroup) {
 	*c.groups = cgs
 }
 
-// A Comment node represents a single //-style comment.
+// A Comment node represents a single //-style or /*-style comment.
 type Comment struct {
 	Slash token.Pos // position of "/" starting the comment
-	Text  string    // comment text excluding '\n'
+	Text  string    // comment text (excluding '\n' for //-style comments)
 }
 
 func (c *Comment) Comments() []*CommentGroup { return nil }
@@ -226,7 +226,7 @@ func stripTrailingWhitespace(s string) string {
 }
 
 // Text returns the text of the comment.
-// Comment markers ("//"), the first space of a line comment, and
+// Comment markers (//, /*, and */), the first space of a line comment, and
 // leading and trailing empty lines are removed. Multiple empty lines are
 // reduced to one, and trailing space on lines is trimmed. Unless the result
 // is empty, it is newline-terminated.
@@ -243,10 +243,17 @@ func (g *CommentGroup) Text() string {
 	for _, c := range comments {
 		// Remove comment markers.
 		// The parser has given us exactly the comment text.
-		c = c[2:]
-		// strip first space - required for Example tests
-		if len(c) > 0 && c[0] == ' ' {
-			c = c[1:]
+		switch c[1] {
+		case '/':
+			//-style comment (no newline at the end)
+			c = c[2:]
+			// strip first space - required for Example tests
+			if len(c) > 0 && c[0] == ' ' {
+				c = c[1:]
+			}
+		case '*':
+			/*-style comment */
+			c = c[2 : len(c)-2]
 		}
 
 		// Split on newlines.
@@ -945,6 +952,10 @@ func (d *EmbedDecl) End() token.Pos { return d.Expr.End() }
 // Files and packages
 
 // A File node represents a CUE source file.
+//
+// The Comments list contains all comments in the source file in order of
+// appearance, including the comments that are pointed to from other nodes
+// via Doc and Comment fields.
 type File struct {
 	Filename string
 	Decls    []Decl // top-level declarations; or nil
@@ -995,9 +1006,6 @@ func (f *File) PackageName() string {
 	for _, d := range f.Decls {
 		switch x := d.(type) {
 		case *Package:
-			if x.Name.Name == "_" {
-				return ""
-			}
 			return x.Name.Name
 		case *CommentGroup, *Attribute:
 		default:

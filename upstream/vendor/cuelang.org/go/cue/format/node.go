@@ -104,7 +104,7 @@ func hasDocComments(d ast.Decl) bool {
 func (f *formatter) walkDeclList(list []ast.Decl) {
 	f.before(nil)
 	d := 0
-	var ellipsis ast.Decl
+	hasEllipsis := false
 	for i, x := range list {
 		if i > 0 {
 			f.print(declcomma)
@@ -128,7 +128,7 @@ func (f *formatter) walkDeclList(list []ast.Decl) {
 			}
 		}
 		if f.printer.cfg.simplify && internal.IsEllipsis(x) {
-			ellipsis = x
+			hasEllipsis = true
 			continue
 		}
 		f.decl(x)
@@ -156,11 +156,8 @@ func (f *formatter) walkDeclList(list []ast.Decl) {
 		}
 		f.print(f.current.parentSep)
 	}
-	if ellipsis != nil {
-		// ensure that comments associated with the original ellipsis are preserved
-		n := &ast.Ellipsis{}
-		ast.SetComments(n, ast.Comments(ellipsis))
-		f.decl(n)
+	if hasEllipsis {
+		f.decl(&ast.Ellipsis{})
 		f.print(f.current.parentSep)
 	}
 	f.after(nil)
@@ -178,12 +175,9 @@ func (f *formatter) walkSpecList(list []*ast.ImportSpec) {
 
 func (f *formatter) walkClauseList(list []ast.Clause, ws whiteSpace) {
 	f.before(nil)
-	for i, x := range list {
+	for _, x := range list {
 		f.before(x)
-		// Only print the whitespace between the clauses.
-		if i > 0 {
-			f.print(ws)
-		}
+		f.print(ws)
 		f.clause(x)
 		f.after(x)
 	}
@@ -314,7 +308,6 @@ func (f *formatter) decl(decl ast.Decl) {
 		} else {
 			f.print(blank, nooverride, n.Token)
 		}
-		f.visitComments(f.current.pos)
 
 		if mem := f.inlineField(n); mem != nil {
 			switch {
@@ -411,7 +404,7 @@ func (f *formatter) decl(decl ast.Decl) {
 			f.print(formfeed)
 		}
 		f.expr(n.Expr)
-		f.print(newline)
+		f.print(newline, noblank)
 
 	case *ast.Attribute:
 		f.print(n.At, n)
@@ -462,16 +455,10 @@ func (f *formatter) nextNeedsFormfeed(n ast.Expr) bool {
 		return strings.IndexByte(x.Value, '\n') >= 0
 	case *ast.ListLit:
 		return true
-	case *ast.ParenExpr:
-		return f.nextNeedsFormfeed(x.X)
 	case *ast.UnaryExpr:
 		return f.nextNeedsFormfeed(x.X)
 	case *ast.BinaryExpr:
 		return f.nextNeedsFormfeed(x.X) || f.nextNeedsFormfeed(x.Y)
-	case *ast.IndexExpr:
-		return f.nextNeedsFormfeed(x.X)
-	case *ast.SelectorExpr:
-		return f.nextNeedsFormfeed(x.X)
 	case *ast.CallExpr:
 		for _, arg := range x.Args {
 			if f.nextNeedsFormfeed(arg) {
@@ -748,8 +735,6 @@ func (f *formatter) clause(clause ast.Clause) {
 		f.markUnindentLine()
 
 	case *ast.LetClause:
-		// TODO(mvdan): LetClause is handled in both the clause and decl methods,
-		// because at the semantic level it is different in each case, but the code is repetitive.
 		f.print(n.Let, token.LET, blank, nooverride)
 		f.print(indent)
 		f.expr(n.Ident)
@@ -776,7 +761,7 @@ func walkBinary(e *ast.BinaryExpr) (has6, has7, has8 bool, maxProblem int) {
 	case *ast.BinaryExpr:
 		if l.Op.Precedence() < e.Op.Precedence() {
 			// parens will be inserted.
-			// pretend this is an *ast.ParenExpr and do nothing.
+			// pretend this is an *syntax.ParenExpr and do nothing.
 			break
 		}
 		h6, h7, h8, mp := walkBinary(l)
@@ -792,7 +777,7 @@ func walkBinary(e *ast.BinaryExpr) (has6, has7, has8 bool, maxProblem int) {
 	case *ast.BinaryExpr:
 		if r.Op.Precedence() <= e.Op.Precedence() {
 			// parens will be inserted.
-			// pretend this is an *ast.ParenExpr and do nothing.
+			// pretend this is an *syntax.ParenExpr and do nothing.
 			break
 		}
 		h6, h7, h8, mp := walkBinary(r)
@@ -901,7 +886,7 @@ func (f *formatter) binaryExpr(x *ast.BinaryExpr, prec1, cutoff, depth int) {
 	prec := x.Op.Precedence()
 	if prec < prec1 {
 		// parenthesis needed
-		// Note: The parser inserts a ast.ParenExpr node; thus this case
+		// Note: The parser inserts a syntax.ParenExpr node; thus this case
 		//       can only occur if the AST is created in a different way.
 		// defer p.pushComment(nil).pop()
 		f.print(token.LPAREN, nooverride)
@@ -945,7 +930,7 @@ func (f *formatter) possibleSelectorExpr(expr ast.Expr, prec1, depth int) bool {
 	return false
 }
 
-// selectorExpr handles an [*ast.SelectorExpr] node and returns whether x spans
+// selectorExpr handles an *syntax.SelectorExpr node and returns whether x spans
 // multiple lines.
 func (f *formatter) selectorExpr(x *ast.SelectorExpr, depth int) bool {
 	f.expr1(x.X, token.HighestPrec, depth)

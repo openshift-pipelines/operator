@@ -1,8 +1,8 @@
 package interpolate
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
 )
 
 // Interpolate takes a set of environment and interpolates it into the provided string using shell script expansions
@@ -28,13 +28,7 @@ func Identifiers(str string) ([]string, error) {
 
 // An expansion is something that takes in ENV and returns a string or an error
 type Expansion interface {
-	// Expand expands the expansion using variables from env.
 	Expand(env Env) (string, error)
-
-	// Identifiers returns any variable names referenced within the expansion.
-	// Escaped expansions do something special and return identifiers
-	// (starting with $) that *would* become referenced after a round of
-	// unescaping.
 	Identifiers() []string
 }
 
@@ -90,17 +84,15 @@ func (e UnsetValueExpansion) Expand(env Env) (string, error) {
 
 // EscapedExpansion is an expansion that is delayed until later on (usually by a later process)
 type EscapedExpansion struct {
-	// PotentialIdentifier is an identifier for the purpose of Identifiers,
-	// but not for the purpose of Expand.
-	PotentialIdentifier string
+	Identifier string
 }
 
 func (e EscapedExpansion) Identifiers() []string {
-	return []string{"$" + e.PotentialIdentifier}
+	return []string{"$" + e.Identifier}
 }
 
 func (e EscapedExpansion) Expand(Env) (string, error) {
-	return "$", nil
+	return "$" + e.Identifier, nil
 }
 
 // SubstringExpansion returns a substring (or slice) of the env
@@ -201,7 +193,7 @@ func (e Expression) Identifiers() []string {
 }
 
 func (e Expression) Expand(env Env) (string, error) {
-	var buf strings.Builder
+	buf := &bytes.Buffer{}
 
 	for _, item := range e {
 		if item.Expansion != nil {
@@ -209,9 +201,9 @@ func (e Expression) Expand(env Env) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			buf.WriteString(result)
+			_, _ = buf.WriteString(result)
 		} else {
-			buf.WriteString(item.Text)
+			_, _ = buf.WriteString(item.Text)
 		}
 	}
 

@@ -11,33 +11,28 @@ import (
 	"github.com/protocolbuffers/txtpbfmt/ast"
 )
 
-// Unquote returns the value of the string node and the rune used to quote it.
+// Unquote returns the value of the string node.
 // Calling Unquote on non-string node doesn't panic, but is otherwise undefined.
-func Unquote(n *ast.Node) (string, rune, error) {
+func Unquote(n *ast.Node) (string, error) {
 	return unquoteValues(n.Values, unquote)
 }
 
-// Raw returns the raw value of the string node and the rune used to quote it, with string escapes
-// left in place.
+// Raw returns the raw value of the string node, with string escapes left in place.
 // Calling UnquoteRaw on non-string node doesn't panic, but is otherwise undefined.
-func Raw(n *ast.Node) (string, rune, error) {
+func Raw(n *ast.Node) (string, error) {
 	return unquoteValues(n.Values, unquoteRaw)
 }
 
-func unquoteValues(values []*ast.Value, unquoter func(string) (string, rune, error)) (string, rune, error) {
+func unquoteValues(values []*ast.Value, unquoter func(string) (string, error)) (string, error) {
 	var ret strings.Builder
-	firstQuote := rune(0)
 	for _, v := range values {
-		uq, quote, err := unquoter(v.Value)
-		if firstQuote == rune(0) {
-			firstQuote = quote
-		}
+		uq, err := unquoter(v.Value)
 		if err != nil {
-			return "", rune(0), err
+			return "", err
 		}
 		ret.WriteString(uq)
 	}
-	return ret.String(), firstQuote, nil
+	return ret.String(), nil
 }
 
 // Returns the quote rune used in the given string (' or "). Returns an error if the string doesn't
@@ -56,21 +51,20 @@ func quoteRune(s string) (rune, error) {
 	return rune(quote), nil
 }
 
-func unquote(s string) (string, rune, error) {
+func unquote(s string) (string, error) {
 	quote, err := quoteRune(s)
 	if err != nil {
-		return "", rune(0), err
+		return "", err
 	}
-	unquoted, err := unquoteC(s[1:len(s)-1], quote)
-	return unquoted, quote, err
+	return unquoteC(s[1:len(s)-1], quote)
 }
 
-func unquoteRaw(s string) (string, rune, error) {
-	quote, err := quoteRune(s) // Trigger validation, which guarantees this is a quote-wrapped string.
+func unquoteRaw(s string) (string, error) {
+	_, err := quoteRune(s) // Trigger validation, which guarantees this is a quote-wrapped string.
 	if err != nil {
-		return "", rune(0), err
+		return "", err
 	}
-	return s[1 : len(s)-1], quote, nil
+	return s[1 : len(s)-1], nil
 }
 
 var (

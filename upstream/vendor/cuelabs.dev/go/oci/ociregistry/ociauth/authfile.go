@@ -10,7 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"slices"
+	"sort"
 	"strings"
 )
 
@@ -265,7 +265,7 @@ func decodeConfigFile(data []byte) (configData, error) {
 			ac = ac1
 		}
 		ac.derivedFrom = append(ac.derivedFrom, addr)
-		slices.Sort(ac.derivedFrom)
+		sort.Strings(ac.derivedFrom)
 		f.Auths[addr1] = ac
 	}
 	return f, nil

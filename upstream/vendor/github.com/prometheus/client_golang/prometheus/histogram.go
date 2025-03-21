@@ -844,7 +844,9 @@ func (h *histogram) Write(out *dto.Metric) error {
 			}}
 		}
 
-		if h.nativeExemplars.isEnabled() {
+		// If exemplars are not configured, the cap will be 0.
+		// So append is not needed in this case.
+		if cap(h.nativeExemplars.exemplars) > 0 {
 			h.nativeExemplars.Lock()
 			his.Exemplars = append(his.Exemplars, h.nativeExemplars.exemplars...)
 			h.nativeExemplars.Unlock()
@@ -1656,15 +1658,8 @@ func addAndResetCounts(hot, cold *histogramCounts) {
 type nativeExemplars struct {
 	sync.Mutex
 
-	// Time-to-live for exemplars, it is set to -1 if exemplars are disabled, that is NativeHistogramMaxExemplars is below 0.
-	// The ttl is used on insertion to remove an exemplar that is older than ttl, if present.
-	ttl time.Duration
-
+	ttl       time.Duration
 	exemplars []*dto.Exemplar
-}
-
-func (n *nativeExemplars) isEnabled() bool {
-	return n.ttl != -1
 }
 
 func makeNativeExemplars(ttl time.Duration, maxCount int) nativeExemplars {
@@ -1678,7 +1673,6 @@ func makeNativeExemplars(ttl time.Duration, maxCount int) nativeExemplars {
 
 	if maxCount < 0 {
 		maxCount = 0
-		ttl = -1
 	}
 
 	return nativeExemplars{
@@ -1688,18 +1682,20 @@ func makeNativeExemplars(ttl time.Duration, maxCount int) nativeExemplars {
 }
 
 func (n *nativeExemplars) addExemplar(e *dto.Exemplar) {
-	if !n.isEnabled() {
+	if cap(n.exemplars) == 0 {
 		return
 	}
 
 	n.Lock()
 	defer n.Unlock()
 
+	// The index where to insert the new exemplar.
+	var nIdx int = -1
+
 	// When the number of exemplars has not yet exceeded or
 	// is equal to cap(n.exemplars), then
 	// insert the new exemplar directly.
 	if len(n.exemplars) < cap(n.exemplars) {
-		var nIdx int
 		for nIdx = 0; nIdx < len(n.exemplars); nIdx++ {
 			if *e.Value < *n.exemplars[nIdx].Value {
 				break
@@ -1709,46 +1705,17 @@ func (n *nativeExemplars) addExemplar(e *dto.Exemplar) {
 		return
 	}
 
-	if len(n.exemplars) == 1 {
-		// When the number of exemplars is 1, then
-		// replace the existing exemplar with the new exemplar.
-		n.exemplars[0] = e
-		return
-	}
-	// From this point on, the number of exemplars is greater than 1.
-
 	// When the number of exemplars exceeds the limit, remove one exemplar.
 	var (
-		ot    = time.Time{} // Oldest timestamp seen. Initial value doesn't matter as we replace it due to otIdx == -1 in the loop.
-		otIdx = -1          // Index of the exemplar with the oldest timestamp.
+		rIdx int // The index where to remove the old exemplar.
 
-		md = -1.0 // Logarithm of the delta of the closest pair of exemplars.
+		ot    = time.Now() // Oldest timestamp seen.
+		otIdx = -1         // Index of the exemplar with the oldest timestamp.
 
-		// The insertion point of the new exemplar in the exemplars slice after insertion.
-		// This is calculated purely based on the order of the exemplars by value.
-		// nIdx == len(n.exemplars) means the new exemplar is to be inserted after the end.
-		nIdx = -1
-
-		// rIdx is ultimately the index for the exemplar that we are replacing with the new exemplar.
-		// The aim is to keep a good spread of exemplars by value and not let them bunch up too much.
-		// It is calculated in 3 steps:
-		//   1. First we set rIdx to the index of the older exemplar within the closest pair by value.
-		//      That is the following will be true (on log scale):
-		//      either the exemplar pair on index (rIdx-1, rIdx) or (rIdx, rIdx+1) will have
-		//      the closest values to each other from all pairs.
-		//      For example, suppose the values are distributed like this:
-		//        |-----------x-------------x----------------x----x-----|
-		//                                                   ^--rIdx as this is older.
-		//      Or like this:
-		//        |-----------x-------------x----------------x----x-----|
-		//                                                        ^--rIdx as this is older.
-		//   2. If there is an exemplar that expired, then we simple reset rIdx to that index.
-		//   3. We check if by inserting the new exemplar we would create a closer pair at
-		//      (nIdx-1, nIdx) or (nIdx, nIdx+1) and set rIdx to nIdx-1 or nIdx accordingly to
-		//      keep the spread of exemplars by value; otherwise we keep rIdx as it is.
-		rIdx = -1
-		cLog float64 // Logarithm of the current exemplar.
-		pLog float64 // Logarithm of the previous exemplar.
+		md    = -1.0  // Logarithm of the delta of the closest pair of exemplars.
+		mdIdx = -1    // Index of the older exemplar within the closest pair.
+		cLog  float64 // Logarithm of the current exemplar.
+		pLog  float64 // Logarithm of the previous exemplar.
 	)
 
 	for i, exemplar := range n.exemplars {
@@ -1759,7 +1726,7 @@ func (n *nativeExemplars) addExemplar(e *dto.Exemplar) {
 		}
 
 		// Find the index at which to insert new the exemplar.
-		if nIdx == -1 && *e.Value <= *exemplar.Value {
+		if *e.Value <= *exemplar.Value && nIdx == -1 {
 			nIdx = i
 		}
 
@@ -1771,13 +1738,11 @@ func (n *nativeExemplars) addExemplar(e *dto.Exemplar) {
 		}
 		diff := math.Abs(cLog - pLog)
 		if md == -1 || diff < md {
-			// The closest exemplar pair is at index: i-1, i.
-			// Choose the exemplar with the older timestamp for replacement.
 			md = diff
 			if n.exemplars[i].Timestamp.AsTime().Before(n.exemplars[i-1].Timestamp.AsTime()) {
-				rIdx = i
+				mdIdx = i
 			} else {
-				rIdx = i - 1
+				mdIdx = i - 1
 			}
 		}
 
@@ -1788,12 +1753,8 @@ func (n *nativeExemplars) addExemplar(e *dto.Exemplar) {
 	if nIdx == -1 {
 		nIdx = len(n.exemplars)
 	}
-	// Here, we have the following relationships:
-	// n.exemplars[nIdx-1].Value < e.Value (if nIdx > 0)
-	// e.Value <= n.exemplars[nIdx].Value (if nIdx < len(n.exemplars))
 
 	if otIdx != -1 && e.Timestamp.AsTime().Sub(ot) > n.ttl {
-		// If the oldest exemplar has expired, then replace it with the new exemplar.
 		rIdx = otIdx
 	} else {
 		// In the previous for loop, when calculating the closest pair of exemplars,
@@ -1803,26 +1764,23 @@ func (n *nativeExemplars) addExemplar(e *dto.Exemplar) {
 		if nIdx > 0 {
 			diff := math.Abs(elog - math.Log(n.exemplars[nIdx-1].GetValue()))
 			if diff < md {
-				// The value we are about to insert is closer to the previous exemplar at the insertion point than what we calculated before in rIdx.
-				//                                            v--rIdx
-				// |-----------x-n-----------x----------------x----x-----|
-				//     nIdx-1--^ ^--new exemplar value
-				// Do not make the spread worse, replace nIdx-1 and not rIdx.
 				md = diff
-				rIdx = nIdx - 1
+				mdIdx = nIdx
+				if n.exemplars[nIdx-1].Timestamp.AsTime().Before(e.Timestamp.AsTime()) {
+					mdIdx = nIdx - 1
+				}
 			}
 		}
 		if nIdx < len(n.exemplars) {
 			diff := math.Abs(math.Log(n.exemplars[nIdx].GetValue()) - elog)
 			if diff < md {
-				// The value we are about to insert is closer to the next exemplar at the insertion point than what we calculated before in rIdx.
-				//                                            v--rIdx
-				// |-----------x-----------n-x----------------x----x-----|
-				//     new exemplar value--^ ^--nIdx
-				// Do not make the spread worse, replace nIdx-1 and not rIdx.
-				rIdx = nIdx
+				mdIdx = nIdx
+				if n.exemplars[nIdx].Timestamp.AsTime().Before(e.Timestamp.AsTime()) {
+					mdIdx = nIdx
+				}
 			}
 		}
+		rIdx = mdIdx
 	}
 
 	// Adjust the slice according to rIdx and nIdx.

@@ -15,7 +15,7 @@
 package build
 
 import (
-	"slices"
+	"sort"
 	"strconv"
 
 	"cuelang.org/go/cue/errors"
@@ -78,7 +78,7 @@ func (inst *Instance) complete() errors.Error {
 		}
 	}
 
-	slices.Sort(paths)
+	sort.Strings(paths)
 
 	if inst.loadFunc != nil {
 		for i, path := range paths {
@@ -147,7 +147,7 @@ func (inst *Instance) complete() errors.Error {
 	for dep := range deps {
 		inst.Deps = append(inst.Deps, dep)
 	}
-	slices.Sort(inst.Deps)
+	sort.Strings(inst.Deps)
 
 	for _, dep := range inst.Deps {
 		p1 := deps[dep]

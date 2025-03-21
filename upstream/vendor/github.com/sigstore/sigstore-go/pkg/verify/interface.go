@@ -21,6 +21,7 @@ import (
 
 	in_toto "github.com/in-toto/attestation/go/v1"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/tlog"
 )
@@ -63,8 +64,8 @@ type SignedEntity interface {
 type VerificationContent interface {
 	CompareKey(any, root.TrustedMaterial) bool
 	ValidAtTime(time.Time, root.TrustedMaterial) bool
-	Certificate() *x509.Certificate
-	PublicKey() PublicKeyProvider
+	GetCertificate() *x509.Certificate
+	HasPublicKey() (PublicKeyProvider, bool)
 }
 
 type SignatureContent interface {
@@ -94,21 +95,19 @@ type EnvelopeContent interface {
 // that only implements a subset of the interfaces.
 type BaseSignedEntity struct{}
 
-var _ SignedEntity = &BaseSignedEntity{}
-
-func (b *BaseSignedEntity) HasInclusionPromise() bool {
-	return false
-}
-
-func (b *BaseSignedEntity) HasInclusionProof() bool {
-	return false
-}
-
-func (b *BaseSignedEntity) VerificationContent() (VerificationContent, error) {
+func (b *BaseSignedEntity) VerificationProvider() (VerificationContent, error) {
 	return nil, errNotImplemented
 }
 
-func (b *BaseSignedEntity) SignatureContent() (SignatureContent, error) {
+func (b *BaseSignedEntity) Envelope() (*dsse.Envelope, error) {
+	return nil, errNotImplemented
+}
+
+func (b *BaseSignedEntity) MessageSignature() (*protocommon.MessageSignature, error) {
+	return nil, errNotImplemented
+}
+
+func (b *BaseSignedEntity) Signature() ([]byte, error) {
 	return nil, errNotImplemented
 }
 

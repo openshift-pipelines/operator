@@ -22,8 +22,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/open-policy-agent/opa/v1/ast"
-	"github.com/open-policy-agent/opa/v1/rego"
+	"github.com/open-policy-agent/opa/rego"
 )
 
 // The query below should meet the following requirements:
@@ -49,9 +48,7 @@ func ValidateJSON(jsonBody []byte, entrypoints []string) []error {
 
 	r := rego.New(
 		rego.Query(QUERY),
-		rego.Load(entrypoints, nil),
-		rego.SetRegoVersion(ast.RegoV0),
-	)
+		rego.Load(entrypoints, nil))
 
 	query, err := r.PrepareForEval(ctx)
 	if err != nil {
@@ -100,9 +97,7 @@ func ValidateJSONWithModuleInput(jsonBody []byte, moduleInput string) (warnings 
 
 	r := rego.New(
 		rego.Query(query),
-		rego.Module(module, moduleInput),
-		rego.SetRegoVersion(ast.RegoV0),
-	)
+		rego.Module(module, moduleInput))
 
 	evalQuery, err := r.PrepareForEval(ctx)
 	if err != nil {
@@ -135,8 +130,8 @@ func ValidateJSONWithModuleInput(jsonBody []byte, moduleInput string) (warnings 
 	return nil, fmt.Errorf("policy is not compliant for query '%s'", query)
 }
 
-func evaluateRegoEvalMapResult(query string, response []interface{}) (warning error, retErr error) {
-	retErr = fmt.Errorf("policy is not compliant for query %q", query) //nolint: revive
+func evaluateRegoEvalMapResult(query string, response []interface{}) (warning error, error error) {
+	error = fmt.Errorf("policy is not compliant for query %q", query) //nolint: revive
 	for _, r := range response {
 		rMap := r.(map[string]interface{})
 		mapBytes, err := json.Marshal(rMap)
@@ -157,7 +152,7 @@ func evaluateRegoEvalMapResult(query string, response []interface{}) (warning er
 			return fmt.Errorf("warning: %s", resultObject.Warning), nil
 		}
 		warning = errors.New(resultObject.Warning)
-		retErr = fmt.Errorf("policy is not compliant for query '%s' with errors: %s", query, resultObject.Error) //nolint: revive
+		error = fmt.Errorf("policy is not compliant for query '%s' with errors: %s", query, resultObject.Error) //nolint: revive
 	}
-	return warning, retErr
+	return warning, error
 }

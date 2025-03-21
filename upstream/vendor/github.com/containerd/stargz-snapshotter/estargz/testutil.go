@@ -26,13 +26,12 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -45,6 +44,10 @@ import (
 	"github.com/klauspost/compress/zstd"
 	digest "github.com/opencontainers/go-digest"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 // TestingController is Compression with some helper methods necessary for testing.
 type TestingController interface {
@@ -917,11 +920,9 @@ func checkVerifyInvalidTOCEntryFail(filename string) check {
 				}
 				if sampleEntry == nil {
 					t.Fatalf("TOC must contain at least one regfile or chunk entry other than the rewrite target")
-					return
 				}
 				if targetEntry == nil {
 					t.Fatalf("rewrite target not found")
-					return
 				}
 				targetEntry.Offset = sampleEntry.Offset
 			},
@@ -2290,11 +2291,7 @@ var runes = []rune("1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWX
 func randomContents(n int) string {
 	b := make([]rune, n)
 	for i := range b {
-		bi, err := rand.Int(rand.Reader, big.NewInt(int64(len(runes))))
-		if err != nil {
-			panic(err)
-		}
-		b[i] = runes[int(bi.Int64())]
+		b[i] = runes[rand.Intn(len(runes))]
 	}
 	return string(b)
 }

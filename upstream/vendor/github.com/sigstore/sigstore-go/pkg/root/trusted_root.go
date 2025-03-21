@@ -40,9 +40,18 @@ type TrustedRoot struct {
 	BaseTrustedMaterial
 	trustedRoot             *prototrustroot.TrustedRoot
 	rekorLogs               map[string]*TransparencyLog
-	certificateAuthorities  []CertificateAuthority
+	fulcioCertAuthorities   []CertificateAuthority
 	ctLogs                  map[string]*TransparencyLog
-	timestampingAuthorities []TimestampingAuthority
+	timestampingAuthorities []CertificateAuthority
+}
+
+type CertificateAuthority struct {
+	Root                *x509.Certificate
+	Intermediates       []*x509.Certificate
+	Leaf                *x509.Certificate
+	ValidityPeriodStart time.Time
+	ValidityPeriodEnd   time.Time
+	URI                 string
 }
 
 type TransparencyLog struct {
@@ -57,12 +66,12 @@ type TransparencyLog struct {
 	SignatureHashFunc crypto.Hash
 }
 
-func (tr *TrustedRoot) TimestampingAuthorities() []TimestampingAuthority {
+func (tr *TrustedRoot) TimestampingAuthorities() []CertificateAuthority {
 	return tr.timestampingAuthorities
 }
 
 func (tr *TrustedRoot) FulcioCertificateAuthorities() []CertificateAuthority {
-	return tr.certificateAuthorities
+	return tr.fulcioCertAuthorities
 }
 
 func (tr *TrustedRoot) RekorLogs() map[string]*TransparencyLog {
@@ -93,12 +102,12 @@ func NewTrustedRootFromProtobuf(protobufTrustedRoot *prototrustroot.TrustedRoot)
 		return nil, err
 	}
 
-	trustedRoot.certificateAuthorities, err = ParseCertificateAuthorities(protobufTrustedRoot.GetCertificateAuthorities())
+	trustedRoot.fulcioCertAuthorities, err = ParseCertificateAuthorities(protobufTrustedRoot.GetCertificateAuthorities())
 	if err != nil {
 		return nil, err
 	}
 
-	trustedRoot.timestampingAuthorities, err = ParseTimestampingAuthorities(protobufTrustedRoot.GetTimestampAuthorities())
+	trustedRoot.timestampingAuthorities, err = ParseCertificateAuthorities(protobufTrustedRoot.GetTimestampAuthorities())
 	if err != nil {
 		return nil, err
 	}
@@ -223,12 +232,12 @@ func ParseCertificateAuthorities(certAuthorities []*prototrustroot.CertificateAu
 		if err != nil {
 			return nil, err
 		}
-		certificateAuthorities[i] = certificateAuthority
+		certificateAuthorities[i] = *certificateAuthority
 	}
 	return certificateAuthorities, nil
 }
 
-func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthority) (*FulcioCertificateAuthority, error) {
+func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthority) (certificateAuthority *CertificateAuthority, err error) {
 	if certAuthority == nil {
 		return nil, fmt.Errorf("CertificateAuthority is nil")
 	}
@@ -241,7 +250,7 @@ func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthorit
 		return nil, fmt.Errorf("CertificateAuthority cert chain is empty")
 	}
 
-	certificateAuthority := &FulcioCertificateAuthority{
+	certificateAuthority = &CertificateAuthority{
 		URI: certAuthority.Uri,
 	}
 	for i, cert := range certChain.GetCertificates() {
@@ -249,9 +258,12 @@ func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthorit
 		if err != nil {
 			return nil, err
 		}
-		if i < chainLen-1 {
+		switch {
+		case i == 0 && !parsedCert.IsCA:
+			certificateAuthority.Leaf = parsedCert
+		case i < chainLen-1:
 			certificateAuthority.Intermediates = append(certificateAuthority.Intermediates, parsedCert)
-		} else {
+		case i == chainLen-1:
 			certificateAuthority.Root = parsedCert
 		}
 	}
@@ -267,68 +279,10 @@ func ParseCertificateAuthority(certAuthority *prototrustroot.CertificateAuthorit
 		}
 	}
 
-	certificateAuthority.URI = certAuthority.Uri
+	// TODO: Should we inspect/enforce ca.Subject and ca.Uri?
+	// TODO: Handle validity period (ca.ValidFor)
 
 	return certificateAuthority, nil
-}
-
-func ParseTimestampingAuthorities(certAuthorities []*prototrustroot.CertificateAuthority) (timestampingAuthorities []TimestampingAuthority, err error) {
-	timestampingAuthorities = make([]TimestampingAuthority, len(certAuthorities))
-	for i, certAuthority := range certAuthorities {
-		timestampingAuthority, err := ParseTimestampingAuthority(certAuthority)
-		if err != nil {
-			return nil, err
-		}
-		timestampingAuthorities[i] = timestampingAuthority
-	}
-	return timestampingAuthorities, nil
-}
-
-func ParseTimestampingAuthority(certAuthority *prototrustroot.CertificateAuthority) (TimestampingAuthority, error) {
-	if certAuthority == nil {
-		return nil, fmt.Errorf("CertificateAuthority is nil")
-	}
-	certChain := certAuthority.GetCertChain()
-	if certChain == nil {
-		return nil, fmt.Errorf("CertificateAuthority missing cert chain")
-	}
-	chainLen := len(certChain.GetCertificates())
-	if chainLen < 1 {
-		return nil, fmt.Errorf("CertificateAuthority cert chain is empty")
-	}
-
-	timestampingAuthority := &SigstoreTimestampingAuthority{
-		URI: certAuthority.Uri,
-	}
-	for i, cert := range certChain.GetCertificates() {
-		parsedCert, err := x509.ParseCertificate(cert.RawBytes)
-		if err != nil {
-			return nil, err
-		}
-		switch {
-		case i == 0 && !parsedCert.IsCA:
-			timestampingAuthority.Leaf = parsedCert
-		case i < chainLen-1:
-			timestampingAuthority.Intermediates = append(timestampingAuthority.Intermediates, parsedCert)
-		case i == chainLen-1:
-			timestampingAuthority.Root = parsedCert
-		}
-	}
-	validFor := certAuthority.GetValidFor()
-	if validFor != nil {
-		start := validFor.GetStart()
-		if start != nil {
-			timestampingAuthority.ValidityPeriodStart = start.AsTime()
-		}
-		end := validFor.GetEnd()
-		if end != nil {
-			timestampingAuthority.ValidityPeriodEnd = end.AsTime()
-		}
-	}
-
-	timestampingAuthority.URI = certAuthority.Uri
-
-	return timestampingAuthority, nil
 }
 
 func NewTrustedRootFromPath(path string) (*TrustedRoot, error) {
@@ -366,14 +320,14 @@ func NewTrustedRootProtobuf(rootJSON []byte) (*prototrustroot.TrustedRoot, error
 func NewTrustedRoot(mediaType string,
 	certificateAuthorities []CertificateAuthority,
 	certificateTransparencyLogs map[string]*TransparencyLog,
-	timestampAuthorities []TimestampingAuthority,
+	timestampAuthorities []CertificateAuthority,
 	transparencyLogs map[string]*TransparencyLog) (*TrustedRoot, error) {
 	// document that we assume 1 cert chain per target and with certs already ordered from leaf to root
 	if mediaType != TrustedRootMediaType01 {
 		return nil, fmt.Errorf("unsupported TrustedRoot media type: %s", TrustedRootMediaType01)
 	}
 	tr := &TrustedRoot{
-		certificateAuthorities:  certificateAuthorities,
+		fulcioCertAuthorities:   certificateAuthorities,
 		ctLogs:                  certificateTransparencyLogs,
 		timestampingAuthorities: timestampAuthorities,
 		rekorLogs:               transparencyLogs,
@@ -474,7 +428,7 @@ func NewLiveTrustedRoot(opts *tuf.Options) (*LiveTrustedRoot, error) {
 	return ltr, nil
 }
 
-func (l *LiveTrustedRoot) TimestampingAuthorities() []TimestampingAuthority {
+func (l *LiveTrustedRoot) TimestampingAuthorities() []CertificateAuthority {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	return l.TrustedRoot.TimestampingAuthorities()
