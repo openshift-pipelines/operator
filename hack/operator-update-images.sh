@@ -24,7 +24,7 @@ function update_image_reference() {
     output=$(echo "$input" | sed -E "s|$SOURCE_PATTEN|$TARGET_PATTEN|g")
 
      #Update Operator Image operator-operator to operator
-     output=$(echo "$output" | sed -E "s/operator-operator-rhel9/rhel9-operator/g")
+     output=$(echo "$output" | sed -E "s/operator-operator-rhel8/rhel8-operator/g")
 
       echo "$output"
 }
