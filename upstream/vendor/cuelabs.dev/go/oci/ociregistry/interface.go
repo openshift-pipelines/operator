@@ -60,7 +60,7 @@ import (
 	"context"
 	"io"
 
-	"cuelabs.dev/go/oci/ociregistry/ociref"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -81,7 +81,7 @@ type ReadWriter interface {
 }
 
 type (
-	Digest     = ociref.Digest
+	Digest     = digest.Digest
 	Descriptor = ocispec.Descriptor
 	Manifest   = ocispec.Manifest
 )

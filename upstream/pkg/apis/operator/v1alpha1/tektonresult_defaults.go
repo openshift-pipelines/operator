@@ -26,8 +26,3 @@ func (tp *TektonResult) SetDefaults(ctx context.Context) {
 		tp.Spec.TLSHostnameOverride = ""
 	}
 }
-
-// Sets default values of Result
-func (c *Result) setDefaults() {
-	// TODO: Set the other default values for Result
-}

@@ -17,8 +17,8 @@ kind: Deployment
 metadata:
   name: tekton-operator-webhook
   labels:
-    version: "devel"
-    operator.tekton.dev/release: "devel"
+    version: v0.74.1
+    operator.tekton.dev/release: v0.74.1
 spec:
   replicas: 1
   selector:
@@ -64,9 +64,6 @@ spec:
           containerPort: 8443
         securityContext:
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
           capabilities:
             drop:
-            - "ALL"
-          seccompProfile:
-            type: RuntimeDefault
+              - ALL

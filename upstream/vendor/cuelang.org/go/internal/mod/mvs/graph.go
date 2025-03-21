@@ -5,9 +5,9 @@
 package mvs
 
 import (
-	"cmp"
 	"fmt"
 	"slices"
+	"sort"
 )
 
 // Versions is an interface that should be provided by implementations
@@ -157,11 +157,12 @@ func (g *Graph[V]) BuildList() []V {
 }
 
 func (g *Graph[V]) sortVersions(vs []V) {
-	slices.SortFunc(vs, func(a, b V) int {
-		if c := cmp.Compare(g.v.Path(a), g.v.Path(b)); c != 0 {
-			return c
+	sort.Slice(vs, func(i, j int) bool {
+		v0, v1 := vs[i], vs[j]
+		if p0, p1 := g.v.Path(v0), g.v.Path(v1); p0 != p1 {
+			return p0 < p1
 		}
-		return g.cmp(g.v.Version(a), g.v.Version(b))
+		return g.cmp(g.v.Version(v0), g.v.Version(v1)) < 0
 	})
 }
 

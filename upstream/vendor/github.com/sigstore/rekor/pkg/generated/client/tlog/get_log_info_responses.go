@@ -22,7 +22,6 @@ package tlog
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 
@@ -103,13 +102,11 @@ func (o *GetLogInfoOK) Code() int {
 }
 
 func (o *GetLogInfoOK) Error() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log][%d] getLogInfoOK %s", 200, payload)
+	return fmt.Sprintf("[GET /api/v1/log][%d] getLogInfoOK  %+v", 200, o.Payload)
 }
 
 func (o *GetLogInfoOK) String() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log][%d] getLogInfoOK %s", 200, payload)
+	return fmt.Sprintf("[GET /api/v1/log][%d] getLogInfoOK  %+v", 200, o.Payload)
 }
 
 func (o *GetLogInfoOK) GetPayload() *models.LogInfo {
@@ -177,13 +174,11 @@ func (o *GetLogInfoDefault) Code() int {
 }
 
 func (o *GetLogInfoDefault) Error() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log][%d] getLogInfo default %s", o._statusCode, payload)
+	return fmt.Sprintf("[GET /api/v1/log][%d] getLogInfo default  %+v", o._statusCode, o.Payload)
 }
 
 func (o *GetLogInfoDefault) String() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log][%d] getLogInfo default %s", o._statusCode, payload)
+	return fmt.Sprintf("[GET /api/v1/log][%d] getLogInfo default  %+v", o._statusCode, o.Payload)
 }
 
 func (o *GetLogInfoDefault) GetPayload() *models.Error {

@@ -147,9 +147,7 @@ func (m *Matrix) validatePermutation(p MatrixPermutation) error {
 	// Check that the dimensions in the permutation are unique and defined in
 	// the matrix setup.
 	for dim := range p {
-		// An empty but non-nil setup dimension is valid (all values may be
-		// given by adjustment tuples).
-		if m.Setup[dim] == nil {
+		if len(m.Setup[dim]) == 0 {
 			return fmt.Errorf("%w: %q", errPermutationUnknownDimension, dim)
 		}
 	}
@@ -182,9 +180,7 @@ func (m *Matrix) validatePermutation(p MatrixPermutation) error {
 			return fmt.Errorf("%w: %d != %d", errAdjustmentLengthMismatch, len(adj.With), len(m.Setup))
 		}
 		for dim := range adj.With {
-			// An empty but non-nil setup dimension is valid (all values may be
-			// given by adjustment tuples).
-			if m.Setup[dim] == nil {
+			if len(m.Setup[dim]) == 0 {
 				return fmt.Errorf("%w: %q", errAdjustmentUnknownDimension, dim)
 			}
 		}

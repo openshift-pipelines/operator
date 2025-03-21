@@ -118,10 +118,9 @@ var p = &pkg.Package{
 			{Kind: adt.BytesKind | adt.StringKind},
 			{Kind: adt.TopKind},
 		},
-		Result:      adt.BoolKind,
-		NonConcrete: true,
+		Result: adt.BoolKind,
 		Func: func(c *pkg.CallCtxt) {
-			b, v := c.Bytes(0), c.Schema(1)
+			b, v := c.Bytes(0), c.Value(1)
 			if c.Do() {
 				c.Ret, c.Err = Validate(b, v)
 			}

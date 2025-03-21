@@ -21,7 +21,6 @@ import (
 	"math/big"
 	"regexp"
 	"strings"
-	"sync"
 
 	"gopkg.in/yaml.v3"
 
@@ -160,14 +159,12 @@ func encodeScalar(b *ast.BasicLit) (n *yaml.Node, err error) {
 // shouldQuote indicates that a string may be a YAML 1.1. legacy value and that
 // the string should be quoted.
 func shouldQuote(str string) bool {
-	return legacyStrings[str] || useQuote().MatchString(str)
+	return legacyStrings[str] || useQuote.MatchString(str)
 }
 
 // This regular expression conservatively matches any date, time string,
 // or base60 float.
-var useQuote = sync.OnceValue(func() *regexp.Regexp {
-	return regexp.MustCompile(`^[\-+0-9:\. \t]+([-:]|[tT])[\-+0-9:\. \t]+[zZ]?$|^0x[a-fA-F0-9]+$`)
-})
+var useQuote = regexp.MustCompile(`^[\-+0-9:\. \t]+([-:]|[tT])[\-+0-9:\. \t]+[zZ]?$|^0x[a-fA-F0-9]+$`)
 
 // legacyStrings contains a map of fixed strings with special meaning for any
 // type in the YAML Tag registry (https://yaml.org/type/index.html) as used

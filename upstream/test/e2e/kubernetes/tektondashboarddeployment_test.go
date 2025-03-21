@@ -34,7 +34,6 @@ func TestTektonDashboardsDeployment(t *testing.T) {
 	crNames := utils.ResourceNames{
 		TektonConfig:    "config",
 		TektonPipeline:  "pipeline",
-		TektonTrigger:   "trigger",
 		TektonDashboard: "dashboard",
 		TargetNamespace: "tekton-pipelines",
 	}
@@ -42,12 +41,10 @@ func TestTektonDashboardsDeployment(t *testing.T) {
 	clients := client.Setup(t, crNames.TargetNamespace)
 
 	utils.CleanupOnInterrupt(func() { utils.TearDownPipeline(clients, crNames.TektonPipeline) })
-	utils.CleanupOnInterrupt(func() { utils.TearDownDashboard(clients, crNames.TektonTrigger) })
 	utils.CleanupOnInterrupt(func() { utils.TearDownDashboard(clients, crNames.TektonDashboard) })
 	utils.CleanupOnInterrupt(func() { utils.TearDownNamespace(clients, crNames.TargetNamespace) })
 	defer utils.TearDownNamespace(clients, crNames.TargetNamespace)
 	defer utils.TearDownPipeline(clients, crNames.TektonPipeline)
-	defer utils.TearDownTrigger(clients, crNames.TektonTrigger)
 	defer utils.TearDownDashboard(clients, crNames.TektonDashboard)
 
 	resources.EnsureNoTektonConfigInstance(t, clients, crNames)
@@ -60,16 +57,6 @@ func TestTektonDashboardsDeployment(t *testing.T) {
 	// Test if TektonPipeline can reach the READY status
 	t.Run("create-pipeline", func(t *testing.T) {
 		resources.AssertTektonPipelineCRReadyStatus(t, clients, crNames)
-	})
-
-	// Create a TektonTrigger
-	if _, err := resources.EnsureTektonTriggerExists(clients.TektonTrigger(), crNames); err != nil {
-		t.Fatalf("TektonTrigger %q failed to create: %v", crNames.TektonTrigger, err)
-	}
-
-	// Test if TektonTrigger can reach the READY status
-	t.Run("create-trigger", func(t *testing.T) {
-		resources.AssertTektonTriggerCRReadyStatus(t, clients, crNames)
 	})
 
 	// Create a TektonDashboard

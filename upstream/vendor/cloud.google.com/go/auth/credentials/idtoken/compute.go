@@ -23,7 +23,6 @@ import (
 	"cloud.google.com/go/auth"
 	"cloud.google.com/go/auth/internal"
 	"cloud.google.com/go/compute/metadata"
-	"github.com/googleapis/gax-go/v2/internallog"
 )
 
 const identitySuffix = "instance/service-accounts/default/identity"
@@ -35,34 +34,29 @@ func computeCredentials(opts *Options) (*auth.Credentials, error) {
 	if opts.CustomClaims != nil {
 		return nil, fmt.Errorf("idtoken: Options.CustomClaims can't be used with the metadata service, please provide a service account if you would like to use this feature")
 	}
-	metadataClient := metadata.NewWithOptions(&metadata.Options{
-		Logger: internallog.New(opts.Logger),
-	})
-	tp := &computeIDTokenProvider{
+	tp := computeIDTokenProvider{
 		audience: opts.Audience,
 		format:   opts.ComputeTokenFormat,
-		client:   metadataClient,
+		client:   *metadata.NewClient(opts.client()),
 	}
 	return auth.NewCredentials(&auth.CredentialsOptions{
 		TokenProvider: auth.NewCachedTokenProvider(tp, &auth.CachedTokenProviderOptions{
 			ExpireEarly: 5 * time.Minute,
 		}),
 		ProjectIDProvider: auth.CredentialsPropertyFunc(func(ctx context.Context) (string, error) {
-			return metadataClient.ProjectIDWithContext(ctx)
+			return metadata.ProjectIDWithContext(ctx)
 		}),
-		UniverseDomainProvider: &internal.ComputeUniverseDomainProvider{
-			MetadataClient: metadataClient,
-		},
+		UniverseDomainProvider: &internal.ComputeUniverseDomainProvider{},
 	}), nil
 }
 
 type computeIDTokenProvider struct {
 	audience string
 	format   ComputeTokenFormat
-	client   *metadata.Client
+	client   metadata.Client
 }
 
-func (c *computeIDTokenProvider) Token(ctx context.Context) (*auth.Token, error) {
+func (c computeIDTokenProvider) Token(ctx context.Context) (*auth.Token, error) {
 	v := url.Values{}
 	v.Set("audience", c.audience)
 	if c.format != ComputeTokenFormatStandard {

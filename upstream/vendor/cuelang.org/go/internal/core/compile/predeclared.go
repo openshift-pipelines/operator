@@ -38,16 +38,12 @@ func predeclared(n *ast.Ident) adt.Expr {
 	case "float", "__float":
 		return &adt.BasicType{Src: n, K: adt.FloatKind}
 	case "number", "__number":
-		return &adt.BasicType{Src: n, K: adt.NumberKind}
+		return &adt.BasicType{Src: n, K: adt.NumKind}
 
 	case "len", "__len":
 		return lenBuiltin
 	case "close", "__close":
 		return closeBuiltin
-	case "matchIf", "__matchIf":
-		return matchIfBuiltin
-	case "matchN", "__matchN":
-		return matchNBuiltin
 	case "and", "__and":
 		return andBuiltin
 	case "or", "__or":
@@ -60,9 +56,6 @@ func predeclared(n *ast.Ident) adt.Expr {
 		return quoBuiltin
 	case "rem", "__rem":
 		return remBuiltin
-
-	case "__no_sharing":
-		return adt.NoShareSentinel
 	}
 
 	if r, ok := predefinedRanges[n.Name]; ok {
@@ -143,8 +136,8 @@ func mkIntRange(a, b string) adt.Expr {
 }
 
 func mkFloatRange(a, b string) adt.Expr {
-	from := newBound(adt.GreaterEqualOp, adt.NumberKind, parseFloat(a))
-	to := newBound(adt.LessEqualOp, adt.NumberKind, parseFloat(b))
+	from := newBound(adt.GreaterEqualOp, adt.NumKind, parseFloat(a))
+	to := newBound(adt.LessEqualOp, adt.NumKind, parseFloat(b))
 	src := ast.NewBinExpr(token.AND, from.Src, to.Src)
 	return &adt.Conjunction{Src: src, Values: []adt.Value{from, to}}
 }

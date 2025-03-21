@@ -17,9 +17,7 @@ package runtime
 import (
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/internal"
-	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/cuedebug"
-	"cuelang.org/go/internal/cueexperiment"
 )
 
 // A Runtime maintains data structures for indexing and reuse for evaluation.
@@ -32,20 +30,13 @@ type Runtime struct {
 	// the kind in a file-level @extern(kind) attribute.
 	interpreters map[string]Interpreter
 
-	version  internal.EvaluatorVersion
-	topoSort bool
+	version internal.EvaluatorVersion
 
 	flags cuedebug.Config
 }
 
 func (r *Runtime) Settings() (internal.EvaluatorVersion, cuedebug.Config) {
 	return r.version, r.flags
-}
-
-func (r *Runtime) ConfigureOpCtx(ctx *adt.OpContext) {
-	ctx.Version = r.version
-	ctx.TopoSort = r.topoSort
-	ctx.Config = r.flags
 }
 
 func (r *Runtime) SetBuildData(b *build.Instance, x interface{}) {
@@ -57,8 +48,7 @@ func (r *Runtime) BuildData(b *build.Instance) (x interface{}, ok bool) {
 	return x, ok
 }
 
-// New creates a new Runtime obeying the CUE_EXPERIMENT and CUE_DEBUG flags set
-// via environment variables.
+// New is a wrapper for NewVersioned(internal.DefaultVersion).
 func New() *Runtime {
 	r := &Runtime{}
 	r.Init()
@@ -69,11 +59,8 @@ func New() *Runtime {
 // debug flags. The builtins registered with RegisterBuiltin are available for
 // evaluation.
 func NewWithSettings(v internal.EvaluatorVersion, flags cuedebug.Config) *Runtime {
-	r := New()
-	// Override the evaluator version and debug flags derived from env vars
-	// with the explicit arguments given to us here.
-	r.version = v
-	r.SetDebugOptions(&flags)
+	r := &Runtime{version: v, flags: flags}
+	r.Init()
 	return r
 }
 
@@ -83,17 +70,10 @@ func (r *Runtime) SetVersion(v internal.EvaluatorVersion) {
 	r.version = v
 }
 
-// SetTopologicalSort sets whether or not to use topological sorting
-// for the Runtime.
-func (r *Runtime) SetTopologicalSort(b bool) {
-	r.topoSort = b
-}
-
 // SetDebugOptions sets the debug flags to use for the Runtime. This should only
 // be set before first use.
 func (r *Runtime) SetDebugOptions(flags *cuedebug.Config) {
 	r.flags = *flags
-	r.topoSort = r.topoSort || r.flags.SortFields
 }
 
 // IsInitialized reports whether the runtime has been initialized.
@@ -113,18 +93,4 @@ func (r *Runtime) Init() {
 	r.index.builtinShort = sharedIndex.builtinShort
 
 	r.loaded = map[*build.Instance]interface{}{}
-
-	cueexperiment.Init()
-	if cueexperiment.Flags.EvalV3 {
-		r.version = internal.DevVersion
-	} else {
-		r.version = internal.DefaultVersion
-	}
-	r.topoSort = cueexperiment.Flags.TopoSort
-
-	// By default we follow the environment's CUE_DEBUG settings,
-	// which can be overriden via [Runtime.SetDebugOptions],
-	// such as with the API option [cuelang.org/go/cue/cuecontext.CUE_DEBUG].
-	cuedebug.Init()
-	r.SetDebugOptions(&cuedebug.Flags)
 }

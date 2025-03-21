@@ -7,9 +7,7 @@ package packet
 import (
 	"crypto/cipher"
 	"crypto/sha256"
-	"fmt"
 	"io"
-	"strconv"
 
 	"github.com/ProtonMail/go-crypto/openpgp/errors"
 	"golang.org/x/crypto/hkdf"
@@ -27,19 +25,19 @@ func (se *SymmetricallyEncrypted) parseAead(r io.Reader) error {
 	se.Cipher = CipherFunction(headerData[0])
 	// cipherFunc must have block size 16 to use AEAD
 	if se.Cipher.blockSize() != 16 {
-		return errors.UnsupportedError("invalid aead cipher: " + strconv.Itoa(int(se.Cipher)))
+		return errors.UnsupportedError("invalid aead cipher: " + string(se.Cipher))
 	}
 
 	// Mode
 	se.Mode = AEADMode(headerData[1])
 	if se.Mode.TagLength() == 0 {
-		return errors.UnsupportedError("unknown aead mode: " + strconv.Itoa(int(se.Mode)))
+		return errors.UnsupportedError("unknown aead mode: " + string(se.Mode))
 	}
 
 	// Chunk size
 	se.ChunkSizeByte = headerData[2]
 	if se.ChunkSizeByte > 16 {
-		return errors.UnsupportedError("invalid aead chunk size byte: " + strconv.Itoa(int(se.ChunkSizeByte)))
+		return errors.UnsupportedError("invalid aead chunk size byte: " + string(se.ChunkSizeByte))
 	}
 
 	// Salt
@@ -64,16 +62,11 @@ func (se *SymmetricallyEncrypted) associatedData() []byte {
 // decryptAead decrypts a V2 SEIPD packet (AEAD) as specified in
 // https://www.ietf.org/archive/id/draft-ietf-openpgp-crypto-refresh-07.html#section-5.13.2
 func (se *SymmetricallyEncrypted) decryptAead(inputKey []byte) (io.ReadCloser, error) {
-	if se.Cipher.KeySize() != len(inputKey) {
-		return nil, errors.StructuralError(fmt.Sprintf("invalid session key length for cipher: got %d bytes, but expected %d bytes", len(inputKey), se.Cipher.KeySize()))
-	}
-
 	aead, nonce := getSymmetricallyEncryptedAeadInstance(se.Cipher, se.Mode, inputKey, se.Salt[:], se.associatedData())
+
 	// Carry the first tagLen bytes
-	chunkSize := decodeAEADChunkSize(se.ChunkSizeByte)
 	tagLen := se.Mode.TagLength()
-	chunkBytes := make([]byte, chunkSize+tagLen*2)
-	peekedBytes := chunkBytes[chunkSize+tagLen:]
+	peekedBytes := make([]byte, tagLen)
 	n, err := io.ReadFull(se.Contents, peekedBytes)
 	if n < tagLen || (err != nil && err != io.EOF) {
 		return nil, errors.StructuralError("not enough data to decrypt:" + err.Error())
@@ -83,13 +76,12 @@ func (se *SymmetricallyEncrypted) decryptAead(inputKey []byte) (io.ReadCloser, e
 		aeadCrypter: aeadCrypter{
 			aead:           aead,
 			chunkSize:      decodeAEADChunkSize(se.ChunkSizeByte),
-			nonce:          nonce,
+			initialNonce:   nonce,
 			associatedData: se.associatedData(),
-			chunkIndex:     nonce[len(nonce)-8:],
+			chunkIndex:     make([]byte, 8),
 			packetTag:      packetTypeSymmetricallyEncryptedIntegrityProtected,
 		},
 		reader:      se.Contents,
-		chunkBytes:  chunkBytes,
 		peekedBytes: peekedBytes,
 	}, nil
 }
@@ -123,7 +115,7 @@ func serializeSymmetricallyEncryptedAead(ciphertext io.WriteCloser, cipherSuite 
 
 	// Random salt
 	salt := make([]byte, aeadSaltSize)
-	if _, err := io.ReadFull(rand, salt); err != nil {
+	if _, err := rand.Read(salt); err != nil {
 		return nil, err
 	}
 
@@ -133,20 +125,16 @@ func serializeSymmetricallyEncryptedAead(ciphertext io.WriteCloser, cipherSuite 
 
 	aead, nonce := getSymmetricallyEncryptedAeadInstance(cipherSuite.Cipher, cipherSuite.Mode, inputKey, salt, prefix)
 
-	chunkSize := decodeAEADChunkSize(chunkSizeByte)
-	tagLen := aead.Overhead()
-	chunkBytes := make([]byte, chunkSize+tagLen)
 	return &aeadEncrypter{
 		aeadCrypter: aeadCrypter{
 			aead:           aead,
-			chunkSize:      chunkSize,
+			chunkSize:      decodeAEADChunkSize(chunkSizeByte),
 			associatedData: prefix,
-			nonce:          nonce,
-			chunkIndex:     nonce[len(nonce)-8:],
+			chunkIndex:     make([]byte, 8),
+			initialNonce:   nonce,
 			packetTag:      packetTypeSymmetricallyEncryptedIntegrityProtected,
 		},
-		writer:     ciphertext,
-		chunkBytes: chunkBytes,
+		writer: ciphertext,
 	}, nil
 }
 
@@ -156,10 +144,10 @@ func getSymmetricallyEncryptedAeadInstance(c CipherFunction, mode AEADMode, inpu
 	encryptionKey := make([]byte, c.KeySize())
 	_, _ = readFull(hkdfReader, encryptionKey)
 
-	nonce = make([]byte, mode.IvLength())
-
 	// Last 64 bits of nonce are the counter
-	_, _ = readFull(hkdfReader, nonce[:len(nonce)-8])
+	nonce = make([]byte, mode.IvLength()-8)
+
+	_, _ = readFull(hkdfReader, nonce)
 
 	blockCipher := c.new(encryptionKey)
 	aead = mode.new(blockCipher)

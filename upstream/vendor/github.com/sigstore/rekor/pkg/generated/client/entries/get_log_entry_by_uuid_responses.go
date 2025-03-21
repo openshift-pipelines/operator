@@ -22,7 +22,6 @@ package entries
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 
@@ -109,13 +108,11 @@ func (o *GetLogEntryByUUIDOK) Code() int {
 }
 
 func (o *GetLogEntryByUUIDOK) Error() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/entries/{entryUUID}][%d] getLogEntryByUuidOK %s", 200, payload)
+	return fmt.Sprintf("[GET /api/v1/log/entries/{entryUUID}][%d] getLogEntryByUuidOK  %+v", 200, o.Payload)
 }
 
 func (o *GetLogEntryByUUIDOK) String() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/entries/{entryUUID}][%d] getLogEntryByUuidOK %s", 200, payload)
+	return fmt.Sprintf("[GET /api/v1/log/entries/{entryUUID}][%d] getLogEntryByUuidOK  %+v", 200, o.Payload)
 }
 
 func (o *GetLogEntryByUUIDOK) GetPayload() models.LogEntry {
@@ -176,11 +173,11 @@ func (o *GetLogEntryByUUIDNotFound) Code() int {
 }
 
 func (o *GetLogEntryByUUIDNotFound) Error() string {
-	return fmt.Sprintf("[GET /api/v1/log/entries/{entryUUID}][%d] getLogEntryByUuidNotFound", 404)
+	return fmt.Sprintf("[GET /api/v1/log/entries/{entryUUID}][%d] getLogEntryByUuidNotFound ", 404)
 }
 
 func (o *GetLogEntryByUUIDNotFound) String() string {
-	return fmt.Sprintf("[GET /api/v1/log/entries/{entryUUID}][%d] getLogEntryByUuidNotFound", 404)
+	return fmt.Sprintf("[GET /api/v1/log/entries/{entryUUID}][%d] getLogEntryByUuidNotFound ", 404)
 }
 
 func (o *GetLogEntryByUUIDNotFound) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -237,13 +234,11 @@ func (o *GetLogEntryByUUIDDefault) Code() int {
 }
 
 func (o *GetLogEntryByUUIDDefault) Error() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/entries/{entryUUID}][%d] getLogEntryByUUID default %s", o._statusCode, payload)
+	return fmt.Sprintf("[GET /api/v1/log/entries/{entryUUID}][%d] getLogEntryByUUID default  %+v", o._statusCode, o.Payload)
 }
 
 func (o *GetLogEntryByUUIDDefault) String() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/entries/{entryUUID}][%d] getLogEntryByUUID default %s", o._statusCode, payload)
+	return fmt.Sprintf("[GET /api/v1/log/entries/{entryUUID}][%d] getLogEntryByUUID default  %+v", o._statusCode, o.Payload)
 }
 
 func (o *GetLogEntryByUUIDDefault) GetPayload() *models.Error {

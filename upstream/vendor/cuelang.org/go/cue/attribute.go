@@ -49,7 +49,6 @@ func newAttr(k internal.AttrKind, a *ast.Attribute) Attribute {
 	x := internal.ParseAttrBody(a.Pos().Add(len(key)+1), body)
 	x.Name = key
 	x.Kind = k
-	x.Pos = a.Pos()
 	return Attribute{x}
 }
 
@@ -211,5 +210,13 @@ func (a *Attribute) Flag(pos int, key string) (bool, error) {
 // and reports the value if found. It reports an error if the attribute is
 // invalid or if the first pos-1 entries are not defined.
 func (a *Attribute) Lookup(pos int, key string) (val string, found bool, err error) {
-	return a.attr.Lookup(pos, key)
+	val, found, err = a.attr.Lookup(pos, key)
+
+	// TODO: remove at some point. This is an ugly hack to simulate the old
+	// behavior of protobufs.
+	if !found && a.attr.Name == "protobuf" && key == "type" {
+		val, err = a.String(1)
+		found = err == nil
+	}
+	return val, found, err
 }

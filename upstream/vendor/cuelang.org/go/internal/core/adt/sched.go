@@ -123,7 +123,6 @@ const (
 	taskWAITING // task is blocked on a property of an arc to hold
 	taskSUCCESS
 	taskFAILED
-	taskCANCELLED
 )
 
 type schedState uint8
@@ -176,8 +175,6 @@ func (s schedState) String() string {
 // runMode indicates how to proceed after a condition could not be met.
 type runMode uint8
 
-//go:generate go run golang.org/x/tools/cmd/stringer -type=runMode
-
 const (
 	// ignore indicates that the new evaluator should not do any processing.
 	// This is mostly used in the transition from old to new evaluator and
@@ -197,6 +194,20 @@ const (
 	// complete the evaluation of a Vertex.
 	finalize
 )
+
+func (r runMode) String() string {
+	switch r {
+	case ignore:
+		return "ignore"
+	case attemptOnly:
+		return "attemptOnly"
+	case yield:
+		return "yield"
+	case finalize:
+		return "finalize"
+	}
+	return "unknown"
+}
 
 // condition is a bit mask of states that a task may depend on.
 //
@@ -268,17 +279,6 @@ type scheduler struct {
 
 func (s *scheduler) clear() {
 	// TODO(perf): free tasks into task pool
-
-	// Any tasks blocked on this scheduler are unblocked once the scheduler is cleared.
-	// Otherwise they might signal a cleared scheduler, which can panic.
-	//
-	// TODO(mvdan,mpvl): In principle, all blocks should have been removed when a scheduler
-	// is cleared. Perhaps this can happen when the scheduler is stopped prematurely.
-	// For now, this solution seems to work OK.
-	for _, t := range s.blocking {
-		t.blockedOn = nil
-		t.blockCondition = neverKnown
-	}
 
 	*s = scheduler{
 		ctx:      s.ctx,
@@ -369,11 +369,11 @@ func (s *scheduler) process(needs condition, mode runMode) bool {
 
 	if s.ctx.LogEval > 0 && len(s.tasks) > 0 {
 		if v := s.tasks[0].node.node; v != nil {
-			c.Logf(v, "START Process %v -- mode: %v", v.Label, mode)
 			c.nest++
+			c.Logf(v, "START Process %v -- mode: %v", v.Label, mode)
 			defer func() {
-				c.nest--
 				c.Logf(v, "END Process")
+				c.nest--
 			}()
 		}
 	}
@@ -394,6 +394,9 @@ processNextTask:
 		}
 
 		switch {
+		case t.defunct:
+			continue
+
 		case t.state == taskRUNNING:
 			// TODO: we could store the current referring node that caused
 			// the cycle and then proceed up the stack to mark all tasks
@@ -593,7 +596,7 @@ type task struct {
 	// scheduler.
 	blockedOn      *scheduler
 	blockCondition condition
-	// blockStack     []*task // TODO: use; for error reporting.
+	blockStack     []*task // TODO: use; for error reporting.
 
 	err *Bottom
 
@@ -657,12 +660,6 @@ func (s *scheduler) insertTask(t *task) {
 
 func runTask(t *task, mode runMode) {
 	if t.defunct {
-		if t.state != taskCANCELLED {
-			t.state = taskCANCELLED
-			if t.id.cc != nil {
-				t.id.cc.decDependent(t.node.ctx, TASK, nil)
-			}
-		}
 		return
 	}
 	t.node.Logf("============ RUNTASK %v %v", t.run.name, t.x)
@@ -703,10 +700,7 @@ func runTask(t *task, mode runMode) {
 	defer ctx.popTask()
 	if t.env != nil {
 		id := t.id
-		// This is done to avoid struct args from passing fields up.
-		// Use [task.updateCI] to get the current CloseInfo with this field
-		// restored.
-		id.cc = nil
+		id.cc = nil // this is done to avoid struct args from passing fields up.
 		s := ctx.PushConjunct(MakeConjunct(t.env, t.x, id))
 		defer ctx.PopState(s)
 	}
@@ -729,22 +723,14 @@ func runTask(t *task, mode runMode) {
 		} else {
 			t.state = taskFAILED
 		}
-		// TODO: do not add both context and task errors. Do something more
-		// principled.
-		t.node.addBottom(t.err)
+		t.node.addBottom(t.err) // TODO: replace with something more principled.
+
 		if t.id.cc != nil {
 			t.id.cc.decDependent(ctx, TASK, nil)
 		}
 		t.node.decrementCounts(t.completes)
 		t.completes = 0 // safety
 	}
-}
-
-// updateCI stitches back the closeContext that more removed from the CloseInfo
-// before in the given CloseInfo.
-func (t *task) updateCI(ci CloseInfo) CloseInfo {
-	ci.cc = t.id.cc
-	return ci
 }
 
 // waitFor blocks task t until the needs for scheduler s are met.

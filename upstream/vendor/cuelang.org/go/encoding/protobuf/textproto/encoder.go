@@ -118,11 +118,11 @@ func (e *encoder) encodeMsg(parent *pbast.Node, v cue.Value) {
 				var key *pbast.Node
 				switch info.KeyType {
 				case pbinternal.String, pbinternal.Bytes:
-					key = pbast.StringNode("key", i.Selector().Unquoted())
+					key = pbast.StringNode("key", i.Label())
 				default:
 					key = &pbast.Node{
 						Name:   "key",
-						Values: []*pbast.Value{{Value: i.Selector().Unquoted()}},
+						Values: []*pbast.Value{{Value: i.Label()}},
 					}
 				}
 				n.Children = append(n.Children, key)

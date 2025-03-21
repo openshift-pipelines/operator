@@ -233,7 +233,7 @@ var p = &pkg.Package{
 		Params: []pkg.Param{
 			{Kind: adt.StringKind},
 		},
-		Result: adt.StructKind,
+		Result: adt.TopKind,
 		Func: func(c *pkg.CallCtxt) {
 			t := c.String(0)
 			if c.Do() {
