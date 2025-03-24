@@ -10,16 +10,16 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "release-v1.17.x" &&
-      ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
-      ".konflux/dockerfiles/proxy.Dockerfile".pathChanged() ||
-      ".tekton/operator-1-17-proxy-push.yaml".pathChanged())
+      == "release-v1.15.x" &&
+      ((".konflux/patches/***".pathChanged() || ".konflux/olm-catalog/bundle/***".pathChanged()) ||
+      ".konflux/olm-catalog/bundle/Dockerfile".pathChanged() ||
+      ".tekton/operator-1-15-bundle-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: openshift-pipelines-1-17
-    appstudio.openshift.io/component: operator-1-17-proxy
+    appstudio.openshift.io/application: openshift-pipelines-1-15
+    appstudio.openshift.io/component: operator-1-15-bundle
     pipelines.appstudio.openshift.io/type: build
-  name: operator-1-17-proxy-on-push
+  name: operator-1-15-bundle-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -28,9 +28,9 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/1-17/operator-proxy-rhel8:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/1-15/operator-bundle-rhel8:{{revision}}
   - name: dockerfile
-    value: .konflux/dockerfiles/proxy.Dockerfile
+    value: .konflux/olm-catalog/bundle/Dockerfile
   - name: prefetch-input
     value: |
       {"type": "rpm", "path": ".konflux/rpms"}
