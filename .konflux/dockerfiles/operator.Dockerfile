@@ -5,7 +5,6 @@ FROM $GO_BUILDER AS builder
 
 WORKDIR /go/src/github.com/tektoncd/operator
 COPY upstream .
-# FIXME: handle patches (maybe ? probably not needed though)
 # COPY patches patches/
 # RUN set -e; for f in patches/*.patch; do echo ${f}; [[ -f ${f} ]] || continue; git apply ${f}; done
 COPY head HEAD
