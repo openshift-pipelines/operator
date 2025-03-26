@@ -40,22 +40,19 @@ func (r *Runtime) SetInterpreter(i Interpreter) {
 // Interpreter defines an entrypoint for creating per-package interpreters.
 type Interpreter interface {
 	// NewCompiler creates a compiler for b and reports any errors.
-	NewCompiler(b *build.Instance, r *Runtime) (Compiler, errors.Error)
+	NewCompiler(b *build.Instance) (Compiler, errors.Error)
 
 	// Kind returns the string to be used in the file-level @extern attribute.
 	Kind() string
 }
 
-// A Compiler fills in an adt.Expr for fields marked with `@extern(kind)`.
+// A Compiler composes an adt.Builtin for an external function implementation.
 type Compiler interface {
-	// Compile creates an adt.Expr (usually a builtin) for the
-	// given external named resource (usually a function). name
-	// is the name of the resource to compile, taken from altName
-	// in `@extern(name=altName)`, or from the field name if that's
-	// not defined. Scope is the struct that contains the field.
-	// Other than "name", the fields in a are implementation
-	// specific.
-	Compile(name string, scope adt.Value, a *internal.Attr) (adt.Expr, errors.Error)
+	// Compile creates a builtin for the given function name and attribute.
+	// funcName is the name of the function to compile, taken from altName in
+	// @extern(name=altName), or from the field name if that's not defined.
+	// Other than "name", the fields in a are implementation specific.
+	Compile(funcName string, a *internal.Attr) (*adt.Builtin, errors.Error)
 }
 
 // injectImplementations modifies v to include implementations of functions
@@ -74,10 +71,9 @@ func (r *Runtime) injectImplementations(b *build.Instance, v *adt.Vertex) (errs 
 		d.errs = errors.Append(d.errs, d.addFile(f))
 	}
 
-	v.VisitLeafConjuncts(func(c adt.Conjunct) bool {
-		d.decorateConjunct(c.Elem(), v)
-		return true
-	})
+	for _, c := range v.Conjuncts {
+		d.decorateConjunct(c.Elem())
+	}
 
 	return d.errs
 }
@@ -100,6 +96,7 @@ type externDecorator struct {
 }
 
 type fieldInfo struct {
+	file     *ast.File
 	extern   string
 	funcName string
 	attrBody string
@@ -218,7 +215,7 @@ func (d *externDecorator) initCompiler(kind string, pos token.Pos) (ok bool, err
 		return false, errors.Newf(pos, "no interpreter defined for %q", kind)
 	}
 
-	c, err := x.NewCompiler(d.pkg, d.runtime)
+	c, err := x.NewCompiler(d.pkg)
 	if err != nil {
 		return false, err
 	}
@@ -292,16 +289,14 @@ func (d *externDecorator) markExternFieldAttr(kind string, decls []ast.Decl) (er
 	return errs
 }
 
-func (d *externDecorator) decorateConjunct(e adt.Elem, scope *adt.Vertex) {
-	w := walk.Visitor{Before: func(n adt.Node) bool {
-		return d.processADTNode(n, scope)
-	}}
+func (d *externDecorator) decorateConjunct(e adt.Elem) {
+	w := walk.Visitor{Before: d.processADTNode}
 	w.Elem(e)
 }
 
 // processADTNode injects a builtin conjunct into n if n is an adt.Field and
 // has a marked ast.Field associated with it.
-func (d *externDecorator) processADTNode(n adt.Node, scope *adt.Vertex) bool {
+func (d *externDecorator) processADTNode(n adt.Node) bool {
 	f, ok := n.(*adt.Field)
 	if !ok {
 		return true
@@ -329,7 +324,7 @@ func (d *externDecorator) processADTNode(n adt.Node, scope *adt.Vertex) bool {
 		name = str
 	}
 
-	b, err := c.Compile(name, scope, &attr)
+	b, err := c.Compile(name, &attr)
 	if err != nil {
 		err = errors.Newf(info.attr.Pos(), "can't load from external module: %v", err)
 		d.errs = errors.Append(d.errs, err)

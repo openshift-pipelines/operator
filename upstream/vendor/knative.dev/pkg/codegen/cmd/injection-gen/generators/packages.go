@@ -412,7 +412,6 @@ func versionInformerPackages(basePackage string, groupPkgName string, gv clientg
 					imports:                     generator.NewImportTracker(),
 					typedInformerPackage:        typedInformerPackage,
 					groupInformerFactoryPackage: factoryPackagePath,
-					disableInformerInit:         customArgs.DisableInformerInit,
 				})
 				return generators
 			},

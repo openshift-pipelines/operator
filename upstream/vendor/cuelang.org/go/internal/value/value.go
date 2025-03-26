@@ -51,7 +51,8 @@ func Make(ctx *adt.OpContext, v adt.Value) cue.Value {
 
 // UnifyBuiltin returns the given Value unified with the given builtin template.
 func UnifyBuiltin(v cue.Value, kind string) cue.Value {
-	pkg, name, _ := strings.Cut(kind, ".")
+	p := strings.Split(kind, ".")
+	pkg, name := p[0], p[1]
 	s := runtime.SharedRuntime.LoadImport(pkg)
 	if s == nil {
 		return v

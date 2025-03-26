@@ -17,7 +17,7 @@ package net
 
 import (
 	"fmt"
-	"net/netip"
+	"net"
 
 	"cuelang.org/go/cue"
 )
@@ -28,81 +28,76 @@ const (
 	IPv6len = 16
 )
 
-func netGetIP(ip cue.Value) (goip netip.Addr) {
+func netGetIP(ip cue.Value) (goip net.IP) {
 	switch ip.Kind() {
 	case cue.StringKind:
 		s, err := ip.String()
 		if err != nil {
-			return netip.Addr{}
+			return nil
 		}
-		goip, err := netip.ParseAddr(s)
-		if err != nil {
-			return netip.Addr{}
+		goip := net.ParseIP(s)
+		if goip == nil {
+			return nil
 		}
 		return goip
 
 	case cue.BytesKind:
 		b, err := ip.Bytes()
 		if err != nil {
-			return netip.Addr{}
+			return nil
 		}
-		goip, err := netip.ParseAddr(string(b))
-		if err != nil {
-			return netip.Addr{}
+		goip := net.ParseIP(string(b))
+		if goip == nil {
+			return nil
 		}
 		return goip
 
 	case cue.ListKind:
 		iter, err := ip.List()
 		if err != nil {
-			return netip.Addr{}
+			return nil
 		}
-		var bytes []byte
 		for iter.Next() {
 			v, err := iter.Value().Int64()
 			if err != nil {
-				return netip.Addr{}
+				return nil
 			}
 			if v < 0 || 255 < v {
-				return netip.Addr{}
+				return nil
 			}
-			bytes = append(bytes, byte(v))
-		}
-		goip, ok := netip.AddrFromSlice(bytes)
-		if !ok {
-			return netip.Addr{}
+			goip = append(goip, byte(v))
 		}
 		return goip
 
 	default:
 		// TODO: return canonical invalid type.
-		return netip.Addr{}
+		return nil
 	}
 }
 
-func netGetIPCIDR(ip cue.Value) (gonet *netip.Prefix, err error) {
+func netGetIPCIDR(ip cue.Value) (gonet *net.IPNet, err error) {
 	switch ip.Kind() {
 	case cue.StringKind:
 		s, err := ip.String()
 		if err != nil {
 			return nil, err
 		}
-		cidr, err := netip.ParsePrefix(s)
+		_, gonet, err := net.ParseCIDR(s)
 		if err != nil {
 			return nil, err
 		}
-		return &cidr, nil
+		return gonet, nil
 
 	case cue.BytesKind:
 		b, err := ip.Bytes()
 		if err != nil {
 			return nil, err
 		}
-		cidr, err := netip.ParsePrefix(string(b))
+		_, gonet, err := net.ParseCIDR(string(b))
 		if err != nil {
 			return nil, err
 		}
-		return &cidr, nil
+		return gonet, nil
 
 	default:
 		// TODO: return canonical invalid type.
@@ -116,14 +111,14 @@ func netGetIPCIDR(ip cue.Value) (gonet *netip.Prefix, err error) {
 // If s is not a valid textual representation of an IP address,
 // ParseIP returns nil.
 func ParseIP(s string) ([]uint, error) {
-	goip, err := netip.ParseAddr(s)
-	if err != nil {
+	goip := net.ParseIP(s)
+	if goip == nil {
 		return nil, fmt.Errorf("invalid IP address %q", s)
 	}
-	return netToList(goip.AsSlice()), nil
+	return netToList(goip), nil
 }
 
-func netToList(ip []byte) []uint {
+func netToList(ip net.IP) []uint {
 	a := make([]uint, len(ip))
 	for i, p := range ip {
 		a[i] = uint(p)
@@ -131,27 +126,20 @@ func netToList(ip []byte) []uint {
 	return a
 }
 
-// IPv4 reports whether ip is a valid IPv4 address.
+// IPv4 reports whether s is a valid IPv4 address.
 //
 // The address may be a string or list of bytes.
 func IPv4(ip cue.Value) bool {
 	// TODO: convert to native CUE.
-	return netGetIP(ip).Is4()
+	return netGetIP(ip).To4() != nil
 }
 
-// IPv6 reports whether ip is a valid IPv6 address.
-//
-// The address may be a string or list of bytes.
-func IPv6(ip cue.Value) bool {
-	return netGetIP(ip).Is6()
-}
-
-// IP reports whether ip is a valid IPv4 or IPv6 address.
+// IP reports whether s is a valid IPv4 or IPv6 address.
 //
 // The address may be a string or list of bytes.
 func IP(ip cue.Value) bool {
 	// TODO: convert to native CUE.
-	return netGetIP(ip).IsValid()
+	return netGetIP(ip) != nil
 }
 
 // IPCIDR reports whether ip is a valid IPv4 or IPv6 address with CIDR subnet notation.
@@ -208,25 +196,24 @@ func UnspecifiedIP(ip cue.Value) bool {
 // 4-byte representation.
 func ToIP4(ip cue.Value) ([]uint, error) {
 	ipdata := netGetIP(ip)
-	if !ipdata.IsValid() {
+	if ipdata == nil {
 		return nil, fmt.Errorf("invalid IP %q", ip)
 	}
-	if !ipdata.Is4() {
+	ipv4 := ipdata.To4()
+	if ipv4 == nil {
 		return nil, fmt.Errorf("cannot convert %q to IPv4", ipdata)
 	}
-	as4 := ipdata.As4()
-	return netToList(as4[:]), nil
+	return netToList(ipv4), nil
 }
 
 // ToIP16 converts a given IP address, which may be a string or a list, to its
 // 16-byte representation.
 func ToIP16(ip cue.Value) ([]uint, error) {
 	ipdata := netGetIP(ip)
-	if !ipdata.IsValid() {
+	if ipdata == nil {
 		return nil, fmt.Errorf("invalid IP %q", ip)
 	}
-	as16 := ipdata.As16()
-	return netToList(as16[:]), nil
+	return netToList(ipdata), nil
 }
 
 // IPString returns the string form of the IP address ip. It returns one of 4 forms:
@@ -237,7 +224,7 @@ func ToIP16(ip cue.Value) ([]uint, error) {
 // - the hexadecimal form of ip, without punctuation, if no other cases apply
 func IPString(ip cue.Value) (string, error) {
 	ipdata := netGetIP(ip)
-	if !ipdata.IsValid() {
+	if ipdata == nil {
 		return "", fmt.Errorf("invalid IP %q", ip)
 	}
 	return ipdata.String(), nil

@@ -1,8 +1,6 @@
 package pipeline
 
-import (
-	"github.com/buildkite/go-pipeline/warning"
-)
+import "fmt"
 
 // In the buildkite pipeline yaml, some step types (broadly, wait steps, input steps and block steps) can be represented
 // either by a scalar string (ie "wait") or by a mapping with keys and values and such
@@ -31,19 +29,13 @@ import (
 
 var validStepScalars = []string{"wait", "waiter", "block", "input", "manual"}
 
-// NewScalarStep returns a Step that can be represented as a single string.
-// Currently these are "wait", "block", "input", and some deprecated variations
-// ("waiter", "manual"). If it is any other string, NewScalarStep returns an
-// UnknownStep containing an error wrapping ErrUnknownStepType.
 func NewScalarStep(s string) (Step, error) {
 	switch s {
 	case "wait", "waiter":
 		return &WaitStep{Scalar: s}, nil
-
 	case "block", "input", "manual":
 		return &InputStep{Scalar: s}, nil
-
 	default:
-		return &UnknownStep{Contents: s}, warning.Newf("%w %q, want one of %v", ErrUnknownStepType, s, validStepScalars)
+		return nil, fmt.Errorf("unmarshaling step: unsupported scalar step type %q, want one of %v", s, validStepScalars)
 	}
 }

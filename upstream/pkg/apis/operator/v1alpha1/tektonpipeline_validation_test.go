@@ -210,41 +210,6 @@ func TestValidateTektonPipelineCoschedule(t *testing.T) {
 	}
 }
 
-func TestValidateTektonPipeline_DisableInlineSpec(t *testing.T) {
-	tp := &TektonPipeline{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "pipeline",
-			Namespace: "tekton-pipelines-ns",
-		},
-		Spec: TektonPipelineSpec{
-			CommonSpec: CommonSpec{
-				TargetNamespace: "tekton-pipelines-ns",
-			},
-		},
-	}
-
-	tests := []struct {
-		name              string
-		disableInlineSpec string
-		err               string
-	}{
-		{name: "disable-inline-spec", disableInlineSpec: "", err: ""},
-		{name: "disable-inline-spec", disableInlineSpec: "pipeline", err: ""},
-		{name: "disable-inline-spec", disableInlineSpec: "pipelinerun", err: ""},
-		{name: "disable-inline-spec", disableInlineSpec: "taskrun", err: ""},
-		{name: "disable-inline-spec", disableInlineSpec: "pipelinerun,taskrun,pipeline", err: ""},
-		{name: "disable-inline-spec", disableInlineSpec: "hello", err: "invalid value: hello: spec.disable-inline-spec"},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			tp.Spec.Pipeline.DisableInlineSpec = test.disableInlineSpec
-			errs := tp.Validate(context.TODO())
-			assert.Equal(t, test.err, errs.Error())
-		})
-	}
-}
-
 func Test_ValidateTektonPipeline_OnDelete(t *testing.T) {
 
 	td := &TektonPipeline{
@@ -283,13 +248,6 @@ func TestTektonPipelinePerformancePropertiesValidate(t *testing.T) {
 		return &value
 	}
 
-	// return pointer value for replicas
-	getReplicas := func(value int32) *int32 {
-		return &value
-	}
-
-	statefulsetOrdinals := true
-
 	// validate buckets minimum range
 	tp.Spec.PipelineProperties.Performance = PipelinePerformanceProperties{}
 	tp.Spec.PipelineProperties.Performance.DisableHA = false
@@ -317,26 +275,4 @@ func TestTektonPipelinePerformancePropertiesValidate(t *testing.T) {
 	tp.Spec.PipelineProperties.Performance.Buckets = getBuckets(10)
 	errs = tp.Validate(context.TODO())
 	assert.Equal(t, "", errs.Error())
-
-	// validate buckets is equal to replicas when StatefulsetOrdinals is true
-	tp.Spec.PipelineProperties.Performance = PipelinePerformanceProperties{}
-	tp.Spec.PipelineProperties.Performance.DisableHA = false
-	bucketValue := uint(5)
-	tp.Spec.PipelineProperties.Performance.Buckets = getBuckets(bucketValue)
-	replicaValue := int32(5)
-	tp.Spec.PipelineProperties.Performance.Replicas = getReplicas(replicaValue)
-	tp.Spec.PipelineProperties.Performance.StatefulsetOrdinals = &statefulsetOrdinals
-	errs = tp.Validate(context.TODO())
-	assert.Equal(t, "", errs.Error())
-
-	// validate error when buckets is not equal to replica
-	tp.Spec.PipelineProperties.Performance = PipelinePerformanceProperties{}
-	tp.Spec.PipelineProperties.Performance.DisableHA = false
-	tp.Spec.PipelineProperties.Performance.StatefulsetOrdinals = &statefulsetOrdinals
-	bucketValue = uint(5)
-	tp.Spec.PipelineProperties.Performance.Buckets = getBuckets(bucketValue)
-	tp.Spec.PipelineProperties.Performance.Replicas = getReplicas(3)
-	errs = tp.Validate(context.TODO())
-	expectedErrorMessage := "invalid value: 3: spec.performance.replicas\nspec.performance.replicas must equal spec.performance.buckets for statefulset ordinals"
-	assert.Equal(t, expectedErrorMessage, errs.Error())
 }

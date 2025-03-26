@@ -20,7 +20,6 @@ import (
 	"context"
 	"strings"
 
-	"knative.dev/pkg/logging"
 	"knative.dev/pkg/ptr"
 )
 
@@ -31,7 +30,6 @@ func (tc *TektonConfig) SetDefaults(ctx context.Context) {
 
 	tc.Spec.Pipeline.setDefaults()
 	tc.Spec.Trigger.setDefaults()
-	tc.Spec.Chain.setDefaults()
 
 	if IsOpenShiftPlatform() {
 		if tc.Spec.Platforms.OpenShift.PipelinesAsCode == nil {
@@ -53,8 +51,7 @@ func (tc *TektonConfig) SetDefaults(ctx context.Context) {
 
 		// pac defaulting
 		if *tc.Spec.Platforms.OpenShift.PipelinesAsCode.Enable {
-			logger := logging.FromContext(ctx)
-			tc.Spec.Platforms.OpenShift.PipelinesAsCode.PACSettings.setPACDefaults(logger)
+			tc.Spec.Platforms.OpenShift.PipelinesAsCode.PACSettings.setPACDefaults()
 		}
 
 		// SCC defaulting

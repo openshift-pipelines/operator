@@ -26,17 +26,11 @@ type Signature struct {
 //
 // Standard caveats apply - see the package comment.
 type CommandStep struct {
-	// Fields common to various step types
-	Key   string `yaml:"key,omitempty" aliases:"id,identifier"`
-	Label string `yaml:"label,omitempty" aliases:"name"`
-
-	// Fields that are meaningful specifically for command steps
 	Command   string            `yaml:"command"`
 	Plugins   Plugins           `yaml:"plugins,omitempty"`
 	Env       map[string]string `yaml:"env,omitempty"`
 	Signature *Signature        `yaml:"signature,omitempty"`
 	Matrix    *Matrix           `yaml:"matrix,omitempty"`
-	Cache     *Cache            `yaml:"cache,omitempty"`
 
 	// RemainingFields stores any other top-level mapping items so they at least
 	// survive an unmarshal-marshal round-trip.
@@ -65,7 +59,8 @@ func (c *CommandStep) UnmarshalOrdered(src any) error {
 	type wrappedCommand CommandStep
 	// Unmarshal into this secret type, then process special fields specially.
 	fullCommand := new(struct {
-		Commands []string `yaml:"commands" aliases:"command"`
+		Command  []string `yaml:"command"`
+		Commands []string `yaml:"commands"`
 
 		// Use inline trickery to capture the rest of the struct.
 		Rem *wrappedCommand `yaml:",inline"`
@@ -80,7 +75,8 @@ func (c *CommandStep) UnmarshalOrdered(src any) error {
 	// string consistently than it is to pick apart multiple strings
 	// in a consistent way in order to hash all of them
 	// consistently.
-	c.Command = strings.Join(fullCommand.Commands, "\n")
+	cmds := append(fullCommand.Command, fullCommand.Commands...)
+	c.Command = strings.Join(cmds, "\n")
 	return nil
 }
 
@@ -98,44 +94,36 @@ func (c *CommandStep) InterpolateMatrixPermutation(mp MatrixPermutation) error {
 }
 
 func (c *CommandStep) interpolate(tf stringTransformer) error {
-	// Fields that are interpolated with env vars and matrix tokens:
-	// command, plugins
-	if err := interpolateString(tf, &c.Command); err != nil {
-		return fmt.Errorf("interpolating command: %w", err)
+	cmd, err := tf.Transform(c.Command)
+	if err != nil {
+		return err
 	}
-	if err := interpolateString(tf, &c.Label); err != nil {
-		return fmt.Errorf("interpolating label: %w", err)
-	}
+	c.Command = cmd
+
 	if err := interpolateSlice(tf, c.Plugins); err != nil {
-		return fmt.Errorf("interpolating plugins: %w", err)
+		return err
 	}
 
 	switch tf.(type) {
 	case envInterpolator:
-		// Env interpolation applies to nearly everything:
-		// key, depends_on, env (keys and values), matrix
-		if err := interpolateString(tf, &c.Key); err != nil {
-			return fmt.Errorf("interpolating key: %w", err)
-		}
 		if err := interpolateMap(tf, c.Env); err != nil {
-			return fmt.Errorf("interpolating env: %w", err)
+			return err
 		}
-		if err := c.Matrix.interpolate(tf); err != nil {
-			return fmt.Errorf("interpolating matrix: %w", err)
+		if c.Matrix, err = interpolateAny(tf, c.Matrix); err != nil {
+			return err
 		}
 
 	case matrixInterpolator:
-		// Matrix interpolation applies only to some things, but particularly
-		// only affects env values (not env keys).
+		// Matrix interpolation doesn't apply to env keys.
 		if err := interpolateMapValues(tf, c.Env); err != nil {
-			return fmt.Errorf("interpolating env values: %w", err)
+			return err
 		}
 	}
 
 	// NB: Do not interpolate Signature.
 
 	if err := interpolateMap(tf, c.RemainingFields); err != nil {
-		return fmt.Errorf("interpolating remaining fields: %w", err)
+		return err
 	}
 
 	return nil

@@ -58,19 +58,11 @@ func (m GroupMilestone) String() string {
 // https://docs.gitlab.com/ee/api/group_milestones.html#list-group-milestones
 type ListGroupMilestonesOptions struct {
 	ListOptions
-	IIDs                    *[]int   `url:"iids[],omitempty" json:"iids,omitempty"`
-	State                   *string  `url:"state,omitempty" json:"state,omitempty"`
-	Title                   *string  `url:"title,omitempty" json:"title,omitempty"`
-	Search                  *string  `url:"search,omitempty" json:"search,omitempty"`
-	SearchTitle             *string  `url:"search_title,omitempty" json:"search_title,omitempty"`
-	IncludeParentMilestones *bool    `url:"include_parent_milestones,omitempty" json:"include_parent_milestones,omitempty"`
-	IncludeAncestors        *bool    `url:"include_ancestors,omitempty" json:"include_ancestors,omitempty"`
-	IncludeDescendents      *bool    `url:"include_descendents,omitempty" json:"include_descendents,omitempty"`
-	UpdatedBefore           *ISOTime `url:"updated_before,omitempty" json:"updated_before,omitempty"`
-	UpdatedAfter            *ISOTime `url:"updated_after,omitempty" json:"updated_after,omitempty"`
-	ContainingDate          *ISOTime `url:"containing_date,omitempty" json:"containing_date,omitempty"`
-	StartDate               *ISOTime `url:"start_date,omitempty" json:"start_date,omitempty"`
-	EndDate                 *ISOTime `url:"end_date,omitempty" json:"end_date,omitempty"`
+	IIDs                    *[]int  `url:"iids[],omitempty" json:"iids,omitempty"`
+	State                   *string `url:"state,omitempty" json:"state,omitempty"`
+	Title                   *string `url:"title,omitempty" json:"title,omitempty"`
+	Search                  *string `url:"search,omitempty" json:"search,omitempty"`
+	IncludeParentMilestones *bool   `url:"include_parent_milestones,omitempty" json:"include_parent_milestones,omitempty"`
 }
 
 // ListGroupMilestones returns a list of group milestones.
@@ -194,24 +186,6 @@ func (s *GroupMilestonesService) UpdateGroupMilestone(gid interface{}, milestone
 	}
 
 	return m, resp, nil
-}
-
-// DeleteGroupMilestone deletes a specified group milestone.
-//
-// GitLab API docs:
-// https://docs.gitlab.com/ee/api/group_milestones.html#delete-group-milestone
-func (s *GroupMilestonesService) DeleteGroupMilestone(pid interface{}, milestone int, options ...RequestOptionFunc) (*Response, error) {
-	project, err := parseID(pid)
-	if err != nil {
-		return nil, err
-	}
-	u := fmt.Sprintf("groups/%s/milestones/%d", PathEscape(project), milestone)
-
-	req, err := s.client.NewRequest(http.MethodDelete, u, nil, options)
-	if err != nil {
-		return nil, err
-	}
-	return s.client.Do(req, nil)
 }
 
 // GetGroupMilestoneIssuesOptions represents the available GetGroupMilestoneIssues() options.

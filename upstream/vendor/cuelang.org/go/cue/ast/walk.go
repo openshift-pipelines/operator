@@ -16,26 +16,55 @@ package ast
 
 import (
 	"fmt"
-)
 
-func walkList[N Node](list []N, before func(Node) bool, after func(Node)) {
-	for _, node := range list {
-		Walk(node, before, after)
-	}
-}
+	"cuelang.org/go/cue/token"
+)
 
 // Walk traverses an AST in depth-first order: It starts by calling f(node);
 // node must not be nil. If before returns true, Walk invokes f recursively for
 // each of the non-nil children of node, followed by a call of after. Both
 // functions may be nil. If before is nil, it is assumed to always return true.
 func Walk(node Node, before func(Node) bool, after func(Node)) {
-	if before != nil && !before(node) {
+	walk(&inspector{before: before, after: after}, node)
+}
+
+// A visitor's before method is invoked for each node encountered by Walk.
+// If the result visitor w is true, Walk visits each of the children
+// of node with the visitor w, followed by a call of w.After.
+type visitor interface {
+	Before(node Node) (w visitor)
+	After(node Node)
+}
+
+// Helper functions for common node lists. They may be empty.
+
+func walkExprList(v visitor, list []Expr) {
+	for _, x := range list {
+		walk(v, x)
+	}
+}
+
+func walkDeclList(v visitor, list []Decl) {
+	for _, x := range list {
+		walk(v, x)
+	}
+}
+
+// walk traverses an AST in depth-first order: It starts by calling
+// v.Visit(node); node must not be nil. If the visitor w returned by
+// v.Visit(node) is not nil, walk is invoked recursively with visitor
+// w for each of the non-nil children of node, followed by a call of
+// w.Visit(nil).
+func walk(v visitor, node Node) {
+	if v = v.Before(node); v == nil {
 		return
 	}
 
 	// TODO: record the comment groups and interleave with the values like for
 	// parsing and printing?
-	walkList(Comments(node), before, after)
+	for _, c := range Comments(node) {
+		walk(v, c)
+	}
 
 	// walk children
 	// (the order of the cases matches the order
@@ -46,121 +75,189 @@ func Walk(node Node, before func(Node) bool, after func(Node)) {
 		// nothing to do
 
 	case *CommentGroup:
-		walkList(n.List, before, after)
+		for _, c := range n.List {
+			walk(v, c)
+		}
 
 	case *Attribute:
 		// nothing to do
 
 	case *Field:
-		Walk(n.Label, before, after)
+		walk(v, n.Label)
 		if n.Value != nil {
-			Walk(n.Value, before, after)
+			walk(v, n.Value)
 		}
-		walkList(n.Attrs, before, after)
+		for _, a := range n.Attrs {
+			walk(v, a)
+		}
 
 	case *Func:
-		walkList(n.Args, before, after)
-		Walk(n.Ret, before, after)
+		walkExprList(v, n.Args)
+		walk(v, n.Ret)
 
 	case *StructLit:
-		walkList(n.Elts, before, after)
+		walkDeclList(v, n.Elts)
 
 	// Expressions
 	case *BottomLit, *BadExpr, *Ident, *BasicLit:
 		// nothing to do
 
 	case *Interpolation:
-		walkList(n.Elts, before, after)
+		for _, e := range n.Elts {
+			walk(v, e)
+		}
 
 	case *ListLit:
-		walkList(n.Elts, before, after)
+		walkExprList(v, n.Elts)
 
 	case *Ellipsis:
 		if n.Type != nil {
-			Walk(n.Type, before, after)
+			walk(v, n.Type)
 		}
 
 	case *ParenExpr:
-		Walk(n.X, before, after)
+		walk(v, n.X)
 
 	case *SelectorExpr:
-		Walk(n.X, before, after)
-		Walk(n.Sel, before, after)
+		walk(v, n.X)
+		walk(v, n.Sel)
 
 	case *IndexExpr:
-		Walk(n.X, before, after)
-		Walk(n.Index, before, after)
+		walk(v, n.X)
+		walk(v, n.Index)
 
 	case *SliceExpr:
-		Walk(n.X, before, after)
+		walk(v, n.X)
 		if n.Low != nil {
-			Walk(n.Low, before, after)
+			walk(v, n.Low)
 		}
 		if n.High != nil {
-			Walk(n.High, before, after)
+			walk(v, n.High)
 		}
 
 	case *CallExpr:
-		Walk(n.Fun, before, after)
-		walkList(n.Args, before, after)
+		walk(v, n.Fun)
+		walkExprList(v, n.Args)
 
 	case *UnaryExpr:
-		Walk(n.X, before, after)
+		walk(v, n.X)
 
 	case *BinaryExpr:
-		Walk(n.X, before, after)
-		Walk(n.Y, before, after)
+		walk(v, n.X)
+		walk(v, n.Y)
 
 	// Declarations
 	case *ImportSpec:
 		if n.Name != nil {
-			Walk(n.Name, before, after)
+			walk(v, n.Name)
 		}
-		Walk(n.Path, before, after)
+		walk(v, n.Path)
 
 	case *BadDecl:
 		// nothing to do
 
 	case *ImportDecl:
-		walkList(n.Specs, before, after)
+		for _, s := range n.Specs {
+			walk(v, s)
+		}
 
 	case *EmbedDecl:
-		Walk(n.Expr, before, after)
+		walk(v, n.Expr)
 
 	case *LetClause:
-		Walk(n.Ident, before, after)
-		Walk(n.Expr, before, after)
+		walk(v, n.Ident)
+		walk(v, n.Expr)
 
 	case *Alias:
-		Walk(n.Ident, before, after)
-		Walk(n.Expr, before, after)
+		walk(v, n.Ident)
+		walk(v, n.Expr)
 
 	case *Comprehension:
-		walkList(n.Clauses, before, after)
-		Walk(n.Value, before, after)
+		for _, c := range n.Clauses {
+			walk(v, c)
+		}
+		walk(v, n.Value)
 
 	// Files and packages
 	case *File:
-		walkList(n.Decls, before, after)
+		walkDeclList(v, n.Decls)
 
 	case *Package:
-		Walk(n.Name, before, after)
+		walk(v, n.Name)
 
 	case *ForClause:
 		if n.Key != nil {
-			Walk(n.Key, before, after)
+			walk(v, n.Key)
 		}
-		Walk(n.Value, before, after)
-		Walk(n.Source, before, after)
+		walk(v, n.Value)
+		walk(v, n.Source)
 
 	case *IfClause:
-		Walk(n.Condition, before, after)
+		walk(v, n.Condition)
 
 	default:
 		panic(fmt.Sprintf("Walk: unexpected node type %T", n))
 	}
 
-	if after != nil {
-		after(node)
+	v.After(node)
+}
+
+type inspector struct {
+	before func(Node) bool
+	after  func(Node)
+
+	commentStack []commentFrame
+	current      commentFrame
+}
+
+type commentFrame struct {
+	cg  []*CommentGroup
+	pos int8
+}
+
+func (f *inspector) Before(node Node) visitor {
+	if f.before == nil || f.before(node) {
+		f.commentStack = append(f.commentStack, f.current)
+		f.current = commentFrame{cg: Comments(node)}
+		f.visitComments(f.current.pos)
+		return f
+	}
+	return nil
+}
+
+func (f *inspector) After(node Node) {
+	f.visitComments(127)
+	p := len(f.commentStack) - 1
+	f.current = f.commentStack[p]
+	f.commentStack = f.commentStack[:p]
+	f.current.pos++
+	if f.after != nil {
+		f.after(node)
+	}
+}
+
+func (f *inspector) Token(t token.Token) {
+	f.current.pos++
+}
+
+func (f *inspector) visitComments(pos int8) {
+	c := &f.current
+	for ; len(c.cg) > 0; c.cg = c.cg[1:] {
+		cg := c.cg[0]
+		if cg.Position == pos {
+			continue
+		}
+		if f.before == nil || f.before(cg) {
+			for _, c := range cg.List {
+				if f.before == nil || f.before(c) {
+					if f.after != nil {
+						f.after(c)
+					}
+				}
+			}
+			if f.after != nil {
+				f.after(cg)
+			}
+		}
 	}
 }

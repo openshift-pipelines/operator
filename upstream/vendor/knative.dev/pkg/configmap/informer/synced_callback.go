@@ -26,14 +26,14 @@ import (
 // namedWaitGroup is used to increment and decrement a WaitGroup by name
 type namedWaitGroup struct {
 	waitGroup sync.WaitGroup
-	keys      sets.Set[string]
+	keys      sets.String
 	mu        sync.Mutex
 }
 
 // newNamedWaitGroup returns an instantiated namedWaitGroup.
 func newNamedWaitGroup() *namedWaitGroup {
 	return &namedWaitGroup{
-		keys: sets.New[string](),
+		keys: sets.NewString(),
 	}
 }
 

@@ -18,6 +18,7 @@ package common
 
 import (
 	"context"
+	"log"
 	"os"
 	"reflect"
 	"strconv"
@@ -25,13 +26,11 @@ import (
 
 	mf "github.com/manifestival/manifestival"
 	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
-	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"knative.dev/pkg/logging"
@@ -46,10 +45,8 @@ const (
 	AddonsImagePrefix             = "IMAGE_ADDONS_"
 	PacImagePrefix                = "IMAGE_PAC_"
 	ChainsImagePrefix             = "IMAGE_CHAINS_"
-	ManualApprovalGatePrefix      = "IMAGE_MAG_"
 	ResultsImagePrefix            = "IMAGE_RESULTS_"
 	HubImagePrefix                = "IMAGE_HUB_"
-	DashboardImagePrefix          = "IMAGE_DASHBOARD_"
 
 	ArgPrefix   = "arg_"
 	ParamPrefix = "param_"
@@ -310,10 +307,9 @@ func SplitsByEqual(arg string) ([]string, bool) {
 }
 
 // TaskImages replaces step and params images.
-func TaskImages(ctx context.Context, images map[string]string) mf.Transformer {
-	logger := logging.FromContext(ctx)
+func TaskImages(images map[string]string) mf.Transformer {
 	return func(u *unstructured.Unstructured) error {
-		if u.GetKind() != "ClusterTask" && u.GetKind() != "Task" {
+		if u.GetKind() != "ClusterTask" {
 			return nil
 		}
 
@@ -324,7 +320,7 @@ func TaskImages(ctx context.Context, images map[string]string) mf.Transformer {
 		if !found {
 			return nil
 		}
-		replaceStepsImages(steps, images, logger)
+		replaceStepsImages(steps, images)
 		err = unstructured.SetNestedField(u.Object, steps, "spec", "steps")
 		if err != nil {
 			return err
@@ -337,73 +333,47 @@ func TaskImages(ctx context.Context, images map[string]string) mf.Transformer {
 		if !found {
 			return nil
 		}
-		replaceParamsImage(params, images, logger)
-		return unstructured.SetNestedField(u.Object, params, "spec", "params")
-	}
-}
-
-// StepActionImages replaces spec images.
-func StepActionImages(ctx context.Context, images map[string]string) mf.Transformer {
-	logger := logging.FromContext(ctx)
-	return func(u *unstructured.Unstructured) error {
-		stepActionSpec, found, err := unstructured.NestedMap(u.Object, "spec")
+		replaceParamsImage(params, images)
+		err = unstructured.SetNestedField(u.Object, params, "spec", "params")
 		if err != nil {
 			return err
 		}
-		if !found {
-			return nil
-		}
-		replaceStepActionImages(stepActionSpec, images, u.GetName(), logger)
-		return unstructured.SetNestedMap(u.Object, stepActionSpec, "spec")
+		return nil
 	}
 }
 
-func replaceStepActionImages(stepActionSpec map[string]interface{}, override map[string]string, name string, logger *zap.SugaredLogger) {
-	name = formKey("", name)
-	image, found := override[name]
-	if !found || image == "" {
-		logger.Debugf("Image not found in stepaction %s action skip", name)
-		return
-	}
-	// Replace the image in the stepActionSpec if the key exists.
-	if _, ok := stepActionSpec["image"]; ok {
-		logger.Debugf("replacing image with %s", image)
-		stepActionSpec["image"] = image
-	}
-}
-
-func replaceStepsImages(steps []interface{}, override map[string]string, logger *zap.SugaredLogger) {
+func replaceStepsImages(steps []interface{}, override map[string]string) {
 	for _, s := range steps {
 		step := s.(map[string]interface{})
 		name, ok := step["name"].(string)
 		if !ok {
-			logger.Debugf("Unable to get the step %v step", s)
+			log.Println("Unable to get the step", "step", s)
 			continue
 		}
 
 		name = formKey("", name)
 		image, found := override[name]
 		if !found || image == "" {
-			logger.Debugf("Image not found step %s action skip", name)
+			log.Println("Image not found", "step", name, "action", "skip")
 			continue
 		}
 		step["image"] = image
 	}
 }
 
-func replaceParamsImage(params []interface{}, override map[string]string, logger *zap.SugaredLogger) {
+func replaceParamsImage(params []interface{}, override map[string]string) {
 	for _, p := range params {
 		param := p.(map[string]interface{})
 		name, ok := param["name"].(string)
 		if !ok {
-			logger.Debugf("Unable to get the pram %v param", p)
+			log.Println("Unable to get the pram", "param", p)
 			continue
 		}
 
 		name = formKey(ParamPrefix, name)
 		image, found := override[name]
 		if !found || image == "" {
-			logger.Debugf("Image not found step %s action skip", name)
+			log.Println("Image not found", "step", name, "action", "skip")
 			continue
 		}
 		param["default"] = image
@@ -964,136 +934,6 @@ func ReplaceNamespace(newNamespace string) mf.Transformer {
 			u.SetUnstructuredContent(obj)
 
 		}
-
-		return nil
-	}
-}
-
-// AddSecretData adds the given data and annotations to the Secret object.
-func AddSecretData(data map[string][]byte, annotations map[string]string) mf.Transformer {
-	return func(u *unstructured.Unstructured) error {
-		// If input data is empty, do not transform
-		if len(data) == 0 {
-			return nil
-		}
-
-		// Check if the resource is a Secret
-		if u.GetKind() != "Secret" {
-			return nil
-		}
-
-		// Convert unstructured to Secret
-		secret := &corev1.Secret{}
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, secret)
-		if err != nil {
-			return err
-		}
-
-		// Update the Secret's data only if it is nil or empty
-		if len(secret.Data) == 0 {
-			secret.Data = data
-		}
-
-		// Update the Secret's annotations
-		if secret.Annotations == nil {
-			secret.Annotations = make(map[string]string)
-		}
-		for key, value := range annotations {
-			secret.Annotations[key] = value
-		}
-
-		// Convert back to unstructured
-		unstrObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(secret)
-		if err != nil {
-			return err
-		}
-
-		// Update the original unstructured object
-		u.SetUnstructuredContent(unstrObj)
-
-		return nil
-	}
-}
-
-// ConvertDeploymentToStatefulSet converts a Deployment to a StatefulSet with given parameters
-func ConvertDeploymentToStatefulSet(controllerName, serviceName string) mf.Transformer {
-	return func(u *unstructured.Unstructured) error {
-		if u.GetKind() != "Deployment" || u.GetName() != controllerName {
-			return nil
-		}
-
-		d := &appsv1.Deployment{}
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, d)
-		if err != nil {
-			return err
-		}
-
-		ss := &appsv1.StatefulSet{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "StatefulSet",
-				APIVersion: appsv1.SchemeGroupVersion.Group + "/" + appsv1.SchemeGroupVersion.Version,
-			},
-			ObjectMeta: d.ObjectMeta,
-			Spec: appsv1.StatefulSetSpec{
-				Selector:    d.Spec.Selector,
-				ServiceName: serviceName,
-				Template:    d.Spec.Template,
-				Replicas:    d.Spec.Replicas,
-				UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
-					Type: appsv1.RollingUpdateStatefulSetStrategyType,
-				},
-			},
-		}
-
-		unstrObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ss)
-		if err != nil {
-			return err
-		}
-
-		u.SetUnstructuredContent(unstrObj)
-
-		return nil
-	}
-}
-
-// AddStatefulEnvVars adds environment variables to the statefulset based on given parameters
-func AddStatefulEnvVars(controllerName, serviceName, statefulServiceEnvVar, controllerOrdinalEnvVar string) mf.Transformer {
-	return func(u *unstructured.Unstructured) error {
-		if u.GetKind() != "StatefulSet" || u.GetName() != controllerName {
-			return nil
-		}
-
-		ss := &appsv1.StatefulSet{}
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, ss)
-		if err != nil {
-			return err
-		}
-
-		newEnvVars := []corev1.EnvVar{
-			{
-				Name:  statefulServiceEnvVar,
-				Value: serviceName,
-			},
-			{
-				Name: controllerOrdinalEnvVar,
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: "metadata.name",
-					},
-				},
-			},
-		}
-
-		if len(ss.Spec.Template.Spec.Containers) > 0 {
-			ss.Spec.Template.Spec.Containers[0].Env = append(ss.Spec.Template.Spec.Containers[0].Env, newEnvVars...)
-		}
-
-		unstrObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ss)
-		if err != nil {
-			return err
-		}
-
-		u.SetUnstructuredContent(unstrObj)
 
 		return nil
 	}

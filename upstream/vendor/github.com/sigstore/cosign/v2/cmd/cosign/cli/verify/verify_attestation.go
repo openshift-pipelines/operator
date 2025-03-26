@@ -28,6 +28,7 @@ import (
 	"github.com/sigstore/cosign/v2/cmd/cosign/cli/fulcio"
 	"github.com/sigstore/cosign/v2/cmd/cosign/cli/options"
 	"github.com/sigstore/cosign/v2/cmd/cosign/cli/rekor"
+	"github.com/sigstore/cosign/v2/internal/pkg/cosign/tsa"
 	"github.com/sigstore/cosign/v2/internal/ui"
 	"github.com/sigstore/cosign/v2/pkg/cosign"
 	"github.com/sigstore/cosign/v2/pkg/cosign/cue"
@@ -52,8 +53,6 @@ type VerifyAttestationCommand struct {
 	CertGithubWorkflowName       string
 	CertGithubWorkflowRepository string
 	CertGithubWorkflowRef        string
-	CAIntermediates              string
-	CARoots                      string
 	CertChain                    string
 	IgnoreSCT                    bool
 	SCTRef                       string
@@ -69,18 +68,6 @@ type VerifyAttestationCommand struct {
 	TSACertChainPath             string
 	IgnoreTlog                   bool
 	MaxWorkers                   int
-	UseSignedTimestamps          bool
-}
-
-func (c *VerifyAttestationCommand) loadTSACertificates(ctx context.Context) (*cosign.TSACertificates, error) {
-	if c.TSACertChainPath == "" && !c.UseSignedTimestamps {
-		return nil, fmt.Errorf("TSA certificate chain path not provided and use-signed-timestamps not set")
-	}
-	tsaCertificates, err := cosign.GetTSACerts(ctx, c.TSACertChainPath, cosign.GetTufTargets)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load TSA certificates: %w", err)
-	}
-	return tsaCertificates, nil
 }
 
 // Exec runs the verification command
@@ -124,23 +111,37 @@ func (c *VerifyAttestationCommand) Exec(ctx context.Context, images []string) (e
 		co.ClaimVerifier = cosign.IntotoSubjectClaimVerifier
 	}
 	// Ignore Signed Certificate Timestamp if the flag is set or a key is provided
-	if shouldVerifySCT(c.IgnoreSCT, c.KeyRef, c.Sk) {
+	if !c.IgnoreSCT || keylessVerification(c.KeyRef, c.Sk) {
 		co.CTLogPubKeys, err = cosign.GetCTLogPubs(ctx)
 		if err != nil {
 			return fmt.Errorf("getting ctlog public keys: %w", err)
 		}
 	}
 
-	if c.TSACertChainPath != "" || c.UseSignedTimestamps {
-		tsaCertificates, err := c.loadTSACertificates(ctx)
+	if c.TSACertChainPath != "" {
+		_, err := os.Stat(c.TSACertChainPath)
 		if err != nil {
-			return fmt.Errorf("unable to load TSA certificates: %w", err)
+			return fmt.Errorf("unable to open timestamp certificate chain file '%s: %w", c.TSACertChainPath, err)
 		}
-		co.TSACertificate = tsaCertificates.LeafCert
-		co.TSARootCertificates = tsaCertificates.RootCert
-		co.TSAIntermediateCertificates = tsaCertificates.IntermediateCerts
-	}
+		// TODO: Add support for TUF certificates.
+		pemBytes, err := os.ReadFile(filepath.Clean(c.TSACertChainPath))
+		if err != nil {
+			return fmt.Errorf("error reading certification chain path file: %w", err)
+		}
 
+		leaves, intermediates, roots, err := tsa.SplitPEMCertificateChain(pemBytes)
+		if err != nil {
+			return fmt.Errorf("error splitting certificates: %w", err)
+		}
+		if len(leaves) > 1 {
+			return fmt.Errorf("certificate chain must contain at most one TSA certificate")
+		}
+		if len(leaves) == 1 {
+			co.TSACertificate = leaves[0]
+		}
+		co.TSAIntermediateCertificates = intermediates
+		co.TSARootCertificates = roots
+	}
 	if !c.IgnoreTlog {
 		if c.RekorURL != "" {
 			rekorClient, err := rekor.NewClient(c.RekorURL)
@@ -156,13 +157,18 @@ func (c *VerifyAttestationCommand) Exec(ctx context.Context, images []string) (e
 			return fmt.Errorf("getting Rekor public keys: %w", err)
 		}
 	}
-
 	if keylessVerification(c.KeyRef, c.Sk) {
-		if err := loadCertsKeylessVerification(c.CertChain, c.CARoots, c.CAIntermediates, co); err != nil {
-			return err
+		// This performs an online fetch of the Fulcio roots. This is needed
+		// for verifying keyless certificates (both online and offline).
+		co.RootCerts, err = fulcio.GetRoots()
+		if err != nil {
+			return fmt.Errorf("getting Fulcio roots: %w", err)
+		}
+		co.IntermediateCerts, err = fulcio.GetIntermediates()
+		if err != nil {
+			return fmt.Errorf("getting Fulcio intermediates: %w", err)
 		}
 	}
-
 	keyRef := c.KeyRef
 
 	// Keys are optional!
@@ -223,9 +229,6 @@ func (c *VerifyAttestationCommand) Exec(ctx context.Context, images []string) (e
 			}
 			co.SCT = sct
 		}
-	case c.CARoots != "":
-		// CA roots + possible intermediates are already loaded into co.RootCerts with the call to
-		// loadCertsKeylessVerification above.
 	}
 
 	// NB: There are only 2 kinds of verification right now:

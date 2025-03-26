@@ -25,13 +25,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
-	"google.golang.org/grpc/internal"
 )
-
-func init() {
-	internal.FromOutgoingContextRaw = fromOutgoingContextRaw
-}
 
 // DecodeKeyValue returns k, v, nil.
 //
@@ -213,6 +207,11 @@ func FromIncomingContext(ctx context.Context) (MD, bool) {
 // ValueFromIncomingContext returns the metadata value corresponding to the metadata
 // key from the incoming metadata if it exists. Keys are matched in a case insensitive
 // manner.
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a
+// later release.
 func ValueFromIncomingContext(ctx context.Context, key string) []string {
 	md, ok := ctx.Value(mdIncomingKey{}).(MD)
 	if !ok {
@@ -223,7 +222,7 @@ func ValueFromIncomingContext(ctx context.Context, key string) []string {
 		return copyOf(v)
 	}
 	for k, v := range md {
-		// Case insensitive comparison: MD is a map, and there's no guarantee
+		// Case insenitive comparison: MD is a map, and there's no guarantee
 		// that the MD attached to the context is created using our helper
 		// functions.
 		if strings.EqualFold(k, key) {
@@ -239,13 +238,16 @@ func copyOf(v []string) []string {
 	return vals
 }
 
-// fromOutgoingContextRaw returns the un-merged, intermediary contents of rawMD.
+// FromOutgoingContextRaw returns the un-merged, intermediary contents of rawMD.
 //
 // Remember to perform strings.ToLower on the keys, for both the returned MD (MD
 // is a map, there's no guarantee it's created using our helper functions) and
 // the extra kv pairs (AppendToOutgoingContext doesn't turn them into
 // lowercase).
-func fromOutgoingContextRaw(ctx context.Context) (MD, [][]string, bool) {
+//
+// This is intended for gRPC-internal use ONLY. Users should use
+// FromOutgoingContext instead.
+func FromOutgoingContextRaw(ctx context.Context) (MD, [][]string, bool) {
 	raw, ok := ctx.Value(mdOutgoingKey{}).(rawMD)
 	if !ok {
 		return nil, nil, false

@@ -21,8 +21,4 @@ import (
 )
 
 func (tp *TektonResult) SetDefaults(ctx context.Context) {
-	// Deprecate TLSHostnameOverride
-	if tp.Spec.TLSHostnameOverride != "" {
-		tp.Spec.TLSHostnameOverride = ""
-	}
 }

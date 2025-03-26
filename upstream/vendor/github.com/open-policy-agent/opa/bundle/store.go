@@ -301,7 +301,6 @@ type ActivateOpts struct {
 	Bundles                  map[string]*Bundle     // Optional
 	ExtraModules             map[string]*ast.Module // Optional
 	AuthorizationDecisionRef ast.Ref
-	ParserOptions            ast.ParserOptions
 
 	legacy bool
 }
@@ -315,11 +314,10 @@ func Activate(opts *ActivateOpts) error {
 
 // DeactivateOpts defines options for the Deactivate API call
 type DeactivateOpts struct {
-	Ctx           context.Context
-	Store         storage.Store
-	Txn           storage.Transaction
-	BundleNames   map[string]struct{}
-	ParserOptions ast.ParserOptions
+	Ctx         context.Context
+	Store       storage.Store
+	Txn         storage.Transaction
+	BundleNames map[string]struct{}
 }
 
 // Deactivate the bundle(s). This will erase associated data, policies, and the manifest entry from the store.
@@ -334,7 +332,7 @@ func Deactivate(opts *DeactivateOpts) error {
 			erase[root] = struct{}{}
 		}
 	}
-	_, err := eraseBundles(opts.Ctx, opts.Store, opts.Txn, opts.ParserOptions, opts.BundleNames, erase)
+	_, err := eraseBundles(opts.Ctx, opts.Store, opts.Txn, opts.BundleNames, erase)
 	return err
 }
 
@@ -384,7 +382,7 @@ func activateBundles(opts *ActivateOpts) error {
 
 	// Erase data and policies at new + old roots, and remove the old
 	// manifests before activating a new snapshot bundle.
-	remaining, err := eraseBundles(opts.Ctx, opts.Store, opts.Txn, opts.ParserOptions, names, erase)
+	remaining, err := eraseBundles(opts.Ctx, opts.Store, opts.Txn, names, erase)
 	if err != nil {
 		return err
 	}
@@ -587,13 +585,13 @@ func activateDeltaBundles(opts *ActivateOpts, bundles map[string]*Bundle) error 
 
 // erase bundles by name and roots. This will clear all policies and data at its roots and remove its
 // manifest from storage.
-func eraseBundles(ctx context.Context, store storage.Store, txn storage.Transaction, parserOpts ast.ParserOptions, names map[string]struct{}, roots map[string]struct{}) (map[string]*ast.Module, error) {
+func eraseBundles(ctx context.Context, store storage.Store, txn storage.Transaction, names map[string]struct{}, roots map[string]struct{}) (map[string]*ast.Module, error) {
 
 	if err := eraseData(ctx, store, txn, roots); err != nil {
 		return nil, err
 	}
 
-	remaining, err := erasePolicies(ctx, store, txn, parserOpts, roots)
+	remaining, err := erasePolicies(ctx, store, txn, roots)
 	if err != nil {
 		return nil, err
 	}
@@ -635,7 +633,7 @@ func eraseData(ctx context.Context, store storage.Store, txn storage.Transaction
 	return nil
 }
 
-func erasePolicies(ctx context.Context, store storage.Store, txn storage.Transaction, parserOpts ast.ParserOptions, roots map[string]struct{}) (map[string]*ast.Module, error) {
+func erasePolicies(ctx context.Context, store storage.Store, txn storage.Transaction, roots map[string]struct{}) (map[string]*ast.Module, error) {
 
 	ids, err := store.ListPolicies(ctx, txn)
 	if err != nil {
@@ -649,7 +647,7 @@ func erasePolicies(ctx context.Context, store storage.Store, txn storage.Transac
 		if err != nil {
 			return nil, err
 		}
-		module, err := ast.ParseModuleWithOpts(id, string(bs), parserOpts)
+		module, err := ast.ParseModule(id, string(bs))
 		if err != nil {
 			return nil, err
 		}

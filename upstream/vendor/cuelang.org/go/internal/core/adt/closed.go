@@ -108,24 +108,11 @@ const (
 
 // TODO: merge with closeInfo: this is a leftover of the refactoring.
 type CloseInfo struct {
-	*closeInfo               // old implementation (TODO: remove)
-	cc         *closeContext // new implementation (TODO: rename field to closeCtx)
+	*closeInfo
 
 	// IsClosed is true if this conjunct represents a single level of closing
 	// as indicated by the closed builtin.
 	IsClosed bool
-
-	// FromEmbed indicates whether this conjunct was inserted because of an
-	// embedding.  This flag is sticky: it will be set for conjuncts created
-	// from fields defined by this conjunct.
-	// NOTE: only used when using closeContext.
-	FromEmbed bool
-
-	// FromDef indicates whether this conjunct was inserted because of a
-	// definition. This flag is sticky: it will be set for conjuncts created
-	// from fields defined by this conjunct.
-	// NOTE: only used when using closeContext.
-	FromDef bool
 
 	// FieldTypes indicates which kinds of fields (optional, dynamic, patterns,
 	// etc.) are contained in this conjunct.
@@ -344,9 +331,6 @@ func isClosed(v *Vertex) bool {
 // Accept determines whether f is allowed in n. It uses the OpContext for
 // caching administrative fields.
 func Accept(ctx *OpContext, n *Vertex, f Feature) (found, required bool) {
-	if ctx.isDevVersion() {
-		return n.accept(ctx, f), true
-	}
 	ctx.generation++
 	ctx.todo = nil
 

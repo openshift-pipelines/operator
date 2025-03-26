@@ -209,8 +209,6 @@ type PipelineTask struct {
 	TaskRef *TaskRef `json:"taskRef,omitempty"`
 
 	// TaskSpec is a specification of a task
-	// Specifying TaskSpec can be disabled by setting
-	// `disable-inline-spec` feature flag..
 	// +optional
 	TaskSpec *EmbeddedTask `json:"taskSpec,omitempty"`
 
@@ -259,8 +257,6 @@ type PipelineTask struct {
 
 	// PipelineSpec is a specification of a pipeline
 	// Note: PipelineSpec is in preview mode and not yet supported
-	// Specifying TaskSpec can be disabled by setting
-	// `disable-inline-spec` feature flag..
 	// +optional
 	PipelineSpec *PipelineSpec `json:"pipelineSpec,omitempty"`
 

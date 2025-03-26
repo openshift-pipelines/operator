@@ -40,8 +40,6 @@ import (
 const (
 	// Default to s3 when the service for sigv4 signing is not specified for backwards compatibility
 	awsSigv4SigningDefaultService = "s3"
-	// Default to urn:ietf:params:oauth:client-assertion-type:jwt-bearer for ClientAssertionType when not specified
-	defaultClientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 )
 
 // DefaultTLSConfig defines standard TLS configurations based on the Config
@@ -283,9 +281,6 @@ type oauth2ClientCredentialsAuthPlugin struct {
 	AdditionalParameters map[string]string      `json:"additional_parameters,omitempty"`
 	AWSKmsKey            *awsKmsKeyConfig       `json:"aws_kms,omitempty"`
 	AWSSigningPlugin     *awsSigningAuthPlugin  `json:"aws_signing,omitempty"`
-	ClientAssertionType  string                 `json:"client_assertion_type"`
-	ClientAssertion      string                 `json:"client_assertion"`
-	ClientAssertionPath  string                 `json:"client_assertion_path"`
 
 	signingKey       *keys.Config
 	signingKeyParsed interface{}
@@ -299,13 +294,16 @@ type oauth2Token struct {
 	ExpiresAt time.Time
 }
 
-func (ap *oauth2ClientCredentialsAuthPlugin) createAuthJWT(ctx context.Context, extClaims map[string]interface{}, signingKey interface{}) (*string, error) {
+func (ap *oauth2ClientCredentialsAuthPlugin) createAuthJWT(ctx context.Context, claims map[string]interface{}, signingKey interface{}) (*string, error) {
 	now := time.Now()
-	claims := map[string]interface{}{
+	baseClaims := map[string]interface{}{
 		"iat": now.Unix(),
 		"exp": now.Add(10 * time.Minute).Unix(),
 	}
-	for k, v := range extClaims {
+	if claims == nil {
+		claims = make(map[string]interface{})
+	}
+	for k, v := range baseClaims {
 		claims[k] = v
 	}
 
@@ -464,30 +462,14 @@ func (ap *oauth2ClientCredentialsAuthPlugin) NewClient(c Config) (*http.Client, 
 		return nil, errors.New("token_url required to use https scheme")
 	}
 	if ap.GrantType == grantTypeClientCredentials {
-		clientCredentialExists := make(map[string]bool)
-		clientCredentialExists["client_secret"] = ap.ClientSecret != ""
-		clientCredentialExists["signing_key"] = ap.SigningKeyID != ""
-		clientCredentialExists["aws_kms"] = ap.AWSKmsKey != nil
-		clientCredentialExists["client_assertion"] = ap.ClientAssertion != ""
-		clientCredentialExists["client_assertion_path"] = ap.ClientAssertionPath != ""
-
-		var notEmptyVarCount int
-
-		for _, credentialSet := range clientCredentialExists {
-			if credentialSet {
-				notEmptyVarCount++
-			}
+		if ap.AWSKmsKey != nil && (ap.ClientSecret != "" || ap.SigningKeyID != "") ||
+			(ap.ClientSecret != "" && ap.SigningKeyID != "") {
+			return nil, errors.New("can only use one of client_secret, signing_key or signing_kms_key for client_credentials")
 		}
-
-		if notEmptyVarCount == 0 {
-			return nil, errors.New("please provide one of client_secret, signing_key, aws_kms, client_assertion, or client_assertion_path required")
+		if ap.SigningKeyID == "" && ap.AWSKmsKey == nil && (ap.ClientID == "" || ap.ClientSecret == "") {
+			return nil, errors.New("client_id and client_secret required")
 		}
-
-		if notEmptyVarCount > 1 {
-			return nil, errors.New("can only use one of client_secret, signing_key, aws_kms, client_assertion, or client_assertion_path")
-		}
-
-		if clientCredentialExists["aws_kms"] {
+		if ap.AWSKmsKey != nil {
 			if ap.AWSSigningPlugin == nil {
 				return nil, errors.New("aws_kms and aws_signing required")
 			}
@@ -495,24 +477,6 @@ func (ap *oauth2ClientCredentialsAuthPlugin) NewClient(c Config) (*http.Client, 
 			_, err = ap.AWSSigningPlugin.NewClient(c)
 			if err != nil {
 				return nil, err
-			}
-		} else if clientCredentialExists["client_assertion"] {
-			if ap.ClientAssertionType == "" {
-				ap.ClientAssertionType = defaultClientAssertionType
-			}
-			if ap.ClientID == "" {
-				return nil, errors.New("client_id and client_assertion required")
-			}
-		} else if clientCredentialExists["client_assertion_path"] {
-			if ap.ClientAssertionType == "" {
-				ap.ClientAssertionType = defaultClientAssertionType
-			}
-			if ap.ClientID == "" {
-				return nil, errors.New("client_id and client_assertion_path required")
-			}
-		} else if clientCredentialExists["client_secret"] {
-			if ap.ClientID == "" {
-				return nil, errors.New("client_id and client_secret required")
 			}
 		}
 	}
@@ -541,34 +505,12 @@ func (ap *oauth2ClientCredentialsAuthPlugin) requestToken(ctx context.Context) (
 			if err != nil {
 				return nil, err
 			}
-			body.Add("client_assertion_type", defaultClientAssertionType)
+			body.Add("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
 			body.Add("client_assertion", *authJwt)
 
 			if ap.ClientID != "" {
 				body.Add("client_id", ap.ClientID)
 			}
-		} else if ap.ClientAssertion != "" {
-			if ap.ClientAssertionType == "" {
-				ap.ClientAssertionType = defaultClientAssertionType
-			}
-			if ap.ClientID != "" {
-				body.Add("client_id", ap.ClientID)
-			}
-			body.Add("client_assertion_type", ap.ClientAssertionType)
-			body.Add("client_assertion", ap.ClientAssertion)
-		} else if ap.ClientAssertionPath != "" {
-			if ap.ClientAssertionType == "" {
-				ap.ClientAssertionType = defaultClientAssertionType
-			}
-			bytes, err := os.ReadFile(ap.ClientAssertionPath)
-			if err != nil {
-				return nil, err
-			}
-			if ap.ClientID != "" {
-				body.Add("client_id", ap.ClientID)
-			}
-			body.Add("client_assertion_type", ap.ClientAssertionType)
-			body.Add("client_assertion", strings.TrimSpace(string(bytes)))
 		}
 	}
 
@@ -599,7 +541,6 @@ func (ap *oauth2ClientCredentialsAuthPlugin) requestToken(ctx context.Context) (
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
 
 	bodyRaw, err := io.ReadAll(response.Body)
 	if err != nil {
@@ -751,7 +692,7 @@ func (ap *clientTLSAuthPlugin) NewClient(c Config) (*http.Client, error) {
 	return client, nil
 }
 
-func (ap *clientTLSAuthPlugin) Prepare(_ *http.Request) error {
+func (ap *clientTLSAuthPlugin) Prepare(req *http.Request) error {
 	return nil
 }
 
@@ -759,14 +700,12 @@ func (ap *clientTLSAuthPlugin) Prepare(_ *http.Request) error {
 type awsSigningAuthPlugin struct {
 	AWSEnvironmentCredentials *awsEnvironmentCredentialService `json:"environment_credentials,omitempty"`
 	AWSMetadataCredentials    *awsMetadataCredentialService    `json:"metadata_credentials,omitempty"`
-	AWSAssumeRoleCredentials  *awsAssumeRoleCredentialService  `json:"assume_role_credentials,omitempty"`
 	AWSWebIdentityCredentials *awsWebIdentityCredentialService `json:"web_identity_credentials,omitempty"`
 	AWSProfileCredentials     *awsProfileCredentialService     `json:"profile_credentials,omitempty"`
 
 	AWSService          string `json:"service,omitempty"`
 	AWSSignatureVersion string `json:"signature_version,omitempty"`
 
-	host          string
 	ecrAuthPlugin *ecrAuthPlugin
 	kmsSignPlugin *awsKMSSignPlugin
 
@@ -857,11 +796,6 @@ func (ap *awsSigningAuthPlugin) awsCredentialService() awsCredentialService {
 		chain.addService(ap.AWSEnvironmentCredentials)
 	}
 
-	if ap.AWSAssumeRoleCredentials != nil {
-		ap.AWSAssumeRoleCredentials.logger = ap.logger
-		chain.addService(ap.AWSAssumeRoleCredentials)
-	}
-
 	if ap.AWSWebIdentityCredentials != nil {
 		ap.AWSWebIdentityCredentials.logger = ap.logger
 		chain.addService(ap.AWSWebIdentityCredentials)
@@ -886,13 +820,6 @@ func (ap *awsSigningAuthPlugin) NewClient(c Config) (*http.Client, error) {
 		return nil, err
 	}
 
-	url, err := url.Parse(c.URL)
-	if err != nil {
-		return nil, err
-	}
-
-	ap.host = url.Host
-
 	if ap.logger == nil {
 		ap.logger = c.logger
 	}
@@ -905,13 +832,6 @@ func (ap *awsSigningAuthPlugin) NewClient(c Config) (*http.Client, error) {
 }
 
 func (ap *awsSigningAuthPlugin) Prepare(req *http.Request) error {
-	if ap.host != req.URL.Host {
-		// Return early if the host does not match.
-		// This can happen when the OCI registry responded with a redirect to another host.
-		// For instance, ECR redirects to S3 and the ECR auth header should not be included in the S3 request.
-		return nil
-	}
-
 	switch ap.AWSService {
 	case "ecr":
 		return ap.ecrAuthPlugin.Prepare(req)
@@ -931,7 +851,6 @@ func (ap *awsSigningAuthPlugin) validateAndSetDefaults(serviceType string) error
 	cfgs := map[bool]int{}
 	cfgs[ap.AWSEnvironmentCredentials != nil]++
 	cfgs[ap.AWSMetadataCredentials != nil]++
-	cfgs[ap.AWSAssumeRoleCredentials != nil]++
 	cfgs[ap.AWSWebIdentityCredentials != nil]++
 	cfgs[ap.AWSProfileCredentials != nil]++
 
@@ -942,12 +861,6 @@ func (ap *awsSigningAuthPlugin) validateAndSetDefaults(serviceType string) error
 	if ap.AWSMetadataCredentials != nil {
 		if ap.AWSMetadataCredentials.RegionName == "" {
 			return errors.New("at least aws_region must be specified for AWS metadata credential service")
-		}
-	}
-
-	if ap.AWSAssumeRoleCredentials != nil {
-		if err := ap.AWSAssumeRoleCredentials.populateFromEnv(); err != nil {
-			return err
 		}
 	}
 

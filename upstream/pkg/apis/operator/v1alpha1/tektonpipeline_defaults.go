@@ -48,12 +48,9 @@ func (p *Pipeline) setDefaults() {
 	if p.RequireGitSshSecretKnownHosts == nil {
 		p.RequireGitSshSecretKnownHosts = ptr.Bool(config.DefaultRequireGitSSHSecretKnownHosts)
 	}
-
-	// not in use, see: https://github.com/tektoncd/pipeline/pull/7789
-	// this field is removed from pipeline component
-	// keeping here to maintain the API compatibility
-	p.EnableTektonOciBundles = nil
-
+	if p.EnableTektonOciBundles == nil {
+		p.EnableTektonOciBundles = ptr.Bool(config.DefaultEnableTektonOciBundles)
+	}
 	if p.EnableCustomTasks == nil {
 		// EnableCustomTask is always enable
 		p.EnableCustomTasks = ptr.Bool(true)
@@ -85,7 +82,7 @@ func (p *Pipeline) setDefaults() {
 	}
 
 	if p.EnableKeepPodOnCancel == nil {
-		p.EnableKeepPodOnCancel = ptr.Bool(config.DefaultEnableKeepPodOnCancel.Enabled)
+		p.EnableKeepPodOnCancel = ptr.Bool(config.DefaultEnableKeepPodOnCancel)
 	}
 
 	if p.ResultExtractionMethod == "" {
@@ -105,19 +102,15 @@ func (p *Pipeline) setDefaults() {
 	}
 
 	if p.EnableCELInWhenExpression == nil {
-		p.EnableCELInWhenExpression = ptr.Bool(config.DefaultEnableCELInWhenExpression.Enabled)
+		p.EnableCELInWhenExpression = ptr.Bool(config.DefaultEnableCELInWhenExpression)
 	}
 
 	if p.EnableStepActions == nil {
-		p.EnableStepActions = ptr.Bool(config.DefaultEnableStepActions.Enabled)
+		p.EnableStepActions = ptr.Bool(config.DefaultEnableStepActions)
 	}
 
 	if p.EnableParamEnum == nil {
-		p.EnableParamEnum = ptr.Bool(config.DefaultEnableParamEnum.Enabled)
-	}
-
-	if p.DisableInlineSpec == "" {
-		p.DisableInlineSpec = config.DefaultDisableInlineSpec
+		p.EnableParamEnum = ptr.Bool(config.DefaultEnableParamEnum)
 	}
 
 	if p.MetricsPipelinerunDurationType == "" {
@@ -148,15 +141,6 @@ func (p *Pipeline) setDefaults() {
 	}
 	if p.EnableGitResolver == nil {
 		p.EnableGitResolver = ptr.Bool(true)
-	}
-
-	// Statefulset Ordinals
-	// if StatefulSet Ordinals mode, buckets should be equal to replicas
-	if p.Performance.StatefulsetOrdinals != nil && *p.Performance.StatefulsetOrdinals {
-		if p.Performance.Replicas != nil && *p.Performance.Replicas > 1 {
-			replicas := uint(*p.Performance.Replicas)
-			p.Performance.Buckets = &replicas
-		}
 	}
 
 	// run platform specific defaulting

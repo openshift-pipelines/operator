@@ -21,10 +21,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"math"
 	"math/rand"
 	"mime/multipart"
 	"net/http"
@@ -66,8 +64,6 @@ const (
 	OAuthToken
 	PrivateToken
 )
-
-var ErrNotFound = errors.New("404 Not Found")
 
 // A Client manages communication with the GitLab API.
 type Client struct {
@@ -128,8 +124,6 @@ type Client struct {
 	Deployments                  *DeploymentsService
 	Discussions                  *DiscussionsService
 	DockerfileTemplate           *DockerfileTemplatesService
-	DORAMetrics                  *DORAMetricsService
-	DraftNotes                   *DraftNotesService
 	Environments                 *EnvironmentsService
 	EpicIssues                   *EpicIssuesService
 	Epics                        *EpicsService
@@ -153,11 +147,9 @@ type Client struct {
 	GroupMilestones              *GroupMilestonesService
 	GroupProtectedEnvironments   *GroupProtectedEnvironmentsService
 	GroupRepositoryStorageMove   *GroupRepositoryStorageMoveService
-	GroupSSHCertificates         *GroupSSHCertificatesService
 	GroupVariables               *GroupVariablesService
 	GroupWikis                   *GroupWikisService
 	Groups                       *GroupsService
-	Import                       *ImportService
 	InstanceCluster              *InstanceClustersService
 	InstanceVariables            *InstanceVariablesService
 	Invites                      *InvitesService
@@ -211,7 +203,6 @@ type Client struct {
 	Repositories                 *RepositoriesService
 	RepositoryFiles              *RepositoryFilesService
 	RepositorySubmodules         *RepositorySubmodulesService
-	ResourceGroup                *ResourceGroupService
 	ResourceIterationEvents      *ResourceIterationEventsService
 	ResourceLabelEvents          *ResourceLabelEventsService
 	ResourceMilestoneEvents      *ResourceMilestoneEventsService
@@ -237,16 +228,15 @@ type Client struct {
 // ListOptions specifies the optional parameters to various List methods that
 // support pagination.
 type ListOptions struct {
-	// For keyset-based paginated result sets, the value must be `"keyset"`
-	Pagination string `url:"pagination,omitempty" json:"pagination,omitempty"`
-	// For offset-based and keyset-based paginated result sets, the number of results to include per page.
-	PerPage int `url:"per_page,omitempty" json:"per_page,omitempty"`
 	// For offset-based paginated result sets, page of results to retrieve.
 	Page int `url:"page,omitempty" json:"page,omitempty"`
-	// For keyset-based paginated result sets, tree record ID at which to fetch the next page.
-	PageToken string `url:"page_token,omitempty" json:"page_token,omitempty"`
+	// For offset-based and keyset-based paginated result sets, the number of results to include per page.
+	PerPage int `url:"per_page,omitempty" json:"per_page,omitempty"`
+
 	// For keyset-based paginated result sets, name of the column by which to order
 	OrderBy string `url:"order_by,omitempty" json:"order_by,omitempty"`
+	// For keyset-based paginated result sets, the value must be `"keyset"`
+	Pagination string `url:"pagination,omitempty" json:"pagination,omitempty"`
 	// For keyset-based paginated result sets, sort order (`"asc"`` or `"desc"`)
 	Sort string `url:"sort,omitempty" json:"sort,omitempty"`
 }
@@ -366,8 +356,6 @@ func newClient(options ...ClientOptionFunc) (*Client, error) {
 	c.Deployments = &DeploymentsService{client: c}
 	c.Discussions = &DiscussionsService{client: c}
 	c.DockerfileTemplate = &DockerfileTemplatesService{client: c}
-	c.DORAMetrics = &DORAMetricsService{client: c}
-	c.DraftNotes = &DraftNotesService{client: c}
 	c.Environments = &EnvironmentsService{client: c}
 	c.EpicIssues = &EpicIssuesService{client: c}
 	c.Epics = &EpicsService{client: c}
@@ -391,11 +379,9 @@ func newClient(options ...ClientOptionFunc) (*Client, error) {
 	c.GroupMilestones = &GroupMilestonesService{client: c}
 	c.GroupProtectedEnvironments = &GroupProtectedEnvironmentsService{client: c}
 	c.GroupRepositoryStorageMove = &GroupRepositoryStorageMoveService{client: c}
-	c.GroupSSHCertificates = &GroupSSHCertificatesService{client: c}
 	c.GroupVariables = &GroupVariablesService{client: c}
 	c.GroupWikis = &GroupWikisService{client: c}
 	c.Groups = &GroupsService{client: c}
-	c.Import = &ImportService{client: c}
 	c.InstanceCluster = &InstanceClustersService{client: c}
 	c.InstanceVariables = &InstanceVariablesService{client: c}
 	c.Invites = &InvitesService{client: c}
@@ -449,7 +435,6 @@ func newClient(options ...ClientOptionFunc) (*Client, error) {
 	c.Repositories = &RepositoriesService{client: c}
 	c.RepositoryFiles = &RepositoryFilesService{client: c}
 	c.RepositorySubmodules = &RepositorySubmodulesService{client: c}
-	c.ResourceGroup = &ResourceGroupService{client: c}
 	c.ResourceIterationEvents = &ResourceIterationEventsService{client: c}
 	c.ResourceLabelEvents = &ResourceLabelEventsService{client: c}
 	c.ResourceMilestoneEvents = &ResourceMilestoneEventsService{client: c}
@@ -526,11 +511,6 @@ func rateLimitBackoff(min, max time.Duration, attemptNum int, resp *http.Respons
 					min = wait
 				}
 			}
-		} else {
-			// In case the RateLimit-Reset header is not set, back off an additional
-			// 100% exponentially. With the default milliseconds being set to 100 for
-			// `min`, this makes the 5th retry wait 3.2 seconds (3,200 ms) by default.
-			min = time.Duration(float64(min) * math.Pow(2, float64(attemptNum)))
 		}
 	}
 
@@ -552,11 +532,6 @@ func (c *Client) configureLimiter(ctx context.Context, headers http.Header) {
 			// prevent hitting the rate limit.
 			limit := rate.Limit(rateLimit * 0.66)
 			burst := int(rateLimit * 0.33)
-
-			// Need at least one allowed to burst or x/time will throw an error
-			if burst == 0 {
-				burst = 1
-			}
 
 			// Create a new limiter using the calculated values.
 			c.limiter = rate.NewLimiter(limit, burst)
@@ -969,13 +944,8 @@ type ErrorResponse struct {
 
 func (e *ErrorResponse) Error() string {
 	path, _ := url.QueryUnescape(e.Response.Request.URL.Path)
-	url := fmt.Sprintf("%s://%s%s", e.Response.Request.URL.Scheme, e.Response.Request.URL.Host, path)
-
-	if e.Message == "" {
-		return fmt.Sprintf("%s %s: %d", e.Response.Request.Method, url, e.Response.StatusCode)
-	} else {
-		return fmt.Sprintf("%s %s: %d %s", e.Response.Request.Method, url, e.Response.StatusCode, e.Message)
-	}
+	u := fmt.Sprintf("%s://%s%s", e.Response.Request.URL.Scheme, e.Response.Request.URL.Host, path)
+	return fmt.Sprintf("%s %s: %d %s", e.Response.Request.Method, u, e.Response.StatusCode, e.Message)
 }
 
 // CheckResponse checks the API response for errors, and returns them if present.
@@ -983,14 +953,11 @@ func CheckResponse(r *http.Response) error {
 	switch r.StatusCode {
 	case 200, 201, 202, 204, 304:
 		return nil
-	case 404:
-		return ErrNotFound
 	}
 
 	errorResponse := &ErrorResponse{Response: r}
-
 	data, err := io.ReadAll(r.Body)
-	if err == nil && strings.TrimSpace(string(data)) != "" {
+	if err == nil && data != nil {
 		errorResponse.Body = data
 
 		var raw interface{}

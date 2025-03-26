@@ -38,9 +38,9 @@ func (v *projLookupTable) FromP3(q *Point) {
 	tmpP3 := Point{}
 	tmpP1xP1 := projP1xP1{}
 	for i := 0; i < 7; i++ {
-		// Compute (i+1)*Q as Q + i*Q and convert to a projCached
+		// Compute (i+1)*Q as Q + i*Q and convert to a ProjCached
 		// This is needlessly complicated because the API has explicit
-		// receivers instead of creating stack objects and relying on RVO
+		// recievers instead of creating stack objects and relying on RVO
 		v.points[i+1].FromP3(tmpP3.fromP1xP1(tmpP1xP1.Add(q, &v.points[i])))
 	}
 }
@@ -53,7 +53,7 @@ func (v *affineLookupTable) FromP3(q *Point) {
 	tmpP3 := Point{}
 	tmpP1xP1 := projP1xP1{}
 	for i := 0; i < 7; i++ {
-		// Compute (i+1)*Q as Q + i*Q and convert to affineCached
+		// Compute (i+1)*Q as Q + i*Q and convert to AffineCached
 		v.points[i+1].FromP3(tmpP3.fromP1xP1(tmpP1xP1.AddAffine(q, &v.points[i])))
 	}
 }

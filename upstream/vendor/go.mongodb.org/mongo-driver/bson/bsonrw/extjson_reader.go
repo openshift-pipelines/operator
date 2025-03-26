@@ -7,7 +7,6 @@
 package bsonrw
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -614,7 +613,7 @@ func (ejvr *extJSONValueReader) ReadElement() (string, ValueReader, error) {
 	name, t, err := ejvr.p.readKey()
 
 	if err != nil {
-		if errors.Is(err, ErrEOD) {
+		if err == ErrEOD {
 			if ejvr.stack[ejvr.frame].mode == mCodeWithScope {
 				_, err := ejvr.p.peekType()
 				if err != nil {
@@ -641,7 +640,7 @@ func (ejvr *extJSONValueReader) ReadValue() (ValueReader, error) {
 
 	t, err := ejvr.p.peekType()
 	if err != nil {
-		if errors.Is(err, ErrEOA) {
+		if err == ErrEOA {
 			ejvr.pop()
 		}
 

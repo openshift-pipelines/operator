@@ -199,6 +199,19 @@ type applyVisitor interface {
 
 // Helper functions for common node lists. They may be empty.
 
+func applyExprList(v applyVisitor, parent Cursor, ptr interface{}, list []ast.Expr) {
+	c := newCursor(parent, nil, nil)
+	for i, x := range list {
+		c.index = i
+		c.node = x
+		c.typ = &list[i]
+		applyCursor(v, c)
+		if x != c.node {
+			list[i] = c.node.(ast.Expr)
+		}
+	}
+}
+
 type declsCursor struct {
 	*cursor
 	decls, after, process []ast.Decl
@@ -273,25 +286,14 @@ func applyDeclList(v applyVisitor, parent Cursor, list []ast.Decl) []ast.Decl {
 	return c.decls
 }
 
-func apply[N ast.Node](v applyVisitor, parent Cursor, nodePtr *N) {
-	node := *nodePtr
+func apply(v applyVisitor, parent Cursor, nodePtr interface{}) {
+	res := reflect.Indirect(reflect.ValueOf(nodePtr))
+	n := res.Interface()
+	node := n.(ast.Node)
 	c := newCursor(parent, node, nodePtr)
 	applyCursor(v, c)
-	if ast.Node(node) != c.node {
-		*nodePtr = c.node.(N)
-	}
-}
-
-func applyList[N ast.Node](v applyVisitor, parent Cursor, list []N) {
-	c := newCursor(parent, nil, nil)
-	for i, node := range list {
-		c.index = i
-		c.node = node
-		c.typ = &list[i]
-		applyCursor(v, c)
-		if ast.Node(node) != c.node {
-			list[i] = c.node.(N)
-		}
+	if node != c.node {
+		res.Set(reflect.ValueOf(c.node))
 	}
 }
 
@@ -309,7 +311,10 @@ func applyCursor(v applyVisitor, c Cursor) {
 
 	// TODO: record the comment groups and interleave with the values like for
 	// parsing and printing?
-	applyList(v, c, ast.Comments(node))
+	comments := node.Comments()
+	for _, cm := range comments {
+		apply(v, c, &cm)
+	}
 
 	// apply children
 	// (the order of the cases matches the order
@@ -320,7 +325,9 @@ func applyCursor(v applyVisitor, c Cursor) {
 		// nothing to do
 
 	case *ast.CommentGroup:
-		applyList(v, c, n.List)
+		for _, cg := range n.List {
+			apply(v, c, &cg)
+		}
 
 	case *ast.Attribute:
 		// nothing to do
@@ -330,7 +337,9 @@ func applyCursor(v applyVisitor, c Cursor) {
 		if n.Value != nil {
 			apply(v, c, &n.Value)
 		}
-		applyList(v, c, n.Attrs)
+		for _, a := range n.Attrs {
+			apply(v, c, &a)
+		}
 
 	case *ast.StructLit:
 		n.Elts = applyDeclList(v, c, n.Elts)
@@ -340,10 +349,10 @@ func applyCursor(v applyVisitor, c Cursor) {
 		// nothing to do
 
 	case *ast.Interpolation:
-		applyList(v, c, n.Elts)
+		applyExprList(v, c, &n, n.Elts)
 
 	case *ast.ListLit:
-		applyList(v, c, n.Elts)
+		applyExprList(v, c, &n, n.Elts)
 
 	case *ast.Ellipsis:
 		if n.Type != nil {
@@ -372,7 +381,7 @@ func applyCursor(v applyVisitor, c Cursor) {
 
 	case *ast.CallExpr:
 		apply(v, c, &n.Fun)
-		applyList(v, c, n.Args)
+		applyExprList(v, c, &n, n.Args)
 
 	case *ast.UnaryExpr:
 		apply(v, c, &n.X)
@@ -392,7 +401,9 @@ func applyCursor(v applyVisitor, c Cursor) {
 		// nothing to do
 
 	case *ast.ImportDecl:
-		applyList(v, c, n.Specs)
+		for _, s := range n.Specs {
+			apply(v, c, &s)
+		}
 
 	case *ast.EmbedDecl:
 		apply(v, c, &n.Expr)
@@ -406,7 +417,10 @@ func applyCursor(v applyVisitor, c Cursor) {
 		apply(v, c, &n.Expr)
 
 	case *ast.Comprehension:
-		applyList(v, c, n.Clauses)
+		clauses := n.Clauses
+		for i := range n.Clauses {
+			apply(v, c, &clauses[i])
+		}
 		apply(v, c, &n.Value)
 
 	// Files and packages
@@ -450,7 +464,7 @@ func (f *applier) Before(c Cursor) applyVisitor {
 	node := c.Node()
 	if f.before == nil || (f.before(c) && node == c.Node()) {
 		f.commentStack = append(f.commentStack, f.current)
-		f.current = commentFrame{cg: ast.Comments(node)}
+		f.current = commentFrame{cg: node.Comments()}
 		f.visitComments(c, f.current.pos)
 		return f
 	}

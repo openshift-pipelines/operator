@@ -377,5 +377,5 @@ func (so *signOpts) dedupeAndReplace(sig oci.Signature, basefn func() (oci.Signa
 		}
 		return ReplaceSignatures(replace)
 	}
-	return AppendSignatures(base, so.rct, sig)
+	return AppendSignatures(base, sig)
 }

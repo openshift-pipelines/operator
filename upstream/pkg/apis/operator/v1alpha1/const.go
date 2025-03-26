@@ -33,13 +33,9 @@ const (
 	ProfileLite  = "lite"
 
 	// Addon Params
-	// Keeping ClusterTasksParams and CommunityClusterTasks params for backward compatibility
-	// will be removed from next operator api release
 	ClusterTasksParam      = "clusterTasks"
-	CommunityClusterTasks  = "communityClusterTasks"
 	PipelineTemplatesParam = "pipelineTemplates"
-	ResolverTasks          = "resolverTasks"
-	ResolverStepActions    = "resolverStepActions"
+	CommunityClusterTasks  = "communityClusterTasks"
 
 	// Hub Params
 	EnableDevconsoleIntegrationParam = "enable-devconsole-integration"
@@ -113,13 +109,9 @@ var (
 	}
 
 	AddonParams = map[string]ParamValue{
-		// Keeping ClusterTasks and CommunityClusterTasks params
-		// for backward compatibility and will be removed in next operator api release
 		ClusterTasksParam:      defaultParamValue,
-		CommunityClusterTasks:  defaultParamValue,
 		PipelineTemplatesParam: defaultParamValue,
-		ResolverTasks:          defaultParamValue,
-		ResolverStepActions:    defaultParamValue,
+		CommunityClusterTasks:  defaultParamValue,
 	}
 
 	HubParams = map[string]ParamValue{
@@ -143,6 +135,5 @@ var (
 	ChainResourceName            = "chain"
 	OperandTektoncdChains        = "tektoncd-chains"
 	OpenShiftPipelinesAsCodeName = "pipelines-as-code"
-	ManualApprovalGates          = "manual-approval-gate"
 	PrunerResourceName           = "tektoncd-pruner"
 )

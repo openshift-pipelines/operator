@@ -32,7 +32,6 @@ const (
 	amzSecurityTokenKey = v4Internal.AmzSecurityTokenKey
 	amzDateKey          = v4Internal.AmzDateKey
 	authorizationHeader = "Authorization"
-	amzContentSha256Key = "x-amz-content-sha256"
 
 	signingAlgorithm = "AWS4-ECDSA-P256-SHA256"
 
@@ -174,7 +173,7 @@ type httpSigner struct {
 	PayloadHash string
 }
 
-func (s *httpSigner) setRequiredSigningFields(headers http.Header, _ url.Values) {
+func (s *httpSigner) setRequiredSigningFields(headers http.Header, query url.Values) {
 	amzDate := s.Time.Format(timeFormat)
 
 	headers.Set(AmzRegionSetKey, strings.Join(s.RegionSet, ","))
@@ -193,7 +192,7 @@ func (s *httpSigner) Build() (signedRequest, error) {
 
 	// seemingly required by S3/MRAP -- 403 Forbidden otherwise
 	headers.Set("host", req.URL.Host)
-	headers.Set(amzContentSha256Key, s.PayloadHash)
+	headers.Set("x-amz-content-sha256", s.PayloadHash)
 
 	s.setRequiredSigningFields(headers, query)
 
@@ -382,7 +381,8 @@ type signedRequest struct {
 
 // SignV4a returns a map[string][]string of headers, including an added AWS V4a signature based on the config/credentials provided.
 func SignV4a(headers map[string][]string, method string, theURL *url.URL, body []byte, service string, awsCreds Credentials, theTime time.Time) map[string][]string {
-	contentSha256 := getContentHash(false, body)
+	bodyHexHash := fmt.Sprintf("%x", sha256.Sum256(body))
+
 	key, err := retrievePrivateKey(awsCreds)
 	if err != nil {
 		return map[string][]string{}
@@ -394,7 +394,7 @@ func SignV4a(headers map[string][]string, method string, theURL *url.URL, body [
 
 	signer := &httpSigner{
 		Request:     req,
-		PayloadHash: contentSha256,
+		PayloadHash: bodyHexHash,
 		ServiceName: service,
 		RegionSet:   []string{"*"},
 		Credentials: key,

@@ -31,7 +31,7 @@ import (
 // - change a predeclared identifier reference to use the __ident form,
 //   instead of introducing an alias.
 
-// Sanitize rewrites File f in place to be well-formed after automated
+// Sanitize rewrites File f in place to be well formed after automated
 // construction of an AST.
 //
 // Rewrites:
@@ -50,11 +50,11 @@ func Sanitize(f *ast.File) error {
 	}
 
 	// Gather all names.
-	walkVisitor(f, &scope{
+	walk(&scope{
 		errFn:   z.errf,
 		nameFn:  z.addName,
 		identFn: z.markUsed,
-	})
+	}, f)
 	if z.errs != nil {
 		return z.errs
 	}
@@ -67,7 +67,7 @@ func Sanitize(f *ast.File) error {
 		index:   make(map[string]entry),
 	}
 	z.fileScope = s
-	walkVisitor(f, s)
+	walk(s, f)
 	if z.errs != nil {
 		return z.errs
 	}
@@ -317,7 +317,7 @@ func (z *sanitizer) handleIdent(s *scope, n *ast.Ident) bool {
 }
 
 // uniqueName returns a new name globally unique name of the form
-// base_NN ... base_NNNNNNNNNNNNNN or _base or the same pattern with a '_'
+// base_XX ... base_XXXXXXXXXXXXXX or _base or the same pattern with a '_'
 // prefix if hidden is true.
 //
 // It prefers short extensions over large ones, while ensuring the likelihood of
@@ -332,8 +332,9 @@ func (z *sanitizer) uniqueName(base string, hidden bool) string {
 		}
 	}
 
-	const mask = 0xff_ffff_ffff_ffff // max bits; stay clear of int64 overflow
-	const shift = 4                  // rate of growth
+	// TODO(go1.13): const mask = 0xff_ffff_ffff_ffff
+	const mask = 0xffffffffffffff // max bits; stay clear of int64 overflow
+	const shift = 4               // rate of growth
 	for n := int64(0x10); ; n = int64(mask&((n<<shift)-1)) + 1 {
 		num := z.rand.Intn(int(n))
 		name := fmt.Sprintf("%s_%01X", base, num)

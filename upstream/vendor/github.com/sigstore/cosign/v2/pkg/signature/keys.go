@@ -17,6 +17,7 @@ package signature
 import (
 	"context"
 	"crypto"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"strings"
@@ -232,4 +233,19 @@ func PublicKeyPem(key signature.PublicKeyProvider, pkOpts ...signature.PublicKey
 		return nil, err
 	}
 	return cryptoutils.MarshalPublicKeyToPEM(pub)
+}
+
+func CertSubject(c *x509.Certificate) string {
+	switch {
+	case c.EmailAddresses != nil:
+		return c.EmailAddresses[0]
+	case c.URIs != nil:
+		return c.URIs[0].String()
+	}
+	// ignore error if there's no OtherName SAN
+	otherName, _ := cryptoutils.UnmarshalOtherNameSAN(c.Extensions)
+	if len(otherName) > 0 {
+		return otherName
+	}
+	return ""
 }

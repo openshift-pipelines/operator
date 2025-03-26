@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:generate go run gen.go
+
 package filetypes
 
 import (
@@ -66,10 +68,6 @@ type FileInfo struct {
 	Attributes   bool `json:"attributes"`   // include/allow attributes
 }
 
-// TODO(mvdan): the funcs below make use of typesValue concurrently,
-// even though we clearly document that cue.Values are not safe for concurrent use.
-// It seems to be OK in practice, as otherwise we would run into `go test -race` failures.
-
 // FromFile return detailed file info for a given build file.
 // Encoding must be specified.
 // TODO: mode should probably not be necessary here.
@@ -98,50 +96,47 @@ func FromFile(b *build.File, mode Mode) (*FileInfo, error) {
 		}, nil
 	}
 
-	typesInit()
-	modeVal := typesValue.LookupPath(cue.MakePath(cue.Str("modes"), cue.Str(mode.String())))
-	fileVal := modeVal.LookupPath(cue.MakePath(cue.Str("FileInfo")))
-	fileVal = fileVal.FillPath(cue.Path{}, b)
+	i, errs := update(nil, cuegenValue, cuegenValue, "modes", mode.String())
+	v := i.LookupDef("FileInfo")
+	v = v.Fill(b)
 
 	if b.Encoding == "" {
-		ext := modeVal.LookupPath(cue.MakePath(cue.Str("extensions"), cue.Str(fileExt(b.Filename))))
+		ext := i.Lookup("extensions", fileExt(b.Filename))
 		if ext.Exists() {
-			fileVal = fileVal.Unify(ext)
+			v = v.Unify(ext)
 		}
 	}
-	var errs errors.Error
 
-	interpretation, _ := fileVal.LookupPath(cue.MakePath(cue.Str("interpretation"))).String()
+	interpretation, _ := v.Lookup("interpretation").String()
 	if b.Form != "" {
-		fileVal, errs = unifyWith(errs, fileVal, typesValue, "forms", string(b.Form))
+		v, errs = update(errs, v, i, "forms", string(b.Form))
 		// may leave some encoding-dependent options open in data mode.
 	} else if interpretation != "" {
 		// always sets schema form.
-		fileVal, errs = unifyWith(errs, fileVal, typesValue, "interpretations", interpretation)
+		v, errs = update(errs, v, i, "interpretations", interpretation)
 	}
 	if interpretation == "" {
-		s, err := fileVal.LookupPath(cue.MakePath(cue.Str("encoding"))).String()
+		s, err := v.Lookup("encoding").String()
 		if err != nil {
 			return nil, err
 		}
-		fileVal, errs = unifyWith(errs, fileVal, modeVal, "encodings", s)
+		v, errs = update(errs, v, i, "encodings", s)
 	}
 
 	fi := &FileInfo{}
-	if err := fileVal.Decode(fi); err != nil {
+	if err := v.Decode(fi); err != nil {
 		return nil, errors.Wrapf(err, token.NoPos, "could not parse arguments")
 	}
 	return fi, errs
 }
 
-// unifyWith returns the equivalent of `v1 & v2[field][value]`.
-func unifyWith(errs errors.Error, v1, v2 cue.Value, field, value string) (cue.Value, errors.Error) {
-	v1 = v1.Unify(v2.LookupPath(cue.MakePath(cue.Str(field), cue.Str(value))))
-	if err := v1.Err(); err != nil {
+func update(errs errors.Error, v, i cue.Value, field, value string) (cue.Value, errors.Error) {
+	v = v.Unify(i.Lookup(field, value))
+	if err := v.Err(); err != nil {
 		errs = errors.Append(errs,
 			errors.Newf(token.NoPos, "unknown %s %s", field, value))
 	}
-	return v1, errs
+	return v, errs
 }
 
 // ParseArgs converts a sequence of command line arguments representing
@@ -162,8 +157,7 @@ func unifyWith(errs errors.Error, v1, v2 cue.Value, field, value string) (cue.Va
 //
 //	json: foo.data bar.data json+schema: bar.schema
 func ParseArgs(args []string) (files []*build.File, err error) {
-	typesInit()
-	var modeVal, fileVal cue.Value
+	var inst, v cue.Value
 
 	qualifier := ""
 	hasFiles := false
@@ -172,7 +166,7 @@ func ParseArgs(args []string) (files []*build.File, err error) {
 		a := strings.Split(s, ":")
 		switch {
 		case len(a) == 1 || len(a[0]) == 1: // filename
-			if !fileVal.Exists() {
+			if !v.Exists() {
 				if len(a) == 1 && strings.HasSuffix(a[0], ".cue") {
 					// Handle majority case.
 					files = append(files, &build.File{
@@ -183,26 +177,12 @@ func ParseArgs(args []string) (files []*build.File, err error) {
 					hasFiles = true
 					continue
 				}
-
-				// The CUE command works just fine without this (how?),
-				// but the API tests require this for some reason.
-				//
-				// This is almost certainly wrong, and in the wrong place.
-				//
-				// TODO(aram): why do we need this here?
-				if len(a) == 1 && strings.HasSuffix(a[0], ".wasm") {
-					continue
-				}
-
-				modeVal, fileVal, err = parseType("", Input)
+				inst, v, err = parseType("", Input)
 				if err != nil {
 					return nil, err
 				}
 			}
-			if s == "" {
-				return nil, errors.Newf(token.NoPos, "empty file name")
-			}
-			f, err := toFile(modeVal, fileVal, s)
+			f, err := toFile(inst, v, s)
 			if err != nil {
 				return nil, err
 			}
@@ -224,7 +204,7 @@ func ParseArgs(args []string) (files []*build.File, err error) {
 			case qualifier != "" && !hasFiles:
 				return nil, errors.Newf(token.NoPos, "scoped qualifier %q without file", qualifier+":")
 			}
-			modeVal, fileVal, err = parseType(a[0], Input)
+			inst, v, err = parseType(a[0], Input)
 			if err != nil {
 				return nil, err
 			}
@@ -255,82 +235,73 @@ func ParseFile(s string, mode Mode) (*build.File, error) {
 	}
 
 	if file == "" {
-		if s != "" {
-			return nil, errors.Newf(token.NoPos, "empty file name in %q", s)
-		}
-		return nil, errors.Newf(token.NoPos, "empty file name")
+		return nil, errors.Newf(token.NoPos, "empty file name in %q", s)
 	}
-	// Quickly discard files which we aren't interested in.
-	// These cases are very common when loading `./...` in a large repository.
-	typesInit()
-	if scope == "" {
-		ext := fileExt(file)
-		if file == "-" {
-			// not handled here
-		} else if ext == "" {
-			return nil, errors.Newf(token.NoPos, "no encoding specified for file %q", file)
-		} else if !knownExtensions[ext] {
-			return nil, errors.Newf(token.NoPos, "unknown file extension %s", ext)
-		}
-	}
-	modeVal, fileVal, err := parseType(scope, mode)
+
+	inst, val, err := parseType(scope, mode)
 	if err != nil {
 		return nil, err
 	}
-	return toFile(modeVal, fileVal, file)
+	return toFile(inst, val, file)
 }
 
-func hasEncoding(v cue.Value) bool {
-	enc := v.LookupPath(cue.MakePath(cue.Str("encoding")))
+func hasEncoding(v cue.Value) (concrete, hasDefault bool) {
+	enc := v.Lookup("encoding")
 	d, _ := enc.Default()
-	return d.IsConcrete()
+	return enc.IsConcrete(), d.IsConcrete()
 }
 
-func toFile(modeVal, fileVal cue.Value, filename string) (*build.File, error) {
-	if !hasEncoding(fileVal) {
+func toFile(i, v cue.Value, filename string) (*build.File, error) {
+	v = v.Fill(filename, "filename")
+
+	if concrete, hasDefault := hasEncoding(v); !concrete {
 		if filename == "-" {
-			fileVal = fileVal.Unify(modeVal.LookupPath(cue.MakePath(cue.Str("Default"))))
-		} else if ext := fileExt(filename); ext != "" {
-			extFile := modeVal.LookupPath(cue.MakePath(cue.Str("extensions"), cue.Str(ext)))
-			fileVal = fileVal.Unify(extFile)
-			if err := fileVal.Err(); err != nil {
-				return nil, errors.Newf(token.NoPos, "unknown file extension %s", ext)
+			if !hasDefault {
+				v = v.Unify(i.LookupDef("Default"))
 			}
-		} else {
-			return nil, errors.Newf(token.NoPos, "no encoding specified for file %q", filename)
+		} else if ext := fileExt(filename); ext != "" {
+			if x := i.Lookup("extensions", ext); x.Exists() || !hasDefault {
+				v = v.Unify(x)
+				if err := v.Err(); err != nil {
+					return nil, errors.Newf(token.NoPos,
+						"unknown file extension %s", ext)
+				}
+			}
+		} else if !hasDefault {
+			return nil, errors.Newf(token.NoPos,
+				"no encoding specified for file %q", filename)
 		}
 	}
 
-	// Note that the filename is only filled in the Go value, and not the CUE value.
-	// This makes no difference to the logic, but saves a non-trivial amount of evaluator work.
-	f := &build.File{Filename: filename}
-	if err := fileVal.Decode(&f); err != nil {
+	f := &build.File{}
+	if err := v.Decode(&f); err != nil {
 		return nil, errors.Wrapf(err, token.NoPos,
 			"could not determine file type")
 	}
 	return f, nil
 }
 
-func parseType(scope string, mode Mode) (modeVal, fileVal cue.Value, _ error) {
-	modeVal = typesValue.LookupPath(cue.MakePath(cue.Str("modes"), cue.Str(mode.String())))
-	fileVal = modeVal.LookupPath(cue.MakePath(cue.Str("File")))
+func parseType(s string, mode Mode) (inst, val cue.Value, err error) {
+	i := cuegenValue
+	i = i.Unify(i.Lookup("modes", mode.String()))
+	v := i.LookupDef("File")
 
-	if scope != "" {
-		for _, tag := range strings.Split(scope, "+") {
-			tagName, tagVal, ok := strings.Cut(tag, "=")
-			if ok {
-				fileVal = fileVal.FillPath(cue.MakePath(cue.Str("tags"), cue.Str(tagName)), tagVal)
+	if s != "" {
+		for _, t := range strings.Split(s, "+") {
+			if p := strings.IndexByte(t, '='); p >= 0 {
+				v = v.Fill(t[p+1:], "tags", t[:p])
 			} else {
-				info := typesValue.LookupPath(cue.MakePath(cue.Str("tags"), cue.Str(tag)))
+				info := i.Lookup("tags", t)
 				if !info.Exists() {
-					return cue.Value{}, cue.Value{}, errors.Newf(token.NoPos, "unknown filetype %s", tag)
+					return inst, val, errors.Newf(token.NoPos,
+						"unknown filetype %s", t)
 				}
-				fileVal = fileVal.Unify(info)
+				v = v.Unify(info)
 			}
 		}
 	}
 
-	return modeVal, fileVal, nil
+	return i, v, nil
 }
 
 // fileExt is like filepath.Ext except we don't treat file names starting with "." as having an extension

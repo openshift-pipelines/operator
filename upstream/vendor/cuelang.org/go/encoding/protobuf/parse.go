@@ -47,7 +47,7 @@ func (s *Extractor) parse(filename string, src interface{}) (p *protoConverter, 
 		s.fileCache[filename] = result{p, err}
 	}()
 
-	b, err := source.ReadAll(filename, src)
+	b, err := source.Read(filename, src)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (s *Extractor) parse(filename string, src interface{}) (p *protoConverter, 
 		return nil, errors.Newf(token.NoPos, "protobuf: %v", err)
 	}
 
-	tfile := token.NewFile(filename, -1, len(b))
+	tfile := token.NewFile(filename, 0, len(b))
 	tfile.SetLinesForContent(b)
 
 	p = &protoConverter{
@@ -796,10 +796,7 @@ func (p *optionParser) parse(options []*proto.Option) {
 			if !p.required {
 				constraint.Optional = token.NoSpace.Pos()
 			}
-		case "(google.api.field_behavior)":
-			if o.Constant.Source == "REQUIRED" {
-				p.required = true
-			}
+
 		default:
 			// TODO: dropping comments. Maybe add dummy tag?
 

@@ -102,12 +102,11 @@ func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 	if result == nil {
 		// fall back to expression mode
 		a := []ast.Expr{}
-		n.VisitLeafConjuncts(func(c adt.Conjunct) bool {
+		for _, c := range n.Conjuncts {
 			if x := e.expr(c.Env, c.Elem()); x != dummyTop {
 				a = append(a, x)
 			}
-			return true
-		})
+		}
 		result = ast.NewBinExpr(token.AND, a...)
 	}
 
@@ -432,7 +431,7 @@ func (e *exporter) structComposite(v *adt.Vertex, attrs []*ast.Attribute) ast.Ex
 			e.inDefinition++
 		}
 
-		arc := v.LookupRaw(label)
+		arc := v.Lookup(label)
 		if arc == nil {
 			continue
 		}
@@ -446,7 +445,7 @@ func (e *exporter) structComposite(v *adt.Vertex, attrs []*ast.Attribute) ast.Ex
 
 		internal.SetConstraint(f, arc.ArcType.Token())
 
-		f.Value = e.vertex(arc.DerefValue())
+		f.Value = e.vertex(arc)
 
 		if label.IsDef() {
 			e.inDefinition--

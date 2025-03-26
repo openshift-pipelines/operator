@@ -15,6 +15,7 @@ package v1alpha1
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/tektoncd/pipeline/pkg/apis/config"
@@ -28,10 +29,8 @@ import (
 	"knative.dev/pkg/webhook/resourcesemantics"
 )
 
-var (
-	_ apis.Validatable              = (*StepAction)(nil)
-	_ resourcesemantics.VerbLimited = (*StepAction)(nil)
-)
+var _ apis.Validatable = (*StepAction)(nil)
+var _ resourcesemantics.VerbLimited = (*StepAction)(nil)
 
 // SupportedVerbs returns the operations that validation should be called for
 func (s *StepAction) SupportedVerbs() []admissionregistrationv1.OperationType {
@@ -145,7 +144,7 @@ func validateObjectUsage(ctx context.Context, sas StepActionSpec, params v1.Para
 		}
 
 		// check if the object's key names are referenced correctly i.e. param.objectParam.key1
-		errs = errs.Also(validateStepActionVariables(ctx, sas, "params\\."+p.Name, objectKeys))
+		errs = errs.Also(validateStepActionVariables(ctx, sas, fmt.Sprintf("params\\.%s", p.Name), objectKeys))
 	}
 
 	return errs.Also(validateStepActionObjectUsageAsWhole(sas, "params", objectParameterNames))

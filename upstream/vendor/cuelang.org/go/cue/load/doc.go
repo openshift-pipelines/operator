@@ -13,4 +13,4 @@
 // limitations under the License.
 
 // Package load loads CUE instances.
-package load
+package load // import "cuelang.org/go/cue/load"

@@ -198,11 +198,8 @@ func (sel Selector) PkgPath() string {
 }
 
 // Index returns the index of the selector. It panics
-// unless sel.Type is IndexLabel.
+// unless sel.Type is SelIndex.
 func (sel Selector) Index() int {
-	// Note that lists will eventually have constraint types too,
-	// and in that case sel.sel would be of type constraintSelector,
-	// causing the type assertion below to fail.
 	s, ok := sel.sel.(indexSelector)
 	if !ok {
 		panic("Index called on non-index selector")
@@ -467,9 +464,9 @@ func isHiddenOrDefinition(s string) bool {
 	return strings.HasPrefix(s, "#") || strings.HasPrefix(s, "_")
 }
 
-// Hid returns a selector for a hidden field. It panics if pkg is empty.
+// Hid returns a selector for a hidden field. It panics is pkg is empty.
 // Hidden fields are scoped by package, and pkg indicates for which package
-// the hidden field must apply. For anonymous packages, it must be set to "_".
+// the hidden field must apply.For anonymous packages, it must be set to "_".
 func Hid(name, pkg string) Selector {
 	if !ast.IsValidIdent(name) {
 		panic(fmt.Sprintf("invalid identifier %s", name))

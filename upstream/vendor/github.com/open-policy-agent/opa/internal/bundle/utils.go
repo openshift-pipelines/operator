@@ -89,22 +89,16 @@ func LoadWasmResolversFromStore(ctx context.Context, store storage.Store, txn st
 
 // LoadBundleFromDisk loads a previously persisted activated bundle from disk
 func LoadBundleFromDisk(path, name string, bvc *bundle.VerificationConfig) (*bundle.Bundle, error) {
-	return LoadBundleFromDiskForRegoVersion(ast.RegoV0, path, name, bvc)
-}
-
-func LoadBundleFromDiskForRegoVersion(regoVersion ast.RegoVersion, path, name string, bvc *bundle.VerificationConfig) (*bundle.Bundle, error) {
 	bundlePath := filepath.Join(path, name, "bundle.tar.gz")
 
-	_, err := os.Stat(bundlePath)
-	if err == nil {
+	if _, err := os.Stat(bundlePath); err == nil {
 		f, err := os.Open(filepath.Join(bundlePath))
 		if err != nil {
 			return nil, err
 		}
 		defer f.Close()
 
-		r := bundle.NewCustomReader(bundle.NewTarballLoaderWithBaseURL(f, "")).
-			WithRegoVersion(regoVersion)
+		r := bundle.NewCustomReader(bundle.NewTarballLoaderWithBaseURL(f, ""))
 
 		if bvc != nil {
 			r = r.WithBundleVerificationConfig(bvc)
@@ -117,9 +111,9 @@ func LoadBundleFromDiskForRegoVersion(regoVersion ast.RegoVersion, path, name st
 		return &b, nil
 	} else if os.IsNotExist(err) {
 		return nil, nil
+	} else {
+		return nil, err
 	}
-
-	return nil, err
 }
 
 // SaveBundleToDisk saves the given raw bytes representing the bundle's content to disk

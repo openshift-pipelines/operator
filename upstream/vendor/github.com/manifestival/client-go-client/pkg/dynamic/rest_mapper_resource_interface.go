@@ -19,11 +19,8 @@ func NewForConfig(config *rest.Config) (ResourceGetter, error) {
 	if err != nil {
 		return nil, err
 	}
-	httpClient, err := rest.HTTPClientFor(config)
-	if err != nil {
-		return nil, err
-	}
-	mapper, err := apiutil.NewDynamicRESTMapper(config, httpClient)
+
+	mapper, err := apiutil.NewDynamicRESTMapper(config)
 
 	if err != nil {
 		return nil, err

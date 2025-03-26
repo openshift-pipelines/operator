@@ -50,7 +50,7 @@ func DeleteAndVerifyDeployments(t *testing.T, clients *utils.Clients, namespace,
 		t.Fatalf("Failed to delete deployment %s/%s: %v", deployment.Namespace, deployment.Name, err)
 	}
 
-	waitErr := wait.PollUntilContextTimeout(context.TODO(), utils.Interval, utils.Timeout, true, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollImmediate(utils.Interval, utils.Timeout, func() (bool, error) {
 		dep, err := clients.KubeClient.
 			AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 		if err != nil {
@@ -83,7 +83,7 @@ func getDeploymentStatus(d *appsv1.Deployment) corev1.ConditionStatus {
 }
 
 func WaitForDeploymentReady(kubeClient kubernetes.Interface, name, namespace string, interval, timeout time.Duration) error {
-	verifyFunc := func(ctx context.Context) (bool, error) {
+	verifyFunc := func() (bool, error) {
 		dep, err := kubeClient.AppsV1().Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil && !apierrs.IsNotFound(err) {
 			return false, err
@@ -97,11 +97,11 @@ func WaitForDeploymentReady(kubeClient kubernetes.Interface, name, namespace str
 		return isReady, nil
 	}
 
-	return wait.PollUntilContextTimeout(context.TODO(), interval, timeout, true, verifyFunc)
+	return wait.PollImmediate(interval, timeout, verifyFunc)
 }
 
 func WaitForDeploymentAvailable(kubeClient kubernetes.Interface, name, namespace string, interval, timeout time.Duration) error {
-	verifyFunc := func(ctx context.Context) (bool, error) {
+	verifyFunc := func() (bool, error) {
 		dep, err := kubeClient.AppsV1().Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil && !apierrs.IsNotFound(err) {
 			return false, err
@@ -109,11 +109,11 @@ func WaitForDeploymentAvailable(kubeClient kubernetes.Interface, name, namespace
 		return IsDeploymentAvailable(dep)
 	}
 
-	return wait.PollUntilContextTimeout(context.TODO(), interval, timeout, true, verifyFunc)
+	return wait.PollImmediate(interval, timeout, verifyFunc)
 }
 
 func WaitForDeploymentDeletion(kubeClient kubernetes.Interface, name, namespace string, interval, timeout time.Duration) error {
-	verifyFunc := func(ctx context.Context) (bool, error) {
+	verifyFunc := func() (bool, error) {
 		_, err := kubeClient.AppsV1().Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			if apierrs.IsNotFound(err) {
@@ -124,5 +124,5 @@ func WaitForDeploymentDeletion(kubeClient kubernetes.Interface, name, namespace 
 		return false, nil
 	}
 
-	return wait.PollUntilContextTimeout(context.TODO(), interval, timeout, true, verifyFunc)
+	return wait.PollImmediate(interval, timeout, verifyFunc)
 }

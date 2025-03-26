@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -50,7 +51,6 @@ type Snippet struct {
 	} `json:"author"`
 	UpdatedAt *time.Time `json:"updated_at"`
 	CreatedAt *time.Time `json:"created_at"`
-	ProjectID int        `json:"project_id"`
 	WebURL    string     `json:"web_url"`
 	RawURL    string     `json:"raw_url"`
 	Files     []struct {
@@ -136,7 +136,7 @@ func (s *SnippetsService) SnippetContent(snippet int, options ...RequestOptionFu
 // GitLab API docs:
 // https://docs.gitlab.com/ee/api/snippets.html#snippet-repository-file-content
 func (s *SnippetsService) SnippetFileContent(snippet int, ref, filename string, options ...RequestOptionFunc) ([]byte, *Response, error) {
-	filepath := PathEscape(filename)
+	filepath := url.QueryEscape(filename)
 	u := fmt.Sprintf("snippets/%d/files/%s/%s/raw", snippet, ref, filepath)
 
 	req, err := s.client.NewRequest(http.MethodGet, u, nil, options)

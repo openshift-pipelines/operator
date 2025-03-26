@@ -22,7 +22,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"mime"
 	"net/http"
@@ -32,18 +31,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-openapi/strfmt"
 	"github.com/opentracing/opentracing-go"
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/runtime/logger"
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/runtime/yamlpc"
-)
-
-const (
-	schemeHTTP  = "http"
-	schemeHTTPS = "https"
+	"github.com/go-openapi/strfmt"
 )
 
 // TLSClientOptions to configure client authentication with mutual TLS
@@ -76,7 +70,7 @@ type TLSClientOptions struct {
 	LoadedCA *x509.Certificate
 
 	// LoadedCAPool specifies a pool of RootCAs to use when validating the server's TLS certificate.
-	// If set, it will be combined with the other loaded certificates (see LoadedCA and CA).
+	// If set, it will be combined with the the other loaded certificates (see LoadedCA and CA).
 	// If neither LoadedCA or CA is set, the provided pool with override the system
 	// certificate pool.
 	// The caller must not use the supplied pool after calling TLSClientAuth.
@@ -118,9 +112,7 @@ type TLSClientOptions struct {
 // TLSClientAuth creates a tls.Config for mutual auth
 func TLSClientAuth(opts TLSClientOptions) (*tls.Config, error) {
 	// create client tls config
-	cfg := &tls.Config{
-		MinVersion: tls.VersionTLS12,
-	}
+	cfg := &tls.Config{}
 
 	// load client cert if specified
 	if opts.Certificate != "" {
@@ -144,7 +136,7 @@ func TLSClientAuth(opts TLSClientOptions) (*tls.Config, error) {
 				return nil, fmt.Errorf("tls client priv key: %v", err)
 			}
 		default:
-			return nil, errors.New("tls client priv key: unsupported key type")
+			return nil, fmt.Errorf("tls client priv key: unsupported key type")
 		}
 
 		block = pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}
@@ -166,12 +158,11 @@ func TLSClientAuth(opts TLSClientOptions) (*tls.Config, error) {
 	// When no CA certificate is provided, default to the system cert pool
 	// that way when a request is made to a server known by the system trust store,
 	// the name is still verified
-	switch {
-	case opts.LoadedCA != nil:
+	if opts.LoadedCA != nil {
 		caCertPool := basePool(opts.LoadedCAPool)
 		caCertPool.AddCert(opts.LoadedCA)
 		cfg.RootCAs = caCertPool
-	case opts.CA != "":
+	} else if opts.CA != "" {
 		// load ca cert
 		caCert, err := os.ReadFile(opts.CA)
 		if err != nil {
@@ -180,7 +171,7 @@ func TLSClientAuth(opts TLSClientOptions) (*tls.Config, error) {
 		caCertPool := basePool(opts.LoadedCAPool)
 		caCertPool.AppendCertsFromPEM(caCert)
 		cfg.RootCAs = caCertPool
-	case opts.LoadedCAPool != nil:
+	} else if opts.LoadedCAPool != nil {
 		cfg.RootCAs = opts.LoadedCAPool
 	}
 
@@ -236,7 +227,7 @@ type Runtime struct {
 	Host     string
 	BasePath string
 	Formats  strfmt.Registry
-	Context  context.Context //nolint:containedctx  // we precisely want this type to contain the request context
+	Context  context.Context
 
 	Debug  bool
 	logger logger.Logger
@@ -325,7 +316,7 @@ func (r *Runtime) pickScheme(schemes []string) string {
 	if v := r.selectScheme(schemes); v != "" {
 		return v
 	}
-	return schemeHTTP
+	return "http"
 }
 
 func (r *Runtime) selectScheme(schemes []string) string {
@@ -336,9 +327,9 @@ func (r *Runtime) selectScheme(schemes []string) string {
 
 	scheme := schemes[0]
 	// prefer https, but skip when not possible
-	if scheme != schemeHTTPS && schLen > 1 {
+	if scheme != "https" && schLen > 1 {
 		for _, sch := range schemes {
-			if sch == schemeHTTPS {
+			if sch == "https" {
 				scheme = sch
 				break
 			}
@@ -377,14 +368,17 @@ func (r *Runtime) EnableConnectionReuse() {
 }
 
 // takes a client operation and creates equivalent http.Request
-func (r *Runtime) createHttpRequest(operation *runtime.ClientOperation) (*request, *http.Request, error) { //nolint:revive,stylecheck
+func (r *Runtime) createHttpRequest(operation *runtime.ClientOperation) (*request, *http.Request, error) {
 	params, _, auth := operation.Params, operation.Reader, operation.AuthInfo
 
-	request := newRequest(operation.Method, operation.PathPattern, params)
+	request, err := newRequest(operation.Method, operation.PathPattern, params)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	var accept []string
 	accept = append(accept, operation.ProducesMediaTypes...)
-	if err := request.SetHeaderParam(runtime.HeaderAccept, accept...); err != nil {
+	if err = request.SetHeaderParam(runtime.HeaderAccept, accept...); err != nil {
 		return nil, nil, err
 	}
 
@@ -426,7 +420,7 @@ func (r *Runtime) createHttpRequest(operation *runtime.ClientOperation) (*reques
 	return request, req, nil
 }
 
-func (r *Runtime) CreateHttpRequest(operation *runtime.ClientOperation) (req *http.Request, err error) { //nolint:revive,stylecheck
+func (r *Runtime) CreateHttpRequest(operation *runtime.ClientOperation) (req *http.Request, err error) {
 	_, req, err = r.createHttpRequest(operation)
 	return
 }
@@ -456,36 +450,27 @@ func (r *Runtime) Submit(operation *runtime.ClientOperation) (interface{}, error
 		r.logger.Debugf("%s\n", string(b))
 	}
 
-	var parentCtx context.Context
-	switch {
-	case operation.Context != nil:
-		parentCtx = operation.Context
-	case r.Context != nil:
-		parentCtx = r.Context
-	default:
-		parentCtx = context.Background()
-	}
-
-	var (
-		ctx    context.Context
-		cancel context.CancelFunc
-	)
-	if request.timeout == 0 {
-		// There may be a deadline in the context passed to the operation.
-		// Otherwise, there is no timeout set.
-		ctx, cancel = context.WithCancel(parentCtx)
+	var hasTimeout bool
+	pctx := operation.Context
+	if pctx == nil {
+		pctx = r.Context
 	} else {
-		// Sets the timeout passed from request params (by default runtime.DefaultTimeout).
-		// If there is already a deadline in the parent context, the shortest will
-		// apply.
-		ctx, cancel = context.WithTimeout(parentCtx, request.timeout)
+		hasTimeout = true
+	}
+	if pctx == nil {
+		pctx = context.Background()
+	}
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if hasTimeout {
+		ctx, cancel = context.WithCancel(pctx)
+	} else {
+		ctx, cancel = context.WithTimeout(pctx, request.timeout)
 	}
 	defer cancel()
 
-	var client *http.Client
-	if operation.Client != nil {
-		client = operation.Client
-	} else {
+	client := operation.Client
+	if client == nil {
 		client = r.client
 	}
 	req = req.WithContext(ctx)
@@ -496,7 +481,7 @@ func (r *Runtime) Submit(operation *runtime.ClientOperation) (interface{}, error
 	defer res.Body.Close()
 
 	ct := res.Header.Get(runtime.HeaderContentType)
-	if ct == "" { // this should really never occur
+	if ct == "" { // this should really really never occur
 		ct = r.DefaultMediaType
 	}
 
@@ -541,7 +526,7 @@ func (r *Runtime) SetLogger(logger logger.Logger) {
 	middleware.Logger = logger
 }
 
-type ClientResponseFunc = func(*http.Response) runtime.ClientResponse //nolint:revive
+type ClientResponseFunc = func(*http.Response) runtime.ClientResponse
 
 // SetResponseReader changes the response reader implementation.
 func (r *Runtime) SetResponseReader(f ClientResponseFunc) {

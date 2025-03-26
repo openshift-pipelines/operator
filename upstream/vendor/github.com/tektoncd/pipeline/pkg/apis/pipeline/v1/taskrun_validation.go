@@ -26,17 +26,14 @@ import (
 	"github.com/tektoncd/pipeline/pkg/apis/validate"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/strings/slices"
 	"knative.dev/pkg/apis"
 	"knative.dev/pkg/webhook/resourcesemantics"
 )
 
-var (
-	_ apis.Validatable              = (*TaskRun)(nil)
-	_ resourcesemantics.VerbLimited = (*TaskRun)(nil)
-)
+var _ apis.Validatable = (*TaskRun)(nil)
+var _ resourcesemantics.VerbLimited = (*TaskRun)(nil)
 
 // SupportedVerbs returns the operations that validation should be called for
 func (tr *TaskRun) SupportedVerbs() []admissionregistrationv1.OperationType {
@@ -51,9 +48,6 @@ func (tr *TaskRun) Validate(ctx context.Context) *apis.FieldError {
 
 // Validate taskrun spec
 func (ts *TaskRunSpec) Validate(ctx context.Context) (errs *apis.FieldError) {
-	// Validate the spec changes
-	errs = errs.Also(ts.ValidateUpdate(ctx))
-
 	// Must have exactly one of taskRef and taskSpec.
 	if ts.TaskRef == nil && ts.TaskSpec == nil {
 		errs = errs.Also(apis.ErrMissingOneOf("taskRef", "taskSpec"))
@@ -67,10 +61,6 @@ func (ts *TaskRunSpec) Validate(ctx context.Context) (errs *apis.FieldError) {
 	}
 	// Validate TaskSpec if it's present.
 	if ts.TaskSpec != nil {
-		if slices.Contains(strings.Split(
-			config.FromContextOrDefaults(ctx).FeatureFlags.DisableInlineSpec, ","), "taskrun") {
-			errs = errs.Also(apis.ErrDisallowedFields("taskSpec"))
-		}
 		errs = errs.Also(ts.TaskSpec.Validate(ctx).ViaField("taskSpec"))
 	}
 
@@ -84,11 +74,11 @@ func (ts *TaskRunSpec) Validate(ctx context.Context) (errs *apis.FieldError) {
 		errs = errs.Also(validateDebug(ts.Debug).ViaField("debug"))
 	}
 	if ts.StepSpecs != nil {
-		errs = errs.Also(config.ValidateEnabledAPIFields(ctx, "stepSpecs", config.BetaAPIFields).ViaField("stepSpecs"))
+		errs = errs.Also(config.ValidateEnabledAPIFields(ctx, "stepSpecs", config.AlphaAPIFields).ViaField("stepSpecs"))
 		errs = errs.Also(validateStepSpecs(ts.StepSpecs).ViaField("stepSpecs"))
 	}
 	if ts.SidecarSpecs != nil {
-		errs = errs.Also(config.ValidateEnabledAPIFields(ctx, "sidecarSpecs", config.BetaAPIFields).ViaField("sidecarSpecs"))
+		errs = errs.Also(config.ValidateEnabledAPIFields(ctx, "sidecarSpecs", config.AlphaAPIFields).ViaField("sidecarSpecs"))
 		errs = errs.Also(validateSidecarSpecs(ts.SidecarSpecs).ViaField("sidecarSpecs"))
 	}
 	if ts.ComputeResources != nil {
@@ -106,13 +96,11 @@ func (ts *TaskRunSpec) Validate(ctx context.Context) (errs *apis.FieldError) {
 			errs = errs.Also(apis.ErrInvalidValue(fmt.Sprintf("statusMessage should not be set if status is not set, but it is currently set to %s", ts.StatusMessage), "statusMessage"))
 		}
 	}
-	if ts.Retries < 0 {
-		errs = errs.Also(apis.ErrInvalidValue(fmt.Sprintf("%d should be >= 0", ts.Retries), "retries"))
-	}
+
 	if ts.Timeout != nil {
 		// timeout should be a valid duration of at least 0.
 		if ts.Timeout.Duration < 0 {
-			errs = errs.Also(apis.ErrInvalidValue(ts.Timeout.Duration.String()+" should be >= 0", "timeout"))
+			errs = errs.Also(apis.ErrInvalidValue(fmt.Sprintf("%s should be >= 0", ts.Timeout.Duration.String()), "timeout"))
 		}
 	}
 
@@ -120,34 +108,6 @@ func (ts *TaskRunSpec) Validate(ctx context.Context) (errs *apis.FieldError) {
 		errs = errs.Also(validatePodTemplateEnv(ctx, *ts.PodTemplate))
 	}
 	return errs
-}
-
-// ValidateUpdate validates the update of a TaskRunSpec
-func (ts *TaskRunSpec) ValidateUpdate(ctx context.Context) (errs *apis.FieldError) {
-	if !apis.IsInUpdate(ctx) {
-		return
-	}
-	oldObj, ok := apis.GetBaseline(ctx).(*TaskRun)
-	if !ok || oldObj == nil {
-		return
-	}
-	old := &oldObj.Spec
-
-	// If already in the done state, the spec cannot be modified.
-	// Otherwise, only the status, statusMessage field can be modified.
-	tips := "Once the TaskRun is complete, no updates are allowed"
-	if !oldObj.IsDone() {
-		old = old.DeepCopy()
-		old.Status = ts.Status
-		old.StatusMessage = ts.StatusMessage
-		tips = "Once the TaskRun has started, only status and statusMessage updates are allowed"
-	}
-
-	if !equality.Semantic.DeepEqual(old, ts) {
-		errs = errs.Also(apis.ErrInvalidValue(tips, ""))
-	}
-
-	return
 }
 
 // validateInlineParameters validates that any parameters called in the
@@ -229,14 +189,14 @@ func combineParamSpec(p ParamSpec, paramSpecForValidation map[string]ParamSpec) 
 			}
 			// If Default values of object type are provided then Properties must also be fully declared.
 			if p.Properties == nil {
-				return paramSpecForValidation, apis.ErrMissingField(p.Name + ".properties")
+				return paramSpecForValidation, apis.ErrMissingField(fmt.Sprintf("%s.properties", p.Name))
 			}
 		}
 
 		// Properties must be defined if paramSpec is of object Type
 		if pSpec.Type == ParamTypeObject {
 			if p.Properties == nil {
-				return paramSpecForValidation, apis.ErrMissingField(p.Name + ".properties")
+				return paramSpecForValidation, apis.ErrMissingField(fmt.Sprintf("%s.properties", p.Name))
 			}
 			// Expect Properties to be complete
 			pSpec.Properties = p.Properties
@@ -256,20 +216,8 @@ func validateDebug(db *TaskRunDebug) (errs *apis.FieldError) {
 	if db == nil || db.Breakpoints == nil {
 		return errs
 	}
-
-	if db.Breakpoints.OnFailure == "" {
-		errs = errs.Also(apis.ErrInvalidValue("onFailure breakpoint is empty, it is only allowed to be set as enabled", "breakpoints.onFailure"))
-	}
-
 	if db.Breakpoints.OnFailure != "" && db.Breakpoints.OnFailure != EnabledOnFailureBreakpoint {
-		errs = errs.Also(apis.ErrInvalidValue(db.Breakpoints.OnFailure+" is not a valid onFailure breakpoint value, onFailure breakpoint is only allowed to be set as enabled", "breakpoints.onFailure"))
-	}
-	beforeSteps := sets.NewString()
-	for i, step := range db.Breakpoints.BeforeSteps {
-		if beforeSteps.Has(step) {
-			errs = errs.Also(apis.ErrGeneric(fmt.Sprintf("before step must be unique, the same step: %s is defined multiple times at", step), fmt.Sprintf("breakpoints.beforeSteps[%d]", i)))
-		}
-		beforeSteps.Insert(step)
+		errs = errs.Also(apis.ErrInvalidValue(fmt.Sprintf("%s is not a valid onFailure breakpoint value, onFailure breakpoint is only allowed to be set as enabled", db.Breakpoints.OnFailure), "breakpoints.onFailure"))
 	}
 	return errs
 }

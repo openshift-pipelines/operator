@@ -17,7 +17,8 @@ type Interface interface {
 	SecurityV1() securityv1.SecurityV1Interface
 }
 
-// Clientset contains the clients for groups.
+// Clientset contains the clients for groups. Each group has exactly one
+// version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
 	securityV1 *securityv1.SecurityV1Client

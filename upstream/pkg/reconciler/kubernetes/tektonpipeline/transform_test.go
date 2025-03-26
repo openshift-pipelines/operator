@@ -17,7 +17,6 @@ limitations under the License.
 package tektonpipeline
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -25,7 +24,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
-	"github.com/tektoncd/operator/pkg/reconciler/common"
 	"github.com/tektoncd/pipeline/test/diff"
 	"gotest.tools/v3/assert"
 	appsv1 "k8s.io/api/apps/v1"
@@ -36,7 +34,7 @@ import (
 	"knative.dev/pkg/ptr"
 )
 
-func TestUpdatePerformanceFlagsInDeploymentAndLeaderConfigMap(t *testing.T) {
+func TestUpdatePerformanceFlagsInDeployment(t *testing.T) {
 	pipelineCR := &v1alpha1.TektonPipeline{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pipeline",
@@ -111,7 +109,7 @@ func TestUpdatePerformanceFlagsInDeploymentAndLeaderConfigMap(t *testing.T) {
 	assert.NilError(t, err)
 
 	// apply transformer
-	transformer := updatePerformanceFlagsInDeploymentAndLeaderConfigMap(pipelineCR, leaderElectionPipelineConfig, pipelinesControllerDeployment, pipelinesControllerContainer)
+	transformer := updatePerformanceFlagsInDeployment(pipelineCR)
 	err = transformer(ud)
 	assert.NilError(t, err)
 
@@ -364,58 +362,6 @@ func TestUpdateResolverConfigEnvironmentsInDeployment(t *testing.T) {
 			if d := cmp.Diff(depOut, depExpected); d != "" {
 				t.Errorf("Diff %s", diff.PrintWantGot(d))
 			}
-		})
-	}
-}
-
-// not in use, see: https://github.com/tektoncd/pipeline/pull/7789
-// this field is removed from pipeline component
-// keeping in types to maintain the API compatibility
-// this test verifies that, "EnableTektonOciBundles" always not present in the feature flags config map
-func TestEnableTektonOciBundlesFeatureFlag(t *testing.T) {
-	tp := &v1alpha1.TektonPipeline{
-		Spec: v1alpha1.TektonPipelineSpec{
-			Pipeline: v1alpha1.Pipeline{
-				PipelineProperties: v1alpha1.PipelineProperties{
-					EnableTektonOciBundles: ptr.Bool(true),
-				},
-			},
-		},
-	}
-	ctx := context.TODO()
-
-	tests := []struct {
-		name                   string
-		enableTektonOciBundles *bool
-		expectedValue          string
-	}{
-		{name: "with-true", enableTektonOciBundles: ptr.Bool(true), expectedValue: "false"},
-		{name: "with-false", enableTektonOciBundles: ptr.Bool(false), expectedValue: "false"},
-		{name: "with-nil", enableTektonOciBundles: nil, expectedValue: "false"},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			tp.Spec.Pipeline.EnableTektonOciBundles = test.enableTektonOciBundles
-
-			// get manifests
-			manifest, err := common.Fetch("./testdata/tektonpipeline-feature-flags-base.yaml")
-			assert.NilError(t, err, "error on fetching testdata")
-
-			transformers := filterAndTransform(common.NoExtension(ctx))
-			_, err = transformers(ctx, &manifest, tp)
-			assert.NilError(t, err)
-
-			resources := manifest.Resources()
-			assert.Assert(t, len(resources) > 0)
-
-			featureFlagsMap := corev1.ConfigMap{}
-			err = apimachineryRuntime.DefaultUnstructuredConverter.FromUnstructured(resources[0].Object, &featureFlagsMap)
-			assert.NilError(t, err)
-
-			flagValue, found := featureFlagsMap.Data["enable-tekton-oci-bundles"]
-			assert.Assert(t, found == true, "'enable-tekton-oci-bundles' not found")
-			assert.Assert(t, flagValue == test.expectedValue, "'enable-tekton-oci-bundles' is not '%s'", test.expectedValue)
 		})
 	}
 }

@@ -17,7 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -63,7 +62,7 @@ func (c SpireConfig) Validate() error {
 	}
 
 	if !strings.HasPrefix(c.NodeAliasPrefix, "/") {
-		return errors.New("Spire node alias should start with a /")
+		return fmt.Errorf("Spire node alias should start with a /")
 	}
 
 	return nil
