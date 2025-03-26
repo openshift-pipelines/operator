@@ -17,27 +17,13 @@ import (
 
 // EmptyInterfaceCodec is the Codec used for interface{} values.
 //
-// Deprecated: EmptyInterfaceCodec will not be directly configurable in Go
-// Driver 2.0. To configure the empty interface encode and decode behavior, use
-// the configuration methods on a [go.mongodb.org/mongo-driver/bson.Encoder] or
-// [go.mongodb.org/mongo-driver/bson.Decoder]. To configure the empty interface
-// encode and decode behavior for a mongo.Client, use
-// [go.mongodb.org/mongo-driver/mongo/options.ClientOptions.SetBSONOptions].
-//
-// For example, to configure a mongo.Client to unmarshal BSON binary field
-// values as a Go byte slice, use:
-//
-//	opt := options.Client().SetBSONOptions(&options.BSONOptions{
-//	    BinaryAsSlice: true,
-//	})
-//
-// See the deprecation notice for each field in EmptyInterfaceCodec for the
-// corresponding settings.
+// Deprecated: Use [go.mongodb.org/mongo-driver/bson.NewRegistry] to get a registry with the
+// EmptyInterfaceCodec registered.
 type EmptyInterfaceCodec struct {
 	// DecodeBinaryAsSlice causes DecodeValue to unmarshal BSON binary field values that are the
 	// "Generic" or "Old" BSON binary subtype as a Go byte slice instead of a primitive.Binary.
 	//
-	// Deprecated: Use bson.Decoder.BinaryAsSlice or options.BSONOptions.BinaryAsSlice instead.
+	// Deprecated: Use bson.Decoder.BinaryAsSlice instead.
 	DecodeBinaryAsSlice bool
 }
 
@@ -52,8 +38,8 @@ var (
 
 // NewEmptyInterfaceCodec returns a EmptyInterfaceCodec with options opts.
 //
-// Deprecated: NewEmptyInterfaceCodec will not be available in Go Driver 2.0. See
-// [EmptyInterfaceCodec] for more details.
+// Deprecated: Use [go.mongodb.org/mongo-driver/bson.NewRegistry] to get a registry with the
+// EmptyInterfaceCodec registered.
 func NewEmptyInterfaceCodec(opts ...*bsonoptions.EmptyInterfaceCodecOptions) *EmptyInterfaceCodec {
 	interfaceOpt := bsonoptions.MergeEmptyInterfaceCodecOptions(opts...)
 

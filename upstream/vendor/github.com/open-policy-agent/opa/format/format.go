@@ -26,11 +26,7 @@ type Opts struct {
 	// carry along their original source locations.
 	IgnoreLocations bool
 
-	// RegoVersion is the version of Rego to format code for.
-	RegoVersion ast.RegoVersion
-
-	// ParserOptions is the parser options used when parsing the module to be formatted.
-	ParserOptions *ast.ParserOptions
+	RegoV1 bool
 }
 
 // defaultLocationFile is the file name used in `Ast()` for terms
@@ -46,29 +42,13 @@ func Source(filename string, src []byte) ([]byte, error) {
 }
 
 func SourceWithOpts(filename string, src []byte, opts Opts) ([]byte, error) {
-	var parserOpts ast.ParserOptions
-	if opts.ParserOptions != nil {
-		parserOpts = *opts.ParserOptions
-	} else {
-		if opts.RegoVersion == ast.RegoV1 {
-			// If the rego version is V1, we need to parse it as such, to allow for future keywords not being imported.
-			// Otherwise, we'll default to RegoV0
-			parserOpts.RegoVersion = ast.RegoV1
-		}
-	}
-
-	module, err := ast.ParseModuleWithOpts(filename, string(src), parserOpts)
+	module, err := ast.ParseModule(filename, string(src))
 	if err != nil {
 		return nil, err
 	}
 
-	if opts.RegoVersion == ast.RegoV0CompatV1 || opts.RegoVersion == ast.RegoV1 {
-		checkOpts := ast.NewRegoCheckOptions()
-		// The module is parsed as v0, so we need to disable checks that will be automatically amended by the AstWithOpts call anyways.
-		checkOpts.RequireIfKeyword = false
-		checkOpts.RequireContainsKeyword = false
-		checkOpts.RequireRuleBodyOrValue = false
-		errors := ast.CheckRegoV1WithOptions(module, checkOpts)
+	if opts.RegoV1 {
+		errors := ast.CheckRegoV1(module)
 		if len(errors) > 0 {
 			return nil, errors
 		}
@@ -135,7 +115,7 @@ func AstWithOpts(x interface{}, opts Opts) ([]byte, error) {
 
 	o := fmtOpts{}
 
-	if opts.RegoVersion == ast.RegoV0CompatV1 || opts.RegoVersion == ast.RegoV1 {
+	if opts.RegoV1 {
 		o.regoV1 = true
 		o.ifs = true
 		o.contains = true
@@ -196,13 +176,10 @@ func AstWithOpts(x interface{}, opts Opts) ([]byte, error) {
 
 	switch x := x.(type) {
 	case *ast.Module:
-		if opts.RegoVersion == ast.RegoV1 {
-			x.Imports = filterRegoV1Import(x.Imports)
-		} else if opts.RegoVersion == ast.RegoV0CompatV1 {
+		if o.regoV1 {
 			x.Imports = ensureRegoV1Import(x.Imports)
 		}
-
-		if opts.RegoVersion == ast.RegoV0CompatV1 || opts.RegoVersion == ast.RegoV1 || moduleIsRegoV1Compatible(x) {
+		if o.regoV1 || moduleIsRegoV1Compatible(x) {
 			x.Imports = future.FilterFutureImports(x.Imports)
 		} else {
 			for kw := range extraFutureKeywordImports {
@@ -558,11 +535,7 @@ func (w *writer) writeHead(head *ast.Head, isDefault, isExpandedConst bool, o fm
 		// * a.b.c.d -> a.b.c.d := true
 		isRegoV1RefConst := o.regoV1 && isExpandedConst && head.Key == nil && len(head.Args) == 0
 
-		if len(head.Args) > 0 &&
-			head.Location == head.Value.Location &&
-			head.Name != "else" &&
-			ast.Compare(head.Value, ast.BooleanTerm(true)) == 0 &&
-			!isRegoV1RefConst {
+		if head.Location == head.Value.Location && head.Name != "else" && !isRegoV1RefConst {
 			// If the value location is the same as the location of the head,
 			// we know that the value is generated, i.e. f(1)
 			// Don't print the value (` = true`) as it is implied.
@@ -1118,44 +1091,15 @@ func (w *writer) writeIterableLine(elements []interface{}, comments []*ast.Comme
 func (w *writer) objectWriter() entryWriter {
 	return func(x interface{}, comments []*ast.Comment) []*ast.Comment {
 		entry := x.([2]*ast.Term)
-
-		call, isCall := entry[0].Value.(ast.Call)
-
-		paren := false
-		if isCall && ast.Or.Ref().Equal(call[0].Value) && entry[0].Location.Text[0] == 40 { // Starts with "("
-			paren = true
-			w.write("(")
-		}
-
 		comments = w.writeTerm(entry[0], comments)
-		if paren {
-			w.write(")")
-		}
-
 		w.write(": ")
-
-		call, isCall = entry[1].Value.(ast.Call)
-		if isCall && ast.Or.Ref().Equal(call[0].Value) && entry[1].Location.Text[0] == 40 { // Starts with "("
-			w.write("(")
-			defer w.write(")")
-		}
-
 		return w.writeTerm(entry[1], comments)
 	}
 }
 
 func (w *writer) listWriter() entryWriter {
 	return func(x interface{}, comments []*ast.Comment) []*ast.Comment {
-		t, ok := x.(*ast.Term)
-		if ok {
-			call, isCall := t.Value.(ast.Call)
-			if isCall && ast.Or.Ref().Equal(call[0].Value) && t.Location.Text[0] == 40 { // Starts with "("
-				w.write("(")
-				defer w.write(")")
-			}
-		}
-
-		return w.writeTerm(t, comments)
+		return w.writeTerm(x.(*ast.Term), comments)
 	}
 }
 
@@ -1352,10 +1296,7 @@ func closingLoc(skipOpen, skipClose, open, close byte, loc *ast.Location) *ast.L
 		i, offset = skipPast(skipOpen, skipClose, loc)
 	}
 
-	for ; i < len(loc.Text); i++ {
-		if loc.Text[i] == open {
-			break
-		}
+	for ; i < len(loc.Text) && loc.Text[i] != open; i++ {
 	}
 
 	if i >= len(loc.Text) {
@@ -1384,10 +1325,7 @@ func closingLoc(skipOpen, skipClose, open, close byte, loc *ast.Location) *ast.L
 
 func skipPast(open, close byte, loc *ast.Location) (int, int) {
 	i := 0
-	for ; i < len(loc.Text); i++ {
-		if loc.Text[i] == open {
-			break
-		}
+	for ; i < len(loc.Text) && loc.Text[i] != open; i++ {
 	}
 
 	state := 1
@@ -1504,17 +1442,6 @@ func ensureFutureKeywordImport(imps []*ast.Import, kw string) []*ast.Import {
 
 func ensureRegoV1Import(imps []*ast.Import) []*ast.Import {
 	return ensureImport(imps, ast.RegoV1CompatibleRef)
-}
-
-func filterRegoV1Import(imps []*ast.Import) []*ast.Import {
-	var ret []*ast.Import
-	for _, imp := range imps {
-		path := imp.Path.Value.(ast.Ref)
-		if !ast.RegoV1CompatibleRef.Equal(path) {
-			ret = append(ret, imp)
-		}
-	}
-	return ret
 }
 
 func ensureImport(imps []*ast.Import, path ast.Ref) []*ast.Import {

@@ -58,9 +58,6 @@ const (
 
 	// KindOpenShiftPipelinesAsCode is the Kind of OpenShiftPipelinesAsCode in a GVK context.
 	KindOpenShiftPipelinesAsCode = "OpenShiftPipelinesAsCode"
-
-	// KindManualApprovalGate is the Kind of KindManualApprovalGate in a GVK context.
-	KindManualApprovalGate = "ManualApprovalGate"
 )
 
 // Resource takes an unqualified resource and returns a Group qualified GroupResource
@@ -92,8 +89,6 @@ func addKnownTypes(s *runtime.Scheme) error {
 		&TektonChainList{},
 		&OpenShiftPipelinesAsCode{},
 		&OpenShiftPipelinesAsCodeList{},
-		&ManualApprovalGate{},
-		&ManualApprovalGateList{},
 	)
 	metav1.AddToGroupVersion(s, SchemeGroupVersion)
 	return nil

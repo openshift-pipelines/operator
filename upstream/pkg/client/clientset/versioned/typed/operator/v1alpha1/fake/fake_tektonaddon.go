@@ -24,6 +24,7 @@ import (
 	v1alpha1 "github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -34,9 +35,9 @@ type FakeTektonAddons struct {
 	Fake *FakeOperatorV1alpha1
 }
 
-var tektonaddonsResource = v1alpha1.SchemeGroupVersion.WithResource("tektonaddons")
+var tektonaddonsResource = schema.GroupVersionResource{Group: "operator.tekton.dev", Version: "v1alpha1", Resource: "tektonaddons"}
 
-var tektonaddonsKind = v1alpha1.SchemeGroupVersion.WithKind("TektonAddon")
+var tektonaddonsKind = schema.GroupVersionKind{Group: "operator.tekton.dev", Version: "v1alpha1", Kind: "TektonAddon"}
 
 // Get takes name of the tektonAddon, and returns the corresponding tektonAddon object, and an error if there is any.
 func (c *FakeTektonAddons) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.TektonAddon, err error) {

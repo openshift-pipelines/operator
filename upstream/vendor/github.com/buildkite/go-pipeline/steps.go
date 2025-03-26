@@ -1,21 +1,10 @@
 package pipeline
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/buildkite/go-pipeline/ordered"
-	"github.com/buildkite/go-pipeline/warning"
 )
-
-// Sentinel errors that can appear when falling back to UnknownStep.
-var (
-	ErrStepTypeInference = errors.New("cannot infer step type")
-	ErrUnknownStepType   = errors.New("unknown step type")
-)
-
-// Compile-time check that *Steps is an ordered.Unmarshaler.
-var _ ordered.Unmarshaler = (*Steps)(nil)
 
 // Steps contains multiple steps. It is useful for unmarshaling step sequences,
 // since it has custom logic for determining the correct step type.
@@ -38,18 +27,14 @@ func (s *Steps) UnmarshalOrdered(o any) error {
 	if *s == nil {
 		*s = make(Steps, 0, len(sl))
 	}
-
-	var warns []error
-	for i, st := range sl {
+	for _, st := range sl {
 		step, err := unmarshalStep(st)
-		if w := warning.As(err); w != nil {
-			warns = append(warns, w.Wrapf("while unmarshaling step %d of %d", i+1, len(sl)))
-		} else if err != nil {
+		if err != nil {
 			return err
 		}
 		*s = append(*s, step)
 	}
-	return warning.Wrap(warns...)
+	return nil
 }
 
 func (s Steps) interpolate(tf stringTransformer) error {
@@ -60,7 +45,11 @@ func (s Steps) interpolate(tf stringTransformer) error {
 func unmarshalStep(o any) (Step, error) {
 	switch o := o.(type) {
 	case string:
-		return NewScalarStep(o)
+		step, err := NewScalarStep(o)
+		if err != nil {
+			return &UnknownStep{Contents: o}, nil
+		}
+		return step, nil
 
 	case *ordered.MapSA:
 		return stepFromMap(o)
@@ -70,79 +59,53 @@ func unmarshalStep(o any) (Step, error) {
 	}
 }
 
-// stepFromMap parses a step (that was originally a YAML mapping).
 func stepFromMap(o *ordered.MapSA) (Step, error) {
 	sType, hasType := o.Get("type")
 
-	var warns []error
 	var step Step
 	var err error
-
 	if hasType {
 		sTypeStr, ok := sType.(string)
 		if !ok {
 			return nil, fmt.Errorf("unmarshaling step: step's `type` key was %T (value %v), want string", sType, sType)
 		}
+
 		step, err = stepByType(sTypeStr)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshaling step: %w", err)
+		}
 	} else {
 		step, err = stepByKeyInference(o)
-	}
-
-	if err != nil {
-		step = new(UnknownStep)
-		warns = append(warns, err)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshaling step: %w", err)
+		}
 	}
 
 	// Decode the step (into the right step type).
-	err = ordered.Unmarshal(o, step)
-	if w := warning.As(err); w != nil {
-		warns = append(warns, w)
-	} else if err != nil {
+	if err := ordered.Unmarshal(o, step); err != nil {
 		// Hmm, maybe we picked the wrong kind of step?
-		// Downgrade this error to a warning.
-		step = &UnknownStep{Contents: o}
-		warns = append(warns, warning.Wrapf(err, "fell back using unknown type of step due to an unmarshaling error"))
+		return &UnknownStep{Contents: o}, nil
 	}
-	return step, warning.Wrap(warns...)
+	return step, nil
 }
 
-// stepByType returns a new empty step with a type corresponding to the "type"
-// field. Unrecognised type values result in an UnknownStep containing an
-// error wrapping ErrUnknownStepType.
 func stepByType(sType string) (Step, error) {
 	switch sType {
 	case "command", "script":
 		return new(CommandStep), nil
-
 	case "wait", "waiter":
 		return &WaitStep{Contents: map[string]any{}}, nil
-
 	case "block", "input", "manual":
 		return &InputStep{Contents: map[string]any{}}, nil
-
 	case "trigger":
 		return new(TriggerStep), nil
-
 	case "group": // as far as i know this doesn't happen, but it's here for completeness
 		return new(GroupStep), nil
-
 	default:
-		return nil, fmt.Errorf("%w %q", ErrUnknownStepType, sType)
+		return nil, fmt.Errorf("unknown step type %q", sType)
 	}
 }
 
-// stepByKeyInference returns a new empty step with a type based on some heuristic rules
-
-// (first rule wins):
-//
-// - command, commands, plugins -> CommandStep
-// - wait, waiter -> WaitStep
-// - block, input, manual -> InputStep
-// - trigger: TriggerStep
-// - group: GroupStep.
-//
-// Failure to infer a step type results in an UnknownStep containing an
-// error wrapping ErrStepTypeInference.
 func stepByKeyInference(o *ordered.MapSA) (Step, error) {
 	switch {
 	case o.Contains("command") || o.Contains("commands") || o.Contains("plugins"):
@@ -163,9 +126,6 @@ func stepByKeyInference(o *ordered.MapSA) (Step, error) {
 		return new(GroupStep), nil
 
 	default:
-		inferrableKeys := []string{
-			"command", "commands", "plugins", "wait", "waiter", "block", "input", "manual", "trigger", "group",
-		}
-		return nil, fmt.Errorf("%w: need one of %v", ErrStepTypeInference, inferrableKeys)
+		return new(UnknownStep), nil
 	}
 }

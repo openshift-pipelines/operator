@@ -94,11 +94,6 @@ release_yaml() {
       cp ${ko_data}/openshift/pipelines-rbac/* ${dirPath}/
     fi
 
-    # Add OpenShift specific files for triggers
-    if [[ ${TARGET} == "openshift" ]] && [[ ${comp} == "triggers" ]]; then
-      cp ${ko_data}/openshift/triggers-rbac/* ${dirPath}/
-    fi
-
     if [[ ${comp} == "dashboard" ]]; then
       sed -i '/aggregationRule/,+3d' ${dest}
     fi
@@ -176,46 +171,6 @@ release_yaml_pac() {
     echo ""
 }
 
-release_yaml_manualapprovalgate() {
-  echo fetching '|' component: manual-approval-gate '|' version: ${1}
-  local version=$1
-
-  ko_data=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata
-  if [ ${version} == "latest" ]
-  then
-    version=$(curl -sL https://api.github.com/repos/openshift-pipelines/manual-approval-gate/releases | jq -r ".[].tag_name" | sort -Vr | head -n1)
-    dirPath=${ko_data}/manual-approval-gate/0.0.0-latest
-  else
-    dirVersion=${version//v}
-    dirPath=${ko_data}/manual-approval-gate/${dirVersion}
-  fi
-  mkdir -p ${dirPath} || true
-
-  dest=${dirPath}
-  fileName=release-${TARGET}.yaml
-  destinationFile=${dest}/${fileName}
-
-  if [ -f "$destinationFile" ] && [ $FORCE_FETCH_RELEASE = "false" ]; then
-        if grep -Eq "$version" $destinationFile;
-        then
-            echo "release file already exist with required version, skipping!"
-            echo ""
-        fi
-  fi
-
-  url="https://github.com/openshift-pipelines/manual-approval-gate/releases/download/${version}/${fileName}"
-  echo ${url}
-  http_response=$(curl -s -L -o ${destinationFile} -w "%{http_code}" ${url})
-  echo url: ${url}
-  if [[ $http_response != "200" ]]; then
-    echo "Error: failed to get manual-approval-gate yaml, status code: $http_response"
-    exit 1
-  fi
-  echo "Info: Added Manual-Approval-Gate/$fileName:$version release yaml !!"
-  echo ""
-
-}
-
 
 release_yaml_hub() {
   echo fetching '|' component: ${1} '|' version: ${2}
@@ -270,18 +225,16 @@ release_yaml_hub() {
 
 fetch_openshift_addon_tasks() {
   fetch_addon_task_script="${SCRIPT_DIR}/hack/openshift"
-  local dest_dir='cmd/openshift/operator/kodata/tekton-addon/addons/06-ecosystem/tasks'
-  ${fetch_addon_task_script}/fetch-tektoncd-catalog-tasks.sh ${dest_dir} "ecosystem_tasks"
-  dest_dir='cmd/openshift/operator/kodata/tekton-addon/addons/06-ecosystem/stepactions'
-  ${fetch_addon_task_script}/fetch-tektoncd-catalog-tasks.sh ${dest_dir} "ecosystem_stepactions"
+  local dest_dir="cmd/openshift/operator/kodata/tekton-addon/addons/02-clustertasks/source_external"
+  ${fetch_addon_task_script}/fetch-tektoncd-catalog-tasks.sh ${dest_dir}
 }
 
 copy_pruner_yaml() {
   srcPath=${SCRIPT_DIR}/config/pruner
   ko_data=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata
   dstPath=${ko_data}/tekton-pruner
-  rm -rf $dstPath
-  cp -r $srcPath $dstPath
+  rm $dstPath -rf
+  cp $srcPath $dstPath -r
 }
 
 main() {
@@ -324,9 +277,6 @@ main() {
 
   hub_version=$(go run ./cmd/tool component-version ${CONFIG} hub)
   release_yaml_hub hub ${hub_version}
-
-  mag_version=$(go run ./cmd/tool component-version ${CONFIG} manual-approval-gate)
-  release_yaml_manualapprovalgate ${mag_version}
 
   # copy pruner rbac/sa yaml
   copy_pruner_yaml

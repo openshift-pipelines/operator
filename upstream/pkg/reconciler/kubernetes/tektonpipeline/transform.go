@@ -43,31 +43,18 @@ const (
 	clusterResolverConfig                        = "cluster-resolver-config"
 	hubResolverConfig                            = "hubresolver-config"
 	gitResolverConfig                            = "git-resolver-config"
-	leaderElectionPipelineConfig                 = "config-leader-election-controller"
-	leaderElectionResolversConfig                = "config-leader-election-resolvers"
+	leaderElectionConfig                         = "config-leader-election-controller"
 	pipelinesControllerDeployment                = "tekton-pipelines-controller"
 	pipelinesControllerContainer                 = "tekton-pipelines-controller"
 	pipelinesRemoteResolversControllerDeployment = "tekton-pipelines-remote-resolvers"
 	pipelinesRemoteResolverControllerContainer   = "controller"
 	resolverEnvKeyTektonHubApi                   = "tekton-hub-api"
 	resolverEnvKeyArtifactHubApi                 = "artifact-hub-api"
-
-	tektonPipelinesControllerName                      = "tekton-pipelines-controller"
-	tektonPipelinesServiceName                         = "tekton-pipelines-controller"
-	tektonRemoteResolversControllerName                = "tekton-pipelines-remote-resolvers"
-	tektonRemoteResolversServiceName                   = "tekton-pipelines-remote-resolvers"
-	tektonPipelinesControllerStatefulServiceName       = "STATEFUL_SERVICE_NAME"
-	tektonPipelinesControllerStatefulControllerOrdinal = "STATEFUL_CONTROLLER_ORDINAL"
 )
 
 func filterAndTransform(extension common.Extension) client.FilterAndTransform {
 	return func(ctx context.Context, manifest *mf.Manifest, comp v1alpha1.TektonComponent) (*mf.Manifest, error) {
 		pipeline := comp.(*v1alpha1.TektonPipeline)
-
-		// not in use, see: https://github.com/tektoncd/pipeline/pull/7789
-		// this field is removed from pipeline component
-		// still keeping types to maintain the API compatibility
-		pipeline.Spec.Pipeline.EnableTektonOciBundles = nil
 
 		images := common.ToLowerCaseKeys(common.ImagesFromEnv(common.PipelinesImagePrefix))
 		instance := comp.(*v1alpha1.TektonPipeline)
@@ -87,19 +74,10 @@ func filterAndTransform(extension common.Extension) client.FilterAndTransform {
 			common.CopyConfigMap(hubResolverConfig, pipeline.Spec.HubResolverConfig),
 			common.CopyConfigMap(clusterResolverConfig, pipeline.Spec.ClusterResolverConfig),
 			common.CopyConfigMap(gitResolverConfig, pipeline.Spec.GitResolverConfig),
-			common.AddConfigMapValues(leaderElectionPipelineConfig, pipeline.Spec.Performance.PipelinePerformanceLeaderElectionConfig),
-			common.AddConfigMapValues(leaderElectionResolversConfig, pipeline.Spec.Performance.PipelinePerformanceLeaderElectionConfig),
-			updatePerformanceFlagsInDeploymentAndLeaderConfigMap(pipeline, leaderElectionPipelineConfig, pipelinesControllerDeployment, pipelinesControllerContainer),
-			updatePerformanceFlagsInDeploymentAndLeaderConfigMap(pipeline, leaderElectionResolversConfig, pipelinesRemoteResolversControllerDeployment, pipelinesRemoteResolverControllerContainer),
+			common.AddConfigMapValues(leaderElectionConfig, pipeline.Spec.Performance.PipelinePerformanceLeaderElectionConfig),
+			updatePerformanceFlagsInDeployment(pipeline),
 			updateResolverConfigEnvironmentsInDeployment(pipeline),
 		}
-		if pipeline.Spec.Performance.StatefulsetOrdinals != nil && *pipeline.Spec.Performance.StatefulsetOrdinals {
-			extra = append(extra, common.ConvertDeploymentToStatefulSet(tektonPipelinesControllerName, tektonPipelinesServiceName), common.AddStatefulEnvVars(
-				tektonPipelinesControllerName, tektonPipelinesServiceName, tektonPipelinesControllerStatefulServiceName, tektonPipelinesControllerStatefulControllerOrdinal))
-			extra = append(extra, common.ConvertDeploymentToStatefulSet(tektonRemoteResolversControllerName, tektonRemoteResolversServiceName), common.AddStatefulEnvVars(
-				tektonRemoteResolversControllerName, tektonRemoteResolversServiceName, tektonPipelinesControllerStatefulServiceName, tektonPipelinesControllerStatefulControllerOrdinal))
-		}
-
 		trns = append(trns, extra...)
 
 		if err := common.Transform(ctx, manifest, instance, trns...); err != nil {
@@ -116,10 +94,10 @@ func filterAndTransform(extension common.Extension) client.FilterAndTransform {
 	}
 }
 
-// updates performance flags/args into deployment and container given as args
-func updatePerformanceFlagsInDeploymentAndLeaderConfigMap(pipelineCR *v1alpha1.TektonPipeline, leaderConfig, deploymentName, containerName string) mf.Transformer {
+// updates performance flags/args into pipelines controller container
+func updatePerformanceFlagsInDeployment(pipelineCR *v1alpha1.TektonPipeline) mf.Transformer {
 	return func(u *unstructured.Unstructured) error {
-		if u.GetKind() != "Deployment" || u.GetName() != deploymentName {
+		if u.GetKind() != "Deployment" || u.GetName() != pipelinesControllerDeployment {
 			return nil
 		}
 
@@ -159,7 +137,7 @@ func updatePerformanceFlagsInDeploymentAndLeaderConfigMap(pipelineCR *v1alpha1.T
 		labelKeys := getSortedKeys(leaderElectionConfigMapData)
 		for _, key := range labelKeys {
 			value := leaderElectionConfigMapData[key]
-			labelKey := fmt.Sprintf("%s.data.%s", leaderConfig, key)
+			labelKey := fmt.Sprintf("%s.data.%s", leaderElectionConfig, key)
 			podLabels[labelKey] = fmt.Sprintf("%v", value)
 		}
 		dep.Spec.Template.Labels = podLabels
@@ -178,18 +156,13 @@ func updatePerformanceFlagsInDeploymentAndLeaderConfigMap(pipelineCR *v1alpha1.T
 		flagKeys := getSortedKeys(flags)
 		// update performance arguments into target container
 		for containerIndex, container := range dep.Spec.Template.Spec.Containers {
-			if container.Name != containerName {
+			if container.Name != pipelinesControllerContainer {
 				continue
 			}
 			for _, flagKey := range flagKeys {
 				// update the arg name with "-" prefix
 				expectedArg := fmt.Sprintf("-%s", flagKey)
 				argStringValue := fmt.Sprintf("%v", flags[flagKey])
-				// skip deprecated disable-ha flag if not pipelinesControllerDeployment
-				// should be removed when the flag is removed from pipelines controller
-				if deploymentName != pipelinesControllerDeployment && flagKey == "disable-ha" {
-					continue
-				}
 				argUpdated := false
 				for argIndex, existingArg := range container.Args {
 					if strings.HasPrefix(existingArg, expectedArg) {

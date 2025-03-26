@@ -65,7 +65,6 @@ func tabs(n int) string {
 // WithOptionalIndent is like WithTabIndent, but only returns a multiline
 // strings if it doesn't contain any newline characters.
 func (f Form) WithOptionalTabIndent(tabs int) Form {
-	// TODO(mvdan): remove this optimization once Go 1.23 lands with https://go.dev/cl/536615
 	if tabs < len(tabIndent) {
 		f.indent = tabIndent[:tabs]
 	} else {
@@ -96,7 +95,7 @@ var (
 	// TODO: ExactString: quotes to bytes type if the string cannot be
 	// represented without loss of accuracy.
 
-	// Label is like String, but optimized for labels.
+	// Label is like Text, but optimized for labels.
 	Label Form = stringForm
 
 	// Bytes defines the format of bytes literal.
@@ -224,6 +223,7 @@ func (f Form) appendEscaped(buf []byte, s string) []byte {
 }
 
 func (f *Form) appendEscapedRune(buf []byte, r rune) []byte {
+	var runeTmp [utf8.UTFMax]byte
 	if (!f.multiline && r == rune(f.quote)) || r == '\\' { // always backslashed
 		buf = f.appendEscape(buf)
 		buf = append(buf, byte(r))
@@ -235,7 +235,8 @@ func (f *Form) appendEscapedRune(buf []byte, r rune) []byte {
 			return buf
 		}
 	} else if strconv.IsPrint(r) || f.graphicOnly && isInGraphicList(r) {
-		buf = utf8.AppendRune(buf, r)
+		n := utf8.EncodeRune(runeTmp[:], r)
+		buf = append(buf, runeTmp[:n]...)
 		return buf
 	}
 	buf = f.appendEscape(buf)

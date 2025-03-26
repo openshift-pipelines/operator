@@ -165,15 +165,15 @@ func AsDuration(key string, target *time.Duration) ParseFunc {
 	}
 }
 
-// AsStringSet parses the value at key as a sets.Set[string] (split by ',') into the target, if it exists.
-func AsStringSet(key string, target *sets.Set[string]) ParseFunc {
+// AsStringSet parses the value at key as a sets.String (split by ',') into the target, if it exists.
+func AsStringSet(key string, target *sets.String) ParseFunc {
 	return func(data map[string]string) error {
 		if raw, ok := data[key]; ok {
 			splitted := strings.Split(raw, ",")
 			for i, v := range splitted {
 				splitted[i] = strings.TrimSpace(v)
 			}
-			*target = sets.New[string](splitted...)
+			*target = sets.NewString(splitted...)
 		}
 		return nil
 	}

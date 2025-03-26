@@ -4,16 +4,18 @@ import (
 	"crypto"
 	"encoding/json"
 	"io"
-	"os"
+	"io/ioutil"
 	"sync"
 
-	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v3"
 	"github.com/spiffe/go-spiffe/v2/internal/jwtutil"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/zeebo/errs"
 )
 
-var jwtbundleErr = errs.Class("jwtbundle")
+var (
+	jwtbundleErr = errs.Class("jwtbundle")
+)
 
 // Bundle is a collection of trusted JWT authorities for a trust domain.
 type Bundle struct {
@@ -41,7 +43,7 @@ func FromJWTAuthorities(trustDomain spiffeid.TrustDomain, jwtAuthorities map[str
 
 // Load loads a bundle from a file on disk. The file must contain a standard RFC 7517 JWKS document.
 func Load(trustDomain spiffeid.TrustDomain, path string) (*Bundle, error) {
-	bundleBytes, err := os.ReadFile(path)
+	bundleBytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, jwtbundleErr.New("unable to read JWT bundle: %w", err)
 	}
@@ -51,7 +53,7 @@ func Load(trustDomain spiffeid.TrustDomain, path string) (*Bundle, error) {
 
 // Read decodes a bundle from a reader. The contents must contain a standard RFC 7517 JWKS document.
 func Read(trustDomain spiffeid.TrustDomain, r io.Reader) (*Bundle, error) {
-	b, err := io.ReadAll(r)
+	b, err := ioutil.ReadAll(r)
 	if err != nil {
 		return nil, jwtbundleErr.New("unable to read: %v", err)
 	}

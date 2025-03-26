@@ -13,14 +13,7 @@ limitations under the License.
 
 package errors
 
-import (
-	"errors"
-	"strings"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-)
-
-const UserErrorLabel = "[User error] "
+const userErrorLabel = "[User error] "
 
 type UserError struct {
 	Reason   string
@@ -51,7 +44,7 @@ func newUserError(reason string, err error) *UserError {
 
 // WrapUserError wraps the original error with the user error label
 func WrapUserError(err error) error {
-	return newUserError(UserErrorLabel, err)
+	return newUserError(userErrorLabel, err)
 }
 
 // LabelUserError labels the failure RunStatus message if any of its error messages has been
@@ -65,21 +58,4 @@ func LabelUserError(messageFormat string, messageA []interface{}) string {
 		}
 	}
 	return messageFormat
-}
-
-// GetErrorMessage returns the error message with the user error label if it is of type user
-// error
-func GetErrorMessage(err error) string {
-	var ue *UserError
-	if errors.As(err, &ue) {
-		return ue.Reason + err.Error()
-	}
-	return err.Error()
-}
-
-// IsImmutableTaskRunSpecError returns true if the error is the taskrun spec is immutable
-func IsImmutableTaskRunSpecError(err error) bool {
-	// The TaskRun may have completed and the spec field is immutable.
-	// validation code: https://github.com/tektoncd/pipeline/blob/v0.62.0/pkg/apis/pipeline/v1/taskrun_validation.go#L136-L138
-	return apierrors.IsBadRequest(err) && strings.Contains(err.Error(), "no updates are allowed")
 }

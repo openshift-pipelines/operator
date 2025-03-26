@@ -24,15 +24,14 @@ type exprChecker func(*TypeEnv, *Expr) *Error
 // accumulated on the typeChecker so that a single run can report multiple
 // issues.
 type typeChecker struct {
-	builtins            map[string]*Builtin
-	required            *Capabilities
-	errs                Errors
-	exprCheckers        map[string]exprChecker
-	varRewriter         varRewriter
-	ss                  *SchemaSet
-	allowNet            []string
-	input               types.Type
-	allowUndefinedFuncs bool
+	builtins     map[string]*Builtin
+	required     *Capabilities
+	errs         Errors
+	exprCheckers map[string]exprChecker
+	varRewriter  varRewriter
+	ss           *SchemaSet
+	allowNet     []string
+	input        types.Type
 }
 
 // newTypeChecker returns a new typeChecker object that has no errors.
@@ -60,10 +59,7 @@ func (tc *typeChecker) copy() *typeChecker {
 		WithVarRewriter(tc.varRewriter).
 		WithSchemaSet(tc.ss).
 		WithAllowNet(tc.allowNet).
-		WithInputType(tc.input).
-		WithAllowUndefinedFunctionCalls(tc.allowUndefinedFuncs).
-		WithBuiltins(tc.builtins).
-		WithRequiredCapabilities(tc.required)
+		WithInputType(tc.input)
 }
 
 func (tc *typeChecker) WithRequiredCapabilities(c *Capabilities) *typeChecker {
@@ -93,13 +89,6 @@ func (tc *typeChecker) WithVarRewriter(f varRewriter) *typeChecker {
 
 func (tc *typeChecker) WithInputType(tpe types.Type) *typeChecker {
 	tc.input = tpe
-	return tc
-}
-
-// WithAllowUndefinedFunctionCalls sets the type checker to allow references to undefined functions.
-// Additionally, the 'CheckUndefinedFuncs' and 'CheckSafetyRuleBodies' compiler stages are skipped.
-func (tc *typeChecker) WithAllowUndefinedFunctionCalls(allow bool) *typeChecker {
-	tc.allowUndefinedFuncs = allow
 	return tc
 }
 
@@ -358,9 +347,6 @@ func (tc *typeChecker) checkExprBuiltin(env *TypeEnv, expr *Expr) *Error {
 	tpe := env.Get(name)
 
 	if tpe == nil {
-		if tc.allowUndefinedFuncs {
-			return nil
-		}
 		return NewError(TypeErr, expr.Location, "undefined function %v", name)
 	}
 

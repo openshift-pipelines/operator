@@ -25,7 +25,6 @@ const (
 	ControllerTektonHub          ControllerName = "tektonhub"
 	ControllerTektonChain        ControllerName = "tektonchain"
 	ControllerTektonResult       ControllerName = "tektonresult"
-	ControllerManualApprovalGate ControllerName = "manualapprovalgate"
 	EnvControllerNames           string         = "CONTROLLER_NAMES"
 	EnvSharedMainName            string         = "UNIQUE_PROCESS_NAME"
 )

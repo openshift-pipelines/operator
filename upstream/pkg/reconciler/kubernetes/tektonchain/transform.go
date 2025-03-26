@@ -38,11 +38,6 @@ func filterAndTransform(extension common.Extension) client.FilterAndTransform {
 			common.AddDeploymentRestrictedPSA(),
 			AddControllerEnv(chainCR.Spec.Chain.ControllerEnvs),
 		}
-		if chainCR.Spec.GenerateSigningSecret {
-			extra = append(extra, common.AddSecretData(GenerateSigningSecrets(ctx), map[string]string{
-				secretTISSigningAnnotation: "true",
-			}))
-		}
 		extra = append(extra, extension.Transformers(chainCR)...)
 		err := common.Transform(ctx, manifest, chainCR, extra...)
 		if err != nil {

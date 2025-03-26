@@ -21,8 +21,6 @@ import (
 	"github.com/sigstore/cosign/v2/pkg/oci/internal/signature"
 )
 
-const maxLayers = 1000
-
 type sigs struct {
 	v1.Image
 }
@@ -35,11 +33,7 @@ func (s *sigs) Get() ([]oci.Signature, error) {
 	if err != nil {
 		return nil, err
 	}
-	numLayers := int64(len(manifest.Layers))
-	if numLayers > maxLayers {
-		return nil, oci.NewMaxLayersExceeded(numLayers, maxLayers)
-	}
-	signatures := make([]oci.Signature, 0, numLayers)
+	signatures := make([]oci.Signature, 0, len(manifest.Layers))
 	for _, desc := range manifest.Layers {
 		l, err := s.Image.LayerByDigest(desc.Digest)
 		if err != nil {

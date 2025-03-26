@@ -38,7 +38,7 @@ type BucketSet struct {
 	// mu guards buckets.
 	mu sync.RWMutex
 	// All the bucket names. Needed for building hash universe.
-	buckets sets.Set[string]
+	buckets sets.String
 }
 
 // Bucket implements reconciler.Bucket and wraps around BuketSet
@@ -59,7 +59,7 @@ func newCache() *lru.Cache {
 
 // NewBucketSet creates a new bucket set with the given universe
 // of bucket names.
-func NewBucketSet(bucketList sets.Set[string]) *BucketSet {
+func NewBucketSet(bucketList sets.String) *BucketSet {
 	return &BucketSet{
 		cache:   newCache(),
 		buckets: bucketList,
@@ -106,7 +106,7 @@ func (bs *BucketSet) Owner(key string) string {
 }
 
 // Returns a single element from the set.
-func GetAny(s sets.Set[string]) (string, bool) {
+func GetAny(s sets.String) (string, bool) {
 	for key := range s {
 		return key, true
 	}
@@ -124,11 +124,11 @@ func (bs *BucketSet) BucketList() []string {
 	bs.mu.RLock()
 	defer bs.mu.RUnlock()
 
-	return sets.List(bs.buckets)
+	return bs.buckets.List()
 }
 
 // Update updates the universe of buckets.
-func (bs *BucketSet) Update(newB sets.Set[string]) {
+func (bs *BucketSet) Update(newB sets.String) {
 	bs.mu.Lock()
 	defer bs.mu.Unlock()
 	// In theory we can iterate over the map and

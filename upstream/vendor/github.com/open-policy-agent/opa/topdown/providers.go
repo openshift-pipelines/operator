@@ -86,7 +86,7 @@ func validateAWSAuthParameters(o ast.Object) error {
 	return nil
 }
 
-func builtinAWSSigV4SignReq(_ BuiltinContext, operands []*ast.Term, iter func(*ast.Term) error) error {
+func builtinAWSSigV4SignReq(ctx BuiltinContext, operands []*ast.Term, iter func(*ast.Term) error) error {
 	// Request object.
 	reqObj, err := builtins.ObjectOperand(operands[0].Value, 1)
 	if err != nil {
@@ -172,33 +172,10 @@ func builtinAWSSigV4SignReq(_ BuiltinContext, operands []*ast.Term, iter func(*a
 	}
 
 	// Sign the request object's headers, and reconstruct the headers map.
-	headersMap := objectToMap(headers)
-
-	// if payload signing config is set, pass it down to the signing method
-	disablePayloadSigning := false
-	t := awsConfigObj.Get(ast.StringTerm("disable_payload_signing"))
-	if t != nil {
-		if v, ok := t.Value.(ast.Boolean); ok {
-			disablePayloadSigning = bool(v)
-		} else {
-			return builtins.NewOperandErr(2, "invalid value for 'disable_payload_signing' in AWS config")
-		}
-	}
-
-	authHeader, awsHeadersMap := aws.SignV4(headersMap, method, theURL, body, service, awsCreds, signingTimestamp, disablePayloadSigning)
+	authHeader, signedHeadersMap := aws.SignV4(objectToMap(headers), method, theURL, body, service, awsCreds, signingTimestamp)
 	signedHeadersObj := ast.NewObject()
-	// Restore original headers
-	for k, v := range headersMap {
-		// objectToMap doesn't support arrays
-		if len(v) == 1 {
-			signedHeadersObj.Insert(ast.StringTerm(k), ast.StringTerm(v[0]))
-		}
-	}
-	// Set authorization header
 	signedHeadersObj.Insert(ast.StringTerm("Authorization"), ast.StringTerm(authHeader))
-
-	// set aws signature headers
-	for k, v := range awsHeadersMap {
+	for k, v := range signedHeadersMap {
 		signedHeadersObj.Insert(ast.StringTerm(k), ast.StringTerm(v))
 	}
 

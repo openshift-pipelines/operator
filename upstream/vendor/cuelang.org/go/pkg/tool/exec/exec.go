@@ -45,8 +45,13 @@ func (c *execCmd) Run(ctx *task.Context) (res interface{}, err error) {
 
 	// TODO: set environment variables, if defined.
 	stream := func(name string) (stream cue.Value, ok bool) {
-		c := ctx.Obj.LookupPath(cue.ParsePath(name))
-		if err := c.Null(); c.Err() != nil || err == nil {
+		c := ctx.Obj.Lookup(name)
+		// Although the schema defines a default versions, older implementations
+		// may not use it yet.
+		if !c.Exists() {
+			return
+		}
+		if err := c.Null(); ctx.Err != nil || err == nil {
 			return
 		}
 		return c, true
@@ -66,12 +71,6 @@ func (c *execCmd) Run(ctx *task.Context) (res interface{}, err error) {
 		cmd.Stderr = ctx.Stderr
 	}
 
-	v := ctx.Obj.LookupPath(cue.ParsePath("mustSucceed"))
-	mustSucceed, err := v.Bool()
-	if err != nil {
-		return nil, errors.Wrapf(err, v.Pos(), "invalid bool value")
-	}
-
 	update := map[string]interface{}{}
 	if captureOut {
 		var stdout []byte
@@ -81,24 +80,15 @@ func (c *execCmd) Run(ctx *task.Context) (res interface{}, err error) {
 		err = cmd.Run()
 	}
 	update["success"] = err == nil
-
-	if err == nil {
-		return update, nil
-	}
-
-	if captureErr {
-		if exit := (*exec.ExitError)(nil); errors.As(err, &exit) {
+	if err != nil {
+		if exit := (*exec.ExitError)(nil); errors.As(err, &exit) && captureErr {
 			update["stderr"] = string(exit.Stderr)
 		} else {
-			update["stderr"] = err.Error()
+			update = nil
 		}
+		err = fmt.Errorf("command %q failed: %v", doc, err)
 	}
-
-	if !mustSucceed {
-		return update, nil
-	}
-
-	return nil, fmt.Errorf("command %q failed: %v", doc, err)
+	return update, err
 }
 
 func mkCommand(ctx *task.Context) (c *exec.Cmd, doc string, err error) {
@@ -144,14 +134,13 @@ func mkCommand(ctx *task.Context) (c *exec.Cmd, doc string, err error) {
 
 	cmd := exec.CommandContext(ctx.Context, bin, args...)
 
-	cmd.Dir, _ = ctx.Obj.LookupPath(cue.ParsePath("dir")).String()
+	cmd.Dir, _ = ctx.Obj.Lookup("dir").String()
 
-	env := ctx.Obj.LookupPath(cue.ParsePath("env"))
+	env := ctx.Obj.Lookup("env")
 
 	// List case.
 	for iter, _ := env.List(); iter.Next(); {
-		v, _ := iter.Value().Default()
-		str, err := v.String()
+		str, err := iter.Value().String()
 		if err != nil {
 			return nil, "", errors.Wrapf(err, v.Pos(),
 				"invalid environment variable value %q", v)
@@ -160,9 +149,9 @@ func mkCommand(ctx *task.Context) (c *exec.Cmd, doc string, err error) {
 	}
 
 	// Struct case.
-	for iter, _ := env.Fields(); iter.Next(); {
+	for iter, _ := ctx.Obj.Lookup("env").Fields(); iter.Next(); {
 		label := iter.Label()
-		v, _ := iter.Value().Default()
+		v := iter.Value()
 		var str string
 		switch v.Kind() {
 		case cue.StringKind:

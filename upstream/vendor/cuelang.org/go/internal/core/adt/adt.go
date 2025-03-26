@@ -39,7 +39,7 @@ func Resolve(ctx *OpContext, c Conjunct) *Vertex {
 		v = x
 
 	case Resolver:
-		r, err := ctx.resolveState(c, x, attempt(finalized, allKnown))
+		r, err := ctx.resolveState(c, x, finalized)
 		if err != nil {
 			v = err
 			break
@@ -60,7 +60,7 @@ func Resolve(ctx *OpContext, c Conjunct) *Vertex {
 	return ToVertex(v)
 }
 
-// A Node is any abstract data type representing a value or expression.
+// A Node is any abstract data type representing an value or expression.
 type Node interface {
 	Source() ast.Node
 	node() // enforce internal.
@@ -108,14 +108,14 @@ type Evaluator interface {
 
 	// evaluate evaluates the underlying expression. If the expression
 	// is incomplete, it may record the error in ctx and return nil.
-	evaluate(ctx *OpContext, state combinedFlags) Value
+	evaluate(ctx *OpContext, state vertexStatus) Value
 }
 
 // A Resolver represents a reference somewhere else within a tree that resolves
 // a value.
 type Resolver interface {
 	Node
-	resolve(ctx *OpContext, state combinedFlags) *Vertex
+	resolve(ctx *OpContext, state vertexStatus) *Vertex
 }
 
 type YieldFunc func(env *Environment)
@@ -251,9 +251,6 @@ func (x *Ellipsis) expr() Expr {
 	}
 	return x.Value
 }
-func (*ConjunctGroup) declNode() {}
-func (*ConjunctGroup) elemNode() {}
-func (*ConjunctGroup) expr()     {}
 
 var top = &Top{}
 
@@ -341,7 +338,6 @@ func (*Comprehension) elemNode() {}
 
 func (*Vertex) node()            {}
 func (*Conjunction) node()       {}
-func (*ConjunctGroup) node()     {}
 func (*Disjunction) node()       {}
 func (*BoundValue) node()        {}
 func (*Builtin) node()           {}

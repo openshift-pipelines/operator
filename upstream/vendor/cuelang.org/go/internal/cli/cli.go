@@ -32,7 +32,7 @@ func ParseValue(pos token.Pos, name, str string, k cue.Kind) (x ast.Expr, errs e
 		expr, err = parser.ParseExpr(name, str)
 		if err != nil {
 			errs = errors.Wrapf(err, pos,
-				"invalid number for injection tag %q", name)
+				"invalid number for environment variable %s", name)
 		}
 	}
 
@@ -41,7 +41,7 @@ func ParseValue(pos token.Pos, name, str string, k cue.Kind) (x ast.Expr, errs e
 		b, ok := boolValues[str]
 		if !ok {
 			errs = errors.Append(errs, errors.Newf(pos,
-				"invalid boolean value %q for injection tag %q", str, name))
+				"invalid boolean value %q for environment variable %s", str, name))
 		} else if expr != nil || k&cue.StringKind != 0 {
 			// Convert into an expression
 			bl := ast.NewBool(b)
@@ -70,7 +70,7 @@ func ParseValue(pos token.Pos, name, str string, k cue.Kind) (x ast.Expr, errs e
 		return x, nil
 	case errs == nil:
 		return nil, errors.Newf(pos,
-			"invalid type for injection tag %q", name)
+			"invalid type for environment variable %s", name)
 	}
 	return nil, errs
 }

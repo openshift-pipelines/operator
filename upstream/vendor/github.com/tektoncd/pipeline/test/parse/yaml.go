@@ -14,7 +14,6 @@
 package parse
 
 import (
-	"context"
 	"testing"
 
 	v1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
@@ -29,17 +28,6 @@ func MustParseV1alpha1StepAction(t *testing.T, yaml string) *v1alpha1.StepAction
 	t.Helper()
 	var sa v1alpha1.StepAction
 	yaml = `apiVersion: tekton.dev/v1alpha1
-kind: StepAction
-` + yaml
-	mustParseYAML(t, yaml, &sa)
-	return &sa
-}
-
-// MustParseV1beta1StepAction takes YAML and parses it into a *v1alpha1.StepAction
-func MustParseV1beta1StepAction(t *testing.T, yaml string) *v1beta1.StepAction {
-	t.Helper()
-	var sa v1beta1.StepAction
-	yaml = `apiVersion: tekton.dev/v1beta1
 kind: StepAction
 ` + yaml
 	mustParseYAML(t, yaml, &sa)
@@ -79,14 +67,6 @@ kind: Task
 	return &task
 }
 
-// MustParseV1beta1TaskAndSetDefaults takes YAML and parses it into a *v1beta1.Task and sets defaults
-func MustParseV1beta1TaskAndSetDefaults(t *testing.T, yaml string) *v1beta1.Task {
-	t.Helper()
-	task := MustParseV1beta1Task(t, yaml)
-	task.SetDefaults(context.Background())
-	return task
-}
-
 // MustParseCustomRun takes YAML and parses it into a *v1beta1.CustomRun
 func MustParseCustomRun(t *testing.T, yaml string) *v1beta1.CustomRun {
 	t.Helper()
@@ -107,14 +87,6 @@ kind: Task
 ` + yaml
 	mustParseYAML(t, yaml, &task)
 	return &task
-}
-
-// MustParseV1TaskAndSetDefaults takes YAML and parses it into a *v1.Task and sets defaults
-func MustParseV1TaskAndSetDefaults(t *testing.T, yaml string) *v1.Task {
-	t.Helper()
-	task := MustParseV1Task(t, yaml)
-	task.SetDefaults(context.Background())
-	return task
 }
 
 // MustParseClusterTask takes YAML and parses it into a *v1beta1.ClusterTask
@@ -161,14 +133,6 @@ kind: Pipeline
 	return &pipeline
 }
 
-// MustParseV1beta1PipelineAndSetDefaults takes YAML and parses it into a *v1beta1.Pipeline and sets defaults
-func MustParseV1beta1PipelineAndSetDefaults(t *testing.T, yaml string) *v1beta1.Pipeline {
-	t.Helper()
-	p := MustParseV1beta1Pipeline(t, yaml)
-	p.SetDefaults(context.Background())
-	return p
-}
-
 // MustParseV1Pipeline takes YAML and parses it into a *v1.Pipeline
 func MustParseV1Pipeline(t *testing.T, yaml string) *v1.Pipeline {
 	t.Helper()
@@ -178,14 +142,6 @@ kind: Pipeline
 ` + yaml
 	mustParseYAML(t, yaml, &pipeline)
 	return &pipeline
-}
-
-// MustParseV1PipelineAndSetDefaults takes YAML and parses it into a *v1.Pipeline and sets defaults
-func MustParseV1PipelineAndSetDefaults(t *testing.T, yaml string) *v1.Pipeline {
-	t.Helper()
-	p := MustParseV1Pipeline(t, yaml)
-	p.SetDefaults(context.Background())
-	return p
 }
 
 // MustParseVerificationPolicy takes YAML and parses it into a *v1alpha1.VerificationPolicy

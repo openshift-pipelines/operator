@@ -28,7 +28,6 @@ type MetricMapping struct {
 	nameFormatter    *fsm.TemplateFormatter
 	regex            *regexp.Regexp
 	Labels           prometheus.Labels `yaml:"labels"`
-	HonorLabels      bool              `yaml:"honor_labels"`
 	labelKeys        []string
 	labelFormatters  []*fsm.TemplateFormatter
 	ObserverType     ObserverType      `yaml:"observer_type"`
@@ -58,7 +57,6 @@ func (m *MetricMapping) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	m.Match = tmp.Match
 	m.Name = tmp.Name
 	m.Labels = tmp.Labels
-	m.HonorLabels = tmp.HonorLabels
 	m.ObserverType = tmp.ObserverType
 	m.LegacyBuckets = tmp.LegacyBuckets
 	m.LegacyQuantiles = tmp.LegacyQuantiles

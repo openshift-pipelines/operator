@@ -18,8 +18,6 @@ limitations under the License.
 
 package v1alpha1
 
-type ManualApprovalGateExpansion interface{}
-
 type OpenShiftPipelinesAsCodeExpansion interface{}
 
 type TektonAddonExpansion interface{}

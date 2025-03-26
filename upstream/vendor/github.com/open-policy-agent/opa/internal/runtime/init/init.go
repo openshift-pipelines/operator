@@ -28,7 +28,6 @@ type InsertAndCompileOptions struct {
 	Bundles               map[string]*bundle.Bundle
 	MaxErrors             int
 	EnablePrintStatements bool
-	ParserOptions         ast.ParserOptions
 }
 
 // InsertAndCompileResult contains the output of the operation.
@@ -59,14 +58,13 @@ func InsertAndCompile(ctx context.Context, opts InsertAndCompileOptions) (*Inser
 	m := metrics.New()
 
 	activation := &bundle.ActivateOpts{
-		Ctx:           ctx,
-		Store:         opts.Store,
-		Txn:           opts.Txn,
-		Compiler:      compiler,
-		Metrics:       m,
-		Bundles:       opts.Bundles,
-		ExtraModules:  policies,
-		ParserOptions: opts.ParserOptions,
+		Ctx:          ctx,
+		Store:        opts.Store,
+		Txn:          opts.Txn,
+		Compiler:     compiler,
+		Metrics:      m,
+		Bundles:      opts.Bundles,
+		ExtraModules: policies,
 	}
 
 	err := bundle.Activate(activation)
@@ -124,19 +122,6 @@ func LoadPaths(paths []string,
 	processAnnotations bool,
 	caps *ast.Capabilities,
 	fsys fs.FS) (*LoadPathsResult, error) {
-	return LoadPathsForRegoVersion(ast.RegoV0, paths, filter, asBundle, bvc, skipVerify, processAnnotations, false, caps, fsys)
-}
-
-func LoadPathsForRegoVersion(regoVersion ast.RegoVersion,
-	paths []string,
-	filter loader.Filter,
-	asBundle bool,
-	bvc *bundle.VerificationConfig,
-	skipVerify bool,
-	processAnnotations bool,
-	followSymlinks bool,
-	caps *ast.Capabilities,
-	fsys fs.FS) (*LoadPathsResult, error) {
 
 	if caps == nil {
 		caps = ast.CapabilitiesForThisVersion()
@@ -161,8 +146,6 @@ func LoadPathsForRegoVersion(regoVersion ast.RegoVersion,
 				WithFilter(filter).
 				WithProcessAnnotation(processAnnotations).
 				WithCapabilities(caps).
-				WithRegoVersion(regoVersion).
-				WithFollowSymlinks(followSymlinks).
 				AsBundle(path)
 			if err != nil {
 				return nil, err
@@ -178,7 +161,6 @@ func LoadPathsForRegoVersion(regoVersion ast.RegoVersion,
 		WithFS(fsys).
 		WithProcessAnnotation(processAnnotations).
 		WithCapabilities(caps).
-		WithRegoVersion(regoVersion).
 		Filtered(nonBundlePaths, filter)
 
 	if err != nil {

@@ -70,7 +70,7 @@ func WaitForTektonPipelineState(clients pipelinev1alpha1.TektonPipelineInterface
 	defer span.End()
 
 	var lastState *v1alpha1.TektonPipeline
-	waitErr := wait.PollUntilContextTimeout(context.TODO(), utils.Interval, utils.Timeout, true, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollImmediate(utils.Interval, utils.Timeout, func() (bool, error) {
 		lastState, err := clients.Get(context.TODO(), name, metav1.GetOptions{})
 		return inState(lastState, err)
 	})
@@ -99,7 +99,7 @@ func TektonPipelineCRDelete(t *testing.T, clients *utils.Clients, crNames utils.
 	if err := clients.TektonPipeline().Delete(context.TODO(), crNames.TektonPipeline, metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("TektonPipeline %q failed to delete: %v", crNames.TektonPipeline, err)
 	}
-	err := wait.PollUntilContextTimeout(context.TODO(), utils.Interval, utils.Timeout, true, func(ctx context.Context) (bool, error) {
+	err := wait.PollImmediate(utils.Interval, utils.Timeout, func() (bool, error) {
 		_, err := clients.TektonPipeline().Get(context.TODO(), crNames.TektonPipeline, metav1.GetOptions{})
 		if apierrs.IsNotFound(err) {
 			return true, nil
@@ -141,38 +141,4 @@ func verifyNoTektonPipelineCR(clients *utils.Clients) error {
 		return errors.New("Unable to verify cluster-scoped resources are deleted if any TektonPipeline exists")
 	}
 	return nil
-}
-
-// EnsureTektonPipelineWithStatefulsetExists creates a TektonPipeline with the name names.TektonPipeline, if it does not exist.
-func EnsureTektonPipelineWithStatefulsetExists(clients pipelinev1alpha1.TektonPipelineInterface, names utils.ResourceNames) (*v1alpha1.TektonPipeline, error) {
-	// If this function is called by the upgrade tests, we only create the custom resource if it does not exist.
-	tpCR, err := clients.Get(context.TODO(), names.TektonPipeline, metav1.GetOptions{})
-	if err == nil {
-		return tpCR, err
-	}
-	if apierrs.IsNotFound(err) {
-		statefulsetOrdinals := true
-
-		tpCR = &v1alpha1.TektonPipeline{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: names.TektonPipeline,
-			},
-			Spec: v1alpha1.TektonPipelineSpec{
-				CommonSpec: v1alpha1.CommonSpec{
-					TargetNamespace: names.TargetNamespace,
-				},
-				Pipeline: v1alpha1.Pipeline{
-					PipelineProperties: v1alpha1.PipelineProperties{
-						Performance: v1alpha1.PipelinePerformanceProperties{
-							PipelinePerformanceStatefulsetOrdinalsConfig: v1alpha1.PipelinePerformanceStatefulsetOrdinalsConfig{
-								StatefulsetOrdinals: &statefulsetOrdinals,
-							},
-						},
-					},
-				},
-			},
-		}
-		return clients.Create(context.TODO(), tpCR, metav1.CreateOptions{})
-	}
-	return tpCR, err
 }

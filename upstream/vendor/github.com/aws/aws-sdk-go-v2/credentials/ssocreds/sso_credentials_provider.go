@@ -129,7 +129,6 @@ func (p *Provider) Retrieve(ctx context.Context) (aws.Credentials, error) {
 		CanExpire:       true,
 		Expires:         time.Unix(0, output.RoleCredentials.Expiration*int64(time.Millisecond)).UTC(),
 		Source:          ProviderName,
-		AccountID:       p.options.AccountID,
 	}, nil
 }
 

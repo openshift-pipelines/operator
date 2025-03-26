@@ -17,7 +17,6 @@ limitations under the License.
 package kubernetesplatform
 
 import (
-	k8sManualApprovalGate "github.com/tektoncd/operator/pkg/reconciler/kubernetes/manualapprovalgate"
 	k8sChain "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektonchain"
 	k8sConfig "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektonconfig"
 	k8sDashboard "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektondashboard"
@@ -58,9 +57,6 @@ var (
 		platform.ControllerTektonChain: injection.NamedControllerConstructor{
 			Name:                  string(platform.ControllerTektonChain),
 			ControllerConstructor: k8sChain.NewController},
-		platform.ControllerManualApprovalGate: injection.NamedControllerConstructor{
-			Name:                  string(platform.ControllerManualApprovalGate),
-			ControllerConstructor: k8sManualApprovalGate.NewController},
 		platform.ControllerTektonInstallerSet: injection.NamedControllerConstructor{
 			Name:                  string(platform.ControllerTektonInstallerSet),
 			ControllerConstructor: k8sInstallerSet.NewController},

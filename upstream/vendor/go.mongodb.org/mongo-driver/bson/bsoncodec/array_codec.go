@@ -15,15 +15,16 @@ import (
 
 // ArrayCodec is the Codec used for bsoncore.Array values.
 //
-// Deprecated: ArrayCodec will not be directly accessible in Go Driver 2.0.
+// Deprecated: Use [go.mongodb.org/mongo-driver/bson.NewRegistry] to get a registry with the
+// ArrayCodec registered.
 type ArrayCodec struct{}
 
 var defaultArrayCodec = NewArrayCodec()
 
 // NewArrayCodec returns an ArrayCodec.
 //
-// Deprecated: NewArrayCodec will not be available in Go Driver 2.0. See
-// [ArrayCodec] for more details.
+// Deprecated: Use [go.mongodb.org/mongo-driver/bson.NewRegistry] to get a registry with the
+// ArrayCodec registered.
 func NewArrayCodec() *ArrayCodec {
 	return &ArrayCodec{}
 }

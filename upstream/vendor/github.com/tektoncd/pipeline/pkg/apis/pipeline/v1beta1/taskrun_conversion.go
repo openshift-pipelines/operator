@@ -214,18 +214,10 @@ func (trd *TaskRunDebug) convertFrom(ctx context.Context, source v1.TaskRunDebug
 
 func (tbp TaskBreakpoints) convertTo(ctx context.Context, sink *v1.TaskBreakpoints) {
 	sink.OnFailure = tbp.OnFailure
-	if len(tbp.BeforeSteps) > 0 {
-		sink.BeforeSteps = make([]string, 0)
-		sink.BeforeSteps = append(sink.BeforeSteps, tbp.BeforeSteps...)
-	}
 }
 
 func (tbp *TaskBreakpoints) convertFrom(ctx context.Context, source v1.TaskBreakpoints) {
 	tbp.OnFailure = source.OnFailure
-	if len(source.BeforeSteps) > 0 {
-		tbp.BeforeSteps = make([]string, 0)
-		tbp.BeforeSteps = append(tbp.BeforeSteps, source.BeforeSteps...)
-	}
 }
 
 func (trso TaskRunStepOverride) convertTo(ctx context.Context, sink *v1.TaskRunStepSpec) {
@@ -352,29 +344,6 @@ func (ss StepState) convertTo(ctx context.Context, sink *v1.StepState) {
 	sink.Container = ss.ContainerName
 	sink.ImageID = ss.ImageID
 	sink.Results = nil
-
-	if ss.Provenance != nil {
-		new := v1.Provenance{}
-		ss.Provenance.convertTo(ctx, &new)
-		sink.Provenance = &new
-	}
-
-	if ss.ContainerState.Terminated != nil {
-		sink.TerminationReason = ss.ContainerState.Terminated.Reason
-	}
-
-	for _, o := range ss.Outputs {
-		new := v1.TaskRunStepArtifact{}
-		o.convertTo(ctx, &new)
-		sink.Outputs = append(sink.Outputs, new)
-	}
-
-	for _, o := range ss.Inputs {
-		new := v1.TaskRunStepArtifact{}
-		o.convertTo(ctx, &new)
-		sink.Inputs = append(sink.Inputs, new)
-	}
-
 	for _, r := range ss.Results {
 		new := v1.TaskRunStepResult{}
 		r.convertTo(ctx, &new)
@@ -393,21 +362,6 @@ func (ss *StepState) convertFrom(ctx context.Context, source v1.StepState) {
 		new.convertFrom(ctx, r)
 		ss.Results = append(ss.Results, new)
 	}
-	if source.Provenance != nil {
-		new := Provenance{}
-		new.convertFrom(ctx, *source.Provenance)
-		ss.Provenance = &new
-	}
-	for _, o := range source.Outputs {
-		new := TaskRunStepArtifact{}
-		new.convertFrom(ctx, o)
-		ss.Outputs = append(ss.Outputs, new)
-	}
-	for _, o := range source.Inputs {
-		new := TaskRunStepArtifact{}
-		new.convertFrom(ctx, o)
-		ss.Inputs = append(ss.Inputs, new)
-	}
 }
 
 func (trr TaskRunResult) convertTo(ctx context.Context, sink *v1.TaskRunResult) {
@@ -424,43 +378,6 @@ func (trr *TaskRunResult) convertFrom(ctx context.Context, source v1.TaskRunResu
 	newValue := ParamValue{}
 	newValue.convertFrom(ctx, source.Value)
 	trr.Value = newValue
-}
-
-func (t *TaskRunStepArtifact) convertFrom(ctx context.Context, source v1.TaskRunStepArtifact) {
-	t.Name = source.Name
-	for _, v := range source.Values {
-		new := ArtifactValue{}
-		new.convertFrom(ctx, v)
-		t.Values = append(t.Values, new)
-	}
-}
-
-func (t TaskRunStepArtifact) convertTo(ctx context.Context, sink *v1.TaskRunStepArtifact) {
-	sink.Name = t.Name
-	for _, v := range t.Values {
-		new := v1.ArtifactValue{}
-		v.convertTo(ctx, &new)
-		sink.Values = append(sink.Values, new)
-	}
-}
-
-func (t *ArtifactValue) convertFrom(ctx context.Context, source v1.ArtifactValue) {
-	t.Uri = source.Uri
-	if source.Digest != nil {
-		t.Digest = map[Algorithm]string{}
-		for i, a := range source.Digest {
-			t.Digest[Algorithm(i)] = a
-		}
-	}
-}
-func (t ArtifactValue) convertTo(ctx context.Context, sink *v1.ArtifactValue) {
-	sink.Uri = t.Uri
-	if t.Digest != nil {
-		sink.Digest = map[v1.Algorithm]string{}
-		for i, a := range t.Digest {
-			sink.Digest[v1.Algorithm(i)] = a
-		}
-	}
 }
 
 func (ss SidecarState) convertTo(ctx context.Context, sink *v1.SidecarState) {

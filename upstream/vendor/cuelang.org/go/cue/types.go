@@ -223,8 +223,8 @@ type Iterator struct {
 
 type hiddenIterator = Iterator
 
-// Next advances the iterator to the next value and reports whether there was any.
-// It must be called before the first call to [Iterator.Value] or [Iterator.Selector].
+// Next advances the iterator to the next value and reports whether there was
+// any. It must be called before the first call to Value or Key.
 func (i *Iterator) Next() bool {
 	if i.p >= len(i.arcs) {
 		i.cur = Value{}
@@ -233,34 +233,29 @@ func (i *Iterator) Next() bool {
 	arc := i.arcs[i.p]
 	arc.Finalize(i.ctx)
 	p := linkParent(i.val.parent_, i.val.v, arc)
+	i.cur = makeValue(i.val.idx, arc, p)
 	i.f = arc.Label
 	i.arcType = arc.ArcType
-	i.cur = makeValue(i.val.idx, arc, p)
 	i.p++
 	return true
 }
 
-// Value returns the current value in the list.
-// It will panic if [Iterator.Next] advanced past the last entry.
+// Value returns the current value in the list. It will panic if Next advanced
+// past the last entry.
 func (i *Iterator) Value() Value {
 	return i.cur
 }
 
 // Selector reports the field label of this iteration.
 func (i *Iterator) Selector() Selector {
-	sel := featureToSel(i.f, i.idx)
-	// Only call wrapConstraint if there is any constraint type to wrap with.
-	if ctype := fromArcType(i.arcType); ctype != 0 {
-		sel = wrapConstraint(sel, ctype)
-	}
-	return sel
+	return wrapConstraint(featureToSel(i.f, i.idx), fromArcType(i.arcType))
 }
 
 // Label reports the label of the value if i iterates over struct fields and ""
 // otherwise.
 //
-// Slated to be deprecated: use [Iterator.Selector] and [Selector.String].
-// Note that this will give more accurate string representations.
+// Slated to be deprecated: use i.Selector().String(). Note that this will give
+// more accurate string representations.
 func (i *hiddenIterator) Label() string {
 	if i.f == 0 {
 		return ""
@@ -468,6 +463,23 @@ func (v Value) Uint64() (uint64, error) {
 	return i, nil
 }
 
+// trimZeros trims 0's for better JSON representations.
+func trimZeros(s string) string {
+	n1 := len(s)
+	s2 := strings.TrimRight(s, "0")
+	n2 := len(s2)
+	if p := strings.IndexByte(s2, '.'); p != -1 {
+		if p == n2-1 {
+			return s[:len(s2)+1]
+		}
+		return s2
+	}
+	if n1-n2 <= 4 {
+		return s
+	}
+	return fmt.Sprint(s2, "e+", n1-n2)
+}
+
 var (
 	smallestPosFloat64 *apd.Decimal
 	smallestNegFloat64 *apd.Decimal
@@ -617,7 +629,6 @@ func newValueRoot(idx *runtime.Runtime, ctx *adt.OpContext, x adt.Expr) Value {
 
 func newChildValue(o *structValue, i int) Value {
 	arc := o.at(i)
-	// TODO: fix linkage to parent.
 	return makeValue(o.v.idx, arc, linkParent(o.v.parent_, o.v.v, arc))
 }
 
@@ -625,25 +636,15 @@ func newChildValue(o *structValue, i int) Value {
 // otherwise.
 func Dereference(v Value) Value {
 	n := v.v
-	if n == nil {
+	if n == nil || len(n.Conjuncts) != 1 {
 		return v
 	}
 
-	c, count := n.SingleConjunct()
-	if count != 1 {
-		return v
-	}
-
-	env, expr := c.EnvExpr()
-
-	// TODO: consider supporting unwrapping of structs or comprehensions around
-	// a single embedded reference.
-	r, _ := expr.(adt.Resolver)
+	c := n.Conjuncts[0]
+	r, _ := c.Expr().(adt.Resolver)
 	if r == nil {
 		return v
 	}
-
-	c = adt.MakeRootConjunct(env, expr)
 
 	ctx := v.ctx()
 	n, b := ctx.Resolve(c, r)
@@ -975,7 +976,6 @@ func (v Value) Syntax(opts ...Option) ast.Node {
 		ShowDocs:        o.docs,
 		ShowErrors:      o.showErrors,
 		InlineImports:   o.inlineImports,
-		Fragment:        o.raw,
 	}
 
 	pkgID := v.instance().ID()
@@ -1055,17 +1055,15 @@ func (v Value) Doc() []*ast.CommentGroup {
 // split values may fail if actually unified.
 // Source returns a non-nil value.
 //
-// Deprecated: use [Value.Expr].
+// Deprecated: use Expr.
 func (v hiddenValue) Split() []Value {
 	if v.v == nil {
 		return nil
 	}
 	a := []Value{}
-	v.v.VisitLeafConjuncts(func(x adt.Conjunct) bool {
-		env, expr := x.EnvExpr()
-		a = append(a, remakeValue(v, env, expr))
-		return true
-	})
+	for _, x := range v.v.Conjuncts {
+		a = append(a, remakeValue(v, x.Env, x.Expr()))
+	}
 	return a
 }
 
@@ -1077,17 +1075,10 @@ func (v Value) Source() ast.Node {
 	if v.v == nil {
 		return nil
 	}
-	count := 0
-	var src ast.Node
-	v.v.VisitLeafConjuncts(func(c adt.Conjunct) bool {
-		src = c.Source()
-		count++
-		return true
-	})
-	if count > 1 || src == nil {
-		src = v.v.Value().Source()
+	if len(v.v.Conjuncts) == 1 {
+		return v.v.Conjuncts[0].Source()
 	}
-	return src
+	return v.v.Value().Source()
 }
 
 // If v exactly represents a package, BuildInstance returns
@@ -1125,25 +1116,24 @@ func (v Value) Pos() token.Pos {
 	}
 	// Pick the most-concrete field.
 	var p token.Pos
-	v.v.VisitLeafConjuncts(func(c adt.Conjunct) bool {
+	for _, c := range v.v.Conjuncts {
 		x := c.Elem()
 		pp := pos(x)
 		if pp == token.NoPos {
-			return true
+			continue
 		}
 		p = pp
 		// Prefer struct conjuncts with actual fields.
 		if s, ok := x.(*adt.StructLit); ok && len(s.Fields) > 0 {
-			return false
+			break
 		}
-		return true
-	})
+	}
 	return p
 }
 
 // TODO: IsFinal: this value can never be changed.
 
-// IsClosed reports whether a list or struct is closed. It reports false when
+// IsClosed reports whether a list of struct is closed. It reports false when
 // the value is not a list or struct.
 //
 // Deprecated: use Allows(AnyString) and Allows(AnyIndex) or Kind/IncompleteKind.
@@ -1155,8 +1145,6 @@ func (v hiddenValue) IsClosed() bool {
 	case ListKind:
 		return v.v.IsClosedList()
 	case StructKind:
-		// TODO: remove this more expensive computation once the old evaluator
-		// is removed.
 		return !v.Allows(AnyString)
 	}
 	return false
@@ -1167,9 +1155,6 @@ func (v hiddenValue) IsClosed() bool {
 // Allows does not take into account validators like list.MaxItems(4). This may
 // change in the future.
 func (v Value) Allows(sel Selector) bool {
-	if v.v.HasEllipsis {
-		return true
-	}
 	c := v.ctx()
 	f := sel.sel.feature(c)
 	return v.v.Accept(c, f)
@@ -1178,12 +1163,12 @@ func (v Value) Allows(sel Selector) bool {
 // IsConcrete reports whether the current value is a concrete scalar value
 // (not relying on default values), a terminal error, a list, or a struct.
 // It does not verify that values of lists or structs are concrete themselves.
-// To check whether there is a concrete default, use this method on [Value.Default].
+// To check whether there is a concrete default, use v.Default().IsConcrete().
 func (v Value) IsConcrete() bool {
 	if v.v == nil {
 		return false // any is neither concrete, not a list or struct.
 	}
-	if b := v.v.Bottom(); b != nil {
+	if b, ok := v.v.BaseValue.(*adt.Bottom); ok {
 		return !b.IsIncomplete()
 	}
 	if !adt.IsConcrete(v.v) {
@@ -1208,37 +1193,12 @@ func (v Value) Exists() bool {
 	if v.v == nil {
 		return false
 	}
-	if err := v.v.Bottom(); err != nil {
+	if err, ok := v.v.BaseValue.(*adt.Bottom); ok {
 		return !err.NotExists
 	}
 	return true
 }
 
-// isKind reports whether a value matches a particular kind.
-// It is like checkKind, except that it doesn't construct an error value.
-// Note that when v is bottom, the method always returns false.
-func (v Value) isKind(ctx *adt.OpContext, want adt.Kind) bool {
-	if v.v == nil {
-		return false
-	}
-	x := v.eval(ctx)
-	if _, ok := x.(*adt.Bottom); ok {
-		return false
-	}
-	k := x.Kind()
-	if want != adt.BottomKind {
-		if k&want == adt.BottomKind {
-			return false
-		}
-		if !adt.IsConcrete(x) {
-			return false
-		}
-	}
-	return true
-}
-
-// checkKind returns a bottom error if a value does not match a particular kind,
-// describing the reason why. Note that when v is bottom, it is always returned as-is.
 func (v Value) checkKind(ctx *adt.OpContext, want adt.Kind) *adt.Bottom {
 	if v.v == nil {
 		return errNotExists
@@ -1304,7 +1264,7 @@ func (v Value) Len() Value {
 
 // Elem returns the value of undefined element types of lists and structs.
 //
-// Deprecated: use [Value.LookupPath] in combination with "AnyString" or "AnyIndex".
+// Deprecated: use LookupPath in combination with "AnyString" or "AnyIndex".
 func (v hiddenValue) Elem() (Value, bool) {
 	sel := AnyString
 	if v.v.IsList() {
@@ -1340,11 +1300,10 @@ func (v Value) Null() error {
 	return nil
 }
 
-// IsNull reports whether v is null.
-func (v Value) IsNull() bool {
-	v, _ = v.Default()
-	return v.isKind(v.ctx(), adt.NullKind)
-}
+// // IsNull reports whether v is null.
+// func (v Value) IsNull() bool {
+// 	return v.Null() == nil
+// }
 
 // Bool returns the bool value of v or false and an error if v is not a boolean.
 func (v Value) Bool() (bool, error) {
@@ -1373,7 +1332,7 @@ func (v Value) Bytes() ([]byte, error) {
 	ctx := v.ctx()
 	switch x := v.eval(ctx).(type) {
 	case *adt.Bytes:
-		return bytes.Clone(x.B), nil
+		return append([]byte(nil), x.B...), nil
 	case *adt.String:
 		return []byte(x.Str), nil
 	}
@@ -1413,8 +1372,8 @@ func (v Value) structValOpts(ctx *adt.OpContext, o options) (s structValue, err 
 
 	obj := v.v
 
-	switch b := v.v.Bottom(); {
-	case b != nil && b.IsIncomplete() && !o.concrete && !o.final:
+	switch b, ok := v.v.BaseValue.(*adt.Bottom); {
+	case ok && b.IsIncomplete() && !o.concrete && !o.final:
 
 	// Allow scalar values if hidden or definition fields are requested.
 	case !o.omitHidden, !o.omitDefinitions:
@@ -1441,7 +1400,7 @@ func (v Value) structValOpts(ctx *adt.OpContext, o options) (s structValue, err 
 		if f.IsHidden() && o.omitHidden {
 			continue
 		}
-		arc := obj.LookupRaw(f)
+		arc := obj.Lookup(f)
 		if arc == nil {
 			continue
 		}
@@ -1456,7 +1415,7 @@ func (v Value) structValOpts(ctx *adt.OpContext, o options) (s structValue, err 
 			// it avoids hiding errors in required fields.
 			if o.omitOptional || o.concrete || o.final {
 				arc = &adt.Vertex{
-					Label:     f,
+					Label:     arc.Label,
 					Parent:    arc.Parent,
 					Conjuncts: arc.Conjuncts,
 					BaseValue: adt.NewRequiredNotPresentError(ctx, arc),
@@ -1472,7 +1431,7 @@ func (v Value) structValOpts(ctx *adt.OpContext, o options) (s structValue, err 
 // Struct returns the underlying struct of a value or an error if the value
 // is not a struct.
 //
-// Deprecated: use [Value.Fields].
+// Deprecated: use Fields.
 func (v hiddenValue) Struct() (*Struct, error) {
 	ctx := v.ctx()
 	obj, err := v.structValOpts(ctx, options{})
@@ -1568,10 +1527,10 @@ func (v Value) Fields(opts ...Option) (*Iterator, error) {
 // Lookup reports the value at a path starting from v. The empty path returns v
 // itself.
 //
-// [Value.Exists] can be used to verify if the returned value existed.
+// The Exists() method can be used to verify if the returned value existed.
 // Lookup cannot be used to look up hidden or optional fields or definitions.
 //
-// Deprecated: use [Value.LookupPath]. At some point before v1.0.0, this method will
+// Deprecated: use LookupPath. At some point before v1.0.0, this method will
 // be removed to be reused eventually for looking up a selector.
 func (v hiddenValue) Lookup(path ...string) Value {
 	ctx := v.ctx()
@@ -1641,7 +1600,7 @@ func appendPath(a []Selector, v Value) []Selector {
 
 // LookupDef is equal to LookupPath(MakePath(Def(name))).
 //
-// Deprecated: use [Value.LookupPath].
+// Deprecated: use LookupPath.
 func (v hiddenValue) LookupDef(name string) Value {
 	return v.LookupPath(MakePath(Def(name)))
 }
@@ -1652,7 +1611,7 @@ var errNotFound = errors.Newf(token.NoPos, "field not found")
 // look up a definition or hidden field (starting with `_` or `_#`). Otherwise
 // it interprets name as an arbitrary string for a regular field.
 //
-// Deprecated: use [Value.LookupPath].
+// Deprecated: use LookupPath.
 func (v hiddenValue) FieldByName(name string, isIdent bool) (f FieldInfo, err error) {
 	s, err := v.Struct()
 	if err != nil {
@@ -1663,7 +1622,7 @@ func (v hiddenValue) FieldByName(name string, isIdent bool) (f FieldInfo, err er
 
 // LookupField reports information about a field of v.
 //
-// Deprecated: use [Value.LookupPath].
+// Deprecated: use LookupPath
 func (v hiddenValue) LookupField(name string) (FieldInfo, error) {
 	s, err := v.Struct()
 	if err != nil {
@@ -1701,7 +1660,7 @@ func (v hiddenValue) LookupField(name string) (FieldInfo, error) {
 // Any reference in v referring to the value at the given path will resolve
 // to x in the newly created value. The resulting value is not validated.
 //
-// Deprecated: use [Value.FillPath].
+// Deprecated: use FillPath.
 func (v hiddenValue) Fill(x interface{}, path ...string) Value {
 	if v.v == nil {
 		return v
@@ -1807,18 +1766,14 @@ func (v Value) FillPath(p Path, x interface{}) Value {
 // The returned function returns the value that would be unified with field
 // given its name.
 //
-// Deprecated: use [Value.LookupPath] in combination with using optional selectors.
+// Deprecated: use LookupPath in combination with using optional selectors.
 func (v hiddenValue) Template() func(label string) Value {
 	if v.v == nil {
 		return nil
 	}
 
-	// Implementation for the old evaluator.
 	types := v.v.OptionalTypes()
-	switch {
-	case types&(adt.HasAdditional|adt.HasPattern) != 0:
-	case v.v.PatternConstraints != nil:
-	default:
+	if types&(adt.HasAdditional|adt.HasPattern) == 0 {
 		return nil
 	}
 
@@ -1832,10 +1787,10 @@ func (v hiddenValue) Template() func(label string) Value {
 // Without options, the entire value is considered for assumption, which means
 // Subsume tests whether  v is a backwards compatible (newer) API version of w.
 //
-// Use the [Final] option to check subsumption if a w is known to be final, and
+// Use the Final option to check subsumption if a w is known to be final, and
 // should assumed to be closed.
 //
-// Use the [Raw] option to do a low-level subsumption, taking defaults into
+// Use the Raw option to do a low-level subsumption, taking defaults into
 // account.
 //
 // Value v and w must be obtained from the same build. TODO: remove this
@@ -1858,7 +1813,7 @@ func (v Value) Subsume(w Value, opts ...Option) error {
 	return p.Value(ctx, v.v, w.v)
 }
 
-// Deprecated: use [Value.Subsume].
+// Deprecated: use Subsume.
 //
 // Subsumes reports whether w is an instance of v.
 //
@@ -1992,7 +1947,7 @@ func (v Value) instance() *Instance {
 // a reference. If a reference contains index selection (foo[bar]), it will
 // only return a reference if the index resolves to a concrete value.
 //
-// Deprecated: use [Value.ReferencePath]
+// Deprecated: use ReferencePath
 func (v hiddenValue) Reference() (inst *Instance, path []string) {
 	root, p := v.ReferencePath()
 	if !root.Exists() {
@@ -2017,15 +1972,13 @@ func (v hiddenValue) Reference() (inst *Instance, path []string) {
 // is not a reference.
 func (v Value) ReferencePath() (root Value, p Path) {
 	// TODO: don't include references to hidden fields.
-	c, count := v.v.SingleConjunct()
-	if count != 1 {
+	if v.v == nil || len(v.v.Conjuncts) != 1 {
 		return Value{}, Path{}
 	}
 	ctx := v.ctx()
+	c := v.v.Conjuncts[0]
 
-	env, expr := c.EnvExpr()
-
-	x, path := reference(v.idx, ctx, env, expr)
+	x, path := reference(v.idx, ctx, c.Env, c.Expr())
 	if x == nil {
 		return Value{}, Path{}
 	}
@@ -2155,17 +2108,17 @@ func InlineImports(expand bool) Option {
 }
 
 // DisallowCycles forces validation in the presence of cycles, even if
-// non-concrete values are allowed. This is implied by [Concrete].
+// non-concrete values are allowed. This is implied by Concrete(true).
 func DisallowCycles(disallow bool) Option {
 	return func(p *options) { p.disallowCycles = disallow }
 }
 
 // ResolveReferences forces the evaluation of references when outputting.
 //
-// Deprecated: [Value.Syntax] will now always attempt to resolve dangling references and
-// make the output self-contained. When [Final] or [Concrete] are used,
-// it will already attempt to resolve all references.
-// See also [InlineImports].
+// Deprecated: Syntax will now always attempt to resolve dangling references and
+// make the output self-contained. When Final or Concrete is used, it will
+// already attempt to resolve all references.
+// See also InlineImports.
 func ResolveReferences(resolve bool) Option {
 	return func(p *options) {
 		p.resolveReferences = resolve
@@ -2191,13 +2144,7 @@ func ErrorsAsValues(show bool) Option {
 	return func(p *options) { p.showErrors = show }
 }
 
-// Raw tells Syntax to generate the value as is without any simplifications and
-// without ensuring a value is self contained. Any references are left dangling.
-// The generated syntax tree can be compiled by passing the Value from which it
-// was generated to scope.
-//
-// The option InlineImports overrides this option with respect to ensuring the
-// output is self contained.
+// Raw tells Syntax to generate the value as is without any simplifications.
 func Raw() Option {
 	return func(p *options) { p.raw = true }
 }
@@ -2264,7 +2211,7 @@ func (o *options) updateOptions(opts []Option) {
 // exists.
 //
 // Note that by default not all errors are reported, unless options like
-// [Concrete] are used. The [Final] option can be used to check for missing
+// Concrete are used. The Final option can be used to check for missing
 // required fields.
 func (v Value) Validate(opts ...Option) error {
 	o := options{}
@@ -2355,44 +2302,41 @@ func (v Value) Expr() (Op, []Value) {
 
 	if v.v.IsData() {
 		expr = v.v.Value()
-		goto process
 
-	}
-
-	switch c, count := v.v.SingleConjunct(); count {
-	case 0:
-		if v.v.BaseValue == nil {
-			return NoOp, []Value{makeValue(v.idx, v.v, v.parent_)} // TODO: v?
-		}
-		expr = v.v.Value()
-
-	case 1:
-		// the default case, processed below.
-		env, expr = c.EnvExpr()
-		if w, ok := expr.(*adt.Vertex); ok {
-			return Value{v.idx, w, v.parent_}.Expr()
-		}
-
-	default:
-		a := []Value{}
-		ctx := v.ctx()
-		v.v.VisitLeafConjuncts(func(c adt.Conjunct) bool {
-			// Keep parent here. TODO: do we need remove the requirement
-			// from other conjuncts?
-			n := &adt.Vertex{
-				Parent: v.v.Parent,
-				Label:  v.v.Label,
+	} else {
+		switch len(v.v.Conjuncts) {
+		case 0:
+			if v.v.BaseValue == nil {
+				return NoOp, []Value{makeValue(v.idx, v.v, v.parent_)} // TODO: v?
 			}
-			n.AddConjunct(c)
-			n.Finalize(ctx)
-			a = append(a, makeValue(v.idx, n, v.parent_))
-			return true
-		})
+			expr = v.v.Value()
 
-		return adt.AndOp, a
+		case 1:
+			// the default case, processed below.
+			c := v.v.Conjuncts[0]
+			env = c.Env
+			expr = c.Expr()
+			if w, ok := expr.(*adt.Vertex); ok {
+				return Value{v.idx, w, v.parent_}.Expr()
+			}
+
+		default:
+			a := []Value{}
+			ctx := v.ctx()
+			for _, c := range v.v.Conjuncts {
+				// Keep parent here. TODO: do we need remove the requirement
+				// from other conjuncts?
+				n := &adt.Vertex{
+					Parent: v.v.Parent,
+					Label:  v.v.Label,
+				}
+				n.AddConjunct(c)
+				n.Finalize(ctx)
+				a = append(a, makeValue(v.idx, n, v.parent_))
+			}
+			return adt.AndOp, a
+		}
 	}
-
-process:
 
 	// TODO: replace appends with []Value{}. For not leave.
 	a := []Value{}

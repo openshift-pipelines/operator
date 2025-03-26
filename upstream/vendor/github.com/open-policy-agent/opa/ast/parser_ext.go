@@ -477,7 +477,7 @@ func ParseModuleWithOpts(filename, input string, popts ParserOptions) (*Module, 
 	if err != nil {
 		return nil, err
 	}
-	return parseModule(filename, stmts, comments, popts.RegoVersion)
+	return parseModule(filename, stmts, comments, popts.RegoV1Compatible)
 }
 
 // ParseBody returns exactly one body.
@@ -626,7 +626,6 @@ func ParseStatementsWithOpts(filename, input string, popts ParserOptions) ([]Sta
 		WithCapabilities(popts.Capabilities).
 		WithSkipRules(popts.SkipRules).
 		WithJSONOptions(popts.JSONOptions).
-		WithRegoVersion(popts.RegoVersion).
 		withUnreleasedKeywords(popts.unreleasedKeywords)
 
 	stmts, comments, errs := parser.Parse()
@@ -638,7 +637,7 @@ func ParseStatementsWithOpts(filename, input string, popts ParserOptions) ([]Sta
 	return stmts, comments, nil
 }
 
-func parseModule(filename string, stmts []Statement, comments []*Comment, regoCompatibilityMode RegoVersion) (*Module, error) {
+func parseModule(filename string, stmts []Statement, comments []*Comment, regoV1Compatible bool) (*Module, error) {
 
 	if len(stmts) == 0 {
 		return nil, NewError(ParseErr, &Location{File: filename}, "empty module")
@@ -659,14 +658,14 @@ func parseModule(filename string, stmts []Statement, comments []*Comment, regoCo
 
 	// The comments slice only holds comments that were not their own statements.
 	mod.Comments = append(mod.Comments, comments...)
-	mod.regoVersion = regoCompatibilityMode
+	mod.regoV1Compatible = regoV1Compatible
 
 	for i, stmt := range stmts[1:] {
 		switch stmt := stmt.(type) {
 		case *Import:
 			mod.Imports = append(mod.Imports, stmt)
-			if mod.regoVersion == RegoV0 && Compare(stmt.Path.Value, RegoV1CompatibleRef) == 0 {
-				mod.regoVersion = RegoV0CompatV1
+			if Compare(stmt.Path.Value, RegoV1CompatibleRef) == 0 {
+				mod.regoV1Compatible = true
 			}
 		case *Rule:
 			setRuleModule(stmt, mod)
@@ -695,10 +694,25 @@ func parseModule(filename string, stmts []Statement, comments []*Comment, regoCo
 		}
 	}
 
-	if mod.regoVersion == RegoV0CompatV1 || mod.regoVersion == RegoV1 {
+	if mod.regoV1Compatible {
 		for _, rule := range mod.Rules {
 			for r := rule; r != nil; r = r.Else {
-				errs = append(errs, CheckRegoV1(r)...)
+				var t string
+				if r.isFunction() {
+					t = "function"
+				} else {
+					t = "rule"
+				}
+
+				if r.generatedBody && r.Head.generatedValue {
+					errs = append(errs, NewError(ParseErr, r.Location, "%s must have value assignment and/or body declaration", t))
+				}
+				if r.Body != nil && !r.generatedBody && !ruleDeclarationHasKeyword(r, tokens.If) && !r.Default {
+					errs = append(errs, NewError(ParseErr, r.Location, "`if` keyword is required before %s body", t))
+				}
+				if r.Head.RuleKind() == MultiValue && !ruleDeclarationHasKeyword(r, tokens.Contains) {
+					errs = append(errs, NewError(ParseErr, r.Location, "`contains` keyword is required for partial set rules"))
+				}
 			}
 		}
 	}
@@ -712,8 +726,6 @@ func parseModule(filename string, stmts []Statement, comments []*Comment, regoCo
 	if len(errs) > 0 {
 		return nil, errs
 	}
-
-	attachRuleAnnotations(mod)
 
 	return mod, nil
 }

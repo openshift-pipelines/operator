@@ -28,11 +28,11 @@ func setAddonDefaults(addon *Addon) {
 
 	paramsMap := ParseParams(addon.Params)
 	_, ptOk := paramsMap[PipelineTemplatesParam]
-	rt, rtOk := paramsMap[ResolverTasks]
+	ct, ctOk := paramsMap[ClusterTasksParam]
 
-	// If ResolverTask is false and pipelineTemplate is not set, then set it as false
-	// as pipelines templates are created using ResolverTask
-	if rtOk && (rt == "false" && !ptOk) {
+	// If clusterTasks is false and pipelineTemplate is not set, then set it as false
+	// as pipelines templates are created using clusterTasks
+	if ctOk && (ct == "false" && !ptOk) {
 		addon.Params = append(addon.Params, Param{
 			Name:  PipelineTemplatesParam,
 			Value: "false",

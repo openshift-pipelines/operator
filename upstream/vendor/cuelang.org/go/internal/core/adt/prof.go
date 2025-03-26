@@ -28,13 +28,6 @@ var (
 	countsMu sync.Mutex
 )
 
-// ResetStats sets the global stats counters to zero.
-func ResetStats() {
-	countsMu.Lock()
-	counts = stats.Counts{}
-	countsMu.Unlock()
-}
-
 // AddStats adds the stats of the given OpContext to the global
 // counters.
 func AddStats(ctx *OpContext) {

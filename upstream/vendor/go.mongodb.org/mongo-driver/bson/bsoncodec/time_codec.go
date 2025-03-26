@@ -23,26 +23,12 @@ const (
 
 // TimeCodec is the Codec used for time.Time values.
 //
-// Deprecated: TimeCodec will not be directly configurable in Go Driver 2.0.
-// To configure the time.Time encode and decode behavior, use the configuration
-// methods on a [go.mongodb.org/mongo-driver/bson.Encoder] or
-// [go.mongodb.org/mongo-driver/bson.Decoder]. To configure the time.Time encode
-// and decode behavior for a mongo.Client, use
-// [go.mongodb.org/mongo-driver/mongo/options.ClientOptions.SetBSONOptions].
-//
-// For example, to configure a mongo.Client to ..., use:
-//
-//	opt := options.Client().SetBSONOptions(&options.BSONOptions{
-//	    UseLocalTimeZone: true,
-//	})
-//
-// See the deprecation notice for each field in TimeCodec for the corresponding
-// settings.
+// Deprecated: Use [go.mongodb.org/mongo-driver/bson.NewRegistry] to get a registry with the
+// TimeCodec registered.
 type TimeCodec struct {
 	// UseLocalTimeZone specifies if we should decode into the local time zone. Defaults to false.
 	//
-	// Deprecated: Use bson.Decoder.UseLocalTimeZone or options.BSONOptions.UseLocalTimeZone
-	// instead.
+	// Deprecated: Use bson.Decoder.UseLocalTimeZone instead.
 	UseLocalTimeZone bool
 }
 
@@ -56,8 +42,8 @@ var (
 
 // NewTimeCodec returns a TimeCodec with options opts.
 //
-// Deprecated: NewTimeCodec will not be available in Go Driver 2.0. See
-// [TimeCodec] for more details.
+// Deprecated: Use [go.mongodb.org/mongo-driver/bson.NewRegistry] to get a registry with the
+// TimeCodec registered.
 func NewTimeCodec(opts ...*bsonoptions.TimeCodecOptions) *TimeCodec {
 	timeOpt := bsonoptions.MergeTimeCodecOptions(opts...)
 

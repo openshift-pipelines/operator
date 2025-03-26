@@ -32,7 +32,6 @@ type TaskRef struct {
 	// Bundle url reference to a Tekton Bundle.
 	//
 	// Deprecated: Please use ResolverRef with the bundles resolver instead.
-	// The field is staying there for go client backward compatibility, but is not used/allowed anymore.
 	// +optional
 	Bundle string `json:"bundle,omitempty"`
 

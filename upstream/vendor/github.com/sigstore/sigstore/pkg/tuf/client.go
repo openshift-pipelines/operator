@@ -116,7 +116,6 @@ type TargetFile struct {
 type customMetadata struct {
 	Usage  UsageKind  `json:"usage"`
 	Status StatusKind `json:"status"`
-	URI    string     `json:"uri"`
 }
 
 type sigstoreCustomMetadata struct {
@@ -452,7 +451,37 @@ func (t *TUF) GetTargetsByMeta(usage UsageKind, fallbacks []string) ([]TargetFil
 func (t *TUF) updateClient() (data.TargetFiles, error) {
 	targets, err := t.client.Update()
 	if err != nil {
-		return nil, fmt.Errorf("error updating to TUF remote mirror: %w", err)
+		// Get some extra information for debugging. What was the state of the top-level
+		// metadata on the remote?
+		status := struct {
+			Mirror   string                    `json:"mirror"`
+			Metadata map[string]MetadataStatus `json:"metadata"`
+		}{
+			Mirror:   t.Mirror(),
+			Metadata: make(map[string]MetadataStatus),
+		}
+		for _, md := range []string{"root.json", "targets.json", "snapshot.json", "timestamp.json"} {
+			r, _, err := t.remote.GetMeta(md)
+			if err != nil {
+				// May be missing, or failed download.
+				continue
+			}
+			defer r.Close()
+			b, err := io.ReadAll(r)
+			if err != nil {
+				continue
+			}
+			mdStatus, err := getMetadataStatus(b)
+			if err != nil {
+				continue
+			}
+			status.Metadata[md] = *mdStatus
+		}
+		b, innerErr := json.MarshalIndent(status, "", "\t")
+		if innerErr != nil {
+			return nil, innerErr
+		}
+		return nil, fmt.Errorf("error updating to TUF remote mirror: %w\nremote status:%s", err, string(b))
 	}
 	// Success! Cache new metadata, if needed.
 	if noCache() {

@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/gengo/args"
+	"k8s.io/gengo/examples/set-gen/sets"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
@@ -130,6 +131,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
+	inputs := sets.NewString(context.Inputs...)
 	packages := generator.Packages{}
 	header := append([]byte(fmt.Sprintf("//go:build !%s\n// +build !%s\n\n", arguments.GeneratedBuildTag, arguments.GeneratedBuildTag)), boilerplate...)
 
@@ -145,7 +147,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 	}
 
-	for _, i := range context.Inputs {
+	for i := range inputs {
 		klog.V(5).Infof("Considering pkg %q", i)
 		pkg := context.Universe[i]
 		if pkg == nil {

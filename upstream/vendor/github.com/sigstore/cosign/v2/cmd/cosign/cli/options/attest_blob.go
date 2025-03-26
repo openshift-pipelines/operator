@@ -36,9 +36,6 @@ type AttestBlobOptions struct {
 	OutputAttestation string
 	OutputCertificate string
 	BundlePath        string
-	NewBundleFormat   bool
-
-	RekorEntryType string
 
 	Rekor       RekorOptions
 	Fulcio      FulcioOptions
@@ -86,10 +83,6 @@ func (o *AttestBlobOptions) AddFlags(cmd *cobra.Command) {
 		"write everything required to verify the blob to a FILE")
 	_ = cmd.Flags().SetAnnotation("bundle", cobra.BashCompFilenameExt, []string{})
 
-	// TODO: have this default to true as a breaking change
-	cmd.Flags().BoolVar(&o.NewBundleFormat, "new-bundle-format", false,
-		"output bundle in new format that contains all verification material")
-
 	cmd.Flags().StringVar(&o.Hash, "hash", "",
 		"hash of blob in hexadecimal (base16). Used if you want to sign an artifact stored elsewhere and have the hash")
 
@@ -98,9 +91,6 @@ func (o *AttestBlobOptions) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().BoolVar(&o.TlogUpload, "tlog-upload", true,
 		"whether or not to upload to the tlog")
-
-	cmd.Flags().StringVar(&o.RekorEntryType, "rekor-entry-type", "dsse",
-		"specifies the type to be used for a rekor entry upload. Options are intoto or dsse (default). ")
 
 	cmd.Flags().StringVar(&o.TSAServerURL, "timestamp-server-url", "",
 		"url to the Timestamp RFC3161 server, default none. Must be the path to the API to request timestamp responses, e.g. https://freetsa.org/tsr")

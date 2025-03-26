@@ -21,7 +21,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -57,7 +56,7 @@ func NewSignature(r io.Reader) (*Signature, error) {
 		}
 		sigBytes, b64Err := base64.StdEncoding.DecodeString(lines[1])
 		if b64Err != nil {
-			return nil, errors.New("invalid signature provided: base64 decoding failed")
+			return nil, fmt.Errorf("invalid signature provided: base64 decoding failed")
 		}
 		if len(sigBytes) != len(signature.SignatureAlgorithm)+len(signature.KeyId)+len(signature.Signature) {
 			return nil, fmt.Errorf("invalid signature provided: incorrect size %v detected", len(sigBytes))
@@ -74,7 +73,7 @@ func NewSignature(r io.Reader) (*Signature, error) {
 // CanonicalValue implements the pki.Signature interface
 func (s Signature) CanonicalValue() ([]byte, error) {
 	if s.signature == nil {
-		return nil, errors.New("minisign signature has not been initialized")
+		return nil, fmt.Errorf("minisign signature has not been initialized")
 	}
 
 	buf := bytes.NewBuffer([]byte("untrusted comment:\n"))
@@ -94,15 +93,15 @@ func (s Signature) CanonicalValue() ([]byte, error) {
 // Verify implements the pki.Signature interface
 func (s Signature) Verify(r io.Reader, k interface{}, opts ...sigsig.VerifyOption) error {
 	if s.signature == nil {
-		return errors.New("minisign signature has not been initialized")
+		return fmt.Errorf("minisign signature has not been initialized")
 	}
 
 	key, ok := k.(*PublicKey)
 	if !ok {
-		return errors.New("cannot use Verify with a non-minisign key")
+		return fmt.Errorf("cannot use Verify with a non-minisign key")
 	}
 	if key.key == nil {
-		return errors.New("minisign public key has not been initialized")
+		return fmt.Errorf("minisign public key has not been initialized")
 	}
 
 	verifier, err := sigsig.LoadED25519Verifier(key.key.PublicKey[:])
@@ -115,7 +114,7 @@ func (s Signature) Verify(r io.Reader, k interface{}, opts ...sigsig.VerifyOptio
 		h, _ := blake2b.New512(nil)
 		_, err := io.Copy(h, r)
 		if err != nil {
-			return errors.New("reading minisign data")
+			return fmt.Errorf("reading minisign data")
 		}
 		r = bytes.NewReader(h.Sum(nil))
 	}
@@ -168,7 +167,7 @@ func NewPublicKey(r io.Reader) (*PublicKey, error) {
 // CanonicalValue implements the pki.PublicKey interface
 func (k PublicKey) CanonicalValue() ([]byte, error) {
 	if k.key == nil {
-		return nil, errors.New("minisign public key has not been initialized")
+		return nil, fmt.Errorf("minisign public key has not been initialized")
 	}
 
 	bin := []byte{}

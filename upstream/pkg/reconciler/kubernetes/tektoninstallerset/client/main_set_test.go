@@ -92,5 +92,4 @@ func markStatusReady(is *v1alpha1.TektonInstallerSet) {
 	is.Status.MarkWebhookReady()
 	is.Status.MarkAllDeploymentsReady()
 	is.Status.MarkReady()
-	is.Status.MarkJobsInstalled()
 }

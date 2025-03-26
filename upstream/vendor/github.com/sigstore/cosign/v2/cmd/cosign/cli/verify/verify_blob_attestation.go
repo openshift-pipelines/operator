@@ -30,10 +30,11 @@ import (
 	"path/filepath"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/sigstore/cosign/v2/cmd/cosign/cli/fulcio"
 	"github.com/sigstore/cosign/v2/cmd/cosign/cli/options"
 	"github.com/sigstore/cosign/v2/cmd/cosign/cli/rekor"
 	internal "github.com/sigstore/cosign/v2/internal/pkg/cosign"
-	payloadsize "github.com/sigstore/cosign/v2/internal/pkg/cosign/payload/size"
+	"github.com/sigstore/cosign/v2/internal/pkg/cosign/tsa"
 	"github.com/sigstore/cosign/v2/pkg/blob"
 	"github.com/sigstore/cosign/v2/pkg/cosign"
 	"github.com/sigstore/cosign/v2/pkg/cosign/bundle"
@@ -51,11 +52,8 @@ type VerifyBlobAttestationCommand struct {
 	options.KeyOpts
 	options.CertVerifyOptions
 
-	CertRef         string
-	CertChain       string
-	CAIntermediates string
-	CARoots         string
-	TrustedRootPath string
+	CertRef   string
+	CertChain string
 
 	CertGithubWorkflowTrigger    string
 	CertGithubWorkflowSHA        string
@@ -72,8 +70,7 @@ type VerifyBlobAttestationCommand struct {
 	PredicateType string
 	// TODO: Add policies
 
-	SignaturePath       string // Path to the signature
-	UseSignedTimestamps bool
+	SignaturePath string // Path to the signature
 }
 
 // Exec runs the verification command
@@ -90,19 +87,6 @@ func (c *VerifyBlobAttestationCommand) Exec(ctx context.Context, artifactPath st
 	// We can't have both a key and a security key
 	if options.NOf(c.KeyRef, c.Sk) > 1 {
 		return &options.KeyParseError{}
-	}
-
-	if c.KeyOpts.NewBundleFormat {
-		if options.NOf(c.RFC3161TimestampPath, c.TSACertChainPath, c.RekorURL, c.CertChain, c.CARoots, c.CAIntermediates, c.CertRef, c.SCTRef) > 1 {
-			return fmt.Errorf("when using --new-bundle-format, please supply signed content with --bundle and verification content with --trusted-root")
-		}
-		err = verifyNewBundle(ctx, c.BundlePath, c.TrustedRootPath, c.KeyRef, c.Slot, c.CertVerifyOptions.CertOidcIssuer, c.CertVerifyOptions.CertOidcIssuerRegexp, c.CertVerifyOptions.CertIdentity, c.CertVerifyOptions.CertIdentityRegexp, c.CertGithubWorkflowTrigger, c.CertGithubWorkflowSHA, c.CertGithubWorkflowName, c.CertGithubWorkflowRepository, c.CertGithubWorkflowRef, artifactPath, c.Sk, c.IgnoreTlog, c.UseSignedTimestamps, c.IgnoreSCT)
-		if err == nil {
-			fmt.Fprintln(os.Stderr, "Verified OK")
-		}
-		return err
-	} else if c.TrustedRootPath != "" {
-		return fmt.Errorf("--trusted-root only supported with --new-bundle-format")
 	}
 
 	var identities []cosign.Identity
@@ -133,14 +117,6 @@ func (c *VerifyBlobAttestationCommand) Exec(ctx context.Context, artifactPath st
 			return err
 		}
 		defer f.Close()
-		fileInfo, err := f.Stat()
-		if err != nil {
-			return err
-		}
-		err = payloadsize.CheckSize(uint64(fileInfo.Size()))
-		if err != nil {
-			return err
-		}
 
 		payload = internal.NewHashReader(f, sha256.New())
 		if _, err := io.ReadAll(&payload); err != nil {
@@ -155,18 +131,32 @@ func (c *VerifyBlobAttestationCommand) Exec(ctx context.Context, artifactPath st
 	}
 
 	// Set up TSA, Fulcio roots and tlog public keys and clients.
-	if c.RFC3161TimestampPath != "" && !(c.TSACertChainPath != "" || c.UseSignedTimestamps) {
-		return fmt.Errorf("either TSA certificate chain path must be provided or use-signed-timestamps must be set when using RFC3161 timestamp path")
+	if c.RFC3161TimestampPath != "" && c.KeyOpts.TSACertChainPath == "" {
+		return fmt.Errorf("timestamp-cert-chain is required to validate a rfc3161 timestamp bundle")
 	}
-
-	if c.TSACertChainPath != "" || c.UseSignedTimestamps {
-		tsaCertificates, err := cosign.GetTSACerts(ctx, c.TSACertChainPath, cosign.GetTufTargets)
+	if c.KeyOpts.TSACertChainPath != "" {
+		_, err := os.Stat(c.TSACertChainPath)
 		if err != nil {
-			return fmt.Errorf("unable to load or get TSA certificates: %w", err)
+			return fmt.Errorf("unable to open timestamp certificate chain file: %w", err)
 		}
-		co.TSACertificate = tsaCertificates.LeafCert
-		co.TSARootCertificates = tsaCertificates.RootCert
-		co.TSAIntermediateCertificates = tsaCertificates.IntermediateCerts
+		// TODO: Add support for TUF certificates.
+		pemBytes, err := os.ReadFile(filepath.Clean(c.TSACertChainPath))
+		if err != nil {
+			return fmt.Errorf("error reading certification chain path file: %w", err)
+		}
+
+		leaves, intermediates, roots, err := tsa.SplitPEMCertificateChain(pemBytes)
+		if err != nil {
+			return fmt.Errorf("error splitting certificates: %w", err)
+		}
+		if len(leaves) > 1 {
+			return fmt.Errorf("certificate chain must contain at most one TSA certificate")
+		}
+		if len(leaves) == 1 {
+			co.TSACertificate = leaves[0]
+		}
+		co.TSAIntermediateCertificates = intermediates
+		co.TSARootCertificates = roots
 	}
 
 	if !c.IgnoreTlog {
@@ -185,13 +175,22 @@ func (c *VerifyBlobAttestationCommand) Exec(ctx context.Context, artifactPath st
 		}
 	}
 	if keylessVerification(c.KeyRef, c.Sk) {
-		if err := loadCertsKeylessVerification(c.CertChain, c.CARoots, c.CAIntermediates, co); err != nil {
-			return err
+		// Use default TUF roots if a cert chain is not provided.
+		// This performs an online fetch of the Fulcio roots. This is needed
+		// for verifying keyless certificates (both online and offline).
+		if c.CertChain == "" {
+			co.RootCerts, err = fulcio.GetRoots()
+			if err != nil {
+				return fmt.Errorf("getting Fulcio roots: %w", err)
+			}
+			co.IntermediateCerts, err = fulcio.GetIntermediates()
+			if err != nil {
+				return fmt.Errorf("getting Fulcio intermediates: %w", err)
+			}
 		}
 	}
-
 	// Ignore Signed Certificate Timestamp if the flag is set or a key is provided
-	if shouldVerifySCT(c.IgnoreSCT, c.KeyRef, c.Sk) {
+	if !c.IgnoreSCT || keylessVerification(c.KeyRef, c.Sk) {
 		co.CTLogPubKeys, err = cosign.GetCTLogPubs(ctx)
 		if err != nil {
 			return fmt.Errorf("getting ctlog public keys: %w", err)
@@ -234,9 +233,6 @@ func (c *VerifyBlobAttestationCommand) Exec(ctx context.Context, artifactPath st
 		if err != nil {
 			return err
 		}
-	case c.CARoots != "":
-		// CA roots + possible intermediates are already loaded into co.RootCerts with the call to
-		// loadCertsKeylessVerification above.
 	}
 	if c.BundlePath != "" {
 		b, err := cosign.FetchLocalSignedPayloadFromPath(c.BundlePath)

@@ -65,7 +65,7 @@ func (tc tektonConfig) ensureInstance(ctx context.Context) {
 	logger := logging.FromContext(ctx)
 	logger.Debug("ensuring tektonconfig instance")
 
-	waitErr := wait.PollUntilContextTimeout(ctx, RetryInterval, RetryTimeout, true, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollImmediate(RetryInterval, RetryTimeout, func() (bool, error) {
 		//note: the code in this block will be retired until
 		// an error is returned, or
 		// 'true' is returned, or

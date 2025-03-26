@@ -308,11 +308,6 @@ func (p *AssumeRoleProvider) Retrieve(ctx context.Context) (aws.Credentials, err
 		return aws.Credentials{Source: ProviderName}, err
 	}
 
-	var accountID string
-	if resp.AssumedRoleUser != nil {
-		accountID = getAccountID(resp.AssumedRoleUser)
-	}
-
 	return aws.Credentials{
 		AccessKeyID:     *resp.Credentials.AccessKeyId,
 		SecretAccessKey: *resp.Credentials.SecretAccessKey,
@@ -321,6 +316,5 @@ func (p *AssumeRoleProvider) Retrieve(ctx context.Context) (aws.Credentials, err
 
 		CanExpire: true,
 		Expires:   *resp.Credentials.Expiration,
-		AccountID: accountID,
 	}, nil
 }

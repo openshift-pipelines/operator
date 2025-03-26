@@ -7,13 +7,10 @@ package plugins
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	mr "math/rand"
 	"sync"
 	"time"
 
-	"github.com/open-policy-agent/opa/internal/report"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/sdk/trace"
 
@@ -25,6 +22,7 @@ import (
 	"github.com/open-policy-agent/opa/hooks"
 	bundleUtils "github.com/open-policy-agent/opa/internal/bundle"
 	cfg "github.com/open-policy-agent/opa/internal/config"
+	"github.com/open-policy-agent/opa/internal/errors"
 	initload "github.com/open-policy-agent/opa/internal/runtime/init"
 	"github.com/open-policy-agent/opa/keys"
 	"github.com/open-policy-agent/opa/loader"
@@ -150,9 +148,6 @@ const (
 	DefaultTriggerMode TriggerMode = "periodic"
 )
 
-// default interval between OPA report uploads
-var defaultUploadIntervalSec = int64(3600)
-
 // Status has a Plugin's current status plus an optional Message.
 type Status struct {
 	State   State  `json:"state"`
@@ -203,14 +198,8 @@ type Manager struct {
 	tracerProvider               *trace.TracerProvider
 	distributedTacingOpts        tracing.Options
 	registeredNDCacheTriggers    []func(bool)
-	registeredTelemetryGatherers map[string]report.Gatherer
 	bootstrapConfigLabels        map[string]string
 	hooks                        hooks.Hooks
-	enableTelemetry              bool
-	reporter                     *report.Reporter
-	opaReportNotifyCh            chan struct{}
-	stop                         chan chan struct{}
-	parserOptions                ast.ParserOptions
 }
 
 type managerContextKey string
@@ -286,10 +275,11 @@ func ValidateAndInjectDefaultsForTriggerMode(a, b *TriggerMode) (*TriggerMode, e
 			return nil, err
 		}
 		return a, nil
-	}
 
-	t := DefaultTriggerMode
-	return &t, nil
+	} else {
+		t := DefaultTriggerMode
+		return &t, nil
+	}
 }
 
 type namedplugin struct {
@@ -395,28 +385,6 @@ func WithHooks(hs hooks.Hooks) func(*Manager) {
 	}
 }
 
-// WithParserOptions sets the parser options to be used by the plugin manager.
-func WithParserOptions(opts ast.ParserOptions) func(*Manager) {
-	return func(m *Manager) {
-		m.parserOptions = opts
-	}
-}
-
-// WithEnableTelemetry controls whether OPA will send telemetry reports to an external service.
-func WithEnableTelemetry(enableTelemetry bool) func(*Manager) {
-	return func(m *Manager) {
-		m.enableTelemetry = enableTelemetry
-	}
-}
-
-// WithTelemetryGatherers allows registration of telemetry gatherers which enable injection of additional data in the
-// telemetry report
-func WithTelemetryGatherers(gs map[string]report.Gatherer) func(*Manager) {
-	return func(m *Manager) {
-		m.registeredTelemetryGatherers = gs
-	}
-}
-
 // New creates a new Manager using config.
 func New(raw []byte, id string, store storage.Store, opts ...func(*Manager)) (*Manager, error) {
 
@@ -485,27 +453,6 @@ func New(raw []byte, id string, store storage.Store, opts ...func(*Manager)) (*M
 		return nil, err
 	}
 
-	if m.enableTelemetry {
-		reporter, err := report.New(id, report.Options{Logger: m.logger})
-		if err != nil {
-			return nil, err
-		}
-		m.reporter = reporter
-
-		m.reporter.RegisterGatherer("min_compatible_version", func(_ context.Context) (any, error) {
-			var minimumCompatibleVersion string
-			if m.compiler != nil && m.compiler.Required != nil {
-				minimumCompatibleVersion, _ = m.compiler.Required.MinimumCompatibleVersion()
-			}
-			return minimumCompatibleVersion, nil
-		})
-
-		// register any additional gatherers
-		for k, g := range m.registeredTelemetryGatherers {
-			m.reporter.RegisterGatherer(k, g)
-		}
-	}
-
 	return m, nil
 }
 
@@ -520,12 +467,6 @@ func (m *Manager) Init(ctx context.Context) error {
 	params := storage.TransactionParams{
 		Write:   true,
 		Context: storage.NewContext(),
-	}
-
-	if m.enableTelemetry {
-		m.opaReportNotifyCh = make(chan struct{})
-		m.stop = make(chan chan struct{})
-		go m.sendOPAUpdateLoop(ctx)
 	}
 
 	err := storage.Txn(ctx, m.Store, params, func(txn storage.Transaction) error {
@@ -556,12 +497,6 @@ func (m *Manager) Init(ctx context.Context) error {
 	})
 
 	if err != nil {
-		if m.stop != nil {
-			done := make(chan struct{})
-			m.stop <- done
-			<-done
-		}
-
 		return err
 	}
 
@@ -738,12 +673,6 @@ func (m *Manager) Stop(ctx context.Context) {
 			m.logger.Error("Error closing store: %v", err)
 		}
 	}
-
-	if m.stop != nil {
-		done := make(chan struct{})
-		m.stop <- done
-		<-done
-	}
 }
 
 // Reconfigure updates the configuration on the manager.
@@ -883,16 +812,11 @@ func (m *Manager) onCommit(ctx context.Context, txn storage.Transaction, event s
 	// compiler on the context but the server does not (nor would users
 	// implementing their own policy loading.)
 	if compiler == nil && event.PolicyChanged() {
-		compiler, _ = loadCompilerFromStore(ctx, m.Store, txn, m.enablePrintStatements, m.ParserOptions())
+		compiler, _ = loadCompilerFromStore(ctx, m.Store, txn, m.enablePrintStatements)
 	}
 
 	if compiler != nil {
 		m.setCompiler(compiler)
-
-		if m.enableTelemetry && event.PolicyChanged() {
-			m.opaReportNotifyCh <- struct{}{}
-		}
-
 		for _, f := range m.registeredTriggers {
 			f(txn)
 		}
@@ -920,7 +844,7 @@ func (m *Manager) onCommit(ctx context.Context, txn storage.Transaction, event s
 	}
 }
 
-func loadCompilerFromStore(ctx context.Context, store storage.Store, txn storage.Transaction, enablePrintStatements bool, popts ast.ParserOptions) (*ast.Compiler, error) {
+func loadCompilerFromStore(ctx context.Context, store storage.Store, txn storage.Transaction, enablePrintStatements bool) (*ast.Compiler, error) {
 	policies, err := store.ListPolicies(ctx, txn)
 	if err != nil {
 		return nil, err
@@ -932,7 +856,7 @@ func loadCompilerFromStore(ctx context.Context, store storage.Store, txn storage
 		if err != nil {
 			return nil, err
 		}
-		module, err := ast.ParseModuleWithOpts(policy, string(bs), popts)
+		module, err := ast.ParseModule(policy, string(bs))
 		if err != nil {
 			return nil, err
 		}
@@ -1057,42 +981,4 @@ func (m *Manager) RegisterNDCacheTrigger(trigger func(bool)) {
 	m.mtx.Lock()
 	defer m.mtx.Unlock()
 	m.registeredNDCacheTriggers = append(m.registeredNDCacheTriggers, trigger)
-}
-
-func (m *Manager) sendOPAUpdateLoop(ctx context.Context) {
-	ticker := time.NewTicker(time.Duration(int64(time.Second) * defaultUploadIntervalSec))
-	mr.New(mr.NewSource(time.Now().UnixNano()))
-
-	ctx, cancel := context.WithCancel(ctx)
-
-	var opaReportNotify bool
-
-	for {
-		select {
-		case <-m.opaReportNotifyCh:
-			opaReportNotify = true
-		case <-ticker.C:
-			ticker.Stop()
-
-			if opaReportNotify {
-				opaReportNotify = false
-				_, err := m.reporter.SendReport(ctx)
-				if err != nil {
-					m.logger.WithFields(map[string]interface{}{"err": err}).Debug("Unable to send OPA telemetry report.")
-				}
-			}
-
-			newInterval := mr.Int63n(defaultUploadIntervalSec) + defaultUploadIntervalSec
-			ticker = time.NewTicker(time.Duration(int64(time.Second) * newInterval))
-		case done := <-m.stop:
-			cancel()
-			ticker.Stop()
-			done <- struct{}{}
-			return
-		}
-	}
-}
-
-func (m *Manager) ParserOptions() ast.ParserOptions {
-	return m.parserOptions
 }

@@ -38,23 +38,17 @@ import (
 var EmailAddressOID asn1.ObjectIdentifier = []int{1, 2, 840, 113549, 1, 9, 1}
 
 type Signature struct {
-	signature        []byte
-	verifierLoadOpts []sigsig.LoadOption
+	signature []byte
 }
 
 // NewSignature creates and validates an x509 signature object
 func NewSignature(r io.Reader) (*Signature, error) {
-	return NewSignatureWithOpts(r)
-}
-
-func NewSignatureWithOpts(r io.Reader, opts ...sigsig.LoadOption) (*Signature, error) {
 	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
 	return &Signature{
-		signature:        b,
-		verifierLoadOpts: opts,
+		signature: b,
 	}, nil
 }
 
@@ -67,7 +61,7 @@ func (s Signature) CanonicalValue() ([]byte, error) {
 func (s Signature) Verify(r io.Reader, k interface{}, opts ...sigsig.VerifyOption) error {
 	if len(s.signature) == 0 {
 		//lint:ignore ST1005 X509 is proper use of term
-		return errors.New("X509 signature has not been initialized")
+		return fmt.Errorf("X509 signature has not been initialized")
 	}
 
 	key, ok := k.(*PublicKey)
@@ -90,7 +84,7 @@ func (s Signature) Verify(r io.Reader, k interface{}, opts ...sigsig.VerifyOptio
 		}
 	}
 
-	verifier, err := sigsig.LoadVerifierWithOpts(p, s.verifierLoadOpts...)
+	verifier, err := sigsig.LoadVerifier(p, crypto.SHA256)
 	if err != nil {
 		return err
 	}
@@ -164,7 +158,7 @@ func (k PublicKey) CanonicalValue() (encoded []byte, err error) {
 	case k.certs != nil:
 		encoded, err = cryptoutils.MarshalCertificatesToPEM(k.certs)
 	default:
-		err = errors.New("x509 public key has not been initialized")
+		err = fmt.Errorf("x509 public key has not been initialized")
 	}
 
 	return

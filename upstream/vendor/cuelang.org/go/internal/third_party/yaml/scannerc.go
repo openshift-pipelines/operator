@@ -489,11 +489,10 @@ func cache(parser *yaml_parser_t, length int) bool {
 
 // Advance the buffer pointer.
 func skip(parser *yaml_parser_t) {
-	w := width(parser.buffer[parser.buffer_pos])
-	parser.mark.index += w
+	parser.mark.index++
 	parser.mark.column++
 	parser.unread--
-	parser.buffer_pos += w
+	parser.buffer_pos += width(parser.buffer[parser.buffer_pos])
 }
 
 func skip_line(parser *yaml_parser_t) {
@@ -504,12 +503,11 @@ func skip_line(parser *yaml_parser_t) {
 		parser.unread -= 2
 		parser.buffer_pos += 2
 	} else if is_break(parser.buffer, parser.buffer_pos) {
-		w := width(parser.buffer[parser.buffer_pos])
-		parser.mark.index += w
+		parser.mark.index++
 		parser.mark.column = 0
 		parser.mark.line++
 		parser.unread--
-		parser.buffer_pos += w
+		parser.buffer_pos += width(parser.buffer[parser.buffer_pos])
 	}
 }
 
@@ -530,7 +528,7 @@ func read(parser *yaml_parser_t, s []byte) []byte {
 		s = append(s, parser.buffer[parser.buffer_pos:parser.buffer_pos+w]...)
 		parser.buffer_pos += w
 	}
-	parser.mark.index += w
+	parser.mark.index++
 	parser.mark.column++
 	parser.unread--
 	return s

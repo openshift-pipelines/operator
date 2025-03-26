@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/buildkite/go-pipeline/warning"
-
 	"gopkg.in/yaml.v3"
 )
 
@@ -27,11 +25,6 @@ type Unmarshaler interface {
 	// UnmarshalOrdered should unmarshal src into the implementing value. src
 	// will generally be one of *Map[string, any], []any, or a "scalar" built-in
 	// type.
-	// If UnmarshalOrdered returns a non-nil error that is not a warning, the
-	// whole unmarshaling process may halt at that point and report that error
-	// (wrapped).
-	// Unlike other errors, returning a warning lets unmarshalling continue
-	// so that all warnings can be printed together at the end.
 	UnmarshalOrdered(src any) error
 }
 
@@ -59,11 +52,6 @@ type Unmarshaler interface {
 //     yaml tags includes ",inline". Inline fields must themselves be a type
 //     that Unmarshal can unmarshal *Map[string, any] into - another struct or
 //     Map or map with string keys.
-//     Struct targets can also have `aliases` tags of the form
-//     `aliases:"apple,banana,citron"`
-//     If the field name or yaml tag key doesn't match, Unmarshal looks through
-//     the aliases list to see if any are present, and uses the value for the
-//     first.
 //   - S = []any (also recursively containing values with types from this list),
 //     which is recursively unmarshaled elementwise; D is *[]any or
 //     *[]somethingElse.
@@ -164,19 +152,14 @@ func Unmarshal(src, dst any) error {
 				return fmt.Errorf("%w: cannot unmarshal []any into %T", ErrIncompatibleTypes, dst)
 			}
 			etype := sdst.Type().Elem() // E = Type of the slice's elements
-			var warns []error
-			for i, a := range tsrc {
+			for _, a := range tsrc {
 				x := reflect.New(etype) // *E
-				err := Unmarshal(a, x.Interface())
-				if w := warning.As(err); w != nil {
-					warns = append(warns, w.Wrapf("while unmarshaling item at index %d of %d", i, len(tsrc)))
-				} else if err != nil {
-					return fmt.Errorf("unmarshaling item at index %d of %d: %w", i, len(tsrc), err)
+				if err := Unmarshal(a, x.Interface()); err != nil {
+					return err
 				}
 				sdst = reflect.Append(sdst, x.Elem())
 			}
 			vdst.Elem().Set(sdst)
-			return warning.Wrap(warns...)
 		}
 
 	case string:
@@ -275,22 +258,14 @@ func (m *Map[K, V]) decodeInto(target any) error {
 		}
 
 		valueType := mapType.Elem()
-		var warns []error
-		if err := tm.Range(func(k string, v any) error {
+		return tm.Range(func(k string, v any) error {
 			nv := reflect.New(valueType)
-			err := Unmarshal(v, nv.Interface())
-			if w := warning.As(err); w != nil {
-				warns = append(warns, w.Wrapf("while unmarshaling value for key %q", k))
-			} else if err != nil {
-				return fmt.Errorf("unmarshaling value for key %q: %w", k, err)
+			if err := Unmarshal(v, nv.Interface()); err != nil {
+				return err
 			}
-
 			innerValue.SetMapIndex(reflect.ValueOf(k), nv.Elem())
 			return nil
-		}); err != nil {
-			return err
-		}
-		return warning.Wrap(warns...)
+		})
 
 	case reflect.Struct:
 		// The rest of the method is concerned with this.
@@ -304,8 +279,6 @@ func (m *Map[K, V]) decodeInto(target any) error {
 
 	var inlineField reflect.StructField
 	outlineKeys := make(map[string]struct{})
-
-	var warns []error
 
 	for _, field := range fields {
 		// Skip non-exported fields. This is conventional *and* correct.
@@ -340,39 +313,23 @@ func (m *Map[K, V]) decodeInto(target any) error {
 		}
 
 		// Is there a value for this key?
-		value, has := tm.Get(key)
+		v, has := tm.Get(key)
 		if !has {
-			// Look for aliases, and choose the first with a value.
-			atag, _ := field.Tag.Lookup("aliases")
-			for _, alias := range strings.Split(atag, ",") {
-				value, has = tm.Get(alias)
-				if has {
-					key = alias
-					break
-				}
-			}
-		}
-		if !has {
-			// Couldn't find a value for the key or any aliases, so skip.
 			continue
 		}
 
-		// key matched a field, so it isn't inline.
+		// Now load v into this field.
 		outlineKeys[key] = struct{}{}
 
-		// Now load value into the field recursively.
 		// Get a pointer to the field. This works because target is a pointer.
 		ptrToField := innerValue.FieldByIndex(field.Index).Addr()
-		err := Unmarshal(value, ptrToField.Interface())
-		if w := warning.As(err); w != nil {
-			warns = append(warns, w.Wrapf("while unmarshaling the value for key %q into struct field %q", key, field.Name))
-		} else if err != nil {
+		if err := Unmarshal(v, ptrToField.Interface()); err != nil {
 			return err
 		}
 	}
 
 	if inlineField.Index == nil {
-		return warning.Wrap(warns...)
+		return nil
 	}
 	// The rest is handling the ",inline" field.
 	// We support any field that Unmarshal can unmarshal tm into.
@@ -392,19 +349,11 @@ func (m *Map[K, V]) decodeInto(target any) error {
 
 	// If the inline map contains nothing, then don't bother setting it.
 	if temp.Len() == 0 {
-		return warning.Wrap(warns...)
+		return nil
 	}
 
-	err := Unmarshal(temp, inlinePtr.Interface())
-	if w := warning.As(err); w != nil {
-		warns = append(warns, w.Wrapf("while unmarshaling the remaining input into an inline field of type %T", inlinePtr.Interface()))
-		return warning.Wrap(warns...)
-	}
-	return err
+	return Unmarshal(temp, inlinePtr.Interface())
 }
-
-// Compile-time check that *Map[string,any] is an Unmarshaler
-var _ Unmarshaler = (*MapSA)(nil)
 
 // UnmarshalOrdered unmarshals a value into this map.
 // K must be string, src must be *Map[string, any], and each value in src must
@@ -424,19 +373,12 @@ func (m *Map[K, V]) UnmarshalOrdered(src any) error {
 		return fmt.Errorf("%w: src type %T, want *Map[string, any]", ErrIncompatibleTypes, src)
 	}
 
-	var warns []error
-	if err := tsrc.Range(func(k string, v any) error {
+	return tsrc.Range(func(k string, v any) error {
 		var dv V
-		err := Unmarshal(v, &dv)
-		if w := warning.As(err); w != nil {
-			warns = append(warns, w.Wrapf("while unmarshaling the value for key %q", k))
-		} else if err != nil {
-			return fmt.Errorf("unmarshaling value for key %q: %w", k, err)
+		if err := Unmarshal(v, &dv); err != nil {
+			return err
 		}
 		tm.Set(k, dv)
 		return nil
-	}); err != nil {
-		return err
-	}
-	return warning.Wrap(warns...)
+	})
 }
