@@ -1,4 +1,4 @@
-ARG GO_BUILDER=brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.22
+ARG GO_BUILDER=brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.21
 ARG RUNTIME=registry.redhat.io/ubi8/ubi:latest@sha256:8bd1b6306f8164de7fb0974031a0f903bd3ab3e6bcab835854d3d9a1a74ea5db
 
 FROM $GO_BUILDER AS builder
@@ -10,8 +10,7 @@ COPY upstream .
 # RUN set -e; for f in patches/*.patch; do echo ${f}; [[ -f ${f} ]] || continue; git apply ${f}; done
 COPY head HEAD
 ENV GODEBUG="http2server=0"
-ENV GOEXPERIMENT=strictfipsruntime
-RUN go build -tags disable_gcp -tags strictfipsruntime -ldflags="-X 'knative.dev/pkg/changeset.rev=$(cat HEAD)'" -mod=vendor -o /tmp/openshift-pipelines-operator \
+RUN go build -tags disable_gcp -ldflags="-X 'knative.dev/pkg/changeset.rev=$(cat HEAD)'" -mod=vendor -o /tmp/openshift-pipelines-operator \
     ./cmd/openshift/operator
 
 FROM $RUNTIME
@@ -27,7 +26,7 @@ COPY head ${KO_DATA_PATH}/HEAD
 LABEL \
       com.redhat.component="openshift-pipelines-rhel8-operator-container" \
       name="openshift-pipelines/pipelines-rhel8-operator" \
-      version="1.17.x" \
+      version="1.14.x" \
       summary="Red Hat OpenShift Pipelines Operator" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator" \
