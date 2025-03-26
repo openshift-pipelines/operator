@@ -84,9 +84,9 @@ for d in controller watcher webhook; do
 done
 
 # Mutate manual-approval-gate payload
-for d in controller webhook; do
-    yq e -i "(select (.kind == \"Deployment\") | select (.metadata.name == \"manual-approval-gate-${d}\") | .spec.template.spec.containers[0].command) = [\"/ko-app/manual-approval-gate-${d}\"]" .konflux/olm-catalog/bundle/kodata/manual-approval-gate/*/release-openshift.yaml
-done
+# for d in controller webhook; do
+#     yq e -i "(select (.kind == \"Deployment\") | select (.metadata.name == \"manual-approval-gate-${d}\") | .spec.template.spec.containers[0].command) = [\"/ko-app/manual-approval-gate-${d}\"]" .konflux/olm-catalog/bundle/kodata/manual-approval-gate/*/release-openshift.yaml
+# done
 
 # Update the OpenShift Pipelines version in the getting started documentation link in the CSV file
 OPENSHIFT_PIPELINES_MINOR_VERSION=${CURRENT_VERSION%.*}
