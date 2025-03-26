@@ -4,7 +4,7 @@ TAG           = latest
 RUNTIME       = docker
 ENVIRONMENT="devel"
 update-payload-and-version: ## Update tektoncd operator build number, payloads, bundle manifests, image references
-        @./hack/update-version.sh
+    @./hack/update-version.sh
 	@./hack/operator-fetch-payload.sh
 	@./hack/operator-update-images.sh
 
