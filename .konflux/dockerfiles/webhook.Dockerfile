@@ -25,7 +25,7 @@ COPY head ${KO_DATA_PATH}/HEAD
 LABEL \
       com.redhat.component="openshift-pipelines-operator-webhook-rhel8-container" \
       name="openshift-pipelines/pipelines-operator-webhook-rhel8" \
-      version="1.17.x" \
+      version="1.14.6" \
       summary="Red Hat OpenShift Pipelines Operator Webhook" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Webhook" \
