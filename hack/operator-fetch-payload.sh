@@ -110,6 +110,6 @@ sed -i -E 's%LABEL com.redhat.openshift.versions=".*%LABEL com.redhat.openshift.
     .konflux/olm-catalog/bundle/Dockerfile
 
 # update channels in operator bundle dockerfile
-sed -i -E 's%LABEL operators.operatorframework.io.bundle.channels.v1=".*%LABEL operators.operatorframework.io.bundle.channels.v1="'latest,${CHANNEL_NAME}'"%' \
+sed -i -E 's%LABEL operators.operatorframework.io.bundle.channels.v1=".*%LABEL operators.operatorframework.io.bundle.channels.v1="'${CHANNEL_NAME}'"%' \
     .konflux/olm-catalog/bundle/Dockerfile
 
