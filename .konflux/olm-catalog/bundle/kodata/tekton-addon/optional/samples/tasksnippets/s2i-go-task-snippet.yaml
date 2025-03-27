@@ -5,7 +5,7 @@ metadata:
   name: s2i-go-snippet
 spec:
   targetResource:
-    apiVersion: tekton.dev/v1
+    apiVersion: tekton.dev/v1beta1
     kind: Pipeline
   title: S2I-Go Workspace based Task
   description: |
@@ -18,21 +18,15 @@ spec:
   yaml: |
     - name: build
       taskRef:
-        resolver: cluster
-        params:
-        - name: kind
-          value: task
-        - name: name
-          value: s2i-go
-        - name: namespace
-          value: openshift-pipelines
+        name: s2i-go
+        kind: ClusterTask
       workspaces:
         - name: source
           workspace: workspace
       params:
         - name: IMAGE
           value: $(params.IMAGE_NAME)
-        - name: CONTEXT
+        - name: PATH_CONTEXT
           value: .
-        - name: TLS_VERIFY
+        - name: TLSVERIFY
           value: "true"
