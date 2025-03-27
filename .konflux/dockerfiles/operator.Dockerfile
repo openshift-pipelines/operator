@@ -5,10 +5,11 @@ FROM $GO_BUILDER AS builder
 
 WORKDIR /go/src/github.com/tektoncd/operator
 COPY upstream .
-# FIXME: handle patches (maybe ? probably not needed though)
-# COPY patches patches/
-# RUN set -e; for f in patches/*.patch; do echo ${f}; [[ -f ${f} ]] || continue; git apply ${f}; done
-# ENV CHANGESET_REV=$CI_OPERATOR_UPSTREAM_COMMIT
+COPY .konflux/patches patches/
+RUN set -e; for f in patches/*.patch; do echo ${f}; [[ -f ${f} ]] || continue; git apply ${f}; done
+COPY head HEAD
+
+
 ENV GODEBUG="http2server=0"
 RUN go build -tags disable_gcp -ldflags="-X 'knative.dev/pkg/changeset.rev=${CHANGESET_REV:0:7}'" -mod=vendor -o /tmp/openshift-pipelines-operator \
     ./cmd/openshift/operator
