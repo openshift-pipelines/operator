@@ -49,7 +49,7 @@ export BUNDLE_ARGS="--workspace ./openshift \
 make -C ${SOURCE} OPERATOR_SDK=$(which operator-sdk) operator-bundle
 
 echo "Clean existing generated bundle data…"
-rm -fRv .konflux/olm-catalog/bundle/metadata/*
+rm -fRv .konflux/olm-catalog/bundle/metadata/annotations.yaml
 rm -fRv .konflux/olm-catalog/bundle/manifests/*
 
 echo "Copy generated bundle data to this onebundle…"
