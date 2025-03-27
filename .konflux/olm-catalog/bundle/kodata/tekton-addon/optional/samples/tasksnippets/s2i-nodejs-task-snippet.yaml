@@ -5,7 +5,7 @@ metadata:
   name: s2i-nodejs-snippet
 spec:
   targetResource:
-    apiVersion: tekton.dev/v1
+    apiVersion: tekton.dev/v1beta1
     kind: Pipeline
   title: S2I-Nodejs Workspace based Task
   description: |
@@ -17,14 +17,8 @@ spec:
   yaml: |
     - name: build
       taskRef:
-        resolver: cluster
-        params:
-        - name: kind
-          value: task
-        - name: name
-          value: s2i-nodejs
-        - name: namespace
-          value: openshift-pipelines
+        name: s2i-nodejs
+        kind: ClusterTask
       workspaces:
         - name: source
           workspace: workspace
@@ -33,7 +27,7 @@ spec:
           value: $(params.IMAGE_NAME)
         - name: VERSION
           value: "14-ubi8"
-        - name: CONTEXT
+        - name: PATH_CONTEXT
           value: .
-        - name: TLS_VERIFY
+        - name: TLSVERIFY
           value: "true"
