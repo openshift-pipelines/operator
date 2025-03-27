@@ -36,12 +36,12 @@ echo "Copy payloads to .konflux/olm-catalog/bundle…"
 cp -rv ${SOURCE}/cmd/openshift/operator/kodata .konflux/olm-catalog/bundle/kodata
 
 echo "Generate bundle data…"
-rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/metadata/*
-rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/manifest/*
+rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/bundle/metadata/*
+rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/bundle/manifest/*
 export BUNDLE_ARGS="--workspace ./openshift \
                     --operator-release-version ${CURRENT_VERSION} \
-                    --channels latest,${CHANNEL_NAME} \
-                    --default-channel latest \
+                    --channels ${CHANNEL_NAME} \
+                    --default-channel ${CHANNEL_NAME} \
                     --fetch-strategy-local \
                     --upgrade-strategy-replaces \
                     --operator-release-previous-version openshift-pipelines-operator-rh.v${PREVIOUS_VERSION} \
