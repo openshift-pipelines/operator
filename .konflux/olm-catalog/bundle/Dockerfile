@@ -12,7 +12,7 @@ LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
 LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
 LABEL operators.operatorframework.io.bundle.package.v1=serverless-operator
 LABEL operators.operatorframework.io.bundle.channel.default.v1="pipelines-1.14"
-LABEL operators.operatorframework.io.bundle.channels.v1="latest,pipelines-1.14"
+LABEL operators.operatorframework.io.bundle.channels.v1="pipelines-1.14"
 
 LABEL \
       com.redhat.component="openshift-pipelines-operator-bundle-container" \
