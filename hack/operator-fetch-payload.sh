@@ -36,8 +36,8 @@ echo "Copy payloads to .konflux/olm-catalog/bundle…"
 cp -rv ${SOURCE}/cmd/openshift/operator/kodata .konflux/olm-catalog/bundle/kodata
 
 echo "Generate bundle data…"
-rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/bundle/metadata/*
-rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/bundle/manifest/*
+rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/metadata/*
+rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/manifest/*
 export BUNDLE_ARGS="--workspace ./openshift \
                     --operator-release-version ${CURRENT_VERSION} \
                     --channels ${CHANNEL_NAME} \
@@ -49,7 +49,7 @@ export BUNDLE_ARGS="--workspace ./openshift \
 make -C ${SOURCE} OPERATOR_SDK=$(which operator-sdk) operator-bundle
 
 echo "Clean existing generated bundle data…"
-rm -fRv .konflux/olm-catalog/bundle/metadata/annotations.yaml
+rm -fRv .konflux/olm-catalog/bundle/metadata/*
 rm -fRv .konflux/olm-catalog/bundle/manifests/*
 
 echo "Copy generated bundle data to this onebundle…"
