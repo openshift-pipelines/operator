@@ -1,4 +1,4 @@
-ARG GO_BUILDER=brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.21
+ARG GO_BUILDER=brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.22
 ARG RUNTIME=registry.redhat.io/ubi8/ubi:latest@sha256:8bd1b6306f8164de7fb0974031a0f903bd3ab3e6bcab835854d3d9a1a74ea5db
 
 FROM $GO_BUILDER as builder
@@ -23,7 +23,7 @@ COPY head ${KO_DATA_PATH}/HEAD
 LABEL \
       com.redhat.component="openshift-pipelines-operator-proxy-rhel8-container" \
       name="openshift-pipelines/pipelines-operator-proxy-rhel8" \
-      version="1.14.x" \
+      version="1.14.6" \
       summary="Red Hat OpenShift Pipelines Operator Proxy" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Proxy" \
