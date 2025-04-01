@@ -12,7 +12,6 @@ COPY head HEAD
 ENV GODEBUG="http2server=0"
 RUN go build -ldflags="-X 'knative.dev/pkg/changeset.rev=${CHANGESET_REV:0:7}'" -mod=vendor -o /tmp/openshift-pipelines-operator-webhook \
     ./cmd/openshift/webhook
-# RUN /bin/sh -c 'echo $CI_PIPELINE_UPSTREAM_COMMIT > /tmp/HEAD'
 
 FROM $RUNTIME
 
