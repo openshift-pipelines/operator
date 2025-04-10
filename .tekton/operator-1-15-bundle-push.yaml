@@ -16,7 +16,7 @@ metadata:
       ".tekton/operator-1-15-bundle-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: openshift-pipelines-1-15
+    appstudio.openshift.io/application: openshift-pipelines-operator-1-15
     appstudio.openshift.io/component: operator-1-15-bundle
     pipelines.appstudio.openshift.io/type: build
   name: operator-1-15-bundle-on-push
@@ -31,6 +31,11 @@ spec:
     value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/1-15/operator-bundle-rhel8:{{revision}}
   - name: dockerfile
     value: .konflux/olm-catalog/bundle/Dockerfile
+  - name: build-platforms
+    value:
+      - linux/x86_64
+  - name: build-image-index
+    value: false
   - name: prefetch-input
     value: |
       {"type": "rpm", "path": ".konflux/rpms"}
