@@ -1,4 +1,4 @@
-FROM registry.redhat.io/openshift4/ose-operator-registry-rhel9@sha256:cee49ce114fd71963c6843a6cc7d647afd88df6bfa9896ff79981449739d3b16
+FROM registry.redhat.io/openshift4/ose-operator-registry-rhel9:v4.17
 
 ENTRYPOINT ["/bin/opm"]
 CMD ["serve", "/configs", "--cache-dir=/tmp/cache"]
@@ -16,5 +16,4 @@ LABEL operators.operatorframework.io.bundle.channel.default.v1="pipelines-main"
 LABEL operators.operatorframework.io.bundle.channels.v1="pipelines-main"
 LABEL operators.operatorframework.io.metrics.builder=operator-sdk-v1.37.0
 LABEL operators.operatorframework.io.metrics.mediatype.v1=metrics+v1
-# LABEL operators.operatorframework.io.metrics.project_layout=go.kubebuilder.io/v3
 LABEL operators.operatorframework.io.index.configs.v1=/configs
