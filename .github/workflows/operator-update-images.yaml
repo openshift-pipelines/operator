@@ -1,6 +1,9 @@
 name: operator-update-images
 
 on:
+  push:
+    paths:
+    - project.yaml
   workflow_dispatch:
     inputs:
       environment:
@@ -12,10 +15,6 @@ on:
           - devel
           # - staging
           # - production
-
-#  Disable Schedule for this workflow as this is Release branch
-#  schedule:
-#  - cron: "0 1 * * *" # At 1AM everyday
 
 jobs:
   update-csv:
