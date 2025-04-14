@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: Checkout the current repo
         uses: actions/checkout@v4
-      - name: auto-approve-update-references
+      - name: auto-approve-konflux-nudges
         run: |
           gh auth status
           git config user.name openshift-pipelines-bot
@@ -23,7 +23,7 @@ jobs:
           BASE_BRANCH=next
           echo "Base branch is $BASE_BRANCH"
           # LGTM pull requests that might have one review but no more lgtm
-          for p in $(gh pr list --search "author:app/red-hat-konflux base:$BASE_BRANCH" --json "number" | jq ".[].number"); do
+          for p in $(gh pr list --search "label:konflux-nudge base:$BASE_BRANCH" --json "number" | jq ".[].number"); do
             echo "Approving PR $p"
             gh pr review $p --approve --body "/lgtm"
           done
