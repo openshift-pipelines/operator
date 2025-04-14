@@ -4,7 +4,7 @@ kind: PipelineRun
 metadata:
   annotations:
     pipelinesascode.tekton.dev/cancel-in-progress: "true" # Cancel in-progress pipelines
-    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/main/.tekton/docker-build-ta.yaml"
+    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/main/.tekton/fbc-build.yaml"
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator.git?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
@@ -13,7 +13,6 @@ metadata:
       == "next" &&
       ((".konflux/patches/***".pathChanged() || ".konflux/olm-catalog/index/***".pathChanged()) ||
       ".konflux/olm-catalog/index/v4.18/Dockerfile.catalog".pathChanged() ||
-      ".tekton/docker-build-ta.yaml".pathChanged() ||
       ".tekton/operator-next-index-4-18-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
