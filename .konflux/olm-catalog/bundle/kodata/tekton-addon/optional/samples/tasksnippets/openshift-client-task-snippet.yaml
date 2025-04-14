@@ -5,7 +5,7 @@ metadata:
   name: openshift-client-snippet
 spec:
   targetResource:
-    apiVersion: tekton.dev/v1
+    apiVersion: tekton.dev/v1beta1
     kind: Pipeline
   title: Openshift-client Task
   description: |
@@ -14,14 +14,8 @@ spec:
   yaml: |
     - name: deploy
       taskRef:
-        resolver: cluster
-        params:
-        - name: kind
-          value: task
-        - name: name
-          value: openshift-client
-        - name: namespace
-          value: openshift-pipelines
+        name: openshift-client
+        kind: ClusterTask
       params:
         - name: ARGS
           value: "help"

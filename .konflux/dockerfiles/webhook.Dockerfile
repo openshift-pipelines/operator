@@ -10,8 +10,7 @@ COPY upstream .
 # RUN set -e; for f in patches/*.patch; do echo ${f}; [[ -f ${f} ]] || continue; git apply ${f}; done
 COPY head HEAD
 ENV GODEBUG="http2server=0"
-ENV GOEXPERIMENT=strictfipsruntime
-RUN go build -tags strictfipsruntime -ldflags="-X 'knative.dev/pkg/changeset.rev=$(cat HEAD)'" -mod=vendor -o /tmp/openshift-pipelines-operator-webhook \
+RUN go build -ldflags="-X 'knative.dev/pkg/changeset.rev=$(cat HEAD)'" -mod=vendor -o /tmp/openshift-pipelines-operator-webhook \
     ./cmd/openshift/webhook
 
 FROM $RUNTIME
@@ -27,7 +26,7 @@ COPY head ${KO_DATA_PATH}/HEAD
 LABEL \
       com.redhat.component="openshift-pipelines-operator-webhook-rhel8-container" \
       name="openshift-pipelines/pipelines-operator-webhook-rhel8" \
-      version="1.17.x" \
+      version="1.15.3" \
       summary="Red Hat OpenShift Pipelines Operator Webhook" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Webhook" \
