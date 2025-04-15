@@ -85,10 +85,7 @@ func DefaultTagVars() map[string]TagVar {
 		"username": {
 			Func: func() (ast.Expr, error) {
 				u, err := user.Current()
-				if err != nil {
-					return nil, err
-				}
-				return ast.NewString(u.Username), nil
+				return varToString(u.Username, err)
 			},
 		},
 		"hostname": {
@@ -329,8 +326,8 @@ func (tg *tagger) injectTags(tags []string) errors.Error {
 
 // shouldBuildFile determines whether a File should be included based on its
 // attributes.
-func shouldBuildFile(f *ast.File, tagger *tagger) errors.Error {
-	tags := tagger.cfg.Tags
+func shouldBuildFile(f *ast.File, fp *fileProcessor) errors.Error {
+	tags := fp.c.Tags
 
 	a, errs := getBuildAttr(f)
 	if errs != nil {
@@ -352,7 +349,7 @@ func shouldBuildFile(f *ast.File, tagger *tagger) errors.Error {
 		tagMap[t] = !strings.ContainsRune(t, '=')
 	}
 
-	c := checker{tags: tagMap, tagger: tagger}
+	c := checker{tags: tagMap, tagger: fp.tagger}
 	include := c.shouldInclude(expr)
 	if c.err != nil {
 		return c.err

@@ -270,18 +270,18 @@ release_yaml_hub() {
 
 fetch_openshift_addon_tasks() {
   fetch_addon_task_script="${SCRIPT_DIR}/hack/openshift"
-  local dest_dir='cmd/openshift/operator/kodata/tekton-addon/addons/06-ecosystem/tasks'
-  ${fetch_addon_task_script}/fetch-tektoncd-catalog-tasks.sh ${dest_dir} "ecosystem_tasks"
-  dest_dir='cmd/openshift/operator/kodata/tekton-addon/addons/06-ecosystem/stepactions'
-  ${fetch_addon_task_script}/fetch-tektoncd-catalog-tasks.sh ${dest_dir} "ecosystem_stepactions"
+  local dest_dir="cmd/openshift/operator/kodata/tekton-addon/addons/02-clustertasks/source_external"
+  ${fetch_addon_task_script}/fetch-tektoncd-catalog-tasks.sh ${dest_dir}
+  dest_dir='cmd/openshift/operator/kodata/tekton-addon/addons/07-ecosystem'
+  ${fetch_addon_task_script}/fetch-tektoncd-catalog-tasks.sh ${dest_dir} "ecosystem"
 }
 
 copy_pruner_yaml() {
   srcPath=${SCRIPT_DIR}/config/pruner
   ko_data=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata
   dstPath=${ko_data}/tekton-pruner
-  rm -rf $dstPath
-  cp -r $srcPath $dstPath
+  rm $dstPath -rf
+  cp $srcPath $dstPath -r
 }
 
 main() {

@@ -146,8 +146,6 @@ func (pkg *Package) Mod() module.Version {
 // packages they import, recursively, using modules from the given
 // requirements to determine which modules they might be obtained from,
 // and reg to download module contents.
-//
-// rootPkgPaths should only contain canonical import paths.
 func LoadPackages(
 	ctx context.Context,
 	mainModulePath string,
@@ -212,9 +210,8 @@ func (pkgs *Packages) All() []*Package {
 	return slices.Clip(pkgs.pkgs)
 }
 
-// Pkg obtains a given package given its canonical import path.
-func (pkgs *Packages) Pkg(canonicalPkgPath string) *Package {
-	pkg, _ := pkgs.pkgCache.Get(canonicalPkgPath)
+func (pkgs *Packages) Pkg(pkgPath string) *Package {
+	pkg, _ := pkgs.pkgCache.Get(pkgPath)
 	return pkg
 }
 
@@ -223,14 +220,14 @@ func (pkgs *Packages) addPkg(ctx context.Context, pkgPath string, flags Flags) *
 		pkg := &Package{
 			path: pkgPath,
 		}
-		pkgs.applyPkgFlags(pkg, flags)
+		pkgs.applyPkgFlags(ctx, pkg, flags)
 
 		pkgs.work.Add(func() { pkgs.load(ctx, pkg) })
 		return pkg
 	})
 
 	// Ensure the flags apply even if the package already existed.
-	pkgs.applyPkgFlags(pkg, flags)
+	pkgs.applyPkgFlags(ctx, pkg, flags)
 	return pkg
 }
 
@@ -245,27 +242,12 @@ func (pkgs *Packages) load(ctx context.Context, pkg *Package) {
 		return
 	}
 	if pkgs.mainModuleVersion.Path() == pkg.mod.Path() {
-		pkgs.applyPkgFlags(pkg, PkgInAll)
+		pkgs.applyPkgFlags(ctx, pkg, PkgInAll)
 	}
 	pkgQual := module.ParseImportPath(pkg.path).Qualifier
-	if pkgQual == "" {
-		pkg.err = fmt.Errorf("cannot determine package name from import path %q", pkg.path)
-		return
-	}
 	importsMap := make(map[string]bool)
-	foundPackageFile := false
 	for _, loc := range pkg.locs {
-		// Layer an iterator whose yield function keeps track of whether we have seen
-		// a single valid CUE file in the package directory.
-		// Otherwise we would have to iterate twice, causing twice as many io/fs operations.
-		pkgFileIter := func(yield func(modimports.ModuleFile, error) bool) {
-			yield2 := func(mf modimports.ModuleFile, err error) bool {
-				foundPackageFile = err == nil
-				return yield(mf, err)
-			}
-			modimports.PackageFiles(loc.FS, loc.Dir, pkgQual)(yield2)
-		}
-		imports, err := modimports.AllImports(pkgFileIter)
+		imports, err := modimports.AllImports(modimports.PackageFiles(loc.FS, loc.Dir, pkgQual))
 		if err != nil {
 			pkg.err = fmt.Errorf("cannot get imports: %v", err)
 			return
@@ -273,10 +255,6 @@ func (pkgs *Packages) load(ctx context.Context, pkg *Package) {
 		for _, imp := range imports {
 			importsMap[imp] = true
 		}
-	}
-	if !foundPackageFile {
-		pkg.err = fmt.Errorf("no files in package directory with package name %q", pkgQual)
-		return
 	}
 	imports := make([]string, 0, len(importsMap))
 	for imp := range importsMap {
@@ -292,13 +270,13 @@ func (pkgs *Packages) load(ctx context.Context, pkg *Package) {
 	for _, path := range imports {
 		pkg.imports = append(pkg.imports, pkgs.addPkg(ctx, path, importFlags))
 	}
-	pkgs.applyPkgFlags(pkg, PkgImportsLoaded)
+	pkgs.applyPkgFlags(ctx, pkg, PkgImportsLoaded)
 }
 
 // applyPkgFlags updates pkg.flags to set the given flags and propagate the
 // (transitive) effects of those flags, possibly loading or enqueueing further
 // packages as a result.
-func (pkgs *Packages) applyPkgFlags(pkg *Package, flags Flags) {
+func (pkgs *Packages) applyPkgFlags(ctx context.Context, pkg *Package, flags Flags) {
 	if flags == 0 {
 		return
 	}
@@ -324,13 +302,13 @@ func (pkgs *Packages) applyPkgFlags(pkg *Package, flags Flags) {
 		// We have just marked pkg with pkgInAll, or we have just loaded its
 		// imports, or both. Now is the time to propagate pkgInAll to the imports.
 		for _, dep := range pkg.imports {
-			pkgs.applyPkgFlags(dep, PkgInAll)
+			pkgs.applyPkgFlags(ctx, dep, PkgInAll)
 		}
 	}
 
 	if new.has(PkgFromRoot) && !old.has(PkgFromRoot|PkgImportsLoaded) {
 		for _, dep := range pkg.imports {
-			pkgs.applyPkgFlags(dep, PkgFromRoot)
+			pkgs.applyPkgFlags(ctx, dep, PkgFromRoot)
 		}
 	}
 }

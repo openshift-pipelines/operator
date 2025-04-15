@@ -27,7 +27,7 @@ import (
 func DebugStr(x interface{}) (out string) {
 	if n, ok := x.(ast.Node); ok {
 		comments := ""
-		for _, g := range ast.Comments(n) {
+		for _, g := range n.Comments() {
 			comments += DebugStr(g)
 		}
 		if comments != "" {

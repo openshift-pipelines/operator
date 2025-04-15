@@ -21,28 +21,27 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 )
 
-// ReadAll loads the source bytes for the given arguments. If src != nil,
-// ReadAll converts src to a []byte if possible; otherwise it returns an
-// error. If src == nil, ReadAll returns the result of reading the file
+// Read loads the source bytes for the given arguments. If src != nil,
+// Read converts src to a []byte if possible; otherwise it returns an
+// error. If src == nil, readSource returns the result of reading the file
 // specified by filename.
-func ReadAll(filename string, src any) ([]byte, error) {
+func Read(filename string, src interface{}) ([]byte, error) {
 	if src != nil {
-		switch src := src.(type) {
+		switch s := src.(type) {
 		case string:
-			return []byte(src), nil
+			return []byte(s), nil
 		case []byte:
-			return src, nil
+			return s, nil
 		case *bytes.Buffer:
 			// is io.Reader, but src is already available in []byte form
-			if src != nil {
-				return src.Bytes(), nil
+			if s != nil {
+				return s.Bytes(), nil
 			}
 		case io.Reader:
 			var buf bytes.Buffer
-			if _, err := io.Copy(&buf, src); err != nil {
+			if _, err := io.Copy(&buf, s); err != nil {
 				return nil, err
 			}
 			return buf.Bytes(), nil
@@ -50,23 +49,4 @@ func ReadAll(filename string, src any) ([]byte, error) {
 		return nil, fmt.Errorf("invalid source type %T", src)
 	}
 	return os.ReadFile(filename)
-}
-
-// Open creates a source reader for the given arguments. If src != nil,
-// Open converts src to an io.Open if possible; otherwise it returns an
-// error. If src == nil, Open returns the result of opening the file
-// specified by filename.
-func Open(filename string, src any) (io.ReadCloser, error) {
-	if src != nil {
-		switch src := src.(type) {
-		case string:
-			return io.NopCloser(strings.NewReader(src)), nil
-		case []byte:
-			return io.NopCloser(bytes.NewReader(src)), nil
-		case io.Reader:
-			return io.NopCloser(src), nil
-		}
-		return nil, fmt.Errorf("invalid source type %T", src)
-	}
-	return os.Open(filename)
 }

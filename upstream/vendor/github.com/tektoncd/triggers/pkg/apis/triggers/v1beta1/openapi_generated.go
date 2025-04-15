@@ -627,7 +627,8 @@ func schema_pkg_apis_triggers_v1beta1_InterceptorParams(ref common.ReferenceCall
 					},
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSON"),
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1.JSON"),
 						},
 					},
 				},
@@ -1650,7 +1651,8 @@ func schema_pkg_apis_triggers_v1beta1_TriggerTemplateSpec(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1.TriggerResourceTemplate"),
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/tektoncd/triggers/pkg/apis/triggers/v1beta1.TriggerResourceTemplate"),
 									},
 								},
 							},

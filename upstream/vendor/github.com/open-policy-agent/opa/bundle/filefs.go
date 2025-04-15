@@ -26,7 +26,6 @@ type dirLoaderFS struct {
 	root              string
 	pathFormat        PathFormat
 	maxSizeLimitBytes int64
-	followSymlinks    bool
 }
 
 // NewFSLoader returns a basic DirectoryLoader implementation
@@ -68,16 +67,6 @@ func (d *dirLoaderFS) walkDir(path string, dirEntry fs.DirEntry, err error) erro
 			}
 
 			d.files = append(d.files, path)
-		} else if dirEntry.Type()&fs.ModeSymlink != 0 && d.followSymlinks {
-			if d.filter != nil && d.filter(filepath.ToSlash(path), info, getdepth(path, false)) {
-				return nil
-			}
-
-			if d.maxSizeLimitBytes > 0 && info.Size() > d.maxSizeLimitBytes {
-				return fmt.Errorf("file %s size %d exceeds limit of %d", path, info.Size(), d.maxSizeLimitBytes)
-			}
-
-			d.files = append(d.files, path)
 		} else if dirEntry.Type().IsDir() {
 			if d.filter != nil && d.filter(filepath.ToSlash(path), info, getdepth(path, true)) {
 				return fs.SkipDir
@@ -102,11 +91,6 @@ func (d *dirLoaderFS) WithPathFormat(pathFormat PathFormat) DirectoryLoader {
 // WithSizeLimitBytes specifies the maximum size of any file in the filesystem directory to read
 func (d *dirLoaderFS) WithSizeLimitBytes(sizeLimitBytes int64) DirectoryLoader {
 	d.maxSizeLimitBytes = sizeLimitBytes
-	return d
-}
-
-func (d *dirLoaderFS) WithFollowSymlinks(followSymlinks bool) DirectoryLoader {
-	d.followSymlinks = followSymlinks
 	return d
 }
 

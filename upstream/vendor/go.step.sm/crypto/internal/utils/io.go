@@ -2,13 +2,10 @@ package utils
 
 import (
 	"bytes"
-	"io"
 	"os"
 	"unicode"
 
 	"github.com/pkg/errors"
-
-	"go.step.sm/crypto/internal/utils/utfbom"
 )
 
 func maybeUnwrap(err error) error {
@@ -18,32 +15,15 @@ func maybeUnwrap(err error) error {
 	return err
 }
 
-// stdinFilename is the name of the file that is used in many command
-// line utilities to denote input is to be read from STDIN.
-const stdinFilename = "-"
-
-// stdin points to STDIN through os.Stdin.
-var stdin = os.Stdin
-
-// ReadFile reads the file identified by filename and returns
-// the contents. If filename is equal to "-", it will read from
-// STDIN.
-func ReadFile(filename string) (b []byte, err error) {
-	if filename == stdinFilename {
-		filename = "/dev/stdin"
-		b, err = io.ReadAll(stdin)
-	} else {
-		var contents []byte
-		contents, err = os.ReadFile(filename)
-		if err != nil {
-			return nil, errors.Wrapf(maybeUnwrap(err), "error reading %q", filename)
-		}
-		b, err = io.ReadAll(utfbom.SkipOnly(bytes.NewReader(contents)))
-	}
+// ReadFile reads the file named by filename and returns the contents.
+//
+// It wraps os.ReadFile wrapping the errors.
+func ReadFile(filename string) ([]byte, error) {
+	b, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, errors.Wrapf(maybeUnwrap(err), "error reading %q", filename)
+		return nil, errors.Wrapf(maybeUnwrap(err), "error reading %s", filename)
 	}
-	return
+	return b, nil
 }
 
 // ReadPasswordFromFile reads and returns the password from the given filename.

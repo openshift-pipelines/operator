@@ -1,7 +1,6 @@
 package acr
 
 import (
-	"github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -13,14 +12,14 @@ type Credentials struct {
 	ExpireTime time.Time
 }
 
-func (c *Client) GetCredentials(serverURL string, logger *logrus.Logger) (*Credentials, error) {
+func (c *Client) GetCredentials(serverURL string) (*Credentials, error) {
 	registry, err := parseServerURL(serverURL)
 	if err != nil {
 		return nil, err
 	}
 
 	if registry.IsEE {
-		client, err := newEEClient(registry.Region, logger)
+		client, err := newEEClient(registry.Region)
 		if err != nil {
 			return nil, err
 		}
@@ -34,7 +33,7 @@ func (c *Client) GetCredentials(serverURL string, logger *logrus.Logger) (*Crede
 		return client.getCredentials(registry.InstanceId)
 	}
 
-	client, err := newPersonClient(registry.Region, logger)
+	client, err := newPersonClient(registry.Region)
 	if err != nil {
 		return nil, err
 	}

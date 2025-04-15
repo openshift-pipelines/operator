@@ -90,7 +90,7 @@ type eval struct {
 	builtinCache           builtins.Cache
 	ndBuiltinCache         builtins.NDBCache
 	functionMocks          *functionMocksStack
-	virtualCache           VirtualCache
+	virtualCache           *virtualCache
 	comprehensionCache     *comprehensionCache
 	interQueryBuiltinCache cache.InterQueryCache
 	saveSet                *saveSet
@@ -237,10 +237,6 @@ func (e *eval) traceWasm(x ast.Node, target *ast.Ref) {
 	e.traceEvent(WasmOp, x, "", target)
 }
 
-func (e *eval) traceUnify(a, b *ast.Term) {
-	e.traceEvent(UnifyOp, ast.Equality.Expr(a, b), "", nil)
-}
-
 func (e *eval) traceEvent(op Op, x ast.Node, msg string, target *ast.Ref) {
 
 	if !e.traceEnabled {
@@ -279,7 +275,6 @@ func (e *eval) traceEvent(op Op, x ast.Node, msg string, target *ast.Ref) {
 
 		evt.Locals = ast.NewValueMap()
 		evt.LocalMetadata = map[ast.Var]VarMetadata{}
-		evt.localVirtualCacheSnapshot = ast.NewValueMap()
 
 		_ = e.bindings.Iter(nil, func(k, v *ast.Term) error {
 			original := k.Value.(ast.Var)
@@ -295,20 +290,14 @@ func (e *eval) traceEvent(op Op, x ast.Node, msg string, target *ast.Ref) {
 		}) // cannot return error
 
 		ast.WalkTerms(x, func(term *ast.Term) bool {
-			switch x := term.Value.(type) {
-			case ast.Var:
-				if _, ok := evt.LocalMetadata[x]; !ok {
-					if rewritten, ok := e.rewrittenVar(x); ok {
-						evt.LocalMetadata[x] = VarMetadata{
+			if v, ok := term.Value.(ast.Var); ok {
+				if _, ok := evt.LocalMetadata[v]; !ok {
+					if rewritten, ok := e.rewrittenVar(v); ok {
+						evt.LocalMetadata[v] = VarMetadata{
 							Name:     rewritten,
 							Location: term.Loc(),
 						}
 					}
-				}
-			case ast.Ref:
-				groundRef := x.GroundPrefix()
-				if v, _ := e.virtualCache.Get(groundRef); v != nil {
-					evt.localVirtualCacheSnapshot.Put(groundRef, v.Value)
 				}
 			}
 			return false
@@ -418,9 +407,15 @@ func (e *eval) evalStep(iter evalIterator) error {
 		})
 	case *ast.Every:
 		eval := evalEvery{
-			Every: terms,
-			e:     e,
-			expr:  expr,
+			e:    e,
+			expr: expr,
+			generator: ast.NewBody(
+				ast.Equality.Expr(
+					ast.RefTerm(terms.Domain, terms.Key).SetLocation(terms.Domain.Location),
+					terms.Value,
+				).SetLocation(terms.Domain.Location),
+			),
+			body: terms.Body,
 		}
 		err = eval.eval(func() error {
 			defined = true
@@ -869,7 +864,7 @@ func (e *eval) biunify(a, b *ast.Term, b1, b2 *bindings, iter unifyIterator) err
 	a, b1 = b1.apply(a)
 	b, b2 = b2.apply(b)
 	if e.traceEnabled {
-		e.traceUnify(a, b)
+		e.traceEvent(UnifyOp, ast.Equality.Expr(a, b), "", nil)
 	}
 	switch vA := a.Value.(type) {
 	case ast.Var, ast.Ref, *ast.ArrayComprehension, *ast.SetComprehension, *ast.ObjectComprehension:
@@ -1107,9 +1102,9 @@ func (e *eval) biunifyComprehension(a, b *ast.Term, b1, b2 *bindings, swap bool,
 		return err
 	} else if value != nil {
 		return e.biunify(value, b, b1, b2, iter)
+	} else {
+		e.instr.counterIncr(evalOpComprehensionCacheMiss)
 	}
-
-	e.instr.counterIncr(evalOpComprehensionCacheMiss)
 
 	switch a := a.Value.(type) {
 	case *ast.ArrayComprehension:
@@ -2407,15 +2402,6 @@ type evalVirtualPartialCacheHint struct {
 	full bool
 }
 
-func (h *evalVirtualPartialCacheHint) keyWithoutScope() ast.Ref {
-	if h.key != nil {
-		if _, ok := h.key[len(h.key)-1].Value.(vcKeyScope); ok {
-			return h.key[:len(h.key)-1]
-		}
-	}
-	return h.key
-}
-
 func (e evalVirtualPartial) eval(iter unifyIterator) error {
 
 	unknown := e.e.unknown(e.ref[:e.pos+1], e.bindings)
@@ -2494,7 +2480,7 @@ func (e evalVirtualPartial) evalEachRule(iter unifyIterator, unknown bool) error
 	}
 
 	if hint.key != nil {
-		if v, err := result.Value.Find(hint.keyWithoutScope()[e.pos+1:]); err == nil && v != nil {
+		if v, err := result.Value.Find(hint.key[e.pos+1:]); err == nil && v != nil {
 			e.e.virtualCache.Put(hint.key, ast.NewTerm(v))
 		}
 	}
@@ -2580,7 +2566,7 @@ func (e evalVirtualPartial) evalOneRulePreUnify(iter unifyIterator, rule *ast.Ru
 	}
 
 	// Walk the dynamic portion of rule ref and key to unify vars
-	err := child.biunifyRuleHead(e.pos+1, e.ref, rule, e.bindings, child.bindings, func(_ int) error {
+	err := child.biunifyRuleHead(e.pos+1, e.ref, rule, e.bindings, child.bindings, func(pos int) error {
 		defined = true
 		return child.eval(func(child *eval) error {
 
@@ -2668,7 +2654,7 @@ func (e evalVirtualPartial) evalOneRulePostUnify(iter unifyIterator, rule *ast.R
 
 	err := child.eval(func(child *eval) error {
 		defined = true
-		return e.e.biunifyRuleHead(e.pos+1, e.ref, rule, e.bindings, child.bindings, func(_ int) error {
+		return e.e.biunifyRuleHead(e.pos+1, e.ref, rule, e.bindings, child.bindings, func(pos int) error {
 			return e.evalOneRuleContinue(iter, rule, child)
 		})
 	})
@@ -2744,7 +2730,7 @@ func (e evalVirtualPartial) partialEvalSupport(iter unifyIterator) error {
 	return e.e.saveUnify(term, e.rterm, e.bindings, e.rbindings, iter)
 }
 
-func (e evalVirtualPartial) partialEvalSupportRule(rule *ast.Rule, _ ast.Ref) (bool, error) {
+func (e evalVirtualPartial) partialEvalSupportRule(rule *ast.Rule, path ast.Ref) (bool, error) {
 
 	child := e.e.child(rule.Body)
 	child.traceEnter(rule)
@@ -2841,8 +2827,6 @@ func (e evalVirtualPartial) evalCache(iter unifyIterator) (evalVirtualPartialCac
 	plugged := e.bindings.Plug(e.ref[e.pos+1])
 
 	if _, ok := plugged.Value.(ast.Var); ok {
-		// Note: we might have additional opportunity to optimize here, if we consider that ground values
-		// right of e.pos could create a smaller eval "scope" through ref bi-unification before evaluating rules.
 		hint.full = true
 		hint.key = e.plugged[:e.pos+1]
 		e.e.instr.counterIncr(evalOpVirtualCacheMiss)
@@ -2851,161 +2835,25 @@ func (e evalVirtualPartial) evalCache(iter unifyIterator) (evalVirtualPartialCac
 
 	m := maxRefLength(e.ir.Rules, len(e.ref))
 
-	// Creating the hint key by walking the ref and plugging vars until we hit a non-ground term.
-	// Any ground term right of this point will affect the scope of evaluation by ref unification,
-	// so we create a virtual-cache scope key to qualify the result stored in the cache.
-	//
-	// E.g. given the following rule:
-	//
-	//   package example
-	//
-	//   a[x][y][z] := x + y + z if {
-	//     some x in [1, 2]
-	//     some y in [3, 4]
-	//     some z in [5, 6]
-	//   }
-	//
-	// and the following ref (1):
-	//
-	//   data.example.a[1][_][5]
-	//
-	// then the hint key will be:
-	//
-	//   data.example.a[1][<_,5>]
-	//
-	// where <_,5> is the scope of the pre-eval unification.
-	// This part does not contribute to the "location" of the cached data.
-	//
-	// The following ref (2):
-	//
-	//   data.example.a[1][_][6]
-	//
-	// will produce the same hint key "location" 'data.example.a[1]', but a different scope component
-	// '<_,6>', which will create a different entry in the cache.
-	scoping := false
-	hintKeyEnd := 0
 	for i := e.pos + 1; i < m; i++ {
 		plugged = e.bindings.Plug(e.ref[i])
 
-		if plugged.IsGround() && !scoping {
-			hintKeyEnd = i
-			hint.key = append(e.plugged[:i], plugged)
-		} else {
-			scoping = true
-			hl := len(hint.key)
-			if hl == 0 {
-				break
-			}
-			if scope, ok := hint.key[hl-1].Value.(vcKeyScope); ok {
-				scope.Ref = append(scope.Ref, plugged)
-				hint.key[len(hint.key)-1] = ast.NewTerm(scope)
-			} else {
-				scope = vcKeyScope{}
-				scope.Ref = append(scope.Ref, plugged)
-				hint.key = append(hint.key, ast.NewTerm(scope))
-			}
+		if !plugged.IsGround() {
+			break
 		}
+
+		hint.key = append(e.plugged[:i], plugged)
 
 		if cached, _ := e.e.virtualCache.Get(hint.key); cached != nil {
 			e.e.instr.counterIncr(evalOpVirtualCacheHit)
 			hint.hit = true
-			return hint, e.evalTerm(iter, hintKeyEnd+1, cached, e.bindings)
-		}
-	}
-
-	if hl := len(hint.key); hl > 0 {
-		if scope, ok := hint.key[hl-1].Value.(vcKeyScope); ok {
-			scope = scope.reduce()
-			if scope.empty() {
-				hint.key = hint.key[:hl-1]
-			} else {
-				hint.key[hl-1].Value = scope
-			}
+			return hint, e.evalTerm(iter, i+1, cached, e.bindings)
 		}
 	}
 
 	e.e.instr.counterIncr(evalOpVirtualCacheMiss)
 
 	return hint, nil
-}
-
-// vcKeyScope represents the scoping that pre-rule-eval ref unification imposes on a virtual cache entry.
-type vcKeyScope struct {
-	ast.Ref
-}
-
-func (q vcKeyScope) Compare(other ast.Value) int {
-	if q2, ok := other.(vcKeyScope); ok {
-		r1 := q.Ref
-		r2 := q2.Ref
-		if len(r1) != len(r2) {
-			return -1
-		}
-
-		for i := range r1 {
-			_, v1IsVar := r1[i].Value.(ast.Var)
-			_, v2IsVar := r2[i].Value.(ast.Var)
-			if v1IsVar && v2IsVar {
-				continue
-			}
-			if r1[i].Value.Compare(r2[i].Value) != 0 {
-				return -1
-			}
-		}
-
-		return 0
-	}
-	return 1
-}
-
-func (vcKeyScope) Find(ast.Ref) (ast.Value, error) {
-	return nil, nil
-}
-
-func (q vcKeyScope) Hash() int {
-	var hash int
-	for _, v := range q.Ref {
-		if _, ok := v.Value.(ast.Var); ok {
-			// all vars are equal
-			hash++
-		} else {
-			hash += v.Value.Hash()
-		}
-	}
-	return hash
-}
-
-func (q vcKeyScope) IsGround() bool {
-	return false
-}
-
-func (q vcKeyScope) String() string {
-	buf := make([]string, 0, len(q.Ref))
-	for _, t := range q.Ref {
-		if _, ok := t.Value.(ast.Var); ok {
-			buf = append(buf, "_")
-		} else {
-			buf = append(buf, t.String())
-		}
-	}
-	return fmt.Sprintf("<%s>", strings.Join(buf, ","))
-}
-
-// reduce removes vars from the tail of the ref.
-func (q vcKeyScope) reduce() vcKeyScope {
-	ref := q.Ref.Copy()
-	var i int
-	for i = len(q.Ref) - 1; i >= 0; i-- {
-		if _, ok := q.Ref[i].Value.(ast.Var); !ok {
-			break
-		}
-	}
-	ref = ref[:i+1]
-	return vcKeyScope{ref}
-}
-
-func (q vcKeyScope) empty() bool {
-	return len(q.Ref) == 0
 }
 
 func getNestedObject(ref ast.Ref, rootObj *ast.Object, b *bindings, l *ast.Location) (*ast.Object, error) {
@@ -3542,32 +3390,19 @@ func (e evalTerm) save(iter unifyIterator) error {
 }
 
 type evalEvery struct {
-	*ast.Every
-	e    *eval
-	expr *ast.Expr
+	e         *eval
+	expr      *ast.Expr
+	generator ast.Body
+	body      ast.Body
 }
 
 func (e evalEvery) eval(iter unifyIterator) error {
 	// unknowns in domain or body: save the expression, PE its body
-	if e.e.unknown(e.Domain, e.e.bindings) || e.e.unknown(e.Body, e.e.bindings) {
+	if e.e.unknown(e.generator, e.e.bindings) || e.e.unknown(e.body, e.e.bindings) {
 		return e.save(iter)
 	}
 
-	if pd := e.e.bindings.Plug(e.Domain); pd != nil {
-		if !isIterableValue(pd.Value) {
-			e.e.traceFail(e.expr)
-			return nil
-		}
-	}
-
-	generator := ast.NewBody(
-		ast.Equality.Expr(
-			ast.RefTerm(e.Domain, e.Key).SetLocation(e.Domain.Location),
-			e.Value,
-		).SetLocation(e.Domain.Location),
-	)
-
-	domain := e.e.closure(generator)
+	domain := e.e.closure(e.generator)
 	all := true // all generator evaluations yield one successful body evaluation
 
 	domain.traceEnter(e.expr)
@@ -3578,14 +3413,14 @@ func (e evalEvery) eval(iter unifyIterator) error {
 			// This would do extra work, like iterating needlessly if domain was a large array.
 			return nil
 		}
-		body := child.closure(e.Body)
+		body := child.closure(e.body)
 		body.findOne = true
-		body.traceEnter(e.Body)
+		body.traceEnter(e.body)
 		done := false
 		err := body.eval(func(*eval) error {
-			body.traceExit(e.Body)
+			body.traceExit(e.body)
 			done = true
-			body.traceRedo(e.Body)
+			body.traceRedo(e.body)
 			return nil
 		})
 		if !done {
@@ -3609,15 +3444,6 @@ func (e evalEvery) eval(iter unifyIterator) error {
 	}
 	domain.traceFail(e.expr)
 	return nil
-}
-
-// isIterableValue returns true if the AST value is an iterable type.
-func isIterableValue(x ast.Value) bool {
-	switch x.(type) {
-	case *ast.Array, ast.Object, ast.Set:
-		return true
-	}
-	return false
 }
 
 func (e *evalEvery) save(iter unifyIterator) error {

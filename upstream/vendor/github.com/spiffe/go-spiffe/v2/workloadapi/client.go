@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/spiffe/go-spiffe/v2/bundle/jwtbundle"
@@ -255,7 +256,7 @@ func (c *Client) ValidateJWTSVID(ctx context.Context, token, audience string) (*
 func (c *Client) newConn(ctx context.Context) (*grpc.ClientConn, error) {
 	c.config.dialOptions = append(c.config.dialOptions, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	c.appendDialOptionsOS()
-	return grpc.DialContext(ctx, c.config.address, c.config.dialOptions...) //nolint:staticcheck // preserve backcompat with WithDialOptions option
+	return grpc.DialContext(ctx, c.config.address, c.config.dialOptions...)
 }
 
 func (c *Client) handleWatchError(ctx context.Context, err error, backoff *backoff) error {
@@ -487,6 +488,9 @@ func parseX509Bundle(spiffeID string, bundle []byte) (*x509bundle.Bundle, error)
 	certs, err := x509.ParseCertificates(bundle)
 	if err != nil {
 		return nil, err
+	}
+	if len(certs) == 0 {
+		return nil, fmt.Errorf("empty X.509 bundle for trust domain %q", td)
 	}
 	return x509bundle.FromX509Authorities(td, certs), nil
 }

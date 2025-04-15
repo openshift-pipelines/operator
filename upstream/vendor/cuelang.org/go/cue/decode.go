@@ -16,11 +16,10 @@ package cue
 
 import (
 	"bytes"
-	"cmp"
 	"encoding"
 	"encoding/json"
 	"reflect"
-	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -102,7 +101,7 @@ func (d *decoder) decode(x reflect.Value, v Value, isPtr bool) {
 	switch x.Kind() {
 	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Interface:
 		// nullable types
-		if v.IsNull() || !v.IsConcrete() {
+		if v.Null() == nil || !v.IsConcrete() {
 			d.clear(x)
 			return
 		}
@@ -115,7 +114,7 @@ func (d *decoder) decode(x reflect.Value, v Value, isPtr bool) {
 		}
 	}
 
-	ij, it, x := indirect(x, v.IsNull())
+	ij, it, x := indirect(x, v.Null() == nil)
 
 	if ij != nil {
 		b, err := v.marshalJSON()
@@ -489,16 +488,19 @@ type goField struct {
 	omitEmpty bool
 }
 
-func compareFieldByIndex(a, b goField) int {
-	for i, x := range a.index {
-		if i >= len(b.index) {
-			break
+// byIndex sorts goField by index sequence.
+type byIndex []goField
+
+func (x byIndex) Less(i, j int) bool {
+	for k, xik := range x[i].index {
+		if k >= len(x[j].index) {
+			return false
 		}
-		if c := cmp.Compare(x, b.index[i]); c != 0 {
-			return c
+		if xik != x[j].index[k] {
+			return xik < x[j].index[k]
 		}
 	}
-	return cmp.Compare(len(a.index), len(b.index))
+	return len(x[i].index) < len(x[j].index)
 }
 
 // typeFields returns a list of fields that JSON should recognize for the given type.
@@ -612,24 +614,21 @@ func typeFields(t reflect.Type) structFields {
 		}
 	}
 
-	slices.SortFunc(fields, func(a, b goField) int {
+	sort.Slice(fields, func(i, j int) bool {
+		x := fields
 		// sort field by name, breaking ties with depth, then
 		// breaking ties with "name came from json tag", then
 		// breaking ties with index sequence.
-		if c := cmp.Compare(a.name, b.name); c != 0 {
-			return c
+		if x[i].name != x[j].name {
+			return x[i].name < x[j].name
 		}
-		if c := cmp.Compare(len(a.index), len(b.index)); c != 0 {
-			return c
+		if len(x[i].index) != len(x[j].index) {
+			return len(x[i].index) < len(x[j].index)
 		}
-		if a.tag != b.tag {
-			if a.tag {
-				return 1
-			} else {
-				return -1
-			}
+		if x[i].tag != x[j].tag {
+			return x[i].tag
 		}
-		return compareFieldByIndex(a, b)
+		return byIndex(x).Less(i, j)
 	})
 
 	// Delete all fields that are hidden by the Go rules for embedded fields,
@@ -661,7 +660,7 @@ func typeFields(t reflect.Type) structFields {
 	}
 
 	fields = out
-	slices.SortFunc(fields, compareFieldByIndex)
+	sort.Slice(fields, byIndex(fields).Less)
 
 	nameIndex := make(map[string]int, len(fields))
 	for i, field := range fields {

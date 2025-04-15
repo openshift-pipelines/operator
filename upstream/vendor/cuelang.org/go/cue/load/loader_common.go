@@ -16,20 +16,20 @@ package load
 
 import (
 	"bytes"
-	"cmp"
 	pathpkg "path"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
+	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
+	"cuelang.org/go/internal"
 )
 
 // An importMode controls the behavior of the Import method.
@@ -43,7 +43,6 @@ const (
 	importComment importMode = 1 << iota
 
 	allowAnonymous
-	allowExcludedFiles
 )
 
 func rewriteFiles(p *build.Instance, root string, isLocal bool) {
@@ -59,16 +58,16 @@ func rewriteFiles(p *build.Instance, root string, isLocal bool) {
 // normalizeFiles sorts the files so that files contained by a parent directory
 // always come before files contained in sub-directories, and that filenames in
 // the same directory are sorted lexically byte-wise, like Go's `<` operator.
-func normalizeFiles(files []*build.File) {
-	slices.SortFunc(files, func(a, b *build.File) int {
-		fa := a.Filename
-		fb := b.Filename
-		ca := strings.Count(fa, string(filepath.Separator))
-		cb := strings.Count(fb, string(filepath.Separator))
-		if c := cmp.Compare(ca, cb); c != 0 {
-			return c
+func normalizeFiles(a []*build.File) {
+	sort.Slice(a, func(i, j int) bool {
+		fi := a[i].Filename
+		fj := a[j].Filename
+		ci := strings.Count(fi, string(filepath.Separator))
+		cj := strings.Count(fj, string(filepath.Separator))
+		if ci != cj {
+			return ci < cj
 		}
-		return cmp.Compare(fa, fb)
+		return fi < fj
 	})
 }
 
@@ -103,6 +102,7 @@ type fileProcessor struct {
 	firstCommentFile string
 	imported         map[string][]token.Pos
 	allTags          map[string]bool
+	allFiles         bool
 	ignoreOther      bool // ignore files from other packages
 	allPackages      bool
 
@@ -161,15 +161,14 @@ func (fp *fileProcessor) finalize(p *build.Instance) errors.Error {
 	return nil
 }
 
-// add adds the given file to the appropriate package in fp.
 func (fp *fileProcessor) add(root string, file *build.File, mode importMode) (added bool) {
 	fullPath := file.Filename
 	if fullPath != "-" {
 		if !filepath.IsAbs(fullPath) {
 			fullPath = filepath.Join(root, fullPath)
 		}
-		file.Filename = fullPath
 	}
+	file.Filename = fullPath
 
 	base := filepath.Base(fullPath)
 
@@ -183,11 +182,8 @@ func (fp *fileProcessor) add(root string, file *build.File, mode importMode) (ad
 		p.InvalidFiles = append(p.InvalidFiles, file)
 		return true
 	}
-	if err := setFileSource(fp.c, file); err != nil {
-		return badFile(errors.Promote(err, ""))
-	}
 
-	match, data, err := matchFile(fp.c, file, true, fp.allTags, mode)
+	match, data, err := matchFile(fp.c, file, true, fp.allFiles, fp.allTags)
 	switch {
 	case match:
 
@@ -209,17 +205,16 @@ func (fp *fileProcessor) add(root string, file *build.File, mode importMode) (ad
 		return false
 	}
 
-	pf, perr := parser.ParseFile(fullPath, data, parser.ImportsOnly)
+	pf, perr := parser.ParseFile(fullPath, data, parser.ImportsOnly, parser.ParseComments)
 	if perr != nil {
 		badFile(errors.Promote(perr, "add failed"))
 		return true
 	}
 
-	pkg := pf.PackageName()
+	_, pkg, pos := internal.PackageInfo(pf)
 	if pkg == "" {
 		pkg = "_"
 	}
-	pos := pf.Pos()
 
 	switch {
 	case pkg == p.PkgName, mode&allowAnonymous != 0:
@@ -248,7 +243,7 @@ func (fp *fileProcessor) add(root string, file *build.File, mode importMode) (ad
 	}
 
 	if !fp.c.AllCUEFiles {
-		if err := shouldBuildFile(pf, fp.tagger); err != nil {
+		if err := shouldBuildFile(pf, fp); err != nil {
 			if !errors.Is(err, errExclude) {
 				fp.err = errors.Append(fp.err, err)
 			}
@@ -269,13 +264,11 @@ func (fp *fileProcessor) add(root string, file *build.File, mode importMode) (ad
 				p.IgnoredFiles = append(p.IgnoredFiles, file)
 				return false
 			}
-			if !fp.allPackages {
-				return badFile(&MultiplePackageError{
-					Dir:      p.Dir,
-					Packages: []string{p.PkgName, pkg},
-					Files:    []string{fp.firstFile, base},
-				})
-			}
+			return badFile(&MultiplePackageError{
+				Dir:      p.Dir,
+				Packages: []string{p.PkgName, pkg},
+				Files:    []string{fp.firstFile, base},
+			})
 		}
 	}
 
@@ -283,7 +276,7 @@ func (fp *fileProcessor) add(root string, file *build.File, mode importMode) (ad
 	isTool := strings.HasSuffix(base, "_tool"+cueSuffix)
 
 	if mode&importComment != 0 {
-		qcom, line := findImportComment(data)
+		qcom, line := findimportComment(data)
 		if line != 0 {
 			com, err := strconv.Unquote(qcom)
 			if err != nil {
@@ -297,17 +290,23 @@ func (fp *fileProcessor) add(root string, file *build.File, mode importMode) (ad
 		}
 	}
 
-	for _, spec := range pf.Imports {
-		quoted := spec.Path.Value
-		path, err := strconv.Unquote(quoted)
-		if err != nil {
-			badFile(errors.Newf(
-				spec.Path.Pos(),
-				"%s: parser returned invalid quoted string: <%s>", fullPath, quoted,
-			))
+	for _, decl := range pf.Decls {
+		d, ok := decl.(*ast.ImportDecl)
+		if !ok {
+			continue
 		}
-		if !isTest || fp.c.Tests {
-			fp.imported[path] = append(fp.imported[path], spec.Pos())
+		for _, spec := range d.Specs {
+			quoted := spec.Path.Value
+			path, err := strconv.Unquote(quoted)
+			if err != nil {
+				badFile(errors.Newf(
+					spec.Path.Pos(),
+					"%s: parser returned invalid quoted string: <%s>", fullPath, quoted,
+				))
+			}
+			if !isTest || fp.c.Tests {
+				fp.imported[path] = append(fp.imported[path], spec.Pos())
+			}
 		}
 	}
 	switch {
@@ -333,7 +332,7 @@ func (fp *fileProcessor) add(root string, file *build.File, mode importMode) (ad
 	return true
 }
 
-func findImportComment(data []byte) (s string, line int) {
+func findimportComment(data []byte) (s string, line int) {
 	// expect keyword package
 	word, data := parseWord(data)
 	if string(word) != "package" {
@@ -442,7 +441,8 @@ func isLocalImport(path string) bool {
 func warnUnmatched(matches []*match) {
 	for _, m := range matches {
 		if len(m.Pkgs) == 0 {
-			m.Err = errors.Newf(token.NoPos, "cue: %q matched no packages", m.Pattern)
+			m.Err =
+				errors.Newf(token.NoPos, "cue: %q matched no packages\n", m.Pattern)
 		}
 	}
 }
@@ -463,13 +463,13 @@ func cleanPatterns(patterns []string) []string {
 			a = strings.Replace(a, `\`, `/`, -1)
 		}
 
-		// Put argument in canonical form, but preserve leading "./".
+		// Put argument in canonical form, but preserve leading ./.
 		if strings.HasPrefix(a, "./") {
 			a = "./" + pathpkg.Clean(a)
 			if a == "./." {
 				a = "."
 			}
-		} else if a != "" {
+		} else {
 			a = pathpkg.Clean(a)
 		}
 		out = append(out, a)
@@ -478,8 +478,6 @@ func cleanPatterns(patterns []string) []string {
 }
 
 // isMetaPackage checks if name is a reserved package name that expands to multiple packages.
-// TODO: none of these package names are actually recognized anywhere else
-// and at least one (cmd) doesn't seem like it belongs in the CUE world.
 func isMetaPackage(name string) bool {
 	return name == "std" || name == "cmd" || name == "all"
 }

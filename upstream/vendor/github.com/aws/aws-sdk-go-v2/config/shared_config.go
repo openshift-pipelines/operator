@@ -115,9 +115,6 @@ const (
 	requestMinCompressionSizeBytes = "request_min_compression_size_bytes"
 
 	s3DisableExpressSessionAuthKey = "s3_disable_express_session_auth"
-
-	accountIDKey          = "aws_account_id"
-	accountIDEndpointMode = "account_id_endpoint_mode"
 )
 
 // defaultSharedConfigProfile allows for swapping the default profile for testing
@@ -344,8 +341,6 @@ type SharedConfig struct {
 	// will only bypass the modified endpoint routing and signing behaviors
 	// associated with the feature.
 	S3DisableExpressAuth *bool
-
-	AccountIDEndpointMode aws.AccountIDEndpointMode
 }
 
 func (c SharedConfig) getDefaultsMode(ctx context.Context) (value aws.DefaultsMode, ok bool, err error) {
@@ -1129,17 +1124,12 @@ func (c *SharedConfig) setFromIniSection(profile string, section ini.Section) er
 		return fmt.Errorf("failed to load %s from shared config, %w", requestMinCompressionSizeBytes, err)
 	}
 
-	if err := updateAIDEndpointMode(&c.AccountIDEndpointMode, section, accountIDEndpointMode); err != nil {
-		return fmt.Errorf("failed to load %s from shared config, %w", accountIDEndpointMode, err)
-	}
-
 	// Shared Credentials
 	creds := aws.Credentials{
 		AccessKeyID:     section.String(accessKeyIDKey),
 		SecretAccessKey: section.String(secretAccessKey),
 		SessionToken:    section.String(sessionTokenKey),
 		Source:          fmt.Sprintf("SharedConfigCredentials: %s", section.SourceFile[accessKeyIDKey]),
-		AccountID:       section.String(accountIDKey),
 	}
 
 	if creds.HasKeys() {
@@ -1187,26 +1177,6 @@ func updateDisableRequestCompression(disable **bool, sec ini.Section, key string
 	return nil
 }
 
-func updateAIDEndpointMode(m *aws.AccountIDEndpointMode, sec ini.Section, key string) error {
-	if !sec.Has(key) {
-		return nil
-	}
-
-	v := sec.String(key)
-	switch v {
-	case "preferred":
-		*m = aws.AccountIDEndpointModePreferred
-	case "required":
-		*m = aws.AccountIDEndpointModeRequired
-	case "disabled":
-		*m = aws.AccountIDEndpointModeDisabled
-	default:
-		return fmt.Errorf("invalid value for shared config profile field, %s=%s, must be preferred/required/disabled", key, v)
-	}
-
-	return nil
-}
-
 func (c SharedConfig) getRequestMinCompressSizeBytes(ctx context.Context) (int64, bool, error) {
 	if c.RequestMinCompressSizeBytes == nil {
 		return 0, false, nil
@@ -1219,10 +1189,6 @@ func (c SharedConfig) getDisableRequestCompression(ctx context.Context) (bool, b
 		return false, false, nil
 	}
 	return *c.DisableRequestCompression, true, nil
-}
-
-func (c SharedConfig) getAccountIDEndpointMode(ctx context.Context) (aws.AccountIDEndpointMode, bool, error) {
-	return c.AccountIDEndpointMode, len(c.AccountIDEndpointMode) > 0, nil
 }
 
 func updateDefaultsMode(mode *aws.DefaultsMode, section ini.Section, key string) error {

@@ -16,11 +16,8 @@ limitations under the License.
 
 package pipeline
 
-import "time"
-
 // Options holds options passed to the Tekton Pipeline controllers
 // typically via command-line flags.
 type Options struct {
-	Images       Images
-	ResyncPeriod time.Duration
+	Images Images
 }

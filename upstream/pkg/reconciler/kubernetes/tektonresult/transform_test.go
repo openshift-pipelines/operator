@@ -40,9 +40,8 @@ func Test_enablePVCLogging(t *testing.T) {
 	deployment := &appsv1.Deployment{}
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(manifest.Resources()[0].Object, deployment)
 	assert.NilError(t, err)
-	logsAPI := true
 	prop := v1alpha1.ResultsAPIProperties{
-		LogsAPI:        &logsAPI,
+		LogsAPI:        true,
 		LogsType:       "File",
 		LogsPath:       "logs",
 		LoggingPVCName: "tekton-logs",
@@ -63,43 +62,29 @@ func Test_updateApiConfig(t *testing.T) {
 	manifest, err := mf.ManifestFrom(mf.Recursive(testData))
 	assert.NilError(t, err)
 
-	boolVal := true
-	intVal := int64(12345)
-	limit := uint(100)
 	cm := &corev1.ConfigMap{}
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(manifest.Resources()[0].Object, cm)
 	assert.NilError(t, err)
-	bufferDuration := uint(20)
-	spec := v1alpha1.TektonResultSpec{
-		LokiStackProperties: v1alpha1.LokiStackProperties{
-			LokiStackName:      "foo",
-			LokiStackNamespace: "bar",
-		},
-		ResultsAPIProperties: v1alpha1.ResultsAPIProperties{
-			DBHost:                              "localhost",
-			DBName:                              "test",
-			ServerPort:                          &intVal,
-			DBSSLMode:                           "enable",
-			DBSSLRootCert:                       "/etc/tls/db/ca.crt",
-			DBEnableAutoMigration:               &boolVal,
-			TLSHostnameOverride:                 "localhostTest",
-			AuthDisable:                         &boolVal,
-			AuthImpersonate:                     &boolVal,
-			PrometheusPort:                      &intVal,
-			PrometheusHistogram:                 &boolVal,
-			LogLevel:                            "warn",
-			LogsAPI:                             &boolVal,
-			LogsPath:                            "/logs/test",
-			LogsType:                            "s3",
-			LogsBufferSize:                      &intVal,
-			StorageEmulatorHost:                 "http://localhost:9004",
-			LoggingPluginForwarderDelayDuration: &bufferDuration,
-			LoggingPluginQueryLimit:             &limit,
-			LoggingPluginQueryParams:            "direction=asc&skip=0",
-		},
+	prop := v1alpha1.ResultsAPIProperties{
+		DBHost:                "localhost",
+		DBName:                "test",
+		DBPort:                5432,
+		ServerPort:            12345,
+		PrometheusPort:        12347,
+		DBSSLMode:             "enable",
+		DBEnableAutoMigration: true,
+		TLSHostnameOverride:   "localhostTest",
+		AuthDisable:           true,
+		AuthImpersonate:       true,
+		LogLevel:              "warn",
+		LogsAPI:               true,
+		LogsPath:              "/logs/test",
+		LogsType:              "s3",
+		LogsBufferSize:        12321,
+		StorageEmulatorHost:   "http://localhost:9004",
 	}
 
-	manifest, err = manifest.Transform(updateApiConfig(spec))
+	manifest, err = manifest.Transform(updateApiConfig(prop))
 	assert.NilError(t, err)
 
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(manifest.Resources()[0].Object, cm)
@@ -108,36 +93,24 @@ func Test_updateApiConfig(t *testing.T) {
 	assert.Equal(t, cm.Data["config"], `DB_HOST=localhost
 DB_PORT=5432
 SERVER_PORT=12345
-PROMETHEUS_PORT=12345
-PROMETHEUS_HISTOGRAM=true
+PROMETHEUS_PORT=12347
 DB_NAME=test
 DB_SSLMODE=enable
-DB_SSLROOTCERT=/etc/tls/db/ca.crt
 DB_ENABLE_AUTO_MIGRATION=true
 TLS_HOSTNAME_OVERRIDE=localhostTest
 TLS_PATH=/etc/tls
 AUTH_DISABLE=true
 AUTH_IMPERSONATE=true
 LOG_LEVEL=warn
-LOGGING_PLUGIN_API_URL=https://foo-gateway-http.bar.svc.cluster.local:8080
-LOGGING_PLUGIN_FORWARDER_DELAY_DURATION=20
-LOGGING_PLUGIN_NAMESPACE_KEY=kubernetes_namespace_name
-LOGGING_PLUGIN_PROXY_PATH=/api/logs/v1/application
-LOGGING_PLUGIN_STATIC_LABELS=log_type=application
-LOGGING_PLUGIN_TLS_VERIFICATION_DISABLE=false
-LOGGING_PLUGIN_TOKEN_PATH=/var/run/secrets/kubernetes.io/serviceaccount/token
 LOGS_API=true
 LOGS_TYPE=s3
-LOGS_BUFFER_SIZE=12345
+LOGS_BUFFER_SIZE=12321
 LOGS_PATH=/logs/test
-LOGGING_PLUGIN_QUERY_LIMIT=100
-LOGGING_PLUGIN_QUERY_PARAMS=direction=asc&skip=0
 STORAGE_EMULATOR_HOST=http://localhost:9004`)
 }
 
 func Test_GoogleCred(t *testing.T) {
 	testData := []string{path.Join("testdata", "api-deployment-gcs.yaml"), path.Join("testdata", "api-deployment.yaml")}
-	logsAPI := true
 	for i := range testData {
 		manifest, err := mf.ManifestFrom(mf.Recursive(testData[i]))
 		assert.NilError(t, err)
@@ -146,7 +119,7 @@ func Test_GoogleCred(t *testing.T) {
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(manifest.Resources()[0].Object, deployment)
 		assert.NilError(t, err)
 		prop := v1alpha1.ResultsAPIProperties{
-			LogsAPI:            &logsAPI,
+			LogsAPI:            true,
 			LogsType:           "GCS",
 			GCSCredsSecretName: "foo-test",
 			GCSCredsSecretKey:  "bar-test",

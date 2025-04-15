@@ -35,6 +35,7 @@ spec:
   enable-param-enum: false
   enable-provenance-in-status: true
   enable-step-actions: false
+  enable-tekton-oci-bundles: false
   enforce-nonfalsifiability: none
   keep-pod-on-cancel: false
   max-result-size: 4096
@@ -46,6 +47,7 @@ spec:
   require-git-ssh-secret-known-hosts: false
   results-from: termination-message
   running-in-environment-with-injected-sidecars: true
+  scope-when-expressions-to-task: false
   send-cloudevents-for-runs: false
   set-security-context: false
   trusted-resources-verification-no-match-policy: ignore
@@ -56,11 +58,6 @@ spec:
     threads-per-controller: 2
     kube-api-qps: 5.0
     kube-api-burst: 10
-    statefulset-ordinals: false
-  options:
-    disabled: false
-    configMaps: {}
-    deployments: {}
 ```
 You can install this component using [TektonConfig](./TektonConfig.md) by choosing appropriate `profile`.
 
@@ -111,6 +108,12 @@ injected sidecars, setting this option to false can lead to unexpected behavior.
     Setting this flag to "true" will require that any Git SSH Secret offered to Tekton must have known_hosts included.
 
     See more info [here](https://github.com/tektoncd/pipeline/issues/2981).
+
+
+- `enable-tekton-oci-bundles` (Default: `false`)
+
+    Setting this flag to "true" enables the use of Tekton OCI bundle. This is an experimental feature and thus should
+still be considered an alpha feature.
 
 
 - `enable-custom-tasks` (Default: `false`)
@@ -164,6 +167,10 @@ and thus should still be considered an alpha feature.
 - `enable-cel-in-whenexpression` (Default: `false`)
 
     Setting this flag to "true" will enable using CEL in when expressions.
+
+- `scope-when-expressions-to-task` (Default: `false`)
+
+    Setting this flag to "true" scopes when expressions to guard a Task only instead of a Task and its dependent Tasks.
 
 - `trusted-resources-verification-no-match-policy` (Default: `ignore`)
 
@@ -264,7 +271,6 @@ spec:
     threads-per-controller: 2
     kube-api-qps: 5.0
     kube-api-burst: 10
-    statefulset-ordinals: false
 ```
 These fields are optional and there is no default values. If user passes them, operator will include most of fields into the deployment `tekton-pipelines-controller` under the container `tekton-pipelines-controller` as arguments(duplicate name? No, container and deployment has the same name), otherwise pipelines controller's default values will be considered. and `buckets` field is updated into `config-leader-election` config-map under the namespace `tekton-pipelines`.
 
@@ -277,11 +283,6 @@ A high level descriptions are given here. To get the detailed information please
 * `threads-per-controller` - is the number of threads(aka worker) to use when processing the pipelines controller's workqueue, default value in pipelines controller is `2`
 * `kube-api-qps` - QPS indicates the maximum QPS to the cluster master from the REST client, default value in pipeline controller is `5.0`
 * `kube-api-burst` - maximum burst for throttle, default value in pipeline controller is `10`
-* `statefulset-ordinals` - enables StatefulSet Ordinals mode for the Tekton Pipelines Controller. When set to true, the Pipelines Controller is deployed as a StatefulSet, allowing for multiple replicas to be configured with a load-balancing mode. This ensures that the load is evenly distributed across replicas, and the number of buckets is enforced to match the number of replicas.
-Moreover, There are two mechanisms available for scaling for scaling Pipelines Controller horizontally: 
-- Using leader election, which allows for failover, but can result in hot-spotting.
-- Using StatefulSet ordinals, which doesn't allow for failover, but guarantees load is evenly spread across replicas.
-
 
 > #### Note:
 > * `kube-api-qps` and `kube-api-burst` will be multiplied by 2 in pipelines controller. To get the detailed information visit [Performance Configuration](https://tekton.dev/docs/pipelines/tekton-controller-performance-configuration/) guide

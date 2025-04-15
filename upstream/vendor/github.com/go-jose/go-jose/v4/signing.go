@@ -358,8 +358,6 @@ func (ctx *genericSigner) Options() SignerOptions {
 //   - *rsa.PublicKey
 //   - *JSONWebKey
 //   - JSONWebKey
-//   - *JSONWebKeySet
-//   - JSONWebKeySet
 //   - []byte (an HMAC key)
 //   - Any type that implements the OpaqueVerifier interface.
 //
@@ -390,10 +388,7 @@ func (obj JSONWebSignature) UnsafePayloadWithoutVerification() []byte {
 // The verificationKey argument must have one of the types allowed for the
 // verificationKey argument of JSONWebSignature.Verify().
 func (obj JSONWebSignature) DetachedVerify(payload []byte, verificationKey interface{}) error {
-	key, err := tryJWKS(verificationKey, obj.headers()...)
-	if err != nil {
-		return err
-	}
+	key := tryJWKS(verificationKey, obj.headers()...)
 	verifier, err := newVerifier(key)
 	if err != nil {
 		return err
@@ -458,10 +453,7 @@ func (obj JSONWebSignature) VerifyMulti(verificationKey interface{}) (int, Signa
 // The verificationKey argument must have one of the types allowed for the
 // verificationKey argument of JSONWebSignature.Verify().
 func (obj JSONWebSignature) DetachedVerifyMulti(payload []byte, verificationKey interface{}) (int, Signature, error) {
-	key, err := tryJWKS(verificationKey, obj.headers()...)
-	if err != nil {
-		return -1, Signature{}, err
-	}
+	key := tryJWKS(verificationKey, obj.headers()...)
 	verifier, err := newVerifier(key)
 	if err != nil {
 		return -1, Signature{}, err

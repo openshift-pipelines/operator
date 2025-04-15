@@ -74,10 +74,9 @@ func (r *Runtime) injectImplementations(b *build.Instance, v *adt.Vertex) (errs 
 		d.errs = errors.Append(d.errs, d.addFile(f))
 	}
 
-	v.VisitLeafConjuncts(func(c adt.Conjunct) bool {
+	for _, c := range v.Conjuncts {
 		d.decorateConjunct(c.Elem(), v)
-		return true
-	})
+	}
 
 	return d.errs
 }
@@ -100,6 +99,7 @@ type externDecorator struct {
 }
 
 type fieldInfo struct {
+	file     *ast.File
 	extern   string
 	funcName string
 	attrBody string
