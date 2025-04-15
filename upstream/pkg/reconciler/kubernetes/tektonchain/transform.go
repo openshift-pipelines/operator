@@ -32,13 +32,14 @@ func filterAndTransform(extension common.Extension) client.FilterAndTransform {
 		extra := []mf.Transformer{
 			common.InjectOperandNameLabelOverwriteExisting(v1alpha1.OperandTektoncdChains),
 			common.DeploymentImages(chainImages),
+			common.DeploymentEnvVarKubernetesMinVersion(),
 			common.AddConfiguration(chainCR.Spec.Config),
 			common.AddConfigMapValues(ChainsConfig, chainCR.Spec.Chain.ChainProperties),
 			common.AddDeploymentRestrictedPSA(),
 			AddControllerEnv(chainCR.Spec.Chain.ControllerEnvs),
 		}
 		if chainCR.Spec.GenerateSigningSecret {
-			extra = append(extra, common.AddSecretData(GenerateSigningSecrets(ctx), map[string]string{
+			extra = append(extra, common.AddSecretData(generateSigningSecrets(ctx), map[string]string{
 				secretTISSigningAnnotation: "true",
 			}))
 		}
