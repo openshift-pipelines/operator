@@ -29,13 +29,12 @@ import (
 // and comprehension sources.
 func (v *visitor) dynamic(n *adt.Vertex, top bool) {
 	found := false
-	n.VisitLeafConjuncts(func(c adt.Conjunct) bool {
+	for _, c := range n.Conjuncts {
 		if v.marked[c.Expr()] {
 			found = true
-			return false
+			break
 		}
-		return true
-	})
+	}
 
 	if !found {
 		return
@@ -67,10 +66,9 @@ func (m marked) markExpr(x adt.Expr) {
 
 	case nil:
 	case *adt.Vertex:
-		x.VisitLeafConjuncts(func(c adt.Conjunct) bool {
+		for _, c := range x.Conjuncts {
 			m.markExpr(c.Expr())
-			return true
-		})
+		}
 
 	case *adt.BinaryExpr:
 		if x.Op == adt.AndOp {

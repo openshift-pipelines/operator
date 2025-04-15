@@ -17,13 +17,15 @@ package build
 // This file describes how various cross-cutting modes influence default
 // settings.
 //
-// It is used by types.go to compile a cue.Value, which is then
+// It is used by gen.go to compile the instance into Go data, which is then
 // used by the rest of the package to determine settings.
+//
+// There
 
 // A File corresponds to a Go build.File.
 #File: {
-	filename?:       string // only filled in FromFile, but not in ParseFile
-	encoding!:       #Encoding
+	filename:        string
+	encoding:        #Encoding
 	interpretation?: #Interpretation
 	form?:           #Form
 	tags?: [string]: string
@@ -42,47 +44,35 @@ package build
 	// For each of these fields it is explained what a true value means
 	// for encoding/decoding.
 
-	data:          *true | false // include/allow regular fields
-	references:    *true | false // don't resolve/allow references
-	cycles:        *true | false // cycles are permitted
-	definitions?:  bool          // include/allow definition fields
-	optional?:     bool          // include/allow definition fields
-	constraints?:  bool          // include/allow constraints
-	keepDefaults?: bool          // select/allow default values
-	incomplete?:   bool          // permit incomplete values
-	imports?:      bool          // don't expand/allow imports
-	stream?:       bool          // permit streaming
-	docs?:         bool          // show/allow docs
-	attributes?:   bool          // include/allow attributes
-}
-
-// knownExtensions derives all the known file extensions
-// from those that are mentioned in modes,
-// allowing us to quickly discard files with unknown extensions.
-knownExtensions: {
-	for mode in modes
-	for ext, _ in mode.extensions {
-		(ext): true
-	}
+	data:         *true | false // include/allow regular fields
+	references:   *true | false // don't resolve/allow references
+	cycles:       *true | false // cycles are permitted
+	definitions:  bool          // include/allow definition fields
+	optional:     bool          // include/allow definition fields
+	constraints:  bool          // include/allow constraints
+	keepDefaults: bool          // select/allow default values
+	incomplete:   bool          // permit incomplete values
+	imports:      bool          // don't expand/allow imports
+	stream:       bool          // permit streaming
+	docs:         bool          // show/allow docs
+	attributes:   bool          // include/allow attributes
 }
 
 // modes sets defaults for different operational modes.
-modes: [string]: {
-	// TODO(mvdan): Document these once they are better understood.
-	// Perhaps make them required as well.
-	File:     #File
-	FileInfo: #FileInfo
-	Default:  #Default
-}
+//
+// These templates are intended to be unified in at the root of this
+// configuration.
+modes: _
 
 // input defines modes for input, such as import, eval, vet or def.
 // In input mode, settings flags are interpreted as what is allowed to occur
 // in the input. The default settings, therefore, tend to be permissive.
 modes: input: {
-	Default: {
+	#Default: {
 		encoding: *"cue" | _
+		...
 	}
-	FileInfo: {
+	#FileInfo: x, let x = {
 		docs:       *true | false
 		attributes: *true | false
 	}
@@ -95,10 +85,11 @@ modes: input: {
 }
 
 modes: export: {
-	Default: {
+	#Default: {
 		encoding: *"json" | _
+		...
 	}
-	FileInfo: {
+	#FileInfo: x, let x = {
 		docs:       true | *false
 		attributes: true | *false
 	}
@@ -107,12 +98,8 @@ modes: export: {
 	}
 }
 
-// TODO(mvdan): this "output" mode appears to be unused at the moment.
-modes: output: {
-	Default: {
-		encoding: *"cue" | _
-	}
-	FileInfo: {
+modes: ouptut: {
+	#FileInfo: x, let x = {
 		docs:       true | *false
 		attributes: true | *false
 	}
@@ -123,10 +110,11 @@ modes: output: {
 
 // eval is a legacy mode
 modes: eval: {
-	Default: {
+	#Default: {
 		encoding: *"cue" | _
+		...
 	}
-	FileInfo: {
+	#FileInfo: x, let x = {
 		docs:       true | *false
 		attributes: true | *false
 	}
@@ -136,16 +124,37 @@ modes: eval: {
 }
 
 modes: def: {
-	Default: {
+	#Default: {
 		encoding: *"cue" | _
+		...
 	}
-	FileInfo: {
+	#FileInfo: x, let x = {
 		docs:       *true | false
 		attributes: *true | false
 	}
 	encodings: cue: {
 		*forms.schema | _
 	}
+}
+
+// Extension maps file extensions to default file properties.
+extensions: {
+	"":           _
+	".cue":       tags.cue
+	".json":      tags.json
+	".jsonl":     tags.jsonl
+	".ldjson":    tags.jsonl
+	".ndjson":    tags.jsonl
+	".yaml":      tags.yaml
+	".yml":       tags.yaml
+	".txt":       tags.text
+	".go":        tags.go
+	".proto":     tags.proto
+	".textproto": tags.textproto
+	".textpb":    tags.textproto // perhaps also pbtxt
+
+	// TODO: jsonseq,
+	// ".pb":        tags.binpb // binarypb
 }
 
 // A Encoding indicates a file format for representing a program.
@@ -157,95 +166,74 @@ modes: def: {
 #Interpretation: string
 #Form:           string
 
-modes: [string]: {
-	// extensions maps a file extension to its associated default file properties.
-	extensions: {
-		// "":           _
-		".cue":       tags.cue
-		".json":      tags.json
-		".jsonl":     tags.jsonl
-		".ldjson":    tags.jsonl
-		".ndjson":    tags.jsonl
-		".yaml":      tags.yaml
-		".yml":       tags.yaml
-		".txt":       tags.text
-		".go":        tags.go
-		".proto":     tags.proto
-		".textproto": tags.textproto
-		".textpb":    tags.textproto // perhaps also pbtxt
+file: #FileInfo & {
 
-		// TODO: jsonseq,
-		// ".pb":        tags.binpb // binarypb
+	filename: "foo.json"
+	form:     "schema"
+}
+
+// tags maps command line tags to file properties.
+tags: {
+	schema: form: "schema"
+	graph: form:  "graph"
+	dag: form:    "dag"
+	data: form:   "data"
+
+	cue: encoding: "cue"
+
+	json: encoding:      "json"
+	jsonl: encoding:     "jsonl"
+	yaml: encoding:      "yaml"
+	proto: encoding:     "proto"
+	textproto: encoding: "textproto"
+	// "binpb":  encodings.binproto
+
+	// pb is used either to indicate binary encoding, or to indicate
+	pb: *{
+		encoding:       "binarypb"
+		interpretation: ""
+	} | {
+		encoding:       !="binarypb"
+		interpretation: "pb"
 	}
 
-	// encodings: "": error("no encoding specified")
-
-	encodings: cue: {
-		stream: false
+	text: {
+		encoding: "text"
+		form:     "data"
+	}
+	binary: {
+		encoding: "binary"
+		form:     "data"
+	}
+	go: {
+		encoding:       "code"
+		interpretation: ""
+		tags: lang: "go"
+	}
+	code: {
+		encoding:       "code"
+		interpretation: ""
+		tags: lang: string
 	}
 
-	encodings: json: {
-		forms.data
-		stream:     *false | true
-		docs:       false
-		attributes: false
+	auto: {
+		interpretation: "auto"
+		encoding:       *"json" | _
 	}
-
-	encodings: yaml: {
-		forms.graph
-		stream: false | *true
+	jsonschema: {
+		interpretation: "jsonschema"
+		encoding:       *"json" | _
 	}
-
-	encodings: jsonl: {
-		forms.data
-		stream: true
-	}
-
-	encodings: text: {
-		forms.data
-		stream: false
-	}
-
-	encodings: binary: {
-		forms.data
-		stream: false
-	}
-
-	encodings: toml: {
-		forms.data
-		stream: false
-	}
-
-	encodings: proto: {
-		forms.schema
-		encoding: "proto"
-	}
-
-	encodings: textproto: {
-		forms.data
-		encoding: "textproto"
-		stream:   false
-	}
-
-	encodings: binarypb: {
-		forms.data
-		encoding: "binarypb"
-		stream:   false
-	}
-
-	// encodings: binproto: {
-	//  forms.DataEncoding
-	//  encoding: "binproto"
-	// }
-
-	encodings: code: {
-		forms.schema
-		stream: false
+	openapi: {
+		interpretation: "openapi"
+		encoding:       *"json" | _
 	}
 }
 
 // forms defines schema for all forms. It does not include the form ID.
 forms: [Name=string]: #FileInfo
+
+forms: "": _
 
 forms: schema: {
 	form:   *"schema" | "final" | "graph"
@@ -298,7 +286,74 @@ forms: data: {
 	optional:    false
 }
 
+// encodings: "": error("no encoding specified")
+
+encodings: cue: {
+	stream: false
+}
+
+encodings: json: {
+	forms.data
+	stream:     *false | true
+	docs:       false
+	attributes: false
+}
+
+encodings: yaml: {
+	forms.graph
+	stream: false | *true
+}
+
+encodings: jsonl: {
+	forms.data
+	stream: true
+}
+
+encodings: text: {
+	forms.data
+	stream: false
+}
+
+encodings: binary: {
+	forms.data
+	stream: false
+}
+
+encodings: toml: {
+	forms.data
+	stream: false
+}
+
+encodings: proto: {
+	forms.schema
+	encoding: "proto"
+}
+
+encodings: textproto: {
+	forms.data
+	encoding: "textproto"
+	stream:   false
+}
+
+encodings: binarypb: {
+	forms.data
+	encoding: "binarypb"
+	stream:   false
+}
+
+// encodings: binproto: {
+//  forms.DataEncoding
+//  encoding: "binproto"
+// }
+
+encodings: code: {
+	forms.schema
+	stream: false
+}
+
 interpretations: [Name=string]: #FileInfo
+
+interpretations: "": _
 
 interpretations: auto: {
 	forms.schema
@@ -317,62 +372,4 @@ interpretations: openapi: {
 interpretations: pb: {
 	forms.data
 	stream: true
-}
-
-// tags maps command line tags to file properties.
-tags: {
-	schema: form: "schema"
-	graph: form:  "graph"
-	dag: form:    "dag"
-	data: form:   "data"
-
-	cue: encoding: "cue"
-
-	json: encoding:      "json"
-	jsonl: encoding:     "jsonl"
-	yaml: encoding:      "yaml"
-	proto: encoding:     "proto"
-	textproto: encoding: "textproto"
-	// "binpb":  encodings.binproto
-
-	// pb is used either to indicate binary encoding, or to indicate
-	pb: *{
-		encoding:       "binarypb"
-		interpretation: ""
-	} | {
-		encoding:       !="binarypb"
-		interpretation: "pb"
-	}
-
-	text: {
-		encoding: "text"
-		form:     "data"
-	}
-	binary: {
-		encoding: "binary"
-		form:     "data"
-	}
-	go: {
-		encoding:       "code"
-		interpretation: ""
-		tags: lang: "go"
-	}
-	code: {
-		encoding:       "code"
-		interpretation: ""
-		tags: lang: *"" | string
-	}
-
-	auto: {
-		interpretation: "auto"
-		encoding:       *"json" | _
-	}
-	jsonschema: {
-		interpretation: "jsonschema"
-		encoding:       *"json" | _
-	}
-	openapi: {
-		interpretation: "openapi"
-		encoding:       *"json" | _
-	}
 }

@@ -14,7 +14,6 @@ import (
 
 	"golang.org/x/mod/module"
 	"golang.org/x/tools/internal/gopathwalk"
-	"golang.org/x/tools/internal/stdlib"
 )
 
 // To find packages to import, the resolver needs to know about all of
@@ -74,7 +73,7 @@ type directoryPackageInfo struct {
 	// the default build context GOOS and GOARCH.
 	//
 	// We can make this explicit, and key exports by GOOS, GOARCH.
-	exports []stdlib.Symbol
+	exports []string
 }
 
 // reachedStatus returns true when info has a status at least target and any error associated with
@@ -230,7 +229,7 @@ func (d *DirInfoCache) CachePackageName(info directoryPackageInfo) (string, erro
 	return info.packageName, info.err
 }
 
-func (d *DirInfoCache) CacheExports(ctx context.Context, env *ProcessEnv, info directoryPackageInfo) (string, []stdlib.Symbol, error) {
+func (d *DirInfoCache) CacheExports(ctx context.Context, env *ProcessEnv, info directoryPackageInfo) (string, []string, error) {
 	if reached, _ := info.reachedStatus(exportsLoaded); reached {
 		return info.packageName, info.exports, info.err
 	}

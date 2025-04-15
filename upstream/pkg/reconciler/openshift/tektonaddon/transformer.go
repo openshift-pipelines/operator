@@ -18,13 +18,23 @@ package tektonaddon
 
 import (
 	"fmt"
-	"strings"
 
 	mf "github.com/manifestival/manifestival"
 	console "github.com/openshift/api/console/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
+
+func replaceKind(fromKind, toKind string) mf.Transformer {
+	return func(u *unstructured.Unstructured) error {
+		kind := u.GetKind()
+		if kind != fromKind {
+			return nil
+		}
+		u.SetKind(toKind)
+		return nil
+	}
+}
 
 // injectLabel adds label key:value to a resource
 // overwritePolicy (Retain/Overwrite) decides whehther to overwrite an already existing label
@@ -66,7 +76,7 @@ func itemInSlice(item string, items []string) bool {
 	return false
 }
 
-func getlinks(baseURL string) []console.CLIDownloadLink {
+func getlinks(baseURL, tknVersion string) []console.CLIDownloadLink {
 	platformURLs := []struct {
 		platform string
 		tknURL   string
@@ -97,7 +107,7 @@ func getURL(baseURL string, path string) string {
 	return fmt.Sprintf("https://%s/%s", baseURL, path)
 }
 
-func replaceURLCCD(baseURL string) mf.Transformer {
+func replaceURLCCD(baseURL, tknVersion string) mf.Transformer {
 	return func(u *unstructured.Unstructured) error {
 		if u.GetKind() != "ConsoleCLIDownload" {
 			return nil
@@ -107,7 +117,7 @@ func replaceURLCCD(baseURL string) mf.Transformer {
 		if err != nil {
 			return err
 		}
-		ccd.Spec.Links = getlinks(baseURL)
+		ccd.Spec.Links = getlinks(baseURL, tknVersion)
 		unstrObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ccd)
 		if err != nil {
 			return err
@@ -119,7 +129,7 @@ func replaceURLCCD(baseURL string) mf.Transformer {
 
 func setVersionedNames(operatorVersion string) mf.Transformer {
 	return func(u *unstructured.Unstructured) error {
-		if u.GetKind() != "Task" && u.GetKind() != "StepAction" {
+		if u.GetKind() != "ClusterTask" {
 			return nil
 		}
 		name := u.GetName()
@@ -128,24 +138,4 @@ func setVersionedNames(operatorVersion string) mf.Transformer {
 		u.SetName(name)
 		return nil
 	}
-}
-
-func formattedVersionMajorMinorX(version, x string) string {
-	ver := getPatchVersionTrimmed(version)
-	ver = fmt.Sprintf("%s.%s", ver, x)
-	return formattedVersionSnake(ver)
-}
-
-func formattedVersionSnake(version string) string {
-	ver := strings.TrimPrefix(version, "v")
-	return strings.Replace(ver, ".", "-", -1)
-}
-
-// To get the minor major version for label i.e. v1.6
-func getPatchVersionTrimmed(version string) string {
-	endIndex := strings.LastIndex(version, ".")
-	if endIndex != -1 {
-		version = version[:endIndex]
-	}
-	return version
 }

@@ -21,6 +21,7 @@ package debug
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -40,19 +41,18 @@ type Config struct {
 	Raw     bool
 }
 
-// AppendNode writes a string representation of the node to w.
-func AppendNode(dst []byte, i adt.StringIndexer, n adt.Node, config *Config) []byte {
+// WriteNode writes a string representation of the node to w.
+func WriteNode(w io.Writer, i adt.StringIndexer, n adt.Node, config *Config) {
 	if config == nil {
 		config = &Config{}
 	}
-	p := printer{dst: dst, index: i, cfg: config}
+	p := printer{Writer: w, index: i, cfg: config}
 	if config.Compact {
 		p := compactPrinter{p}
 		p.node(n)
-		return p.dst
+	} else {
+		p.node(n)
 	}
-	p.node(n)
-	return p.dst
 }
 
 // NodeString returns a string representation of the given node.
@@ -60,12 +60,13 @@ func AppendNode(dst []byte, i adt.StringIndexer, n adt.Node, config *Config) []b
 // Commonly available implementations of StringIndexer include *adt.OpContext
 // and *runtime.Runtime.
 func NodeString(i adt.StringIndexer, n adt.Node, config *Config) string {
-	var buf [128]byte
-	return string(AppendNode(buf[:0], i, n, config))
+	b := &strings.Builder{}
+	WriteNode(b, i, n, config)
+	return b.String()
 }
 
 type printer struct {
-	dst    []byte
+	io.Writer
 	index  adt.StringIndexer
 	indent string
 	cfg    *Config
@@ -78,79 +79,42 @@ type printer struct {
 }
 
 func (w *printer) string(s string) {
-	if len(w.indent) > 0 {
-		s = strings.Replace(s, "\n", "\n"+w.indent, -1)
-	}
-	w.dst = append(w.dst, s...)
-}
-
-func (w *printer) int(i int64) {
-	w.dst = strconv.AppendInt(w.dst, i, 10)
+	s = strings.Replace(s, "\n", "\n"+w.indent, -1)
+	_, _ = io.WriteString(w, s)
 }
 
 func (w *printer) label(f adt.Feature) {
-	switch {
-	case f.IsHidden():
-		ident := f.IdentString(w.index)
-		if pkgName := f.PkgID(w.index); pkgName != "_" {
-			ident = fmt.Sprintf("%s(%s)", ident, pkgName)
-		}
-		w.string(ident)
-
-	case f.IsLet():
-		ident := f.RawString(w.index)
-		ident = strings.Replace(ident, "\x00", "#", 1)
-		w.string(ident)
-
-	default:
-		w.string(f.SelectorString(w.index))
-	}
+	w.string(w.labelString(f))
 }
 
 func (w *printer) ident(f adt.Feature) {
 	w.string(f.IdentString(w.index))
 }
 
-func (w *printer) path(v *adt.Vertex) {
-	if p := v.Parent; p != nil && p.Label != 0 {
-		w.path(v.Parent)
-		w.string(".")
-	}
-	w.label(v.Label)
-}
+// TODO: fold into label once :: is no longer supported.
+func (w *printer) labelString(f adt.Feature) string {
+	switch {
+	case f.IsHidden():
+		ident := f.IdentString(w.index)
+		if pkgName := f.PkgID(w.index); pkgName != "_" {
+			ident = fmt.Sprintf("%s(%s)", ident, pkgName)
+		}
+		return ident
 
-func (w *printer) shared(v *adt.Vertex) {
-	w.string("~(")
-	w.path(v)
-	w.string(")")
-}
+	case f.IsLet():
+		ident := f.RawString(w.index)
+		ident = strings.Replace(ident, "\x00", "#", 1)
+		return ident
 
-// printShared prints a reference to a structure-shared node that is a value
-// of v, if it is a shared node. It reports the dereferenced node and whether
-// the node was printed.
-func (w *printer) printShared(v *adt.Vertex) (x *adt.Vertex, ok bool) {
-	// Handle cyclic shared nodes differently.  If a shared node was part of
-	// a disjunction, it will still be wrapped in a disjunct Vertex.
-	// Similarly, a shared node should never point to a disjunct directly,
-	// but rather to the original arc that subsequently points to a
-	// disjunct.
-	v = v.DerefDisjunct()
-	useReference := v.IsShared
-	isCyclic := v.IsCyclic
-	s, ok := v.BaseValue.(*adt.Vertex)
-	v = v.DerefValue()
-	isCyclic = isCyclic || v.IsCyclic
-	if useReference && isCyclic && ok && len(v.Arcs) > 0 {
-		w.shared(s)
-		return v, true
+	default:
+		return f.SelectorString(w.index)
 	}
-	return v, false
 }
 
 func (w *printer) shortError(errs errors.Error) {
 	for {
 		msg, args := errs.Msg()
-		w.dst = fmt.Appendf(w.dst, msg, args...)
+		fmt.Fprintf(w, msg, args...)
 
 		err := errors.Unwrap(errs)
 		if err == nil {
@@ -180,7 +144,7 @@ func (w *printer) interpolation(x *adt.Interpolation) {
 			}
 		case adt.BytesKind:
 			if s, ok := x.Parts[i].(*adt.Bytes); ok {
-				w.dst = append(w.dst, s.B...)
+				_, _ = w.Write(s.B)
 			} else {
 				w.string("<bad bytes>")
 			}
@@ -197,11 +161,6 @@ func (w *printer) interpolation(x *adt.Interpolation) {
 func (w *printer) node(n adt.Node) {
 	switch x := n.(type) {
 	case *adt.Vertex:
-		x, ok := w.printShared(x)
-		if ok {
-			return
-		}
-
 		var kind adt.Kind
 		if x.BaseValue != nil {
 			kind = x.BaseValue.Kind()
@@ -216,7 +175,7 @@ func (w *printer) node(n adt.Node) {
 			}
 		}
 
-		w.dst = fmt.Appendf(w.dst, "(%s){", kindStr)
+		fmt.Fprintf(w, "(%s){", kindStr)
 
 		saved := w.indent
 		w.indent += "  "
@@ -229,7 +188,7 @@ func (w *printer) node(n adt.Node) {
 			saved := w.indent
 			w.indent += "// "
 			w.string("\n")
-			w.dst = fmt.Appendf(w.dst, "[%v]", v.Code)
+			fmt.Fprintf(w, "[%v]", v.Code)
 			if !v.ChildError {
 				msg := errors.Details(v.Err, &errors.Config{
 					Cwd:     w.cfg.Cwd,
@@ -239,15 +198,6 @@ func (w *printer) node(n adt.Node) {
 				if msg != "" {
 					w.string(" ")
 					w.string(msg)
-				}
-
-				// TODO: we could consider removing CycleError here. It does
-				// seem safer, however, as sometimes structural cycles are
-				// detected as regular cycles.
-				// Alternatively, we could consider to never report arcs if
-				// there is any error.
-				if v.Code == adt.CycleError || v.Code == adt.StructuralCycleError {
-					goto endVertex
 				}
 			}
 			w.indent = saved
@@ -316,8 +266,6 @@ func (w *printer) node(n adt.Node) {
 			}
 		}
 
-	endVertex:
-
 		w.indent = saved
 		w.string("\n")
 		w.string("}")
@@ -358,7 +306,8 @@ func (w *printer) node(n adt.Node) {
 		w.string("\n]")
 
 	case *adt.Field:
-		w.label(x.Label)
+		s := w.labelString(x.Label)
+		w.string(s)
 		w.string(x.ArcType.Suffix())
 		w.string(":")
 		w.string(" ")
@@ -366,7 +315,8 @@ func (w *printer) node(n adt.Node) {
 
 	case *adt.LetField:
 		w.string("let ")
-		w.label(x.Label)
+		s := w.labelString(x.Label)
+		w.string(s)
 		if x.IsMulti {
 			w.string("multi")
 		}
@@ -403,29 +353,29 @@ func (w *printer) node(n adt.Node) {
 		w.string("null")
 
 	case *adt.Bool:
-		w.dst = strconv.AppendBool(w.dst, x.B)
+		fmt.Fprint(w, x.B)
 
 	case *adt.Num:
-		w.string(x.X.String())
+		fmt.Fprint(w, &x.X)
 
 	case *adt.String:
-		w.dst = literal.String.Append(w.dst, x.Str)
+		w.string(literal.String.Quote(x.Str))
 
 	case *adt.Bytes:
-		w.dst = literal.Bytes.Append(w.dst, string(x.B))
+		w.string(literal.Bytes.Quote(string(x.B)))
 
 	case *adt.Top:
 		w.string("_")
 
 	case *adt.BasicType:
-		w.string(x.K.String())
+		fmt.Fprint(w, x.K)
 
 	case *adt.BoundExpr:
-		w.string(x.Op.String())
+		fmt.Fprint(w, x.Op)
 		w.node(x.Expr)
 
 	case *adt.BoundValue:
-		w.string(x.Op.String())
+		fmt.Fprint(w, x.Op)
 		w.node(x.Value)
 
 	case *adt.NodeLink:
@@ -440,25 +390,25 @@ func (w *printer) node(n adt.Node) {
 
 	case *adt.FieldReference:
 		w.string(openTuple)
-		w.int(int64(x.UpCount))
+		w.string(strconv.Itoa(int(x.UpCount)))
 		w.string(";")
 		w.label(x.Label)
 		w.string(closeTuple)
 
 	case *adt.ValueReference:
 		w.string(openTuple)
-		w.int(int64(x.UpCount))
+		w.string(strconv.Itoa(int(x.UpCount)))
 		w.string(closeTuple)
 
 	case *adt.LabelReference:
 		w.string(openTuple)
-		w.int(int64(x.UpCount))
+		w.string(strconv.Itoa(int(x.UpCount)))
 		w.string(";-")
 		w.string(closeTuple)
 
 	case *adt.DynamicReference:
 		w.string(openTuple)
-		w.int(int64(x.UpCount))
+		w.string(strconv.Itoa(int(x.UpCount)))
 		w.string(";(")
 		w.node(x.Label)
 		w.string(")")
@@ -471,7 +421,7 @@ func (w *printer) node(n adt.Node) {
 
 	case *adt.LetReference:
 		w.string(openTuple)
-		w.int(int64(x.UpCount))
+		w.string(strconv.Itoa(int(x.UpCount)))
 		w.string(";let ")
 		w.label(x.Label)
 		w.string(closeTuple)
@@ -507,15 +457,13 @@ func (w *printer) node(n adt.Node) {
 		w.interpolation(x)
 
 	case *adt.UnaryExpr:
-		w.string(x.Op.String())
+		fmt.Fprint(w, x.Op)
 		w.node(x.X)
 
 	case *adt.BinaryExpr:
 		w.string("(")
 		w.node(x.X)
-		w.string(" ")
-		w.string(x.Op.String())
-		w.string(" ")
+		fmt.Fprint(w, " ", x.Op, " ")
 		w.node(x.Y)
 		w.string(")")
 

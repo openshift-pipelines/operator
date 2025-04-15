@@ -18,9 +18,11 @@
 package encoding
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -38,15 +40,13 @@ import (
 	"cuelang.org/go/encoding/protobuf/jsonpb"
 	"cuelang.org/go/encoding/protobuf/textproto"
 	"cuelang.org/go/internal"
-	"cuelang.org/go/internal/encoding/yaml"
 	"cuelang.org/go/internal/filetypes"
-	"cuelang.org/go/internal/source"
+	"cuelang.org/go/internal/third_party/yaml"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 )
 
 type Decoder struct {
-	ctx            *cue.Context
 	cfg            *Config
 	closer         io.Closer
 	next           func() (ast.Expr, error)
@@ -61,7 +61,7 @@ type Decoder struct {
 	err            error
 }
 
-type interpretFunc func(cue.Value) (file *ast.File, id string, err error)
+type interpretFunc func(*cue.Instance) (file *ast.File, id string, err error)
 type rewriteFunc func(*ast.File) (file *ast.File, err error)
 
 // ID returns a canonical identifier for the decoded object or "" if no such
@@ -103,21 +103,30 @@ func (i *Decoder) doInterpret() {
 		}
 	}
 	if i.interpretFunc != nil {
+		var r cue.Runtime
 		i.file = i.File()
-		v := i.ctx.BuildFile(i.file)
-		if err := v.Err(); err != nil {
+		inst, err := r.CompileFile(i.file)
+		if err != nil {
 			i.err = err
 			return
 		}
-		i.file, i.id, i.err = i.interpretFunc(v)
+		i.file, i.id, i.err = i.interpretFunc(inst)
 	}
+}
+
+func toFile(x ast.Expr) *ast.File {
+	return internal.ToFile(x)
+}
+
+func valueToFile(v cue.Value) *ast.File {
+	return internal.ToFile(v.Syntax())
 }
 
 func (i *Decoder) File() *ast.File {
 	if i.file != nil {
 		return i.file
 	}
-	return internal.ToFile(i.expr)
+	return toFile(i.expr)
 }
 
 func (i *Decoder) Err() error {
@@ -128,9 +137,7 @@ func (i *Decoder) Err() error {
 }
 
 func (i *Decoder) Close() {
-	if i.closer != nil {
-		i.closer.Close()
-	}
+	i.closer.Close()
 }
 
 type Config struct {
@@ -160,11 +167,11 @@ type Config struct {
 // NewDecoder returns a stream of non-rooted data expressions. The encoding
 // type of f must be a data type, but does not have to be an encoding that
 // can stream. stdin is used in case the file is "-".
-func NewDecoder(ctx *cue.Context, f *build.File, cfg *Config) *Decoder {
+func NewDecoder(f *build.File, cfg *Config) *Decoder {
 	if cfg == nil {
 		cfg = &Config{}
 	}
-	i := &Decoder{filename: f.Filename, ctx: ctx, cfg: cfg}
+	i := &Decoder{filename: f.Filename, cfg: cfg}
 	i.next = func() (ast.Expr, error) {
 		if i.err != nil {
 			return nil, i.err
@@ -174,22 +181,16 @@ func NewDecoder(ctx *cue.Context, f *build.File, cfg *Config) *Decoder {
 
 	if file, ok := f.Source.(*ast.File); ok {
 		i.file = file
+		i.closer = io.NopCloser(strings.NewReader(""))
 		i.validate(file, f)
 		return i
 	}
 
-	var srcr io.Reader
-	if f.Source == nil && f.Filename == "-" {
-		// TODO: should we allow this?
-		srcr = cfg.Stdin
-	} else {
-		rc, err := source.Open(f.Filename, f.Source)
-		i.closer = rc
-		i.err = err
-		if i.err != nil {
-			return i
-		}
-		srcr = rc
+	rc, err := reader(f, cfg.Stdin)
+	i.closer = rc
+	i.err = err
+	if err != nil {
+		return i
 	}
 
 	// For now we assume that all encodings require UTF-8. This will not be the
@@ -198,19 +199,19 @@ func NewDecoder(ctx *cue.Context, f *build.File, cfg *Config) *Decoder {
 	// TODO: this code also allows UTF16, which is too permissive for some
 	// encodings. Switch to unicode.UTF8Sig once available.
 	t := unicode.BOMOverride(unicode.UTF8.NewDecoder())
-	r := transform.NewReader(srcr, t)
+	r := transform.NewReader(rc, t)
 
 	switch f.Interpretation {
 	case "":
 	case build.Auto:
 		openAPI := openAPIFunc(cfg, f)
 		jsonSchema := jsonSchemaFunc(cfg, f)
-		i.interpretFunc = func(v cue.Value) (file *ast.File, id string, err error) {
-			switch i.interpretation = Detect(v); i.interpretation {
+		i.interpretFunc = func(inst *cue.Instance) (file *ast.File, id string, err error) {
+			switch i.interpretation = Detect(inst.Value()); i.interpretation {
 			case build.JSONSchema:
-				return jsonSchema(v)
+				return jsonSchema(inst)
 			case build.OpenAPI:
-				return openAPI(v)
+				return openAPI(inst)
 			}
 			return i.file, "", i.err
 		}
@@ -243,9 +244,9 @@ func NewDecoder(ctx *cue.Context, f *build.File, cfg *Config) *Decoder {
 		i.next = json.NewDecoder(nil, path, r).Extract
 		i.Next()
 	case build.YAML:
-		b, err := io.ReadAll(r)
+		d, err := yaml.NewDecoder(path, r)
 		i.err = err
-		i.next = yaml.NewDecoder(path, b).Decode
+		i.next = d.Decode
 		i.Next()
 	case build.Text:
 		b, err := io.ReadAll(r)
@@ -277,10 +278,10 @@ func NewDecoder(ctx *cue.Context, f *build.File, cfg *Config) *Decoder {
 }
 
 func jsonSchemaFunc(cfg *Config, f *build.File) interpretFunc {
-	return func(v cue.Value) (file *ast.File, id string, err error) {
+	return func(i *cue.Instance) (file *ast.File, id string, err error) {
 		id = f.Tags["id"]
 		if id == "" {
-			id, _ = v.LookupPath(cue.MakePath(cue.Str("$id"))).String()
+			id, _ = i.Lookup("$id").String()
 		}
 		if id != "" {
 			u, err := url.Parse(id)
@@ -296,7 +297,7 @@ func jsonSchemaFunc(cfg *Config, f *build.File) interpretFunc {
 
 			Strict: cfg.Strict,
 		}
-		file, err = jsonschema.Extract(v, cfg)
+		file, err = jsonschema.Extract(i, cfg)
 		// TODO: simplify currently erases file line info. Reintroduce after fix.
 		// file, err = simplify(file, err)
 		return file, id, err
@@ -305,8 +306,8 @@ func jsonSchemaFunc(cfg *Config, f *build.File) interpretFunc {
 
 func openAPIFunc(c *Config, f *build.File) interpretFunc {
 	cfg := &openapi.Config{PkgName: c.PkgName}
-	return func(v cue.Value) (file *ast.File, id string, err error) {
-		file, err = openapi.Extract(v, cfg)
+	return func(i *cue.Instance) (file *ast.File, id string, err error) {
+		file, err = openapi.Extract(i, cfg)
 		// TODO: simplify currently erases file line info. Reintroduce after fix.
 		// file, err = simplify(file, err)
 		return file, "", err
@@ -321,6 +322,29 @@ func protobufJSONFunc(cfg *Config, file *build.File) rewriteFunc {
 		}
 		return f, jsonpb.NewDecoder(cfg.Schema).RewriteFile(f)
 	}
+}
+
+func reader(f *build.File, stdin io.Reader) (io.ReadCloser, error) {
+	switch s := f.Source.(type) {
+	case nil:
+		// Use the file name.
+	case string:
+		return io.NopCloser(strings.NewReader(s)), nil
+	case []byte:
+		return io.NopCloser(bytes.NewReader(s)), nil
+	case *bytes.Buffer:
+		// is io.Reader, but it needs to be readable repeatedly
+		if s != nil {
+			return io.NopCloser(bytes.NewReader(s.Bytes())), nil
+		}
+	default:
+		return nil, fmt.Errorf("invalid source type %T", f.Source)
+	}
+	// TODO: should we allow this?
+	if f.Filename == "-" {
+		return io.NopCloser(stdin), nil
+	}
+	return os.Open(f.Filename)
 }
 
 func shouldValidate(i *filetypes.FileInfo) bool {

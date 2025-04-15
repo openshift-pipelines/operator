@@ -18,6 +18,7 @@ import (
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/errors"
+	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/compile"
 	"cuelang.org/go/internal/core/runtime"
@@ -137,6 +138,21 @@ func getImportFromPath(x *runtime.Runtime, id string) *Instance {
 	return inst
 }
 
+func init() {
+	internal.MakeInstance = func(value interface{}) interface{} {
+		v := value.(Value)
+		x := v.eval(v.ctx())
+		st, ok := x.(*adt.Vertex)
+		if !ok {
+			st = &adt.Vertex{}
+			st.AddConjunct(adt.MakeRootConjunct(nil, x))
+		}
+		return addInst(v.idx, &Instance{
+			root: st,
+		})
+	}
+}
+
 // newInstance creates a new instance. Use Insert to populate the instance.
 func newInstance(x *runtime.Runtime, p *build.Instance, v *adt.Vertex) *Instance {
 	// TODO: associate root source with structLit.
@@ -244,7 +260,7 @@ func Merge(inst ...*Instance) *Instance {
 // identifier to bind to the top-level field in inst. The top-level fields in
 // inst take precedence over predeclared identifier and builtin functions.
 //
-// Deprecated: use [Context.BuildInstance]
+// Deprecated: use Context.Build
 func (inst *hiddenInstance) Build(p *build.Instance) *Instance {
 	p.Complete()
 
@@ -279,7 +295,7 @@ func (inst *hiddenInstance) Build(p *build.Instance) *Instance {
 // empty path returns the top-level configuration struct. Use LookupDef for definitions or LookupField for
 // any kind of field.
 //
-// Deprecated: use [Value.LookupPath]
+// Deprecated: use Value.LookupPath
 func (inst *hiddenInstance) Lookup(path ...string) Value {
 	return inst.Value().Lookup(path...)
 }
@@ -288,7 +304,7 @@ func (inst *hiddenInstance) Lookup(path ...string) Value {
 // Exists method of the returned value will report false if the definition did
 // not exist. The Err method reports if any error occurred during evaluation.
 //
-// Deprecated: use [Value.LookupPath]
+// Deprecated: use Value.LookupPath
 func (inst *hiddenInstance) LookupDef(path string) Value {
 	return inst.Value().LookupDef(path)
 }
@@ -298,7 +314,10 @@ func (inst *hiddenInstance) LookupDef(path string) Value {
 //
 // It cannot look up hidden or unexported fields.
 //
-// Deprecated: use [Value.LookupPath]
+// Deprecated: this API does not work with new-style definitions. Use
+// FieldByName defined on inst.Value().
+//
+// Deprecated: use Value.LookupPath
 func (inst *hiddenInstance) LookupField(path ...string) (f FieldInfo, err error) {
 	v := inst.Value()
 	for _, k := range path {
@@ -326,7 +345,7 @@ func (inst *hiddenInstance) LookupField(path ...string) (f FieldInfo, err error)
 // a Value. In the latter case, it will panic if the Value is not from the same
 // Runtime.
 //
-// Deprecated: use [Value.FillPath]
+// Deprecated: use Value.FillPath()
 func (inst *hiddenInstance) Fill(x interface{}, path ...string) (*Instance, error) {
 	v := inst.Value().Fill(x, path...)
 

@@ -13,9 +13,8 @@ jobs:
     steps:
     - id: set-matrix
       run: |
-        SUPPORTED_BRANCHES=$(git ls-remote --heads https://github.com/tektoncd/operator 'release-*' | grep -v 'v0.2[0-9].*\|v0.5[0-9]\.*\|v0.6[0-7]\.*' | awk '{ print $2 }' | cut -d/ -f3- | jq -cRs 'split("\n")[:-1]')
-        echo "Supported Branches: ${SUPPORTED_BRANCHES}"
-        echo "branches=${SUPPORTED_BRANCHES}" >> $GITHUB_OUTPUT
+        git ls-remote --heads https://github.com/tektoncd/operator 'release-*' | grep -v 'v0.2\.*\|v0.5\.*\|v0.60\|v0.61' | awk '{ print $2 }' | cut -d/ -f3- | jq -cRs 'split("\n")[:-1]'
+        echo "branches=$(git ls-remote --heads https://github.com/tektoncd/operator 'release-*' | grep -v 'v0.2\.*\|v0.5\.*\|v0.60\|v0.61' | awk '{ print $2 }' | cut -d/ -f3- | jq -cRs 'split("\n")[:-1]')" >> $GITHUB_OUTPUT
     outputs:
       branches: ${{ steps.set-matrix.outputs.branches }}
   bump-payloads:
@@ -28,7 +27,7 @@ jobs:
     steps:
     - uses: actions/setup-go@v5
       with:
-        go-version: 1.21.x
+        go-version: 1.19.x
     - uses: actions/checkout@v4
       with:
         ref: ${{ matrix.branch }}
@@ -37,7 +36,7 @@ jobs:
         export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
         make components/bump-bugfix
     - name: create pull request
-      uses: peter-evans/create-pull-request@v7
+      uses: peter-evans/create-pull-request@v6
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         commit-message: Bump payloads versions

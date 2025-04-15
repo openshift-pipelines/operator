@@ -121,7 +121,9 @@ func matchPattern(ctx *OpContext, pattern Value, f Feature) bool {
 	// avoid many bound checks), which we probably should. Especially when we
 	// allow list constraints, like [<10]: T.
 	var label Value
-	if f.IsString() && int64(f.Index()) != MaxIndex {
+	if int64(f.Index()) == MaxIndex {
+		f = 0
+	} else if f.IsString() {
 		label = f.ToValue(ctx)
 	}
 
@@ -139,14 +141,6 @@ func matchPatternValue(ctx *OpContext, pattern Value, f Feature, label Value) (r
 
 	if pattern == label {
 		return true
-	}
-
-	k := IntKind
-	if f.IsString() {
-		k = StringKind
-	}
-	if !k.IsAnyOf(pattern.Kind()) {
-		return false
 	}
 
 	// Fast track for the majority of cases.
@@ -171,6 +165,7 @@ func matchPatternValue(ctx *OpContext, pattern Value, f Feature, label Value) (r
 		return true
 
 	case *BasicType:
+		k := label.Kind()
 		return x.K&k == k
 
 	case *BoundValue:
@@ -195,9 +190,6 @@ func matchPatternValue(ctx *OpContext, pattern Value, f Feature, label Value) (r
 		return err == nil && xi == yi
 
 	case *String:
-		if label == nil {
-			return false
-		}
 		y, ok := label.(*String)
 		return ok && x.Str == y.Str
 

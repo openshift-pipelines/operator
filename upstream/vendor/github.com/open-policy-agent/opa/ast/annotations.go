@@ -417,7 +417,7 @@ func (a *Annotations) Copy(node Node) *Annotations {
 	return &cpy
 }
 
-// toObject constructs an AST Object from the annotation.
+// toObject constructs an AST Object from a.
 func (a *Annotations) toObject() (*Object, *Error) {
 	obj := NewObject()
 
@@ -509,34 +509,6 @@ func (a *Annotations) toObject() (*Object, *Error) {
 	return &obj, nil
 }
 
-func attachRuleAnnotations(mod *Module) {
-	// make a copy of the annotations
-	cpy := make([]*Annotations, len(mod.Annotations))
-	for i, a := range mod.Annotations {
-		cpy[i] = a.Copy(a.node)
-	}
-
-	for _, rule := range mod.Rules {
-		var j int
-		var found bool
-		for i, a := range cpy {
-			if rule.Ref().Equal(a.GetTargetPath()) {
-				if a.Scope == annotationScopeDocument {
-					rule.Annotations = append(rule.Annotations, a)
-				} else if a.Scope == annotationScopeRule && rule.Loc().Row > a.Location.Row {
-					j = i
-					found = true
-					rule.Annotations = append(rule.Annotations, a)
-				}
-			}
-		}
-
-		if found && j < len(cpy) {
-			cpy = append(cpy[:j], cpy[j+1:]...)
-		}
-	}
-}
-
 func attachAnnotationsNodes(mod *Module) Errors {
 	var errs Errors
 
@@ -556,11 +528,7 @@ func attachAnnotationsNodes(mod *Module) Errors {
 		if a.Scope == "" {
 			switch a.node.(type) {
 			case *Rule:
-				if a.Entrypoint {
-					a.Scope = annotationScopeDocument
-				} else {
-					a.Scope = annotationScopeRule
-				}
+				a.Scope = annotationScopeRule
 			case *Package:
 				a.Scope = annotationScopePackage
 			case *Import:
@@ -600,9 +568,8 @@ func validateAnnotationScopeAttachment(a *Annotations) *Error {
 }
 
 func validateAnnotationEntrypointAttachment(a *Annotations) *Error {
-	if a.Entrypoint && !(a.Scope == annotationScopeDocument || a.Scope == annotationScopePackage) {
-		return NewError(
-			ParseErr, a.Loc(), "annotation entrypoint applied to non-document or package scope '%v'", a.Scope)
+	if a.Entrypoint && !(a.Scope == annotationScopeRule || a.Scope == annotationScopePackage) {
+		return NewError(ParseErr, a.Loc(), "annotation entrypoint applied to non-rule or package scope '%v'", a.Scope)
 	}
 	return nil
 }
@@ -632,8 +599,9 @@ func (a *AuthorAnnotation) String() string {
 		return a.Name
 	} else if len(a.Name) == 0 {
 		return fmt.Sprintf("<%s>", a.Email)
+	} else {
+		return fmt.Sprintf("%s <%s>", a.Name, a.Email)
 	}
-	return fmt.Sprintf("%s <%s>", a.Name, a.Email)
 }
 
 // Copy returns a deep copy of rr.

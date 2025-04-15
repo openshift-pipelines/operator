@@ -99,8 +99,6 @@ func (c *OpContext) evaluate(v *Vertex, r Resolver, state combinedFlags) Value {
 	}
 
 	if n := v.state; n != nil {
-		n.assertInitialized()
-
 		if n.errs != nil && !n.errs.IsIncomplete() {
 			return n.errs
 		}
@@ -133,7 +131,7 @@ func (c *OpContext) evaluate(v *Vertex, r Resolver, state combinedFlags) Value {
 		return nil
 	}
 
-	if v.status < finalized && v.state != nil && !c.isDevVersion() {
+	if v.status < finalized && v.state != nil {
 		// TODO: errors are slightly better if we always add addNotify, but
 		// in this case it is less likely to cause a performance penalty.
 		// See https://cuelang.org/issue/661. It may be possible to
@@ -160,7 +158,7 @@ func (c *OpContext) unify(v *Vertex, flags combinedFlags) {
 	}
 
 	// defer c.PopVertex(c.PushVertex(v))
-	if c.LogEval > 0 {
+	if Debug {
 		c.nest++
 		c.Logf(v, "Unify")
 		defer func() {
@@ -194,7 +192,7 @@ func (c *OpContext) unify(v *Vertex, flags combinedFlags) {
 		return
 
 	case evaluatingArcs:
-		Assertf(c, v.status > 0, "unexpected status %d", v.status)
+		Assertf(v.status > 0, "unexpected status %d", v.status)
 		return
 
 	case 0:
@@ -353,7 +351,7 @@ func (c *OpContext) unify(v *Vertex, flags combinedFlags) {
 		// completing all disjunctions.
 		if !n.done() {
 			if err := n.incompleteErrors(true); err != nil {
-				b := n.node.Bottom()
+				b, _ := n.node.BaseValue.(*Bottom)
 				if b != err {
 					err = CombineErrors(n.ctx.src, b, err)
 				}
@@ -459,7 +457,7 @@ func (n *nodeContext) doNotify() {
 	for _, rec := range n.notify {
 		v := rec.v
 		if v.state == nil {
-			if b := v.Bottom(); b != nil {
+			if b, ok := v.BaseValue.(*Bottom); ok {
 				v.BaseValue = CombineErrors(nil, b, n.errs)
 			} else {
 				v.BaseValue = n.errs
@@ -614,7 +612,7 @@ func (n *nodeContext) validateValue(state vertexStatus) {
 	} else if len(n.node.Structs) > 0 {
 		markStruct = n.kind&StructKind != 0 && !n.hasTop
 	}
-	v := n.node.DerefValue().Value()
+	v := n.node.Value()
 	if n.node.BaseValue == nil && markStruct {
 		n.node.BaseValue = &StructMarker{}
 		v = n.node
@@ -684,7 +682,6 @@ func (n *nodeContext) incompleteErrors(final bool) *Bottom {
 		// n := d.node.getNodeContext(ctx)
 		// n.addBottom(err)
 		if final && c.vertex != nil && c.vertex.status != finalized {
-			c.vertex.state.assertInitialized()
 			c.vertex.state.addBottom(err)
 			c.vertex = nil
 		}
@@ -822,7 +819,7 @@ func (n *nodeContext) completeArcs(state vertexStatus) {
 					state = conjuncts
 				}
 
-				if err := a.Bottom(); err != nil {
+				if err, _ := a.BaseValue.(*Bottom); err != nil {
 					n.node.AddChildError(err)
 				}
 			}
@@ -848,7 +845,7 @@ func (n *nodeContext) completeArcs(state vertexStatus) {
 				// faulty CUE using this mechanism, though. At most error
 				// messages are a bit unintuitive. This may change once we have
 				// functionality to reflect on types.
-				if !n.node.IsErr() {
+				if _, ok := n.node.BaseValue.(*Bottom); !ok {
 					n.node.BaseValue = &StructMarker{}
 					n.kind = StructKind
 				}
@@ -920,10 +917,6 @@ var cycle = &Bottom{
 }
 
 func isCyclePlaceholder(v BaseValue) bool {
-	// TODO: do not mark cycle in BaseValue.
-	if a, _ := v.(*Vertex); a != nil {
-		v = a.DerefValue().BaseValue
-	}
 	return v == cycle
 }
 
@@ -978,14 +971,6 @@ type nodeContext struct {
 	// for source-level debuggers.
 	node *Vertex
 
-	// underlying is the original Vertex that this node overlays. It should be
-	// set for all Vertex values that were cloned.
-	underlying *Vertex
-
-	// overlays is set if this node is the root of a disjunct created in
-	// doDisjunct. It points to the direct parent nodeContext.
-	overlays *nodeContext
-
 	nodeContextState
 
 	scheduler
@@ -1021,28 +1006,15 @@ type nodeContext struct {
 	// Disjunction handling
 	disjunctions []envDisjunct
 
-	// disjunctCCs holds the close context that represent "holes" in which
-	// pending disjuncts are to be inserted for the clone represented by this
-	// nodeContext. Holes that are not yet filled will always need to be cloned
-	// when a disjunction branches in doDisjunct.
-	//
-	// Holes may accumulate as nested disjunctions get added and filled holes
-	// may be removed. So the list of disjunctCCs may differ from the number
-	// of disjunctions.
-	disjunctCCs []disjunctHole
-
 	// usedDefault indicates the for each of possibly multiple parent
 	// disjunctions whether it is unified with a default disjunct or not.
 	// This is then later used to determine whether a disjunction should
 	// be treated as a marked disjunction.
 	usedDefault []defaultInfo
 
-	// disjuncts holds disjuncts that evaluated to a non-bottom value.
-	// TODO: come up with a better name.
 	disjuncts    []*nodeContext
 	buffer       []*nodeContext
 	disjunctErrs []*Bottom
-	disjunct     Conjunct
 
 	// snapshot holds the last value of the vertex before calling postDisjunct.
 	snapshot Vertex
@@ -1063,35 +1035,11 @@ type conjunct struct {
 }
 
 type nodeContextState struct {
-	// isInitialized indicates whether conjuncts have been inserted in the node.
-	isInitialized bool
-
-	// toComplete marks whether completeNodeTasks needs to be called on this
-	// node after a corresponding task has been completed.
-	toComplete bool
-
-	// isCompleting > 0 indicates whether a call to completeNodeTasks is in
-	// progress.
-	isCompleting int
-
-	// evalDept is a number that is assigned when evaluating arcs and is set to
-	// detect structural cycles. This value may be temporarily altered when a
-	// node descends into evaluating a value that may be an error (pattern
-	// constraints, optional fields, etc.). A non-zero value always indicates
-	// that there are cyclic references, though.
-	evalDepth int
-
 	// State info
 
 	hasTop      bool
 	hasCycle    bool // has conjunct with structural cycle
 	hasNonCycle bool // has conjunct without structural cycle
-
-	isShared      bool      // set if we are currently structure sharing.
-	noSharing     bool      // set if structure sharing is not allowed
-	shared        Conjunct  // the original conjunct that led to sharing
-	sharedID      CloseInfo // the original CloseInfo that led to sharing
-	origBaseValue BaseValue // the BaseValue that structure sharing replaces.
 
 	depth       int32
 	defaultMode defaultMode
@@ -1221,7 +1169,6 @@ func (c *OpContext) newNodeContext(node *Vertex) *nodeContext {
 			vLists:             n.vLists[:0],
 			exprs:              n.exprs[:0],
 			disjunctions:       n.disjunctions[:0],
-			disjunctCCs:        n.disjunctCCs[:0],
 			usedDefault:        n.usedDefault[:0],
 			disjunctErrs:       n.disjunctErrs[:0],
 			disjuncts:          n.disjuncts[:0],
@@ -1229,7 +1176,6 @@ func (c *OpContext) newNodeContext(node *Vertex) *nodeContext {
 		}
 		n.scheduler.clear()
 		n.scheduler.node = n
-		n.underlying = node
 
 		return n
 	}
@@ -1244,7 +1190,6 @@ func (c *OpContext) newNodeContext(node *Vertex) *nodeContext {
 		nodeContextState: nodeContextState{kind: TopKind},
 	}
 	n.scheduler.node = n
-	n.underlying = node
 	return n
 }
 
@@ -1431,8 +1376,6 @@ func (n *nodeContext) finalDone() bool {
 // hasErr is used to determine if an evaluation path, for instance a single
 // path after expanding all disjunctions, has an error.
 func (n *nodeContext) hasErr() bool {
-	n.assertInitialized()
-
 	if n.node.ChildErrors != nil {
 		return true
 	}
@@ -1443,16 +1386,12 @@ func (n *nodeContext) hasErr() bool {
 }
 
 func (n *nodeContext) getErr() *Bottom {
-	n.assertInitialized()
-
 	n.errs = CombineErrors(nil, n.errs, n.ctx.Err())
 	return n.errs
 }
 
 // getValidators sets the vertex' Value in case there was no concrete value.
 func (n *nodeContext) getValidators(state vertexStatus) BaseValue {
-	n.assertInitialized()
-
 	ctx := n.ctx
 
 	a := []Value{}
@@ -1553,8 +1492,6 @@ type envCheck struct {
 }
 
 func (n *nodeContext) addBottom(b *Bottom) {
-	n.assertInitialized()
-
 	n.errs = CombineErrors(nil, n.errs, b)
 	// TODO(errors): consider doing this
 	// n.kindExpr = n.errs
@@ -1562,8 +1499,6 @@ func (n *nodeContext) addBottom(b *Bottom) {
 }
 
 func (n *nodeContext) addErr(err errors.Error) {
-	n.assertInitialized()
-
 	if err != nil {
 		n.addBottom(&Bottom{Err: err})
 	}
@@ -2050,7 +1985,7 @@ func (n *nodeContext) addStruct(
 		Vertex: n.node,
 	}
 
-	s.Init(n.ctx)
+	s.Init()
 
 	if s.HasEmbed && !s.IsFile() {
 		closeInfo = closeInfo.SpawnGroup(nil)
@@ -2441,7 +2376,7 @@ outer:
 		s := l.list.info
 		if s == nil {
 			s = &StructLit{Decls: []Decl{l.elipsis}}
-			s.Init(n.ctx)
+			s.Init()
 			l.list.info = s
 		}
 		info := n.node.AddStruct(s, l.env, l.id)

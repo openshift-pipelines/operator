@@ -44,9 +44,6 @@ func (c *client) GetBlobRange(ctx context.Context, repo string, digest ociregist
 		Digest: string(digest),
 	}
 	req, err := newRequest(ctx, rreq, nil)
-	if err != nil {
-		return nil, err
-	}
 	if o1 < 0 {
 		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", o0))
 	} else {
@@ -60,7 +57,7 @@ func (c *client) GetBlobRange(ctx context.Context, repo string, digest ociregist
 	// Fix that either by returning ErrUnsupported or by reading the whole
 	// blob and returning only the required portion.
 	defer closeOnError(&_err, resp.Body)
-	desc, err := descriptorFromResponse(resp, ociregistry.Digest(rreq.Digest), requireSize)
+	desc, err := descriptorFromResponse(resp, ociregistry.Digest(rreq.Digest), true)
 	if err != nil {
 		return nil, fmt.Errorf("invalid descriptor in response: %v", err)
 	}
@@ -97,7 +94,7 @@ func (c *client) resolve(ctx context.Context, rreq *ocirequest.Request) (ociregi
 		return ociregistry.Descriptor{}, err
 	}
 	resp.Body.Close()
-	desc, err := descriptorFromResponse(resp, ociregistry.Digest(rreq.Digest), requireSize|requireDigest)
+	desc, err := descriptorFromResponse(resp, "", true)
 	if err != nil {
 		return ociregistry.Descriptor{}, fmt.Errorf("invalid descriptor in response: %v", err)
 	}
@@ -138,7 +135,7 @@ func (c *client) read(ctx context.Context, rreq *ocirequest.Request) (_ ociregis
 		return nil, err
 	}
 	defer closeOnError(&_err, resp.Body)
-	desc, err := descriptorFromResponse(resp, ociregistry.Digest(rreq.Digest), requireSize)
+	desc, err := descriptorFromResponse(resp, ociregistry.Digest(rreq.Digest), true)
 	if err != nil {
 		return nil, fmt.Errorf("invalid descriptor in response: %v", err)
 	}
@@ -176,9 +173,12 @@ func (c *client) read(ctx context.Context, rreq *ocirequest.Request) (_ ociregis
 				return nil, err
 			}
 			resp1.Body.Close()
-			desc, err = descriptorFromResponse(resp1, ociregistry.Digest(rreq1.Digest), requireSize|requireDigest)
+			desc, err = descriptorFromResponse(resp1, "", true)
 			if err != nil {
 				return nil, err
+			}
+			if desc.Digest == "" {
+				return nil, fmt.Errorf("no digest header found in response")
 			}
 		}
 	}

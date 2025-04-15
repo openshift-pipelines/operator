@@ -23,7 +23,6 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/token"
-	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/value"
 )
 
@@ -39,7 +38,7 @@ type Context struct {
 }
 
 func (c *Context) Lookup(field string) cue.Value {
-	f := c.Obj.LookupPath(cue.MakePath(cue.Str(field)))
+	f := c.Obj.Lookup(field)
 	if !f.Exists() {
 		c.addErr(f, nil, "could not find field %q", field)
 		return cue.Value{}
@@ -51,7 +50,7 @@ func (c *Context) Lookup(field string) cue.Value {
 }
 
 func (c *Context) Int64(field string) int64 {
-	f := c.Obj.LookupPath(cue.MakePath(cue.Str(field)))
+	f := c.Obj.Lookup(field)
 	value, err := f.Int64()
 	if err != nil {
 		c.addErr(f, err, "invalid integer argument")
@@ -61,7 +60,7 @@ func (c *Context) Int64(field string) int64 {
 }
 
 func (c *Context) String(field string) string {
-	f := c.Obj.LookupPath(cue.MakePath(cue.Str(field)))
+	f := c.Obj.Lookup(field)
 	value, err := f.String()
 	if err != nil {
 		c.addErr(f, err, "invalid string argument")
@@ -71,7 +70,7 @@ func (c *Context) String(field string) string {
 }
 
 func (c *Context) Bytes(field string) []byte {
-	f := c.Obj.LookupPath(cue.MakePath(cue.Str(field)))
+	f := c.Obj.Lookup(field)
 	value, err := f.Bytes()
 	if err != nil {
 		c.addErr(f, err, "invalid bytes argument")
@@ -114,12 +113,11 @@ func (t *taskError) Position() token.Pos {
 func (t *taskError) InputPositions() (a []token.Pos) {
 	_, nx := value.ToInternal(t.v)
 
-	nx.VisitLeafConjuncts(func(x adt.Conjunct) bool {
+	for _, x := range nx.Conjuncts {
 		if src := x.Source(); src != nil {
 			a = append(a, src.Pos())
 		}
-		return true
-	})
+	}
 	return a
 }
 

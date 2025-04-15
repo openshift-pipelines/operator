@@ -284,6 +284,7 @@ func (m *Map[K, V]) Range(f func(k K, v V) error) error {
 func (m *Map[K, V]) MarshalJSON() ([]byte, error) {
 	// NB: writes to b don't error, but JSON encoding could error.
 	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
 	b.WriteRune('{')
 	first := true
 	err := m.Range(func(k K, v V) error {
@@ -292,18 +293,11 @@ func (m *Map[K, V]) MarshalJSON() ([]byte, error) {
 			b.WriteRune(',')
 		}
 		first = false
-		bk, err := json.Marshal(k)
-		if err != nil {
+		if err := enc.Encode(k); err != nil {
 			return err
 		}
-		b.Write(bk)
 		b.WriteRune(':')
-		bv, err := json.Marshal(v)
-		if err != nil {
-			return err
-		}
-		b.Write(bv)
-		return nil
+		return enc.Encode(v)
 	})
 	if err != nil {
 		return nil, err
