@@ -178,19 +178,19 @@ func (f *Funcs) Repositories(ctx context.Context, startAfter string) Seq[string]
 	if f != nil && f.Repositories_ != nil {
 		return f.Repositories_(ctx, startAfter)
 	}
-	return ErrorSeq[string](f.newError(ctx, "Repositories", ""))
+	return ErrorIter[string](f.newError(ctx, "Repositories", ""))
 }
 
 func (f *Funcs) Tags(ctx context.Context, repo string, startAfter string) Seq[string] {
 	if f != nil && f.Tags_ != nil {
 		return f.Tags_(ctx, repo, startAfter)
 	}
-	return ErrorSeq[string](f.newError(ctx, "Tags", repo))
+	return ErrorIter[string](f.newError(ctx, "Tags", repo))
 }
 
 func (f *Funcs) Referrers(ctx context.Context, repo string, digest Digest, artifactType string) Seq[Descriptor] {
 	if f != nil && f.Referrers_ != nil {
 		return f.Referrers_(ctx, repo, digest, artifactType)
 	}
-	return ErrorSeq[Descriptor](f.newError(ctx, "Referrers", repo))
+	return ErrorIter[Descriptor](f.newError(ctx, "Referrers", repo))
 }

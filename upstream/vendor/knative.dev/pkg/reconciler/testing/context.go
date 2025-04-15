@@ -120,7 +120,7 @@ func RunAndSyncInformers(ctx context.Context, informers ...controller.Informer) 
 		return wf, err
 	}
 
-	err = wait.PollUntilContextTimeout(ctx, time.Microsecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollImmediate(time.Microsecond, wait.ForeverTestTimeout, func() (bool, error) {
 		if watchesPending.Load() == 0 {
 			return true, nil
 		}

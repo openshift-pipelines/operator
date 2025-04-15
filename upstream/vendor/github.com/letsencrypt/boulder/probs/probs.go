@@ -20,8 +20,6 @@ const (
 	BadRevocationReasonProblem   = ProblemType("badRevocationReason")
 	BadSignatureAlgorithmProblem = ProblemType("badSignatureAlgorithm")
 	CAAProblem                   = ProblemType("caa")
-	// ConflictProblem is a problem type that is not defined in RFC8555.
-	ConflictProblem              = ProblemType("conflict")
 	ConnectionProblem            = ProblemType("connection")
 	DNSProblem                   = ProblemType("dns")
 	InvalidContactProblem        = ProblemType("invalidContact")
@@ -292,11 +290,11 @@ func Canceled(detail string, a ...any) *ProblemDetails {
 	}
 }
 
-// Conflict returns a ProblemDetails with a ConflictProblem and a 409 Conflict
+// Conflict returns a ProblemDetails with a MalformedProblem and a 409 Conflict
 // status code.
 func Conflict(detail string) *ProblemDetails {
 	return &ProblemDetails{
-		Type:       ConflictProblem,
+		Type:       MalformedProblem,
 		Detail:     detail,
 		HTTPStatus: http.StatusConflict,
 	}

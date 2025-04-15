@@ -30,6 +30,4 @@ const (
 	StepsDir = "/tekton/steps"
 
 	ScriptDir = "/tekton/scripts"
-
-	ArtifactsDir = "/tekton/artifacts"
 )

@@ -47,6 +47,10 @@ var (
 	ErrBadRequest        = errors.New("bad request")
 )
 
+func badAPIUseError(f string, a ...any) error {
+	return ociregistry.NewError(fmt.Sprintf(f, a...), ociregistry.ErrUnsupported.Code(), nil)
+}
+
 type Request struct {
 	Kind Kind
 

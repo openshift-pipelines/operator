@@ -1,5 +1,5 @@
 ---
-apiVersion: tekton.dev/v1
+apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   namespace: openshift
@@ -22,35 +22,24 @@ spec:
   tasks:
     - name: fetch-repository
       taskRef:
-        resolver: cluster
-        params:
-          - name: kind
-            value: task
-          - name: name
-            value: git-clone
-          - name: namespace
-            value: openshift-pipelines
+        name: git-clone
+        kind: ClusterTask
       workspaces:
         - name: output
           workspace: workspace
       params:
-        - name: URL
+        - name: url
           value: $(params.GIT_REPO)
-        - name: REVISION
+        - name: revision
           value: $(params.GIT_REVISION)
-        - name: SUBDIRECTORY
+        - name: subdirectory
           value: ""
-        - name: DELETE_EXISTING
+        - name: deleteExisting
           value: "true"
 
     - name: build
       taskRef:
-        resolver: cluster
-        params:
-          - name: kind
-            value: task
-          - name: namespace
-            value: openshift-pipelines
+        kind: ClusterTask
       runAfter:
         - fetch-repository
       workspaces:
@@ -59,7 +48,7 @@ spec:
       params:
         - name: IMAGE
           value: $(params.IMAGE_NAME)
-        - name: TLS_VERIFY
+        - name: TLSVERIFY
           value: "false"
 
     - name: deploy

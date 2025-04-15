@@ -18,7 +18,6 @@ package common
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"path"
 	"testing"
@@ -182,25 +181,10 @@ func TestReplaceImages(t *testing.T) {
 
 		manifest, err := mf.ManifestFrom(mf.Recursive(testData))
 		assertNoError(t, err)
-		newManifest, err := manifest.Transform(TaskImages(context.TODO(), images))
+		newManifest, err := manifest.Transform(TaskImages(images))
 		assertNoError(t, err)
 		assertTaskImage(t, newManifest.Resources(), "push", image)
 		assertTaskImage(t, newManifest.Resources(), "build", "$(inputs.params.BUILDER_IMAGE)")
-	})
-
-	t.Run("replace stepaction image", func(t *testing.T) {
-		stepActionName := "git_clone"
-		image := "foo.bar/image/git-clone"
-		images := map[string]string{
-			stepActionName: image,
-		}
-		testData := path.Join("testdata", "test-replace-stepaction-image.yaml")
-
-		manifest, err := mf.ManifestFrom(mf.Recursive(testData))
-		assertNoError(t, err)
-		newManifest, err := manifest.Transform(StepActionImages(context.TODO(), images))
-		assertNoError(t, err)
-		assertStepActionImage(t, newManifest.Resources(), "git-clone", image)
 	})
 
 	t.Run("replace containers by name", func(t *testing.T) {
@@ -228,7 +212,7 @@ func TestReplaceImages(t *testing.T) {
 
 		manifest, err := mf.ManifestFrom(mf.Recursive(testData))
 		assertNoError(t, err)
-		newManifest, err := manifest.Transform(TaskImages(context.TODO(), images))
+		newManifest, err := manifest.Transform(TaskImages(images))
 		assertNoError(t, err)
 		assertParamHasImage(t, newManifest.Resources(), "BUILDER_IMAGE", image)
 		assertTaskImage(t, newManifest.Resources(), "push", "buildah")
@@ -333,43 +317,6 @@ func assertParamHasImage(t *testing.T, resources []unstructured.Unstructured, na
 			if i != image {
 				t.Errorf("assertion failed; unexpected image: expected %s, got %s", image, i)
 			}
-		}
-	}
-}
-
-func assertStepActionImage(t *testing.T, resources []unstructured.Unstructured, name string, image string) {
-	t.Helper()
-
-	for _, r := range resources {
-		stepActionData, found, err := unstructured.NestedFieldCopy(r.Object, "metadata", "name")
-		if err != nil {
-			t.Error(err)
-		}
-		if !found {
-			continue
-		}
-		stepActionName, ok := stepActionData.(string)
-		if !ok {
-			t.Errorf("assertion failed; name not found")
-			continue
-		}
-		if stepActionName != name {
-			t.Errorf("assertion failed; unexpected name: expected %s, got %s", name, stepActionData.(string))
-		}
-		stepActionImage, found, err := unstructured.NestedMap(r.Object, "spec")
-		if err != nil {
-			t.Errorf("assertion failed; %v", err)
-		}
-		if !found {
-			continue
-		}
-		i, ok := stepActionImage["image"]
-		if !ok {
-			t.Errorf("assertion failed; image not found")
-			continue
-		}
-		if i != image {
-			t.Errorf("assertion failed; unexpected image: expected %s, got %s", image, i)
 		}
 	}
 }
@@ -515,7 +462,8 @@ func TestAddConfigMapValues_PipelineProperties(t *testing.T) {
 	assertNoError(t, err)
 
 	prop := v1alpha1.PipelineProperties{
-		EnableApiFields: "stable",
+		EnableTektonOciBundles: ptr.Bool(true),
+		EnableApiFields:        "stable",
 	}
 
 	manifest, err = manifest.Transform(AddConfigMapValues("test1", prop))
@@ -526,6 +474,7 @@ func TestAddConfigMapValues_PipelineProperties(t *testing.T) {
 	assertNoError(t, err)
 
 	assert.Equal(t, cm.Data["foo"], "bar")
+	assert.Equal(t, cm.Data["enable-tekton-oci-bundles"], "true")
 	assert.Equal(t, cm.Data["enable-api-fields"], "stable")
 }
 
@@ -1145,138 +1094,6 @@ func TestReplaceNamespace(t *testing.T) {
 					}
 				}
 
-			}
-		})
-	}
-}
-
-func TestAddSecretData(t *testing.T) {
-	tests := []struct {
-		name        string
-		inputObj    *unstructured.Unstructured
-		inputData   map[string][]byte
-		inputAnnot  map[string]string
-		expectedObj *unstructured.Unstructured
-		expectError bool
-	}{
-		{
-			name: "Add data to empty Secret",
-			inputObj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "Secret",
-					"metadata":   map[string]interface{}{},
-				},
-			},
-			inputData:  map[string][]byte{"key": []byte("value")},
-			inputAnnot: map[string]string{"anno": "value"},
-			expectedObj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "Secret",
-					"metadata": map[string]interface{}{
-						"annotations": map[string]interface{}{
-							"anno": "value",
-						},
-					},
-					"data": map[string]interface{}{
-						"key": base64.StdEncoding.EncodeToString([]byte("value")),
-					},
-				},
-			},
-			expectError: false,
-		},
-		{
-			name: "Do not overwrite existing data",
-			inputObj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "Secret",
-					"metadata":   map[string]interface{}{},
-					"data": map[string]interface{}{
-						"existingKey": []byte("existingValue"),
-					},
-				},
-			},
-			inputData:  map[string][]byte{"newKey": []byte("newValue")},
-			inputAnnot: map[string]string{"anno": "value"},
-			expectedObj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "Secret",
-					"metadata": map[string]interface{}{
-						"annotations": map[string]interface{}{
-							"anno": "value",
-						},
-					},
-					"data": map[string]interface{}{
-						"existingKey": base64.StdEncoding.EncodeToString([]byte("existingValue")),
-					},
-				},
-			},
-			expectError: false,
-		},
-		{
-			name: "Non-Secret resource",
-			inputObj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "ConfigMap",
-					"metadata":   map[string]interface{}{},
-				},
-			},
-			inputData:  map[string][]byte{"key": []byte("value")},
-			inputAnnot: map[string]string{"anno": "value"},
-			expectedObj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "ConfigMap",
-					"metadata":   map[string]interface{}{},
-				},
-			},
-			expectError: false,
-		},
-		{
-			name: "Empty input data",
-			inputObj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "Secret",
-					"metadata":   map[string]interface{}{},
-				},
-			},
-			inputData:  map[string][]byte{},
-			inputAnnot: map[string]string{"anno": "value"},
-			expectedObj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "Secret",
-					"metadata":   map[string]interface{}{},
-				},
-			},
-			expectError: false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			err := AddSecretData(test.inputData, test.inputAnnot)(test.inputObj)
-
-			if test.expectError {
-				t.Errorf("Error %v", err)
-			} else {
-				assertNoError(t, err)
-				// Remove creationTimestamp from both expected and actual objects
-				if metadata, ok := test.expectedObj.Object["metadata"].(map[string]interface{}); ok {
-					delete(metadata, "creationTimestamp")
-				}
-				if metadata, ok := test.inputObj.Object["metadata"].(map[string]interface{}); ok {
-					delete(metadata, "creationTimestamp")
-				}
-
-				if diff := cmp.Diff(test.expectedObj.Object, test.inputObj.Object); diff != "" {
-					t.Errorf("Objects do not match (-expected +actual):\n%s", diff)
-				}
 			}
 		})
 	}

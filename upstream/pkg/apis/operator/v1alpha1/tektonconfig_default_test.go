@@ -69,7 +69,8 @@ func Test_SetDefaults_Pipeline_Properties(t *testing.T) {
 	}
 
 	tc.SetDefaults(context.TODO())
-	if *tc.Spec.Pipeline.SendCloudEventsForRuns != true {
+	if *tc.Spec.Pipeline.SendCloudEventsForRuns != true ||
+		*tc.Spec.Pipeline.EnableTektonOciBundles != false {
 		t.Error("Setting default failed for TektonConfig (spec.pipeline.pipelineProperties)")
 	}
 }
@@ -89,7 +90,7 @@ func Test_SetDefaults_Addon_Params(t *testing.T) {
 	t.Setenv("PLATFORM", "openshift")
 
 	tc.SetDefaults(context.TODO())
-	if len(tc.Spec.Addon.Params) != 5 {
+	if len(tc.Spec.Addon.Params) != 4 {
 		t.Error("Setting default failed for TektonConfig (spec.addon.params)")
 	}
 }

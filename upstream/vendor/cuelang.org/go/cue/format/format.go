@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package format implements standard formatting of CUE configurations.
-package format
+package format // import "cuelang.org/go/cue/format"
 
 // TODO: this package is in need of a rewrite. When doing so, the API should
 // allow for reformatting an AST, without actually writing bytes.
@@ -202,7 +202,7 @@ func newFormatter(p *printer) *formatter {
 type whiteSpace int
 
 const (
-	_ whiteSpace = 0
+	ignore whiteSpace = 0
 
 	// write a space, or disallow it
 	blank whiteSpace = 1 << iota
@@ -262,6 +262,13 @@ func (f *formatter) formfeed() whiteSpace {
 	return formfeed
 }
 
+func (f *formatter) wsOverride(def whiteSpace) whiteSpace {
+	if f.current.override == ignore {
+		return def
+	}
+	return f.current.override
+}
+
 func (f *formatter) onOneLine(node ast.Node) bool {
 	a := node.Pos()
 	b := node.End()
@@ -282,7 +289,7 @@ func (f *formatter) before(node ast.Node) bool {
 		if ok && len(s.Elts) <= 1 && f.current.nodeSep != blank && f.onOneLine(node) {
 			f.current.nodeSep = blank
 		}
-		f.current.cg = ast.Comments(node)
+		f.current.cg = node.Comments()
 		f.visitComments(f.current.pos)
 		return true
 	}

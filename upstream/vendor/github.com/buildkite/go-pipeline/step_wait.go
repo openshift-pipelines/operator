@@ -1,6 +1,8 @@
 package pipeline
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // See the comment in step_scalar.go.
 
@@ -12,26 +14,18 @@ type WaitStep struct {
 	Contents map[string]any `yaml:",inline"`
 }
 
-// MarshalJSON marshals a wait step as "wait" if the step is empty, or as the
-// s.Scalar if it is not empty, or as s.Contents.
+// MarshalJSON marshals a wait step as "wait" if w is empty, or as the step's scalar if it's set.
+// If scalar is empty, it marshals as the remaining fields
 func (s *WaitStep) MarshalJSON() ([]byte, error) {
-	o, err := s.MarshalYAML()
-	if err != nil {
-		return nil, err
-	}
-	return json.Marshal(o)
-}
-
-// MarshalYAML returns a wait step as "wait" if the step is empty, or as the
-// s.Scalar if it is not empty, or as s.Contents.
-func (s *WaitStep) MarshalYAML() (any, error) {
 	if s.Scalar != "" {
-		return s.Scalar, nil
+		return json.Marshal(s.Scalar)
 	}
+
 	if len(s.Contents) == 0 {
-		return "wait", nil
+		return json.Marshal("wait")
 	}
-	return s.Contents, nil
+
+	return json.Marshal(s.Contents)
 }
 
 func (s *WaitStep) interpolate(tf stringTransformer) error {

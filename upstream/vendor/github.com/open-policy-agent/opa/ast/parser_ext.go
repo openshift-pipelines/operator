@@ -713,8 +713,6 @@ func parseModule(filename string, stmts []Statement, comments []*Comment, regoCo
 		return nil, errs
 	}
 
-	attachRuleAnnotations(mod)
-
 	return mod, nil
 }
 

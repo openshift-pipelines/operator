@@ -47,8 +47,8 @@ func (c *httpCmd) Run(ctx *task.Context) (res interface{}, err error) {
 		u      = ctx.String("url")
 	)
 	var r io.Reader
-	if obj := ctx.Obj.LookupPath(cue.MakePath(cue.Str("request"))); obj.Exists() {
-		if v := obj.LookupPath(cue.MakePath(cue.Str("body"))); v.Exists() {
+	if obj := ctx.Obj.Lookup("request"); obj.Exists() {
+		if v := obj.Lookup("body"); v.Exists() {
 			r, err = v.Reader()
 			if err != nil {
 				return nil, err
@@ -65,7 +65,7 @@ func (c *httpCmd) Run(ctx *task.Context) (res interface{}, err error) {
 	}
 
 	var caCert []byte
-	caCertValue := ctx.Obj.LookupPath(cue.MakePath(cue.Str("tls"), cue.Str("caCert")))
+	caCertValue := ctx.Obj.LookupPath(cue.ParsePath("tls.caCert"))
 	if caCertValue.Exists() {
 		caCert, err = caCertValue.Bytes()
 		if err != nil {
@@ -74,7 +74,7 @@ func (c *httpCmd) Run(ctx *task.Context) (res interface{}, err error) {
 	}
 
 	tlsVerify := true
-	tlsVerifyValue := ctx.Obj.LookupPath(cue.MakePath(cue.Str("tls"), cue.Str("verify")))
+	tlsVerifyValue := ctx.Obj.LookupPath(cue.ParsePath("tls.verify"))
 	if tlsVerifyValue.Exists() {
 		tlsVerify, err = tlsVerifyValue.Bool()
 		if err != nil {
@@ -143,7 +143,7 @@ func (c *httpCmd) Run(ctx *task.Context) (res interface{}, err error) {
 }
 
 func parseHeaders(obj cue.Value, label string) (http.Header, error) {
-	m := obj.LookupPath(cue.MakePath(cue.Str(label)))
+	m := obj.Lookup(label)
 	if !m.Exists() {
 		return nil, nil
 	}

@@ -102,16 +102,11 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 		return x == b
 
 	case *adt.BuiltinValidator:
-		state := s.ctx.PushState(s.ctx.Env(0), b.Source())
-		b1 := s.ctx.Validate(x, b)
-		if b1 != nil {
-			s.errs = errors.Append(s.errs, b1.Err)
+		if y := s.ctx.Validate(x, b); y != nil {
+			s.errs = errors.Append(s.errs, y.Err)
+			return false
 		}
-		b2 := s.ctx.PopState(state)
-		if b2 != nil {
-			s.errs = errors.Append(s.errs, b2.Err)
-		}
-		return b1 == nil && b2 == nil
+		return true
 
 	case *adt.Null:
 		return b.Kind() == adt.NullKind

@@ -29,24 +29,24 @@ import (
 //	// comment
 //	foo: bar: 2
 func ExtractDoc(v *adt.Vertex) (docs []*ast.CommentGroup) {
-	return extractDocs(v)
+	return extractDocs(v, v.Conjuncts)
 }
 
-func extractDocs(v *adt.Vertex) (docs []*ast.CommentGroup) {
+func extractDocs(v *adt.Vertex, a []adt.Conjunct) (docs []*ast.CommentGroup) {
 	fields := []*ast.Field{}
 
 	// Collect docs directly related to this Vertex.
-	v.VisitLeafConjuncts(func(x adt.Conjunct) bool {
+	for _, x := range a {
 		// TODO: Is this still being used?
 		if v, ok := x.Elem().(*adt.Vertex); ok {
-			docs = append(docs, extractDocs(v)...)
-			return true
+			docs = append(docs, extractDocs(v, v.Conjuncts)...)
+			continue
 		}
 
 		switch f := x.Field().Source().(type) {
 		case *ast.Field:
 			if hasShorthandValue(f) {
-				return true
+				continue
 			}
 			fields = append(fields, f)
 			for _, cg := range f.Comments() {
@@ -60,19 +60,21 @@ func extractDocs(v *adt.Vertex) (docs []*ast.CommentGroup) {
 				docs = append(docs, c)
 			}
 		}
+	}
 
-		return true
-	})
+	if v == nil {
+		return docs
+	}
 
 	// Collect docs from parent scopes in collapsed fields.
 	for p := v.Parent; p != nil; p = p.Parent {
 
 		newFields := []*ast.Field{}
 
-		p.VisitLeafConjuncts(func(x adt.Conjunct) bool {
+		for _, x := range p.Conjuncts {
 			f, ok := x.Source().(*ast.Field)
 			if !ok || !hasShorthandValue(f) {
-				return true
+				continue
 			}
 
 			nested := nestedField(f)
@@ -86,8 +88,7 @@ func extractDocs(v *adt.Vertex) (docs []*ast.CommentGroup) {
 					}
 				}
 			}
-			return true
-		})
+		}
 
 		fields = newFields
 	}
@@ -143,10 +144,9 @@ func containsDoc(a []*ast.CommentGroup, cg *ast.CommentGroup) bool {
 }
 
 func ExtractFieldAttrs(v *adt.Vertex) (attrs []*ast.Attribute) {
-	v.VisitLeafConjuncts(func(x adt.Conjunct) bool {
+	for _, x := range v.Conjuncts {
 		attrs = extractFieldAttrs(attrs, x.Field())
-		return true
-	})
+	}
 	return attrs
 }
 

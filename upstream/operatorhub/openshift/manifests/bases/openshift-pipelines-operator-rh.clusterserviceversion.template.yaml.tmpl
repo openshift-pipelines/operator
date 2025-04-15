@@ -10,15 +10,12 @@ metadata:
     description: Red Hat OpenShift Pipelines is a cloud-native CI/CD solution for building pipelines using Tekton concepts which run natively on OpenShift and Kubernetes.
     operators.operatorframework.io/builder: operator-sdk-v1.7.2
     features.operators.openshift.io/disconnected: "true"
-    features.operators.openshift.io/fips-compliant: "true"
+    features.operators.openshift.io/fips-compliant: "false"
     features.operators.openshift.io/proxy-aware: "true"
     features.operators.openshift.io/tls-profiles: "false"
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
-    features.operators.openshift.io/cnf: "false"
-    features.operators.openshift.io/cni: "false"
-    features.operators.openshift.io/csi: "false"
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev"]'
     repository: https://github.com/tektoncd/operator
     support: Red Hat
@@ -110,7 +107,7 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:label
       version: v1alpha1
-    - description: Represents an installation of latest version of Addons (exclusively Tasks, StepActions, consoleyamlsamples, consoleclidownloads and consolequickstarts)
+    - description: Represents an installation of latest version of Addons (exclusively ClusterTasks, consoleyamlsamples, consoleclidownloads and consolequickstarts)
       displayName: Tekton Addons
       kind: TektonAddon
       name: tektonaddons.operator.tekton.dev

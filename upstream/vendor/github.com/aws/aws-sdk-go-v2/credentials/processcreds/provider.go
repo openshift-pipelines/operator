@@ -167,9 +167,6 @@ type CredentialProcessResponse struct {
 
 	// The date on which the current credentials expire.
 	Expiration *time.Time
-
-	// The ID of the account for credentials
-	AccountID string `json:"AccountId"`
 }
 
 // Retrieve executes the credential process command and returns the
@@ -211,7 +208,6 @@ func (p *Provider) Retrieve(ctx context.Context) (aws.Credentials, error) {
 		AccessKeyID:     resp.AccessKeyID,
 		SecretAccessKey: resp.SecretAccessKey,
 		SessionToken:    resp.SessionToken,
-		AccountID:       resp.AccountID,
 	}
 
 	// Handle expiration

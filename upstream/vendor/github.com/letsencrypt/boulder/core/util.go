@@ -25,9 +25,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/go-jose/go-jose/v4"
-	"google.golang.org/protobuf/types/known/durationpb"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"gopkg.in/go-jose/go-jose.v2"
 )
 
 const Unspecified = "Unspecified"
@@ -76,9 +74,9 @@ func NewToken() string {
 
 var tokenFormat = regexp.MustCompile(`^[\w-]{43}$`)
 
-// looksLikeAToken checks whether a string represents a 32-octet value in
+// LooksLikeAToken checks whether a string represents a 32-octet value in
 // the URL-safe base64 alphabet.
-func looksLikeAToken(token string) bool {
+func LooksLikeAToken(token string) bool {
 	return tokenFormat.MatchString(token)
 }
 
@@ -94,7 +92,8 @@ func Fingerprint256(data []byte) string {
 
 type Sha256Digest [sha256.Size]byte
 
-// KeyDigest produces the SHA256 digest of a provided public key.
+// KeyDigest produces a Base64-encoded SHA256 digest of a
+// provided public key.
 func KeyDigest(key crypto.PublicKey) (Sha256Digest, error) {
 	switch t := key.(type) {
 	case *jose.JSONWebKey:
@@ -213,81 +212,8 @@ func IsAnyNilOrZero(vals ...interface{}) bool {
 		switch v := val.(type) {
 		case nil:
 			return true
-		case bool:
-			if !v {
-				return true
-			}
-		case string:
-			if v == "" {
-				return true
-			}
-		case []string:
-			if len(v) == 0 {
-				return true
-			}
-		case byte:
-			// Byte is an alias for uint8 and will cover that case.
-			if v == 0 {
-				return true
-			}
 		case []byte:
 			if len(v) == 0 {
-				return true
-			}
-		case int:
-			if v == 0 {
-				return true
-			}
-		case int8:
-			if v == 0 {
-				return true
-			}
-		case int16:
-			if v == 0 {
-				return true
-			}
-		case int32:
-			if v == 0 {
-				return true
-			}
-		case int64:
-			if v == 0 {
-				return true
-			}
-		case uint:
-			if v == 0 {
-				return true
-			}
-		case uint16:
-			if v == 0 {
-				return true
-			}
-		case uint32:
-			if v == 0 {
-				return true
-			}
-		case uint64:
-			if v == 0 {
-				return true
-			}
-		case float32:
-			if v == 0 {
-				return true
-			}
-		case float64:
-			if v == 0 {
-				return true
-			}
-		case time.Time:
-			if v.IsZero() {
-				return true
-			}
-		case *timestamppb.Timestamp:
-			if v == nil || v.AsTime().IsZero() {
-				return true
-			}
-		case *durationpb.Duration:
-			if v == nil || v.AsDuration() == time.Duration(0) {
 				return true
 			}
 		default:
