@@ -71,31 +71,34 @@ func Test_updateApiConfig(t *testing.T) {
 	assert.NilError(t, err)
 	bufferDuration := uint(20)
 	spec := v1alpha1.TektonResultSpec{
-		LokiStackProperties: v1alpha1.LokiStackProperties{
-			LokiStackName:      "foo",
-			LokiStackNamespace: "bar",
-		},
-		ResultsAPIProperties: v1alpha1.ResultsAPIProperties{
-			DBHost:                              "localhost",
-			DBName:                              "test",
-			ServerPort:                          &intVal,
-			DBSSLMode:                           "enable",
-			DBSSLRootCert:                       "/etc/tls/db/ca.crt",
-			DBEnableAutoMigration:               &boolVal,
-			TLSHostnameOverride:                 "localhostTest",
-			AuthDisable:                         &boolVal,
-			AuthImpersonate:                     &boolVal,
-			PrometheusPort:                      &intVal,
-			PrometheusHistogram:                 &boolVal,
-			LogLevel:                            "warn",
-			LogsAPI:                             &boolVal,
-			LogsPath:                            "/logs/test",
-			LogsType:                            "s3",
-			LogsBufferSize:                      &intVal,
-			StorageEmulatorHost:                 "http://localhost:9004",
-			LoggingPluginForwarderDelayDuration: &bufferDuration,
-			LoggingPluginQueryLimit:             &limit,
-			LoggingPluginQueryParams:            "direction=asc&skip=0",
+		Result: v1alpha1.Result{
+
+			LokiStackProperties: v1alpha1.LokiStackProperties{
+				LokiStackName:      "foo",
+				LokiStackNamespace: "bar",
+			},
+			ResultsAPIProperties: v1alpha1.ResultsAPIProperties{
+				DBHost:                              "localhost",
+				DBName:                              "test",
+				ServerPort:                          &intVal,
+				DBSSLMode:                           "enable",
+				DBSSLRootCert:                       "/etc/tls/db/ca.crt",
+				DBEnableAutoMigration:               &boolVal,
+				TLSHostnameOverride:                 "localhostTest",
+				AuthDisable:                         &boolVal,
+				AuthImpersonate:                     &boolVal,
+				PrometheusPort:                      &intVal,
+				PrometheusHistogram:                 &boolVal,
+				LogLevel:                            "warn",
+				LogsAPI:                             &boolVal,
+				LogsPath:                            "/logs/test",
+				LogsType:                            "s3",
+				LogsBufferSize:                      &intVal,
+				StorageEmulatorHost:                 "http://localhost:9004",
+				LoggingPluginForwarderDelayDuration: &bufferDuration,
+				LoggingPluginQueryLimit:             &limit,
+				LoggingPluginQueryParams:            "direction=asc&skip=0",
+			},
 		},
 	}
 
@@ -217,6 +220,71 @@ func TestUpdateEnvWithSecretName(t *testing.T) {
 			}
 			assert.Equal(t, true, envFound, fmt.Sprintf("property not found in env:%s", propertyKey))
 		}
+	}
+	assert.Equal(t, true, containerFound, "container not found")
+}
+
+func TestUpdateAPIEnv(t *testing.T) {
+	testData := path.Join("testdata", "api-deployment-env.yaml")
+	manifest, err := mf.ManifestFrom(mf.Recursive(testData))
+	assert.NilError(t, err)
+
+	deployment := &appsv1.Deployment{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(manifest.Resources()[0].Object, deployment)
+	assert.NilError(t, err)
+
+	boolVal := true
+	intVal := int64(12345)
+	spec := v1alpha1.TektonResultSpec{
+		Result: v1alpha1.Result{
+
+			ResultsAPIProperties: v1alpha1.ResultsAPIProperties{
+				DBHost:                "localhost",
+				DBName:                "test",
+				ServerPort:            &intVal,
+				DBEnableAutoMigration: &boolVal,
+				TLSHostnameOverride:   "localhostTest",
+				AuthDisable:           &boolVal,
+				LogLevel:              "warn",
+				LogsAPI:               &boolVal,
+				LogsPath:              "/logs/test",
+				LogsType:              "S3",
+				LogsBufferSize:        &intVal,
+			},
+		},
+	}
+
+	manifest, err = manifest.Transform(updateApiEnv(spec))
+	assert.NilError(t, err)
+
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(manifest.Resources()[0].Object, deployment)
+	assert.NilError(t, err)
+
+	containerFound := false
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		if container.Name != apiContainerName {
+			continue
+		}
+		containerFound = true
+		envFound := false
+		for _, env := range container.Env {
+			switch env.Name {
+			case "LOGS_PATH":
+				envFound = true
+				assert.Equal(t, env.Value, "/logs/test")
+			case "LOGS_TYPE":
+				envFound = true
+				assert.Equal(t, env.Value, "S3")
+			case "SERVER_PORT":
+				envFound = true
+				assert.Equal(t, env.Value, "12345")
+			case "AUTH_DISABLE":
+				envFound = true
+				assert.Equal(t, env.Value, "true")
+			}
+		}
+		assert.Equal(t, true, envFound, "env not found")
+
 	}
 	assert.Equal(t, true, containerFound, "container not found")
 }
