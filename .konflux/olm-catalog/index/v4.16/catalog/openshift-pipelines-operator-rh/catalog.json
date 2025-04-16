@@ -6362,7 +6362,7 @@
     "schema": "olm.bundle",
     "name": "openshift-pipelines-operator-rh.v1.15.3",
     "package": "openshift-pipelines-operator-rh",
-    "image": "quay.io/redhat-user-workloads/tekton-ecosystem-tenant/1-15/operator-bundle-rhel8@sha256:96249bb71475290dfcb80046fb9583438194643234dca629405330edde1e64cd",
+    "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:96249bb71475290dfcb80046fb9583438194643234dca629405330edde1e64cd",
     "properties": [
         {
             "type": "olm.gvk",
@@ -6652,11 +6652,11 @@
             "image": "quay.io/openshift-pipeline/pipelines-controller-rhel8@sha256:5e6b209aee9ac513ef55edd176f25510d48c094f5b2f2f77716d64f2fb360d0f"
         },
         {
-            "name": "IMAGE_PIPELINES_ARG__SHELL_IMAGE",
+            "name": "IMAGE_PIPELINES_ARG__ENTRYPOINT_IMAGE",
             "image": "quay.io/openshift-pipeline/pipelines-entrypoint-rhel8@sha256:e1c7716da3644a02716e9f52ec0987e293e7d47f52ebf7517e7095f8963fb032"
         },
         {
-            "name": "IMAGE_PIPELINES_ARG__ENTRYPOINT_IMAGE",
+            "name": "IMAGE_PIPELINES_ARG__SHELL_IMAGE",
             "image": "quay.io/openshift-pipeline/pipelines-entrypoint-rhel8@sha256:e1c7716da3644a02716e9f52ec0987e293e7d47f52ebf7517e7095f8963fb032"
         },
         {
@@ -6664,19 +6664,19 @@
             "image": "quay.io/openshift-pipeline/pipelines-events-rhel8@sha256:bdfe4d3525d9569114bf17353d62ae3b0ddf0bbe89f6520ec879bd8624154225"
         },
         {
-            "name": "IMAGE_PIPELINES_ARG__GIT_IMAGE",
-            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel8@sha256:4f6247d0f697bab492acf0e347605cfc3a87308d3987250c2dbd87f93c4f2d91"
-        },
-        {
             "name": "IMAGE_ADDONS_REPORT",
             "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel8@sha256:4f6247d0f697bab492acf0e347605cfc3a87308d3987250c2dbd87f93c4f2d91"
         },
         {
-            "name": "IMAGE_ADDONS_GIT_RUN",
+            "name": "IMAGE_PIPELINES_ARG__GIT_IMAGE",
             "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel8@sha256:4f6247d0f697bab492acf0e347605cfc3a87308d3987250c2dbd87f93c4f2d91"
         },
         {
             "name": "IMAGE_ADDONS_PARAM_GITINITIMAGE",
+            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel8@sha256:4f6247d0f697bab492acf0e347605cfc3a87308d3987250c2dbd87f93c4f2d91"
+        },
+        {
+            "name": "IMAGE_ADDONS_GIT_RUN",
             "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel8@sha256:4f6247d0f697bab492acf0e347605cfc3a87308d3987250c2dbd87f93c4f2d91"
         },
         {
@@ -6702,6 +6702,10 @@
         {
             "name": "IMAGE_PIPELINES_ARG__NOP_IMAGE",
             "image": "quay.io/openshift-pipeline/pipelines-nop-rhel8@sha256:c083092380a7e4603a7bb0d942510fb39e072a0042ba7653ddb5ffd3667415bb"
+        },
+        {
+            "name": "",
+            "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:96249bb71475290dfcb80046fb9583438194643234dca629405330edde1e64cd"
         },
         {
             "name": "IMAGE_PIPELINES_PROXY",
@@ -6768,10 +6772,6 @@
             "image": "quay.io/openshift-pipeline/pipelines-workingdirinit-rhel8@sha256:57dfe68b15f23c8cd0ee78dfc0b353e891732ee25f2aa28655e4f0f7baa47590"
         },
         {
-            "name": "",
-            "image": "quay.io/redhat-user-workloads/tekton-ecosystem-tenant/1-15/operator-bundle-rhel8@sha256:96249bb71475290dfcb80046fb9583438194643234dca629405330edde1e64cd"
-        },
-        {
             "name": "IMAGE_ADDONS_TKN_CLI_SERVE",
             "image": "registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel8@sha256:d055d2b35a663aef3e1aafdbed0b12957867c0670c946ebae66e9c44a768bda2"
         },
@@ -6784,15 +6784,15 @@
             "image": "registry.redhat.io/openshift-serverless-1/client-kn-rhel8@sha256:bf6cf2e87fb19f7aa9a490b83c16af69834c0721220a643710a1b077959e91ca"
         },
         {
+            "name": "IMAGE_ADDONS_PARAM_BUILDER_IMAGE",
+            "image": "registry.redhat.io/rhel8/buildah@sha256:aac6629389db17e99894c5bee0da01d4c8065d11d8c6f6e1602f9484290baa70"
+        },
+        {
             "name": "IMAGE_ADDONS_S2I_BUILD",
             "image": "registry.redhat.io/rhel8/buildah@sha256:aac6629389db17e99894c5bee0da01d4c8065d11d8c6f6e1602f9484290baa70"
         },
         {
             "name": "IMAGE_ADDONS_BUILD",
-            "image": "registry.redhat.io/rhel8/buildah@sha256:aac6629389db17e99894c5bee0da01d4c8065d11d8c6f6e1602f9484290baa70"
-        },
-        {
-            "name": "IMAGE_ADDONS_PARAM_BUILDER_IMAGE",
             "image": "registry.redhat.io/rhel8/buildah@sha256:aac6629389db17e99894c5bee0da01d4c8065d11d8c6f6e1602f9484290baa70"
         },
         {
