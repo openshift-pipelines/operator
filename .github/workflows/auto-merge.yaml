@@ -23,9 +23,10 @@ jobs:
           BASE_BRANCH=${GITHUB_REF#refs/heads/}
           echo "Base branch is $BASE_BRANCH"
           # LGTM pull requests that might have one review but no more lgtm
-          for p in $(gh pr list --search "author:app/red-hat-konflux base:$BASE_BRANCH" --json "number" | jq ".[].number"); do
+          for p in $(gh pr list --search "label:konflux-nudge author:app/red-hat-konflux base:$BASE_BRANCH" --json "number" | jq ".[].number"); do
             echo "Approving PR $p"
             gh pr review $p --approve --body "/lgtm"
+            gh pr merge --rebase --delete-branch --auto $p
           done
         env:
           GH_TOKEN: ${{ secrets.OPENSHIFT_PIPELINES_ROBOT }}
