@@ -1,9 +1,9 @@
-name: auto-merge-next
+name: auto-merge
 
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: "0,30 * * * *" # At every 30 minutes
+    - cron: "*/30 * * * *" # At every 30 minutes
 
 jobs:
   auto-approve:
@@ -14,18 +14,19 @@ jobs:
     steps:
       - name: Checkout the current repo
         uses: actions/checkout@v4
-      - name: auto-approve-konflux-nudges
+      - name: auto-approve-update-references
         run: |
           gh auth status
           git config user.name openshift-pipelines-bot
           git config user.email pipelines-extcomm@redhat.com
           # Approve and merge pull-request with no reviews
-          BASE_BRANCH=next
+          BASE_BRANCH=${GITHUB_REF#refs/heads/}
           echo "Base branch is $BASE_BRANCH"
           # LGTM pull requests that might have one review but no more lgtm
-          for p in $(gh pr list --search "label:konflux-nudge base:$BASE_BRANCH" --json "number" | jq ".[].number"); do
+          for p in $(gh pr list --search "label:konflux-nudge author:app/red-hat-konflux base:$BASE_BRANCH" --json "number" | jq ".[].number"); do
             echo "Approving PR $p"
             gh pr review $p --approve --body "/lgtm"
+            gh pr merge --rebase --delete-branch --auto $p
           done
         env:
           GH_TOKEN: ${{ secrets.OPENSHIFT_PIPELINES_ROBOT }}
@@ -35,7 +36,7 @@ jobs:
           git config user.name openshift-pipelines-bot
           git config user.email pipelines-extcomm@redhat.com
           # Approve and merge pull-request with no reviews
-          BASE_BRANCH=next
+          BASE_BRANCH=${GITHUB_REF#refs/heads/}
           for p in $(gh pr list --search "head:actions/update/sources-$BASE_BRANCH" --json "number" | jq ".[].number"); do
             gh pr review $p --approve --body "/lgtm"
           done
