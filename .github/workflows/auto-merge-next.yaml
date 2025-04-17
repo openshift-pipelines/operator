@@ -26,6 +26,7 @@ jobs:
           for p in $(gh pr list --search "label:konflux-nudge base:$BASE_BRANCH" --json "number" | jq ".[].number"); do
             echo "Approving PR $p"
             gh pr review $p --approve --body "/lgtm"
+            gh pr merge --rebase --delete-branch --auto $p
           done
         env:
           GH_TOKEN: ${{ secrets.OPENSHIFT_PIPELINES_ROBOT }}
