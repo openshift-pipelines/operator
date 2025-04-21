@@ -55,13 +55,13 @@ jobs:
           EOF
           
           git push -f origin ${SOURCE_BRANCH}
-          
-          if [ "$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json url --jq 'length')" = "0" ]; then
+          pr_list=$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json number)
+          if [ "$(echo $pr_list | jq length)" = "0" ]; then
             echo "creating PR..."
             gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
           else
             echo "a PR already exists, editing..."
-            gh pr edit --title "[bot:${BASE_BRANCH}] Update  generate Cluster Service Version (CSV)" --fill
+            gh pr edit $(echo $pr_list | jq .[0].number) ${BASE_BRANCH}   --add-label=lgtm  --add-label=approved 
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
