@@ -61,7 +61,7 @@ jobs:
             gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
           else
             echo "a PR already exists, editing..."
-            gh pr edit $(echo $pr_list | jq .[0].number) ${BASE_BRANCH}   --add-label=lgtm  --add-label=approved 
+            gh pr edit $(echo $pr_list | jq .[0].number) --add-label=lgtm  --add-label=approved 
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
