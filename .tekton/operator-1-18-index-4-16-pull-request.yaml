@@ -3,17 +3,15 @@ kind: PipelineRun
 metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator?rev={{revision}}
+    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/main/.tekton/fbc-build.yaml"
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch == "release-v1.18.x" &&
-      (".tekton/operator-1-18-index-4-16-push.yaml".pathChanged() ||
-      ".tekton/operator-1-18-index-4-16-pull-request.yaml".pathChanged() ||
+      (".tekton/operator-1-18-index-4-16-pull-request.yaml".pathChanged() ||
       ".konflux/olm-catalog/index/v4.16/catalog/***".pathChanged() ||
-      ".konflux/olm-catalog/index/v4.16/Dockerfile.catalog".pathChanged() ||
-      ".tekton/fbc-build.yaml".pathChanged())
-  creationTimestamp: null
+      ".konflux/olm-catalog/index/v4.16/Dockerfile.catalog".pathChanged())
   labels:
     appstudio.openshift.io/application: operator-1-18-index-4-16-application
     appstudio.openshift.io/component: operator-1-18-index-4-16
