@@ -1,18 +1,16 @@
-# Generated for Konflux Application openshift-pipelines-operator-main by openshift-pipelines/hack. DO NOT EDIT
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   annotations:
-    pipelinesascode.tekton.dev/cancel-in-progress: "true" # Cancel in-progress pipelines
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator.git?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "main" &&
-      ((".konflux/patches/***".pathChanged() || ".konflux/olm-catalog/bundle/***".pathChanged()) ||
-      ".konflux/olm-catalog/bundle/Dockerfile".pathChanged() || ".tekton/docker-build-ta.yaml".pathChanged() ||
-      ".tekton/operator-main-bundle-push.yaml".pathChanged())
+      == "main" && ((".konflux/patches/***".pathChanged() || ".konflux/olm-catalog/bundle/***".pathChanged())
+      || ".konflux/olm-catalog/bundle/Dockerfile".pathChanged() || ".tekton/docker-build-ta.yaml".pathChanged()
+      || ".tekton/operator-main-bundle-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: openshift-pipelines-operator-main
@@ -32,15 +30,16 @@ spec:
     value: .konflux/olm-catalog/bundle/Dockerfile
   - name: build-platforms
     value:
-      - linux/x86_64
+    - linux/x86_64
   - name: build-image-index
-    value: false
-  
+    value: "false"
   - name: prefetch-input
     value: |
       {"type": "rpm", "path": ".konflux/rpms"}
   pipelineRef:
     name: docker-build-ta
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-operator-main-bundle
   workspaces:
   - name: git-auth
     secret:
