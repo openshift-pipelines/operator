@@ -1,75 +1,36 @@
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  labels:
-    app.kubernetes.io/component: controller
-    app.kubernetes.io/instance: default
-    app.kubernetes.io/part-of: tekton-pruner
-    pruner.tekton.dev/release: devel
-  name: tekton-pruner-controller
-  namespace: tekton-pipelines
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  labels:
-    pruner.tekton.dev/release: devel
-  name: tekton-pruner-controller
-  namespace: tekton-pipelines
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - configmaps
-      - secrets
-    verbs:
-      - get
-      - list
-      - update
-      - watch
-  - apiGroups:
-      - coordination.k8s.io
-    resources:
-      - leases
-    verbs:
-      - get
-      - list
-      - create
-      - update
-      - delete
-      - patch
-      - watch
----
-apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  labels:
-    pruner.tekton.dev/release: devel
   name: tekton-pruner-controller-cluster-access
+  labels:
+    pruner.tekton.dev/release: "v0.1.0"
 rules:
+  # Write permissions to publish events.
   - apiGroups:
       - ""
     resources:
-      - events
+      - "events"
     verbs:
-      - create
-      - update
-      - patch
+      - "create"
+      - "update"
+      - "patch"
+  # allows to manage taskruns and pipelineruns
   - apiGroups:
-      - tekton.dev
+      - "tekton.dev"
     resources:
-      - taskruns
-      - pipelineruns
-      - taskruns/finalizers
-      - pipelineruns/finalizers
+      - "taskruns"
+      - "pipelineruns"
+      - "taskruns/finalizers"
+      - "pipelineruns/finalizers"
     verbs:
-      - get
-      - list
-      - create
-      - update
-      - delete
-      - patch
-      - watch
+      - "get"
+      - "list"
+      - "create"
+      - "update"
+      - "delete"
+      - "patch"
+      - "watch"
+  # used in webhook
   - apiGroups:
       - admissionregistration.k8s.io
     resources:
@@ -83,6 +44,7 @@ rules:
       - delete
       - patch
       - watch
+  # used in webhook
   - apiGroups:
       - ""
     resources:
@@ -101,45 +63,130 @@ rules:
       - namespaces/finalizers
     verbs:
       - update
+
 ---
+kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
 metadata:
+  name: tekton-pruner-controller
+  namespace: tekton-pipelines
   labels:
+    pruner.tekton.dev/release: "v0.1.0"
+rules:
+  # Needed to watch and load configuration and secret data.
+  - apiGroups: [""]
+    resources:
+      - "configmaps"
+      - "secrets"
+    verbs: ["get", "list", "update", "watch"]
+  # This is needed by leader election to run the controller in HA.
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-pruner-controller
+  namespace: tekton-pipelines
+  labels:
+    pruner.tekton.dev/release: "v0.1.0"
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pruner
-    pruner.tekton.dev/release: devel
-  name: tekton-pruner-controller
-  namespace: tekton-pipelines
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: tekton-pruner-controller
-subjects:
-  - kind: ServiceAccount
-    name: tekton-pruner-controller
-    namespace: tekton-pipelines
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
+  name: tekton-pruner-controller-cluster-access
   labels:
+    pruner.tekton.dev/release: "v0.1.0"
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pruner
-    pruner.tekton.dev/release: devel
-  name: tekton-pruner-controller-cluster-access
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: tekton-pruner-controller-cluster-access
 subjects:
   - kind: ServiceAccount
     name: tekton-pruner-controller
     namespace: tekton-pipelines
+roleRef:
+  kind: ClusterRole
+  name: tekton-pruner-controller-cluster-access
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-pruner-controller
+  namespace: tekton-pipelines
+  labels:
+    pruner.tekton.dev/release: "v0.1.0"
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-pruner
+subjects:
+  - kind: ServiceAccount
+    name: tekton-pruner-controller
+    namespace: tekton-pipelines
+roleRef:
+  kind: Role
+  name: tekton-pruner-controller
+  apiGroup: rbac.authorization.k8s.io
+
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tekton-pruner-default-spec
+  namespace: tekton-pipelines
+data:
+  global-config: |-
+    enforcedConfigLevel: global
+    ttlSecondsAfterFinished: 300    # 5 minutes
+    successfulHistoryLimit: 3        # Keep last 3 successful runs
+    failedHistoryLimit: 3           # Keep last 3 failed runs
+    historyLimit: 5                 # When successfulHistoryLimit and failedHistoryLimit are not set, keep last 5 successful and last 5 failed runs individually
+
+---
+# Copyright 2021 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pruner-info
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tektoncd-pruner
+data:
+  # Contains triggers version which can be queried by external
+  # tools such as CLI. Elevated permissions are already given to
+  # this ConfigMap such that even if we don't have access to
+  # other resources in the namespace we still can have access to
+  # this ConfigMap.
+  version: "devel"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-logging-tekton-pruner
+  namespace: tekton-pipelines
+  labels:
+    pruner.tekton.dev/release: "v0.1.0"
 data:
   _example: |
     ################################
@@ -179,16 +226,18 @@ data:
           "callerEncoder": ""
         }
       }
-  loglevel.tekton-pruner-controller: warn
-  loglevel.tekton-pruner-webhook: warn
-kind: ConfigMap
-metadata:
-  labels:
-    pruner.tekton.dev/release: devel
-  name: config-logging-tekton-pruner
-  namespace: tekton-pipelines
+  # Log level overrides
+  # Changes are be picked up immediately.
+  loglevel.tekton-pruner-controller: "info"
+
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-observability-tekton-pruner
+  namespace: tekton-pipelines
+  labels:
+    pruner.tekton.dev/release: "v0.1.0"
 data:
   _example: |
     ################################
@@ -256,64 +305,15 @@ data:
     # flag to "true" could cause extra Stackdriver charge.
     # If metrics.backend-destination is not Stackdriver, this is ignored.
     metrics.allow-stackdriver-custom-metrics: "false"
-kind: ConfigMap
-metadata:
-  labels:
-    pruner.tekton.dev/release: devel
-  name: config-observability-tekton-pruner
-  namespace: tekton-pipelines
----
-apiVersion: v1
-data:
-  version: devel
-kind: ConfigMap
-metadata:
-  labels:
-    app.kubernetes.io/instance: default
-    app.kubernetes.io/part-of: tektoncd-pruner
-  name: pruner-info
-  namespace: tekton-pipelines
----
-apiVersion: v1
-data:
-  _example: |
-    ttlSecondsAfterFinished: 600 # 10 minutes
-    successfulHistoryLimit: 3
-    failedHistoryLimit: 1
-    namespaces:
-      ns-1:
-        pipelines:
-        - name: foo
-          ttlSecondsAfterFinished: 60
-          successfulHistoryLimit: 3
-          failedHistoryLimit: 1
-        - name: bar
-          ttlSecondsAfterFinished: 600 # 10 minutes
-          successfulHistoryLimit: 3
-          failedHistoryLimit: 1
-        tasks:
-        - name: task1
-          ttlSecondsAfterFinished: 60
-      ns-2:
-        ttlSecondsAfterFinished: 300 # 5 minutes
-        pipelines:
-        - name: foo
-          ttlSecondsAfterFinished: 120 # 2 minutes
-  global-config: |
-    successfulHistoryLimit: 3
-    failedHistoryLimit: 3
-kind: ConfigMap
-metadata:
-  name: tekton-pruner-default-spec
-  namespace: tekton-pipelines
+
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  labels:
-    pruner.tekton.dev/release: devel
   name: tekton-pruner-controller
   namespace: tekton-pipelines
+  labels:
+    pruner.tekton.dev/release: "v0.1.0"
 spec:
   replicas: 1
   selector:
@@ -323,8 +323,9 @@ spec:
     metadata:
       labels:
         app: controller
-        pruner.tekton.dev/release: devel
+        pruner.tekton.dev/release: "v0.1.0"
     spec:
+      # To avoid node becoming SPOF, spread our replicas to different nodes.
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -334,8 +335,23 @@ spec:
                     app: controller
                 topologyKey: kubernetes.io/hostname
               weight: 100
+      serviceAccountName: tekton-pruner-controller
       containers:
-        - env:
+        - name: controller
+          # This is the Go import path for the binary that is containerized
+          # and substituted here.
+          image: ghcr.io/openshift-pipelines/tektoncd-pruner/controller:v0.1.0@sha256:d70bedfa5b4a0912334ec281742f1f6518a7e7f8e3190dba5884e9dda8e1f274
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 1000m
+              memory: 1000Mi
+          ports:
+            - name: metrics
+              containerPort: 9090
+          env:
             - name: SYSTEM_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -348,29 +364,17 @@ spec:
               value: pruner.tekton.dev
             - name: CONFIG_LEADERELECTION_NAME
               value: config-leader-election-tekton-pruner-controller
-          image: ghcr.io/openshift-pipelines/tektoncd-pruner/controller:v0.1.0@sha256:5273646ed0afdd98eb0282ee4ce54cee4b5b609558aa94aee86fb14a451906de
-          name: controller
-          ports:
-            - containerPort: 9090
-              name: metrics
-          resources:
-            limits:
-              cpu: 1000m
-              memory: 1000Mi
-            requests:
-              cpu: 100m
-              memory: 100Mi
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
-                - ALL
-            readOnlyRootFilesystem: true
+                - "ALL"
+            # User 65532 is the distroless nonroot user ID
+            runAsUser: 65532
             runAsGroup: 65532
             runAsNonRoot: true
-            runAsUser: 65532
             seccompProfile:
               type: RuntimeDefault
-      serviceAccountName: tekton-pruner-controller
 
 ---
