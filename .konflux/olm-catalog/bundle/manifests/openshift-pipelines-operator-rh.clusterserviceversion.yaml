@@ -19,7 +19,7 @@ metadata:
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
     olm.skipRange: '>=1.18.0 <5.0.5-594'
-    operators.operatorframework.io/builder: operator-sdk-v1.39.2
+    operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
     repository: https://github.com/tektoncd/operator
@@ -334,7 +334,7 @@ spec:
 
     - Tekton Triggers: v0.31.0
 
-    - Pipelines as Code: v0.33.0
+    - Pipelines as Code: v0.33.1
 
     - Tekton Chains: v0.24.0
 
@@ -1334,6 +1334,8 @@ spec:
                       - -unique-process-name
                       - tekton-operator-cluster-operations
                     env:
+                      - name: KUBERNETES_MIN_VERSION
+                        value: v1.0.0
                       - name: SYSTEM_NAMESPACE
                         valueFrom:
                           fieldRef:
@@ -1387,6 +1389,8 @@ spec:
               spec:
                 containers:
                   - env:
+                      - name: KUBERNETES_MIN_VERSION
+                        value: v1.0.0
                       - name: SYSTEM_NAMESPACE
                         valueFrom:
                           fieldRef:
