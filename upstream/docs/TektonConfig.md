@@ -61,7 +61,6 @@ The TektonConfig CR provides the following features
       enable-param-enum: false
       enable-provenance-in-status: true
       enable-step-actions: false
-      enable-tekton-oci-bundles: false
       enforce-nonfalsifiability: none
       keep-pod-on-cancel: false
       max-result-size: 4096
@@ -73,7 +72,6 @@ The TektonConfig CR provides the following features
       require-git-ssh-secret-known-hosts: false
       results-from: termination-message
       running-in-environment-with-injected-sidecars: true
-      scope-when-expressions-to-task: false
       send-cloudevents-for-runs: false
       set-security-context: false
       trusted-resources-verification-no-match-policy: ignore
@@ -88,6 +86,7 @@ The TektonConfig CR provides the following features
         disabled: false
         configMaps: {}
         deployments: {}
+        webhookConfigurationOptions: {}
     pruner:
       disabled: false
       schedule: "0 8 * * *"
@@ -106,12 +105,14 @@ The TektonConfig CR provides the following features
         disabled: false
         configMaps: {}
         deployments: {}
+        webhookConfigurationOptions: {}
     dashboard:
       readonly: true
       options:
         disabled: false
         configMaps: {}
         deployments: {}
+        webhookConfigurationOptions: {}
     platforms:
       openshift:
         pipelinesAsCode:
@@ -144,6 +145,7 @@ The TektonConfig CR provides the following features
           disabled: false
           configMaps: {}
           deployments: {}
+          webhookConfigurationOptions: {}
 ```
 Look for the particular section to understand a particular field in the spec.
 
@@ -215,7 +217,6 @@ pipeline:
   disable-working-directory-overwrite: true
   enable-api-fields: stable
   enable-custom-tasks: false
-  enable-tekton-oci-bundles: false
   metrics.pipelinerun.duration-type: histogram
   metrics.pipelinerun.level: pipelinerun
   metrics.taskrun.duration-type: histogram
@@ -340,6 +341,8 @@ addon:
     - name: "pipelineTemplates"
       value: "true"
     - name: "resolverTasks"
+      value: "true"
+    - name: "resolverStepActions"
       value: "true"
 ```
 
@@ -560,6 +563,15 @@ options:
               averageUtilization: 85
               type: Utilization
           type: Resource
+  webhookConfigurationOptions:
+    validation.webhook.pipeline.tekton.dev:
+      failurePolicy: Fail
+      timeoutSeconds: 20
+      sideEffects: None
+    webhook.pipeline.tekton.dev:
+      failurePolicy: Fail
+      timeoutSeconds: 20
+      sideEffects: None
 ```
 * `disabled` - disables the additional `options` support, if `disabled` set to `true`. default: `false`
 
@@ -654,6 +666,14 @@ The following fields are supported in `HorizontalPodAutoscaler` (aka HPA)
     * `scaleDown` - replaces scaleDown with this, if not empty
 
 **NOTE**: If a Deployment or StatefulSet has a Horizontal Pod Autoscaling (HPA) and is in active state, Operator will not control the replicas to that resource. However if `status.desiredReplicas` and `spec.minReplicas` not present in HPA, operator takes the control. Also if HPA disabled, operator takes control. Even though the operator takes the control, the replicas value will be adjusted to the hpa's scaling range.
+
+#### webhookConfigurationOptions
+Defines additional options for each webhooks. Use webhook name as a key to define options for a webhook. Options are ignored if the webhook does not exist with the name key. To get detailed information about webhooks options visit https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/
+
+the following options are supported for webhookConfigurationOptions
+* `failurePolicy` -  defines how unrecognized errors and timeout errors from the admission webhook are handled. Allowed values are `Ignore` or `Fail`
+* `timeoutSeconds` - allows configuring how long the API server should wait for a webhook to respond before treating the call as a failure.
+* `sideEffects` -  indicates whether the webhook have a side effet. Allowed values are `None`, `NoneOnDryRun`, `Unknown`, or `Some`
 
 [node-selector]:https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
 [tolerations]:https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
