@@ -32,8 +32,8 @@ import (
 var (
 	// pre upgrade functions
 	preUpgradeFunctions = []upgradeFunc{
-		upgradeChainProperties,      // upgrade #1: upgrade chain properties
-		resetTektonConfigConditions, // upgrade #2: removes conditions from TektonConfig CR, clears outdated conditions
+		resetTektonConfigConditions, // upgrade #1: removes conditions from TektonConfig CR, clears outdated conditions
+		upgradePipelineProperties,   // update default value of enable-step-actions from false to true
 	}
 
 	// post upgrade functions
