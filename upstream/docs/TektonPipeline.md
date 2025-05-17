@@ -35,7 +35,6 @@ spec:
   enable-param-enum: false
   enable-provenance-in-status: true
   enable-step-actions: false
-  enable-tekton-oci-bundles: false
   enforce-nonfalsifiability: none
   keep-pod-on-cancel: false
   max-result-size: 4096
@@ -47,7 +46,6 @@ spec:
   require-git-ssh-secret-known-hosts: false
   results-from: termination-message
   running-in-environment-with-injected-sidecars: true
-  scope-when-expressions-to-task: false
   send-cloudevents-for-runs: false
   set-security-context: false
   trusted-resources-verification-no-match-policy: ignore
@@ -58,6 +56,10 @@ spec:
     threads-per-controller: 2
     kube-api-qps: 5.0
     kube-api-burst: 10
+  options:
+    disabled: false
+    configMaps: {}
+    deployments: {}
 ```
 You can install this component using [TektonConfig](./TektonConfig.md) by choosing appropriate `profile`.
 
@@ -108,12 +110,6 @@ injected sidecars, setting this option to false can lead to unexpected behavior.
     Setting this flag to "true" will require that any Git SSH Secret offered to Tekton must have known_hosts included.
 
     See more info [here](https://github.com/tektoncd/pipeline/issues/2981).
-
-
-- `enable-tekton-oci-bundles` (Default: `false`)
-
-    Setting this flag to "true" enables the use of Tekton OCI bundle. This is an experimental feature and thus should
-still be considered an alpha feature.
 
 
 - `enable-custom-tasks` (Default: `false`)
@@ -167,10 +163,6 @@ and thus should still be considered an alpha feature.
 - `enable-cel-in-whenexpression` (Default: `false`)
 
     Setting this flag to "true" will enable using CEL in when expressions.
-
-- `scope-when-expressions-to-task` (Default: `false`)
-
-    Setting this flag to "true" scopes when expressions to guard a Task only instead of a Task and its dependent Tasks.
 
 - `trusted-resources-verification-no-match-policy` (Default: `ignore`)
 
