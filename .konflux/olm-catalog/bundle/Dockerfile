@@ -13,7 +13,6 @@ LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
 LABEL operators.operatorframework.io.bundle.package.v1=openshift-pipelines-operator-rh
 LABEL operators.operatorframework.io.bundle.channel.default.v1="pipelines-1.15"
 LABEL operators.operatorframework.io.bundle.channels.v1="pipelines-1.15"
-
 LABEL \
       com.redhat.component="openshift-pipelines-operator-bundle-container" \
       name="openshift-pipelines/pipelines-operator-bundle-container" \
