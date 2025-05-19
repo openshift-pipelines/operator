@@ -23,77 +23,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 	operatorFake "github.com/tektoncd/operator/pkg/client/clientset/versioned/fake"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sFake "k8s.io/client-go/kubernetes/fake"
 	duckv1 "knative.dev/pkg/apis/duck/v1"
 	"knative.dev/pkg/logging"
+	"knative.dev/pkg/ptr"
 )
 
-func TestUpgradeChainProperties(t *testing.T) {
-	ctx := context.TODO()
-	operatorClient := operatorFake.NewSimpleClientset()
-	k8sClient := k8sFake.NewSimpleClientset()
-	logger := logging.FromContext(ctx).Named("unit-test")
-
-	// there is no tektonConfig CR available, returns error
-	err := upgradeChainProperties(ctx, logger, k8sClient, operatorClient, nil)
-	assert.Error(t, err)
-
-	// create tekconConfig CR
-	tc := &v1alpha1.TektonConfig{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: v1alpha1.ConfigResourceName,
-		},
-		Spec: v1alpha1.TektonConfigSpec{
-			CommonSpec: v1alpha1.CommonSpec{
-				TargetNamespace: "foo",
-			},
-			Chain: v1alpha1.Chain{
-				ChainProperties: v1alpha1.ChainProperties{
-					BuilderID: "bar",
-				},
-			},
-		},
-	}
-	_, err = operatorClient.OperatorV1alpha1().TektonConfigs().Create(ctx, tc, metav1.CreateOptions{})
-	assert.NoError(t, err)
-
-	// there is no chains-config configMap, return no error
-	err = upgradeChainProperties(ctx, logger, k8sClient, operatorClient, nil)
-	assert.NoError(t, err)
-
-	// verify chains existing field, should not be empty
-	tc, err = operatorClient.OperatorV1alpha1().TektonConfigs().Get(ctx, v1alpha1.ConfigResourceName, metav1.GetOptions{})
-	assert.NoError(t, err)
-	assert.Equal(t, "", tc.Spec.Chain.ChainProperties.BuilderID)
-
-	// create a config map with values
-	config := &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "chains-config",
-			Namespace: tc.Spec.GetTargetNamespace(),
-		},
-		Data: map[string]string{
-			"builder.id":           "123",
-			"transparency.enabled": "false",
-			"unknown_field":        "hello",
-		},
-	}
-	_, err = k8sClient.CoreV1().ConfigMaps(tc.Spec.GetTargetNamespace()).Create(ctx, config, metav1.CreateOptions{})
-	assert.NoError(t, err)
-
-	// execute chains upgrade
-	err = upgradeChainProperties(ctx, logger, k8sClient, operatorClient, nil)
-	assert.NoError(t, err)
-
-	// verify chains with new configMap, map values should be updated
-	tc, err = operatorClient.OperatorV1alpha1().TektonConfigs().Get(ctx, v1alpha1.ConfigResourceName, metav1.GetOptions{})
-	assert.NoError(t, err)
-	assert.Equal(t, "123", tc.Spec.Chain.ChainProperties.BuilderID)
-	assert.Equal(t, v1alpha1.BoolValue("false"), tc.Spec.Chain.ChainProperties.TransparencyConfigEnabled)
-
-}
 func TestResetTektonConfigConditions(t *testing.T) {
 	ctx := context.TODO()
 	operatorClient := operatorFake.NewSimpleClientset()
@@ -128,4 +63,66 @@ func TestResetTektonConfigConditions(t *testing.T) {
 	_tc, err := operatorClient.OperatorV1alpha1().TektonConfigs().Get(ctx, v1alpha1.ConfigResourceName, metav1.GetOptions{})
 	assert.NoError(t, err)
 	assert.Empty(t, _tc.Status.Conditions)
+}
+
+func TestUpgradePipelineProperties(t *testing.T) {
+	tests := []struct {
+		name     string
+		tc       *v1alpha1.TektonConfig
+		expected bool
+	}{
+		{
+			name: "with explicit false enable step actions",
+			tc: &v1alpha1.TektonConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: v1alpha1.ConfigResourceName,
+				},
+				Spec: v1alpha1.TektonConfigSpec{
+					Pipeline: v1alpha1.Pipeline{
+						PipelineProperties: v1alpha1.PipelineProperties{
+							EnableStepActions: ptr.Bool(false),
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "with default pipeline properties",
+			tc: &v1alpha1.TektonConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: v1alpha1.ConfigResourceName,
+				},
+			},
+			expected: true,
+		},
+	}
+
+	ctx := context.TODO()
+	logger := logging.FromContext(ctx).Named("unit-test")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			operatorClient := operatorFake.NewSimpleClientset()
+
+			// test when no tektonConfig CR exists
+			err := upgradePipelineProperties(ctx, logger, nil, operatorClient, nil)
+			assert.NoError(t, err)
+
+			// create tektonConfig CR
+			if tt.tc != nil {
+				_, err = operatorClient.OperatorV1alpha1().TektonConfigs().Create(ctx, tt.tc, metav1.CreateOptions{})
+				assert.NoError(t, err)
+			}
+
+			// update enable-step-actions to true
+			err = upgradePipelineProperties(ctx, logger, nil, operatorClient, nil)
+			assert.NoError(t, err)
+
+			// verify the pipeline property enable-step-actions is set to true
+			tcData, err := operatorClient.OperatorV1alpha1().TektonConfigs().Get(ctx, v1alpha1.ConfigResourceName, metav1.GetOptions{})
+			assert.NoError(t, err)
+			assert.Equal(t, *tcData.Spec.Pipeline.EnableStepActions, tt.expected)
+		})
+	}
 }

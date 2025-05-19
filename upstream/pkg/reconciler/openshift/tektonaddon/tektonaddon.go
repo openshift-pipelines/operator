@@ -49,6 +49,7 @@ type Reconciler struct {
 	triggerInformer              informer.TektonTriggerInformer
 	operatorVersion              string
 	resolverTaskManifest         *mf.Manifest
+	resolverStepActionManifest   *mf.Manifest
 	clusterTaskManifest          *mf.Manifest
 	triggersResourcesManifest    *mf.Manifest
 	pipelineTemplateManifest     *mf.Manifest
@@ -61,9 +62,12 @@ const (
 	retain int = iota
 	overwrite
 
-	labelProviderType     = "operator.tekton.dev/provider-type"
-	providerTypeCommunity = "community"
-	providerTypeRedHat    = "redhat"
+	labelProviderType                     = "operator.tekton.dev/provider-type"
+	providerTypeCommunity                 = "community"
+	providerTypeRedHat                    = "redhat"
+	installerSetNameForResolverTasks      = "addon-versioned-resolvertasks"
+	installerSetNameForResolverStepAction = "addon-versioned-resolverstepactions"
+	installerSetNameForClusterTasks       = "addon-versioned-clustertasks"
 )
 
 // Check that our Reconciler implements controller.Reconciler
@@ -132,6 +136,7 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, ta *v1alpha1.TektonAddon
 	ctVal, _ := findValue(ta.Spec.Params, v1alpha1.ClusterTasksParam)
 	cctVal, _ := findValue(ta.Spec.Params, v1alpha1.CommunityClusterTasks)
 	rtVal, _ := findValue(ta.Spec.Params, v1alpha1.ResolverTasks)
+	rsaVal, _ := findValue(ta.Spec.Params, v1alpha1.ResolverStepActions)
 
 	if ptVal == "true" && ctVal == "false" {
 		ta.Status.MarkNotReady("pipelineTemplates cannot be true if clusterTask is false")
@@ -156,6 +161,24 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, ta *v1alpha1.TektonAddon
 	if err := r.EnsureResolverTask(ctx, rtVal, ta); err != nil {
 		ready = false
 		errorMsg = fmt.Sprintf("namespaced tasks not yet ready: %v", err)
+		logger.Error(errorMsg)
+	}
+
+	if err := r.EnsureVersionedResolverTask(ctx, rtVal, ta); err != nil {
+		ready = false
+		errorMsg = fmt.Sprintf("versioned namespaced tasks not yet ready:  %v", err)
+		logger.Error(errorMsg)
+	}
+
+	if err := r.EnsureResolverStepAction(ctx, rsaVal, ta); err != nil {
+		ready = false
+		errorMsg = fmt.Sprintf("namespaced stepactions not yet ready: %v", err)
+		logger.Error(errorMsg)
+	}
+
+	if err := r.EnsureVersionedResolverStepAction(ctx, rsaVal, ta); err != nil {
+		ready = false
+		errorMsg = fmt.Sprintf("versioned namespaced stepactions not yet ready:  %v", err)
 		logger.Error(errorMsg)
 	}
 
