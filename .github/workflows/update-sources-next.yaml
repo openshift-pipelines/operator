@@ -61,8 +61,9 @@ jobs:
       run: |
         pushd upstream
         rm ../.konflux/patches/0000-go1.23.patch || true
-        sed -i "s%go 1.23.*%go 1.22%g" go.mod
-        sed -i "s%go 1.23.*%go 1.22%g" vendor/modules.txt
+        sed -i "s%go 1.23.*%go 1.23%g" go.mod
+        sed -i "s%go1.24.*%go1.23%g" go.mod
+        sed -i "s%go 1.23.*%go 1.23%g" vendor/modules.txt
         if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
               echo "No change, exiting"
               exit 0
