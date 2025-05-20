@@ -27,7 +27,6 @@ jobs:
         pushd upstream
         git checkout -B main origin/main
         popd
-
     - name: fetch-payload
       run: |
         pushd upstream
@@ -58,8 +57,22 @@ jobs:
         git checkout HEAD .
         popd
     
-
-
+    - name: Generate patches
+      run: |
+        pushd upstream
+        rm ../.konflux/patches/0000-go1.23.patch || true
+        sed -i "s%go 1.23.*%go 1.22%g" go.mod
+        sed -i "s%go 1.23.*%go 1.22%g" vendor/modules.txt
+        if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
+              echo "No change, exiting"
+              exit 0
+        else
+          git diff > ../.konflux/patches/0000-go1.23.patch
+        fi
+        # clean after yourself >:D
+        git checkout HEAD go.mod vendor/modules.txt
+        
+        popd
     - name: Commit new changes
       run: |
         git config user.name openshift-pipelines-bot
