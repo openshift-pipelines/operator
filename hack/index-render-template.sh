@@ -38,12 +38,16 @@ echo "Bundle Image updated for index images : $BUNDLE_IMAGE"
 ## jq query ensure proper replacement based on BUNDLE_NAME.
 BUNDLE_JSON=$(opm render --skip-tls-verify -o json ${BUNDLE_IMAGE})
 BUNDLE_NAME=$(echo $BUNDLE_JSON | jq -r '.name')
+echo "Bundle Name from $BUNDLE_IMAGE : $BUNDLE_NAME"
 
+# Update the bundle image in the catalog.json file
 jq --arg BUNDLE_IMAGE "$BUNDLE_IMAGE" --arg BUNDLE_NAME "$BUNDLE_NAME" '.entries |= map(if .schema == "olm.bundle" and .name == $BUNDLE_NAME then .image = $BUNDLE_IMAGE else . end)' "$CATALOG_JSON" > temp.json && mv temp.json "$CATALOG_JSON"
 echo "Update bundle Image in $CATALOG_JSON"
 
 BUNDLE_VERSION=$(echo $BUNDLE_NAME | awk -F 'v' '{ print $2 }')
-# Update catalog-template
+echo "Bundle Version : $BUNDLE_VERSION"
+
+# Update the bundle version in the catalog.json file
 sed -Ei "s%5.0.5-[0-9]+%${BUNDLE_VERSION}%g" .konflux/olm-catalog/index/${VERSION}/catalog-template.json
 
 # as per this doc https://github.com/konflux-ci/olm-operator-konflux-sample/blob/main/docs/konflux-onboarding.md#create-the-fbc-in-the-git-repository
