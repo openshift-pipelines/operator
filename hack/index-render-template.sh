@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -ex
+set -e
 
 # Update BUNDLE_NAME for each release according to the corresponding 'name' value specified in the catalog-template.json file.
 # ex: for 1.19 it will be openshift-pipelines-operator-rh.v1.19.0, for 1.17.2 it will be openshift-pipelines-operator-rh.v1.17.2
@@ -36,7 +36,8 @@ echo "Bundle Image updated for index images : $BUNDLE_IMAGE"
 ## Update the image field with $BUNDLE_IMAGE
 ## There are multiple olm.bundle entries for all previously released versions.
 ## jq query ensure proper replacement based on BUNDLE_NAME.
-BUNDLE_NAME=$(opm render --skip-tls-verify -o json ${BUNDLE_IMAGE} | jq -r '.name')
+BUNDLE_JSON=$(opm render --skip-tls-verify -o json ${BUNDLE_IMAGE})
+BUNDLE_NAME=$(echo $BUNDLE_JSON | jq -r '.name')
 
 jq --arg BUNDLE_IMAGE "$BUNDLE_IMAGE" --arg BUNDLE_NAME "$BUNDLE_NAME" '.entries |= map(if .schema == "olm.bundle" and .name == $BUNDLE_NAME then .image = $BUNDLE_IMAGE else . end)' "$CATALOG_JSON" > temp.json && mv temp.json "$CATALOG_JSON"
 echo "Update bundle Image in $CATALOG_JSON"
@@ -53,3 +54,4 @@ if (( $(echo "$NUMERIC_VERSION >= 4.17" | bc -l) )); then
 else
   opm alpha render-template basic .konflux/olm-catalog/index/${VERSION}/catalog-template.json > .konflux/olm-catalog/index/${VERSION}/catalog/openshift-pipelines-operator-rh/catalog.json
 fi
+echo "Render template for $VERSION Done"
