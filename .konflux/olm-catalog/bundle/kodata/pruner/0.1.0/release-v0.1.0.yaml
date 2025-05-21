@@ -1,3 +1,16 @@
+# Copyright 2025 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -65,6 +78,19 @@ rules:
       - update
 
 ---
+# Copyright 2025 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -85,6 +111,19 @@ rules:
     verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
 
 ---
+# Copyright 2025 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -97,6 +136,19 @@ metadata:
     app.kubernetes.io/part-of: tekton-pruner
 
 ---
+# Copyright 2025 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -116,6 +168,19 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 
 ---
+# Copyright 2025 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -136,6 +201,19 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 
 ---
+# Copyright 2025 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -144,13 +222,10 @@ metadata:
 data:
   global-config: |-
     enforcedConfigLevel: global
-    ttlSecondsAfterFinished: 300    # 5 minutes
-    successfulHistoryLimit: 3        # Keep last 3 successful runs
-    failedHistoryLimit: 3           # Keep last 3 failed runs
-    historyLimit: 5                 # When successfulHistoryLimit and failedHistoryLimit are not set, keep last 5 successful and last 5 failed runs individually
+    historyLimit: 100
 
 ---
-# Copyright 2021 The Tekton Authors
+# Copyright 2025 The Tekton Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -172,14 +247,22 @@ metadata:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tektoncd-pruner
 data:
-  # Contains triggers version which can be queried by external
-  # tools such as CLI. Elevated permissions are already given to
-  # this ConfigMap such that even if we don't have access to
-  # other resources in the namespace we still can have access to
-  # this ConfigMap.
   version: "devel"
 
 ---
+# Copyright 2025 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -231,6 +314,19 @@ data:
   loglevel.tekton-pruner-controller: "info"
 
 ---
+# Copyright 2025 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -307,6 +403,19 @@ data:
     metrics.allow-stackdriver-custom-metrics: "false"
 
 ---
+# Copyright 2025 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -340,7 +449,7 @@ spec:
         - name: controller
           # This is the Go import path for the binary that is containerized
           # and substituted here.
-          image: ghcr.io/openshift-pipelines/tektoncd-pruner/controller:v0.1.0@sha256:d70bedfa5b4a0912334ec281742f1f6518a7e7f8e3190dba5884e9dda8e1f274
+          image: ghcr.io/openshift-pipelines/tektoncd-pruner/controller:v0.1.0@sha256:6d8604915fd3450624b6f7844319709a8b32586d6ed7b46e8983ad906126d346
           resources:
             requests:
               cpu: 100m

@@ -68,4 +68,10 @@ func TestTektonPruner(t *testing.T) {
 		resources.TektonPrunerCRDelete(t, clients, crNames)
 	})
 
+	// Delete the TektonPipeline CR instance to see if all resources will be removed
+	t.Run("delete-pipeline", func(t *testing.T) {
+		resources.AssertTektonPipelineCRReadyStatus(t, clients, crNames)
+		resources.TektonPipelineCRDelete(t, clients, crNames)
+	})
+
 }
