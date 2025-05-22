@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   annotations:
-    pipelinesascode.tekton.dev/cancel-in-progress: "true" # Cancel in-progress pipelines
+    #pipelinesascode.tekton.dev/cancel-in-progress: "true" # Cancel in-progress pipelines
     pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/main/.tekton/fbc-build.yaml"
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator.git?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
@@ -39,6 +39,8 @@ spec:
     - linux/x86_64
   pipelineRef:
     name: fbc-build
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-operator-next-index-4.15
   workspaces:
   - name: git-auth
     secret:
