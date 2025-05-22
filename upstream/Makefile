@@ -4,11 +4,12 @@ MODULE   = $(shell env GO111MODULE=on $(GO) list -m)
 DATE         ?= $(shell date +%FT%T%z)
 KO_DATA_PATH  = $(shell pwd)/cmd/$(TARGET)/operator/kodata
 TARGET        = kubernetes
+COMPONENT ?= components.yaml
 FORCE_FETCH_RELEASE = false
 CR            = config/basic
 PLATFORM := $(if $(PLATFORM),--platform $(PLATFORM))
 
-GOLANGCI_VERSION  = v1.57.2
+GOLANGCI_VERSION  = v1.63.4
 
 BIN      = $(CURDIR)/.bin
 
@@ -67,7 +68,8 @@ ifeq ($(TARGET), openshift)
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-pruner
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/addons/02-clustertasks/source_external/
-	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/addons/07-ecosystem/task-*
+	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/addons/07-ecosystem/tasks
+	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/addons/07-ecosystem/stepactions
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/go.yaml
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/java.yaml
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/nodejs.yaml
@@ -97,17 +99,17 @@ FORCE:
 bin/%: cmd/% FORCE
 	$Q $(GO) build -mod=vendor $(LDFLAGS) -v -o $@ ./$<
 
-.PHONY: compoments/bump
+.PHONY: components/bump
 components/bump: $(OPERATORTOOL)
-	@go run ./cmd/tool bump components.yaml
+	@go run ./cmd/tool bump ${COMPONENT}
 
 .PHONY: components/bump-bugfix
 components/bump-bugfix: $(OPERATORTOOL)
-	@go run ./cmd/tool bump --bugfix components.yaml
+	@go run ./cmd/tool bump --bugfix ${COMPONENT}
 
 .PHONY: get-releases
 get-releases: |
-	$Q ./hack/fetch-releases.sh $(TARGET) components.yaml $(FORCE_FETCH_RELEASE) || exit ;
+	$Q ./hack/fetch-releases.sh $(TARGET) ${COMPONENT} $(FORCE_FETCH_RELEASE) || exit ;
 
 .PHONY: apply
 apply: | $(KO) $(KUSTOMIZE) get-releases ; $(info $(M) ko apply on $(TARGET)) @ ## Apply config to the current cluster
@@ -131,7 +133,7 @@ clean-cr: | ; $(info $(M) clean CRs on $(TARGET)) @ ## Clean the CRs to the curr
 resolve: | $(KO) $(KUSTOMIZE) get-releases ; $(info $(M) ko resolve on $(TARGET)) @ ## Resolve config to the current cluster
 	@ ## --load-restrictor LoadRestrictionsNone is needed in kustomize build as files which not in child tree of kustomize base are pulled
 	@ ## https://github.com/kubernetes-sigs/kustomize/issues/766
-	$Q $(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone config/$(TARGET)/overlays/default | $(KO) resolve --push=false --oci-layout-path=$(BIN)/oci -f -
+	$Q $(KUSTOMIZE) build --load-restrictor LoadRestrictionsNone config/$(TARGET)/overlays/default | $(KO) resolve --push=false --platform=all --oci-layout-path=$(BIN)/oci -f -
 
 .PHONY: generated
 generated: | vendor ; $(info $(M) update generated files) ## Update generated files
@@ -144,10 +146,11 @@ vendor: ; $(info $(M) update vendor folder)  ## Update vendor folder
 
 ## Tests
 GO           = go
-TEST_UNIT_TARGETS := test-unit-verbose test-unit-race test-unit-failfast
+TEST_UNIT_TARGETS := test-unit-verbose test-unit-race test-unit-failfast test-unit-verbose-and-race
 test-unit-verbose: ARGS=-v
 test-unit-failfast: ARGS=-failfast
 test-unit-race:    ARGS=-race
+test-unit-verbose-and-race: ARGS=-v -race
 $(TEST_UNIT_TARGETS): test-unit
 test-clean:  ## Clean testcache
 	@echo "Cleaning test cache"
@@ -156,8 +159,7 @@ test-clean:  ## Clean testcache
 test: test-clean test-unit ## Run test-unit
 test-unit: ## Run unit tests
 	@echo "Running unit tests..."
-	@set -o pipefail ; \
-		$(GO) test -timeout $(TIMEOUT_UNIT) $(ARGS) ./... | { grep -v 'no test files'; true; }
+	$Q $(GO) test -timeout $(TIMEOUT_UNIT) $(ARGS) ./...
 
 
 .PHONY: lint
