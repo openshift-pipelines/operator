@@ -99,6 +99,7 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, original *v1alpha1.Tekton
 	if err := r.extension.Finalize(ctx, original); err != nil {
 		logger.Error("Failed to finalize platform resources", err)
 	}
+
 	return nil
 }
 
@@ -145,6 +146,8 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tr *v1alpha1.TektonResul
 	}
 
 	// check if the secrets are created
+	// TODO: Create secret automatically if they don't exist
+	// TODO: And remove this check in future release.
 	if err := r.validateSecretsAreCreated(ctx, tr); err != nil {
 		return err
 	}
@@ -300,7 +303,7 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tr *v1alpha1.TektonResul
 
 	// Mark PostReconcile Complete
 	tr.Status.MarkPostReconcilerComplete()
-
+	r.updateTektonResultsStatus(ctx, tr, installedTIS)
 	return nil
 }
 
@@ -318,16 +321,6 @@ func (r *Reconciler) validateSecretsAreCreated(ctx context.Context, tr *v1alpha1
 		if apierrors.IsNotFound(err) {
 			logger.Error(err)
 			tr.Status.MarkDependencyMissing(fmt.Sprintf("%s secret is missing", DbSecretName))
-			return err
-		}
-		logger.Error(err)
-		return err
-	}
-	_, err = r.kubeClientSet.CoreV1().Secrets(tr.Spec.TargetNamespace).Get(ctx, TlsSecretName, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			logger.Error(err)
-			tr.Status.MarkDependencyMissing(fmt.Sprintf("%s secret is missing", TlsSecretName))
 			return err
 		}
 		logger.Error(err)
