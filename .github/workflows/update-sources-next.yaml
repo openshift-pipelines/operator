@@ -61,9 +61,15 @@ jobs:
       run: |
         pushd upstream
         rm ../.konflux/patches/0000-go1.23.patch || true
-        sed -i "s%go1.24.*%go1.23%g" go.mod
-        sed -i "s%go 1.23.*%go 1.23%g" go.mod
-        sed -i "s%go 1.23.*%go 1.23%g" vendor/modules.txt
+        
+        # Change 'go 1.23.8' to 'go 1.23.6' in go.mod 
+        sed -i 's|^go 1\.23\.8$|go 1.23.6|' go.mod
+        
+        # Change 'toolchain go1.24.x' to 'toolchain go1.23' in go.mod
+        sed -i 's|^toolchain go1\.24\..*$|toolchain go1.23|' go.mod
+        
+        # Change 'go 1.23.8' to 'go 1.23.6' in vendor/modules.txt (within comments or specific lines)
+        sed -i 's|go 1\.23\.8|go 1.23.6|g' vendor/modules.txt
         
         if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
               echo "No change, exiting"
