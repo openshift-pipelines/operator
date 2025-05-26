@@ -11,7 +11,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "next" &&
-      ((".konflux/patches/***".pathChanged() || ".konflux/olm-catalog/index/***".pathChanged()) ||
+      (( ".konflux/olm-catalog/index/***".pathChanged()) ||
       ".konflux/olm-catalog/index/v4.15/Dockerfile.catalog".pathChanged() ||
       ".tekton/operator-next-index-4.15-push.yaml".pathChanged())
   creationTimestamp: null
