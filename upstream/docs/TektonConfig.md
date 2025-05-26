@@ -121,7 +121,11 @@ spec:
     disabled: false
     is_external_db: false
     options: {}
-  platforms:
+    performance:
+      disable-ha: false
+      buckets: 1
+      replicas: 1
+platforms:
     openshift:
       pipelinesAsCode:
         additionalPACControllers:
@@ -145,6 +149,8 @@ spec:
             ^(?P<filename>[^:]*):(?P<line>[0-9]+):(?P<column>[0-9]+):([
             ]*)?(?P<error>.*)
           error-log-snippet: "true"
+          enable-cancel-in-progress-on-pull-requests: "false"
+          enable-cancel-in-progress-on-push: "false"
           hub-catalog-name: tekton
           hub-url: https://api.hub.tekton.dev/v1
           remote-tasks: "true"
@@ -541,6 +547,8 @@ platforms:
           ^(?P<filename>[^:]*):(?P<line>[0-9]+):(?P<column>[0-9]+):([
           ]*)?(?P<error>.*)
         error-log-snippet: "true"
+        enable-cancel-in-progress-on-pull-requests: "false"
+        enable-cancel-in-progress-on-push: "false"
         hub-catalog-name: tekton
         hub-url: https://api.hub.tekton.dev/v1
         remote-tasks: "true"
