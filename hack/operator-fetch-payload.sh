@@ -12,7 +12,12 @@ SOURCE=upstream
 # minor release example: new release: 1.14.0, PREVIOUS_VERSION will be 1.13.0
 # patch release example: new release: 1.13.2, PREVIOUS_VERSION will be 1.13.1SOURCE=upstream/tektoncd-operator
 # FIXME: figure out CURRENT_VERSION vs PREVIOUS_VERSION
-CURRENT_VERSION=$(yq e '.versions.current' project.yaml)
+CURRENT_VERSION=$(yq -r '
+  .versions.current
+  | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))
+' project.yaml) || {
+  echo >&2 "versions.current must be MAJOR.MINOR.PATCH (e.g., 1.19.0)"; exit 1;
+}
 PREVIOUS_VERSION=$(yq e '.versions.previous' project.yaml)
 PREVIOUS_VERSION_RANGE=$(yq e '.versions.previous_range' project.yaml)
 CHANNEL_NAME=$(yq e '.versions.channel' project.yaml)
