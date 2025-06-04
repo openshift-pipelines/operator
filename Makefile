@@ -9,7 +9,6 @@ update-payload-and-version: ## Update tektoncd operator build number, payloads, 
 	@./hack/operator-update-images.sh
 
 update-payload-and-reference: ## Update tektoncd operator payloads, bundle manifests, image references
-	@./hack/update-version.sh
 	@./hack/operator-fetch-payload.sh
 	@./hack/operator-update-images.sh
 
