@@ -28,7 +28,7 @@ case "$ENVIRONMENT" in
     ;;
 esac
 
-SOURCE_PATTEN="quay.io/.*/(.*)-rhel9(@sha256:.+)"
+SOURCE_PATTEN="quay.io/.*/(.*)-rhel8(@sha256:.+)"
 TARGET_PATTEN="$TARGET_REGISTRY/pipelines-\1\2"
 BUNDLE_IMAGE=$(echo "${BUNDLE_IMAGE}" | sed -E "s|$SOURCE_PATTEN|$TARGET_PATTEN|g")
 echo "Bundle Image updated for index images : $BUNDLE_IMAGE"
