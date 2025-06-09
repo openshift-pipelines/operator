@@ -27,6 +27,8 @@ LABEL \
       com.redhat.delivery.backport=false \
       io.openshift.tags="pipelines,tekton,openshift" \
       vendor="Red Hat, Inc." \
-      distribution-scope="public"
+      distribution-scope="public" \
+      release="Openshift Pipelines 1.17.2" \
+      url="https://access.redhat.com/containers/#/registry.access.redhat.com/ubi9-minimal/images/9.4-1227.1725849298"
 
 USER 65532
