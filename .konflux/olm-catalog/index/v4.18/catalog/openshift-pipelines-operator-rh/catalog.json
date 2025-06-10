@@ -38,9 +38,9 @@
             "skipRange": ">=1.17.0 <1.18.0"
         },
         {
-            "name": "openshift-pipelines-operator-rh.v5.0.5-595",
+            "name": "openshift-pipelines-operator-rh.v5.0.5-596",
             "replaces": "openshift-pipelines-operator-rh.v1.18.0",
-            "skipRange": ">=1.18.0 <5.0.5-595"
+            "skipRange": ">=1.18.0 <5.0.5-596"
         }
     ]
 }
@@ -170,9 +170,9 @@
     "package": "openshift-pipelines-operator-rh",
     "entries": [
         {
-            "name": "openshift-pipelines-operator-rh.v5.0.5-595",
+            "name": "openshift-pipelines-operator-rh.v5.0.5-596",
             "replaces": "openshift-pipelines-operator-rh.v1.18.0",
-            "skipRange": ">=1.18.0 <5.0.5-595"
+            "skipRange": ">=1.18.0 <5.0.5-596"
         }
     ]
 }
@@ -11190,9 +11190,9 @@
 }
 {
     "schema": "olm.bundle",
-    "name": "openshift-pipelines-operator-rh.v5.0.5-595",
+    "name": "openshift-pipelines-operator-rh.v5.0.5-596",
     "package": "openshift-pipelines-operator-rh",
-    "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:48cc055148d0a2c4338237db293e9ecbfacb83d2f220fefa000bba30cecf1ca3",
+    "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:17a243ea3155aaf00d5b91ff561a9353f9f27c6531fa4536d3932e17479fc21c",
     "properties": [
         {
             "type": "olm.gvk",
@@ -11231,14 +11231,6 @@
             "value": {
                 "group": "operator.tekton.dev",
                 "kind": "TektonConfig",
-                "version": "v1alpha1"
-            }
-        },
-        {
-            "type": "olm.gvk",
-            "value": {
-                "group": "operator.tekton.dev",
-                "kind": "TektonDashboard",
                 "version": "v1alpha1"
             }
         },
@@ -11294,14 +11286,14 @@
             "type": "olm.package",
             "value": {
                 "packageName": "openshift-pipelines-operator-rh",
-                "version": "5.0.5-595"
+                "version": "5.0.5-596"
             }
         },
         {
             "type": "olm.csv.metadata",
             "value": {
                 "annotations": {
-                    "alm-examples": "[\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"ManualApprovalGate\",\n    \"metadata\": {\n      \"name\": \"manual-approval-gate\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"OpenShiftPipelinesAsCode\",\n    \"metadata\": {\n      \"name\": \"pipelines-as-code\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonAddon\",\n    \"metadata\": {\n      \"name\": \"addon\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonChain\",\n    \"metadata\": {\n      \"name\": \"chain\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonConfig\",\n    \"metadata\": {\n      \"name\": \"config\"\n    },\n    \"spec\": {\n      \"addon\": {\n        \"params\": [\n          {\n            \"name\": \"pipelineTemplates\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverTasks\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverStepActions\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"communityResolverTasks\",\n            \"value\": \"true\"\n          }\n        ]\n      },\n      \"params\": [\n        {\n          \"name\": \"createRbacResource\",\n          \"value\": \"true\"\n        }\n      ],\n      \"profile\": \"all\",\n      \"pruner\": {\n        \"keep\": 100,\n        \"resources\": [\n          \"pipelinerun\",\n          \"taskrun\"\n        ],\n        \"schedule\": \"0 8 * * *\"\n      },\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonHub\",\n    \"metadata\": {\n      \"name\": \"hub\"\n    },\n    \"spec\": {\n      \"api\": {\n        \"catalogRefreshInterval\": \"30m\"\n      },\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonInstallerSet\",\n    \"metadata\": {\n      \"name\": \"foo\"\n    },\n    \"spec\": {\n      \"manifests\": []\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonPipeline\",\n    \"metadata\": {\n      \"name\": \"pipeline\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonPruner\",\n    \"metadata\": {\n      \"name\": \"pruner\"\n    },\n    \"spec\": {\n      \"disabled\": true,\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonResult\",\n    \"metadata\": {\n      \"name\": \"result\"\n    },\n    \"spec\": {\n      \"auth_disable\": true,\n      \"db_enable_auto_migration\": true,\n      \"db_host\": \"tekton-results-postgres-service.openshift-pipelines.svc.cluster.local\",\n      \"db_port\": 5432,\n      \"log_level\": \"debug\",\n      \"logging_pvc_name\": \"tekton-logs\",\n      \"logs_api\": true,\n      \"logs_buffer_size\": 32768,\n      \"logs_path\": \"/logs\",\n      \"logs_type\": \"File\",\n      \"prometheus_port\": 9090,\n      \"server_port\": 8080,\n      \"targetNamespace\": \"openshift-pipelines\",\n      \"tls_hostname_override\": \"tekton-results-api-service.openshift-pipelines.svc.cluster.local\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonTrigger\",\n    \"metadata\": {\n      \"name\": \"trigger\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  }\n]",
+                    "alm-examples": "[\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"ManualApprovalGate\",\n    \"metadata\": {\n      \"name\": \"manual-approval-gate\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"OpenShiftPipelinesAsCode\",\n    \"metadata\": {\n      \"name\": \"pipelines-as-code\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonAddon\",\n    \"metadata\": {\n      \"name\": \"addon\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonChain\",\n    \"metadata\": {\n      \"name\": \"chain\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonConfig\",\n    \"metadata\": {\n      \"name\": \"config\"\n    },\n    \"spec\": {\n      \"addon\": {\n        \"params\": [\n          {\n            \"name\": \"pipelineTemplates\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverTasks\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverStepActions\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"communityResolverTasks\",\n            \"value\": \"true\"\n          }\n        ]\n      },\n      \"params\": [\n        {\n          \"name\": \"createRbacResource\",\n          \"value\": \"true\"\n        },\n        {\n          \"name\": \"legacyPipelineRbac\",\n          \"value\": \"true\"\n        }\n      ],\n      \"profile\": \"all\",\n      \"pruner\": {\n        \"keep\": 100,\n        \"resources\": [\n          \"pipelinerun\",\n          \"taskrun\"\n        ],\n        \"schedule\": \"0 8 * * *\"\n      },\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonHub\",\n    \"metadata\": {\n      \"name\": \"hub\"\n    },\n    \"spec\": {\n      \"api\": {\n        \"catalogRefreshInterval\": \"30m\"\n      },\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonInstallerSet\",\n    \"metadata\": {\n      \"name\": \"foo\"\n    },\n    \"spec\": {\n      \"manifests\": []\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonPipeline\",\n    \"metadata\": {\n      \"name\": \"pipeline\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonPruner\",\n    \"metadata\": {\n      \"name\": \"pruner\"\n    },\n    \"spec\": {\n      \"disabled\": true,\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonResult\",\n    \"metadata\": {\n      \"name\": \"result\"\n    },\n    \"spec\": {\n      \"auth_disable\": true,\n      \"db_enable_auto_migration\": true,\n      \"db_host\": \"tekton-results-postgres-service.openshift-pipelines.svc.cluster.local\",\n      \"db_port\": 5432,\n      \"log_level\": \"debug\",\n      \"logging_pvc_name\": \"tekton-logs\",\n      \"logs_api\": true,\n      \"logs_buffer_size\": 32768,\n      \"logs_path\": \"/logs\",\n      \"logs_type\": \"File\",\n      \"prometheus_port\": 9090,\n      \"server_port\": 8080,\n      \"targetNamespace\": \"openshift-pipelines\",\n      \"tls_hostname_override\": \"tekton-results-api-service.openshift-pipelines.svc.cluster.local\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonTrigger\",\n    \"metadata\": {\n      \"name\": \"trigger\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  }\n]",
                     "capabilities": "Full Lifecycle",
                     "categories": "Developer Tools, Integration & Delivery",
                     "certified": "false",
@@ -11317,7 +11309,7 @@
                     "features.operators.openshift.io/token-auth-aws": "false",
                     "features.operators.openshift.io/token-auth-azure": "false",
                     "features.operators.openshift.io/token-auth-gcp": "false",
-                    "olm.skipRange": ">=1.18.0 <5.0.5-595",
+                    "olm.skipRange": ">=1.18.0 <5.0.5-596",
                     "operators.openshift.io/valid-subscription": "[\"OpenShift Container Platform\", \"OpenShift Platform Plus\"]",
                     "operators.operatorframework.io/builder": "operator-sdk-v1.37.0",
                     "operators.operatorframework.io/internal-objects": "[\"tektoninstallersets.operator.tekton.dev\", \"tektonconfigs.operator.tekton.dev\",\"tektonpipelines.operator.tekton.dev\",\"tektontriggers.operator.tekton.dev\",\"tektonaddons.operator.tekton.dev\", \"tektonhubs.operator.tekton.dev\", \"tektonresults.operator.tekton.dev\", \"tektonchains.operator.tekton.dev\", \"openshiftpipelinesascodes.operator.tekton.dev\", \"manualapprovalgates.operator.tekton.dev\"]",
@@ -11772,7 +11764,7 @@
                         }
                     ]
                 },
-                "description": "Red Hat OpenShift Pipelines is a cloud-native continuous integration and delivery\n(CI/CD) solution for building pipelines using [Tekton](https://tekton.dev).\nTekton is a flexible Kubernetes-native open-source CI/CD framework, which\nenables automating deployments across multiple platforms (Kubernetes,\nserverless, VMs, etc) by abstracting away the underlying details.\n\n## Features\n\n* Standard CI/CD pipelines definition\n* Build images with Kubernetes tools such as S2I, Buildah, Buildpacks, Kaniko, etc\n* Deploy applications to multiple platforms such as Kubernetes, serverless and VMs\n* Easy to extend and integrate with existing tools\n* Scale pipelines on-demand\n* Portable across any Kubernetes platform\n* Designed for microservices and decentralized team\n* Integrated with OpenShift Developer Console\n\n## Installation\n\n_Red Hat OpenShift Pipelines Operator_ gets installed into a single namespace (openshift-operators) which would then install _Red Hat OpenShift Pipelines_ into the openshift-pipelines namespace. _Red Hat OpenShift Pipelines_ is however cluster-wide and can run pipelines created in any namespace.\n\n### Components\n\n- Tekton Pipelines: v1.0.0\n- Tekton Triggers: v0.32.0\n- Pipelines as Code: v0.35.1\n- Tekton Chains: v0.25.1\n- Tekton Hub (tech-preview): v1.21.0\n- Tekton Results (tech-preview): v0.15.0\n- Manual Approval Gate (tech-preview): v0.6.0\n- Tekton Pruner (tech-preview): v0.1.0\n\n## Getting Started\n\nIn order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/pipelines/5.0/create/creating-applications-with-cicd-pipelines.html).\n\n## CLI (tkn)\n\nTekton Pipelines cli project provides a CLI (tkn) for interacting with OpenShift Pipelines.\n\n[Download tkn](/command-line-tools) (links will be available on `command line tools` page after this operator is installed).\n",
+                "description": "Red Hat OpenShift Pipelines is a cloud-native continuous integration and delivery\n(CI/CD) solution for building pipelines using [Tekton](https://tekton.dev).\nTekton is a flexible Kubernetes-native open-source CI/CD framework, which\nenables automating deployments across multiple platforms (Kubernetes,\nserverless, VMs, etc) by abstracting away the underlying details.\n\n## Features\n\n* Standard CI/CD pipelines definition\n* Build images with Kubernetes tools such as S2I, Buildah, Buildpacks, Kaniko, etc\n* Deploy applications to multiple platforms such as Kubernetes, serverless and VMs\n* Easy to extend and integrate with existing tools\n* Scale pipelines on-demand\n* Portable across any Kubernetes platform\n* Designed for microservices and decentralized team\n* Integrated with OpenShift Developer Console\n\n## Installation\n\n_Red Hat OpenShift Pipelines Operator_ gets installed into a single namespace (openshift-operators) which would then install _Red Hat OpenShift Pipelines_ into the openshift-pipelines namespace. _Red Hat OpenShift Pipelines_ is however cluster-wide and can run pipelines created in any namespace.\n\n### Components\n\n- Tekton Pipelines: v1.1.0\n- Tekton Triggers: v0.32.0\n- Pipelines as Code: v0.35.1\n- Tekton Chains: v0.25.1\n- Tekton Hub (tech-preview): v1.21.0\n- Tekton Results (tech-preview): v0.15.0\n- Manual Approval Gate (tech-preview): v0.6.0\n- Tekton Pruner (tech-preview): v0.1.0\n\n## Getting Started\n\nIn order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/pipelines/5.0/create/creating-applications-with-cicd-pipelines.html).\n\n## CLI (tkn)\n\nTekton Pipelines cli project provides a CLI (tkn) for interacting with OpenShift Pipelines.\n\n[Download tkn](/command-line-tools) (links will be available on `command line tools` page after this operator is installed).\n",
                 "displayName": "Red Hat OpenShift Pipelines",
                 "installModes": [
                     {
@@ -11926,15 +11918,15 @@
         },
         {
             "name": "",
-            "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:48cc055148d0a2c4338237db293e9ecbfacb83d2f220fefa000bba30cecf1ca3"
+            "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:17a243ea3155aaf00d5b91ff561a9353f9f27c6531fa4536d3932e17479fc21c"
         },
         {
             "name": "IMAGE_PIPELINES_PROXY",
-            "image": "quay.io/openshift-pipeline/pipelines-operator-proxy-rhel9@sha256:e37a2b061eff6984f8d341825e5989e459de4125322e33480ac01dce5a57c801"
+            "image": "quay.io/openshift-pipeline/pipelines-operator-proxy-rhel9@sha256:55c27e8a2f55d751b927b03f090c4d1897b0ba608c87a3f18f7a41a5e290ef83"
         },
         {
             "name": "TEKTON_OPERATOR_WEBHOOK",
-            "image": "quay.io/openshift-pipeline/pipelines-operator-webhook-rhel9@sha256:21008da85a57a5ad22cf748a8fc5f1bd92abedb228acab8d3d1bd98008d37a36"
+            "image": "quay.io/openshift-pipeline/pipelines-operator-webhook-rhel9@sha256:5e76b7c30e08be9853fdda621d334e4d41f3761be686c4300c62d719ac50bf74"
         },
         {
             "name": "IMAGE_PAC_PAC_CLI",
@@ -11974,11 +11966,11 @@
         },
         {
             "name": "OPENSHIFT_PIPELINES_OPERATOR_LIFECYCLE",
-            "image": "quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:87791b558320da8d5fe47722f63835abaad99b0b646a66ef9d9f289abba17a05"
+            "image": "quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:7e1a6d6a5d4d4f498383cf1d9b05488968e9ca3411bdb52f3054bdef8a187ea6"
         },
         {
             "name": "OPENSHIFT_PIPELINES_OPERATOR_CLUSTER_OPERATIONS",
-            "image": "quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:87791b558320da8d5fe47722f63835abaad99b0b646a66ef9d9f289abba17a05"
+            "image": "quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:7e1a6d6a5d4d4f498383cf1d9b05488968e9ca3411bdb52f3054bdef8a187ea6"
         },
         {
             "name": "IMAGE_PIPELINES_ARG__SIDECARLOGRESULTS_IMAGE",
