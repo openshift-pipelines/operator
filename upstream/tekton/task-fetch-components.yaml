@@ -14,16 +14,11 @@ spec:
     description: Target platform for for which the payload is going to be used
     default: "kubernetes openshift"
   steps:
-  - image: docker.io/library/golang:1.24
+  - image: docker.io/library/golang:1.24@sha256:4c0a1814a7c6c65ece28b3bfea14ee3cf83b5e80b81418453f0e9d5255a5d7b8
     name: fetch-components
     workingDir: /go/src/github.com/tektoncd/operator
     script: |
       #!/usr/bin/env bash
-      set -e
-
-      echo "Installing yq..."
-      wget -q https://github.com/mikefarah/yq/releases/download/v4.40.5/yq_linux_amd64 -O /usr/bin/yq
-      chmod +x /usr/bin/yq
       for platform in $(params.TARGET_PLATFORMS); do
         echo "Fetching Tekton components for ${platform} build"
         make TARGET=${platform} get-releases
