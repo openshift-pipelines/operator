@@ -9,6 +9,7 @@ COPY .konflux/patches patches/
 RUN set -e; for f in patches/*.patch; do echo ${f}; [[ -f ${f} ]] || continue; git apply ${f}; done
 COPY head HEAD
 ENV GODEBUG="http2server=0"
+ENV GOEXPERIMENT=strictfipsruntime
 RUN go build -tags disable_gcp -tags strictfipsruntime -ldflags="-X 'knative.dev/pkg/changeset.rev=$(cat HEAD)'" -mod=vendor -o /tmp/openshift-pipelines-operator \
     ./cmd/openshift/operator
 
