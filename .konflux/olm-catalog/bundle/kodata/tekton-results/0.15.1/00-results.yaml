@@ -3,7 +3,7 @@ kind: ServiceAccount
 metadata:
   labels:
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-api
   namespace: tekton-pipelines
 ---
@@ -12,7 +12,7 @@ kind: ServiceAccount
 metadata:
   labels:
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-watcher
   namespace: tekton-pipelines
 ---
@@ -22,7 +22,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tekton-results-info
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-info
   namespace: tekton-pipelines
 rules:
@@ -41,7 +41,7 @@ kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
     rbac.authorization.k8s.io/aggregate-to-admin: "true"
   name: tekton-results-admin
 rules:
@@ -63,7 +63,7 @@ kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-api
 rules:
   - apiGroups:
@@ -84,7 +84,7 @@ kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
     rbac.authorization.k8s.io/aggregate-to-edit: "true"
     rbac.authorization.k8s.io/aggregate-to-view: "true"
   name: tekton-results-readonly
@@ -105,7 +105,7 @@ kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-readwrite
 rules:
   - apiGroups:
@@ -125,7 +125,7 @@ kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-watcher
 rules:
   - apiGroups:
@@ -203,7 +203,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tekton-results-info
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-info
   namespace: tekton-pipelines
 roleRef:
@@ -220,7 +220,7 @@ kind: ClusterRoleBinding
 metadata:
   labels:
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-api
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -236,7 +236,7 @@ kind: ClusterRoleBinding
 metadata:
   labels:
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-watcher
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -307,7 +307,7 @@ kind: ConfigMap
 metadata:
   labels:
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-api-config
   namespace: tekton-pipelines
 ---
@@ -347,7 +347,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tekton-results-leader-election
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-config-leader-election
   namespace: tekton-pipelines
 ---
@@ -380,7 +380,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tekton-results-logging
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-config-logging
   namespace: tekton-pipelines
 ---
@@ -428,7 +428,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tekton-results-observability
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-config-observability
   namespace: tekton-pipelines
 ---
@@ -441,19 +441,19 @@ metadata:
   labels:
     app.kubernetes.io/name: tekton-results-retention-policy
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-config-results-retention-policy
   namespace: tekton-pipelines
 ---
 apiVersion: v1
 data:
-  version: v0.15.0
+  version: v0.15.1
 kind: ConfigMap
 metadata:
   labels:
     app.kubernetes.io/name: tekton-results-info
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-info
   namespace: tekton-pipelines
 ---
@@ -463,7 +463,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tekton-results-api
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-api-service
   namespace: tekton-pipelines
 spec:
@@ -482,7 +482,7 @@ spec:
       targetPort: 6060
   selector:
     app.kubernetes.io/name: tekton-results-api
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
 ---
 apiVersion: v1
 kind: Service
@@ -490,7 +490,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tekton-results-watcher
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-watcher
   namespace: tekton-pipelines
 spec:
@@ -501,7 +501,7 @@ spec:
       port: 8008
   selector:
     app.kubernetes.io/name: tekton-results-watcher
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -509,7 +509,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tekton-results-api
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-api
   namespace: tekton-pipelines
 spec:
@@ -517,14 +517,14 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: tekton-results-api
-      app.kubernetes.io/version: v0.15.0
+      app.kubernetes.io/version: v0.15.1
   template:
     metadata:
       annotations:
         cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
       labels:
         app.kubernetes.io/name: tekton-results-api
-        app.kubernetes.io/version: v0.15.0
+        app.kubernetes.io/version: v0.15.1
     spec:
       containers:
         - env:
@@ -538,7 +538,7 @@ spec:
                 secretKeyRef:
                   key: POSTGRES_PASSWORD
                   name: tekton-results-postgres
-          image: ghcr.io/tektoncd/results/api-b1b7ffa9ba32f7c3020c3b68830b30a8:v0.15.0@sha256:6abfa830fd02344d473bf0345204231f165422bf101c87efbc797253fa9ca3c1
+          image: ghcr.io/tektoncd/results/api-b1b7ffa9ba32f7c3020c3b68830b30a8:v0.15.1@sha256:efe888b1f0380c3c016b08b6293e50d5f23317d14da591f5dbb0fb28ca47e351
           livenessProbe:
             httpGet:
               path: /healthz
@@ -592,7 +592,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tekton-results-retention-policy-agent
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-retention-policy-agent
   namespace: tekton-pipelines
 spec:
@@ -600,14 +600,14 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: tekton-results-retention-policy-agent
-      app.kubernetes.io/version: v0.15.0
+      app.kubernetes.io/version: v0.15.1
   template:
     metadata:
       annotations:
         cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
       labels:
         app.kubernetes.io/name: tekton-results-retention-policy-agent
-        app.kubernetes.io/version: v0.15.0
+        app.kubernetes.io/version: v0.15.1
     spec:
       containers:
         - env:
@@ -627,7 +627,7 @@ spec:
                 secretKeyRef:
                   key: POSTGRES_PASSWORD
                   name: tekton-results-postgres
-          image: ghcr.io/tektoncd/results/retention-policy-agent-07427b345034d96a9a27896ebb138518:v0.15.0@sha256:daee61d0ff3ea8d54b9473c784287b392f5e5a473dc4981f69564e17a1b793c4
+          image: ghcr.io/tektoncd/results/retention-policy-agent-07427b345034d96a9a27896ebb138518:v0.15.1@sha256:c33a5ffbae08469420bb437dc1534f0d4a3735ff0722455fa23753874ccd35b8
           name: retention-policy-agent
           securityContext:
             allowPrivilegeEscalation: false
@@ -659,7 +659,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tekton-results-watcher
     app.kubernetes.io/part-of: tekton-results
-    app.kubernetes.io/version: v0.15.0
+    app.kubernetes.io/version: v0.15.1
   name: tekton-results-watcher
   namespace: tekton-pipelines
 spec:
@@ -667,14 +667,14 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: tekton-results-watcher
-      app.kubernetes.io/version: v0.15.0
+      app.kubernetes.io/version: v0.15.1
   template:
     metadata:
       annotations:
         cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
       labels:
         app.kubernetes.io/name: tekton-results-watcher
-        app.kubernetes.io/version: v0.15.0
+        app.kubernetes.io/version: v0.15.1
     spec:
       containers:
         - args:
@@ -701,7 +701,7 @@ spec:
               value: token
             - name: KUBERNETES_MIN_VERSION
               value: v1.28.0
-          image: ghcr.io/tektoncd/results/watcher-83f971ea227fb24157c0c699b824a628:v0.15.0@sha256:0707f6bb5ad8efc843de2bbeccb73f5b523b1d1359dbd28fde9f3e010b8f2f63
+          image: ghcr.io/tektoncd/results/watcher-83f971ea227fb24157c0c699b824a628:v0.15.1@sha256:32572f6f468ee02abfff1686c93b4fe342d79255ce94a148c0a69ec9c2e1ef55
           name: watcher
           ports:
             - containerPort: 9090
