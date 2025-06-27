@@ -262,7 +262,26 @@ spec:
             script: |
               gauge run --tags="" --log-level=debug --verbose specs/konflux-olm.spec
 
-          - name: run-e2e-tests
+          - name: run-e2e-pipelines
+            image: $(params.image)
+            workingDir: /source/repo
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+            script: |
+              gauge run --tags="" --log-level=debug --verbose specs/pipelines/
+
+          - name: run-e2e-metrics
+            image: $(params.image)
+            workingDir: /source/repo
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+            script: |
+              gauge run --tags="" --log-level=debug --verbose specs/metrics/
+
+
+          - name: run-e2e-chains
             image: $(params.image)
             workingDir: /source/repo
             env:
@@ -276,8 +295,21 @@ spec:
             script: |
               
               export CHAINS_REPOSITORY=quay.io/openshift-pipeline/chainstest
-
-              gauge run --tags="" --log-level=debug --verbose specs/pipelines/
-              gauge run --tags="" --log-level=debug --verbose specs/metrics/
               gauge run --tags="" --log-level=debug --verbose specs/chains/
+
+
+          - name: run-e2e-manualapprovalgate
+            image: $(params.image)
+            workingDir: /source/repo
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+            script: |
               gauge run --tags="" --log-level=debug --verbose specs/manualapprovalgate/
+          
+              
+          
+              
+          
+              
+              
