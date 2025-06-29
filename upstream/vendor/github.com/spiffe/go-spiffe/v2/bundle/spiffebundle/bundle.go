@@ -4,12 +4,13 @@ import (
 	"crypto"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"io"
-	"io/ioutil"
+	"os"
 	"sync"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v4"
 	"github.com/spiffe/go-spiffe/v2/bundle/jwtbundle"
 	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 	"github.com/spiffe/go-spiffe/v2/internal/jwtutil"
@@ -23,9 +24,7 @@ const (
 	jwtSVIDUse  = "jwt-svid"
 )
 
-var (
-	spiffebundleErr = errs.Class("spiffebundle")
-)
+var spiffebundleErr = errs.Class("spiffebundle")
 
 type bundleDoc struct {
 	jose.JSONWebKeySet
@@ -58,7 +57,7 @@ func New(trustDomain spiffeid.TrustDomain) *Bundle {
 // Load loads a bundle from a file on disk. The file must contain a JWKS
 // document following the SPIFFE Trust Domain and Bundle specification.
 func Load(trustDomain spiffeid.TrustDomain, path string) (*Bundle, error) {
-	bundleBytes, err := ioutil.ReadFile(path)
+	bundleBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, spiffebundleErr.New("unable to read SPIFFE bundle: %w", err)
 	}
@@ -69,7 +68,7 @@ func Load(trustDomain spiffeid.TrustDomain, path string) (*Bundle, error) {
 // Read decodes a bundle from a reader. The contents must contain a JWKS
 // document following the SPIFFE Trust Domain and Bundle specification.
 func Read(trustDomain spiffeid.TrustDomain, r io.Reader) (*Bundle, error) {
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, spiffebundleErr.New("unable to read: %v", err)
 	}
@@ -108,7 +107,7 @@ func Parse(trustDomain spiffeid.TrustDomain, bundleBytes []byte) (*Bundle, error
 			bundle.AddX509Authority(key.Certificates[0])
 		case jwtSVIDUse:
 			if err := bundle.AddJWTAuthority(key.KeyID, key.Key); err != nil {
-				return nil, spiffebundleErr.New("error adding authority %d of JWKS: %v", i, errs.Unwrap(err))
+				return nil, spiffebundleErr.New("error adding authority %d of JWKS: %v", i, errors.Unwrap(err))
 			}
 		}
 	}
