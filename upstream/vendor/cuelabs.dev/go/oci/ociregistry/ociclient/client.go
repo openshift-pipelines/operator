@@ -25,6 +25,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -35,6 +36,7 @@ import (
 	"cuelabs.dev/go/oci/ociregistry"
 	"cuelabs.dev/go/oci/ociregistry/internal/ocirequest"
 	"cuelabs.dev/go/oci/ociregistry/ociauth"
+	"cuelabs.dev/go/oci/ociregistry/ociref"
 )
 
 // debug enables logging.
@@ -166,7 +168,7 @@ func descriptorFromResponse(resp *http.Response, knownDigest digest.Digest, requ
 	}
 	digest := digest.Digest(resp.Header.Get("Docker-Content-Digest"))
 	if digest != "" {
-		if !ociregistry.IsValidDigest(string(digest)) {
+		if !ociref.IsValidDigest(string(digest)) {
 			return ociregistry.Descriptor{}, fmt.Errorf("bad digest %q found in response", digest)
 		}
 	} else {
@@ -323,10 +325,8 @@ func (c *client) do(req *http.Request, okStatuses ...int) (*http.Response, error
 	if len(okStatuses) == 0 && resp.StatusCode == http.StatusOK {
 		return resp, nil
 	}
-	for _, status := range okStatuses {
-		if resp.StatusCode == status {
-			return resp, nil
-		}
+	if slices.Contains(okStatuses, resp.StatusCode) {
+		return resp, nil
 	}
 	defer resp.Body.Close()
 	if !isOKStatus(resp.StatusCode) {
