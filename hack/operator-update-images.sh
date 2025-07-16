@@ -26,22 +26,34 @@ function update_image_reference() {
      #Update Operator Image operator-operator to operator
      output=$(echo "$output" | sed -E "s/operator-operator-rhel9/rhel9-operator/g")
 
-      echo "$output"
+     # Check if the image exists in the target registry
+    skopeo inspect --raw docker://${output} > /dev/null 2>&1
+     if [ $? -ne 0 ]; then
+         echo -e "\e[31m Image ${output} does not exist, skipping update \e[0m" >&2
+         return 1
+     fi
+    echo "$output"
 }
 CSV_FILE=".konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml"
 LENGTH=$(yq e '.images | length' project.yaml)
 for i in $(seq 0 $((${LENGTH}-1))); do
     NAME=$(yq e ".images.${i}.name" project.yaml)
     REFERENCE=$(update_image_reference "$(yq e ".images.${i}.value" project.yaml)")
-    echo "${NAME}: ${REFERENCE}"
+    if [ $? -ne 1 ]; then
+      echo "${NAME}: ${REFERENCE}"
 
-    yq eval --inplace "(.spec.install.spec.deployments[] | select(.name == \"openshift-pipelines-operator\")| .spec.template.spec.containers[].env[] | select(.name == \"${NAME}\") | .value) = \"${REFERENCE}\"" $CSV_FILE
-    yq eval --inplace "(.spec.relatedImages[] | select(.name == \"${NAME}\") | .image) = \"${REFERENCE}\"" $CSV_FILE
+      yq eval --inplace "(.spec.install.spec.deployments[] | select(.name == \"openshift-pipelines-operator\")| .spec.template.spec.containers[].env[] | select(.name == \"${NAME}\") | .value) = \"${REFERENCE}\"" $CSV_FILE
+      yq eval --inplace "(.spec.relatedImages[] | select(.name == \"${NAME}\") | .image) = \"${REFERENCE}\"" $CSV_FILE
+    fi
 done
-#
-## Operator's specifics
+
+# Operator's specifics
 REFERENCE=$(update_image_reference "$(yq e '.images[] | select(.name == "OPENSHIFT_PIPELINES_OPERATOR_LIFECYCLE") | .value' project.yaml)")
-yq eval --inplace "(.spec.install.spec.deployments[] | select(.name == \"openshift-pipelines-operator\")| .spec.template.spec.containers[].image) = \"${REFERENCE}\"" $CSV_FILE
+if [ $? -ne 1 ]; then
+  yq eval --inplace "(.spec.install.spec.deployments[] | select(.name == \"openshift-pipelines-operator\")| .spec.template.spec.containers[].image) = \"${REFERENCE}\"" $CSV_FILE
+fi
 
 REFERENCE=$(update_image_reference "$(yq e '.images[] | select(.name == "TEKTON_OPERATOR_WEBHOOK") | .value' project.yaml)")
-yq eval --inplace "(.spec.install.spec.deployments[] | select(.name == \"tekton-operator-webhook\")| .spec.template.spec.containers[].image) = \"${REFERENCE}\"" $CSV_FILE
+if [ $? -ne 1 ]; then
+  yq eval --inplace "(.spec.install.spec.deployments[] | select(.name == \"tekton-operator-webhook\")| .spec.template.spec.containers[].image) = \"${REFERENCE}\"" $CSV_FILE
+fi
