@@ -18,7 +18,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.19.0 <5.0.5-630'
+    olm.skipRange: '>=1.19.0 <5.0.5-631'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
@@ -30,7 +30,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v5.0.5-630
+  name: openshift-pipelines-operator-rh.v5.0.5-631
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -1205,7 +1205,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 5.0.5-630
+                        value: 5.0.5-631
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1315,9 +1315,9 @@ spec:
                       - name: IMAGE_HUB_TEKTON_HUB_UI
                         value: quay.io/openshift-pipeline/pipelines-hub-ui-rhel9@sha256:48f3e03942332b0389d4adb8b765c3b302d5a1efd6f062e31babb464d869d351
                       - name: IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER
-                        value: quay.io/openshift-pipeline/pipelines-manual-approval-gate-controller-rhel9@sha256:395a4f622026f4e9423de3ddd732b314b5910505fdd2b9048de866c3442240ef
+                        value: registry.redhat.io/openshift-pipelines/pipelines-manual-approval-gate-rhel9@
                       - name: IMAGE_MAG_MANUAL_APPROVAL
-                        value: quay.io/openshift-pipeline/pipelines-manual-approval-gate-webhook-rhel9@sha256:48d0987bcbfd03e5a4390860ec21a559dc79e23c6ac3f9c9c569f2933d4816bc
+                        value: registry.redhat.io/openshift-pipelines/pipelines-manual-approval-gate-rhel9@
                       - name: IMAGE_PRUNER_CONTROLLER
                         value: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:a303156d2412f548bc53a8d1af404e672c9bd262cf4d74bb4fb3b8144c4c127c
                       - name: IMAGE_PAC_PAC_CONTROLLER
@@ -1579,9 +1579,9 @@ spec:
       name: IMAGE_HUB_TEKTON_HUB_API
     - image: quay.io/openshift-pipeline/pipelines-hub-ui-rhel9@sha256:48f3e03942332b0389d4adb8b765c3b302d5a1efd6f062e31babb464d869d351
       name: IMAGE_HUB_TEKTON_HUB_UI
-    - image: quay.io/openshift-pipeline/pipelines-manual-approval-gate-controller-rhel9@sha256:395a4f622026f4e9423de3ddd732b314b5910505fdd2b9048de866c3442240ef
+    - image: registry.redhat.io/openshift-pipelines/pipelines-manual-approval-gate-rhel9@
       name: IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER
-    - image: quay.io/openshift-pipeline/pipelines-manual-approval-gate-webhook-rhel9@sha256:48d0987bcbfd03e5a4390860ec21a559dc79e23c6ac3f9c9c569f2933d4816bc
+    - image: registry.redhat.io/openshift-pipelines/pipelines-manual-approval-gate-rhel9@
       name: IMAGE_MAG_MANUAL_APPROVAL
     - image: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:a303156d2412f548bc53a8d1af404e672c9bd262cf4d74bb4fb3b8144c4c127c
       name: IMAGE_PRUNER_CONTROLLER
@@ -1605,5 +1605,5 @@ spec:
       name: IMAGE_ADDONS_MAVEN_GOALS
     - image: quay.io/openshift-pipeline/pipelines-console-plugin-rhel9@sha256:aba7a9bf9f94e0428ee3fa11ad62aa2e0b1a3c0afba3266834e938efa932e0e9
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
-  replaces: openshift-pipelines-operator-rh.v5.0.5-629
-  version: 5.0.5-630
+  replaces: openshift-pipelines-operator-rh.v5.0.5-630
+  version: 5.0.5-631
