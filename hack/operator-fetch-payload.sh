@@ -83,14 +83,13 @@ yq e -i "(.spec.install.spec.deployments[] | select (.name == \"openshift-pipeli
 # fix serve-tkn-cli wrong image
 SERVE_REF=$(yq e '.images[] | select(.name == "IMAGE_ADDONS_TKN_CLI_SERVE") | .value' project.yaml)
 
-yq e -i '
+env SERVE_REF="$SERVE_REF" yq e -i '
   (.spec.install.spec.deployments[]
     | select(.name=="openshift-pipelines-operator")
     | .spec.template.spec.containers[0].env[]
     | select(.name=="IMAGE_ADDONS_TKN_CLI_SERVE")
-    | .value) = \"$SERVE_REF\"
+    | .value) = strenv(SERVE_REF)
 ' .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
-
 
 # Mutate pipelines-as-code payload
 for d in controller watcher webhook; do
