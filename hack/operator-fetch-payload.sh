@@ -88,7 +88,7 @@ yq e -i '
     | select(.name=="openshift-pipelines-operator")
     | .spec.template.spec.containers[0].env[]
     | select(.name=="IMAGE_ADDONS_TKN_CLI_SERVE")
-    | .value) = strenv(SERVE_REF)
+    | .value) = \"$SERVE_REF\"
 ' .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
 
