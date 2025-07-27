@@ -84,12 +84,14 @@ yq e -i "(.spec.install.spec.deployments[] | select (.name == \"openshift-pipeli
 SERVE_REF=$(yq e '.images[] | select(.name == "IMAGE_ADDONS_TKN_CLI_SERVE") | .value' project.yaml)
 
 env SERVE_REF="$SERVE_REF" yq e -i '
-  (.spec.install.spec.deployments[]
-    | select(.name=="openshift-pipelines-operator")
-    | .spec.template.spec.containers[0].env[]
-    | select(.name=="IMAGE_ADDONS_TKN_CLI_SERVE")
-    | .value) = strenv(SERVE_REF)
-' .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+(.spec.install.spec.deployments[].spec.template.spec.containers[].env[] 
+  | select(.name == "IMAGE_ADDONS_TKN_CLI_SERVE")).value = strenv(SERVE_REF)' \
+  .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+
+env SERVE_REF="$SERVE_REF" yq e -i '
+(.spec.relatedImages[] 
+  | select(.name == "IMAGE_ADDONS_TKN_CLI_SERVE")).image = strenv(SERVE_REF)' \
+  .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
 # Mutate pipelines-as-code payload
 for d in controller watcher webhook; do
