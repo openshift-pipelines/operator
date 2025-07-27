@@ -56,6 +56,22 @@ echo "Copy generated bundle data to this onebundle…"
 cp -rv ${SOURCE}/operatorhub/openshift/release-artifacts/bundle/metadata .konflux/olm-catalog/bundle
 cp -rv ${SOURCE}/operatorhub/openshift/release-artifacts/bundle/manifests .konflux/olm-catalog/bundle
 
+# fix wrong image on serve-tkn-cli
+SERVE_REF=$(yq e '.images[] | select(.name=="IMAGE_ADDONS_TKN_CLI_SERVE") | .value' project.yaml)
+CSV=".konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml"
+
+yq e -i '
+  (.spec.install.spec.deployments[]
+     | select(.name=="openshift-pipelines-operator")
+     | .spec.template.spec.containers[].env)
+    += [{"name":"IMAGE_ADDONS_TKN_CLI_SERVE","value":"'"$SERVE_REF"'"}]
+' $CSV
+
+yq e -i '
+  .spec.relatedImages
+    += [{"name":"IMAGE_ADDONS_TKN_CLI_SERVE","image":"'"$SERVE_REF"'"}]
+' $CSV
+
 for f in .konflux/olm-catalog/bundle/manifests/*.yaml; do
     if [[ $(yq e '.metadata.labels.version' ${f}) == null ]]; then
         continue
@@ -72,6 +88,7 @@ yq e -i 'del(.metadata.annotations["createdAt"])' \
 # Add valid-subscription annotation
 yq e -i '.metadata.annotations["operators.openshift.io/valid-subscription"] = "[\"OpenShift Container Platform\", \"OpenShift Platform Plus\"]"' \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+
 
 # Update VERSION env variable to use ${VERSION=}
 yq e -i "(.spec.install.spec.deployments[] | select (.name == \"openshift-pipelines-operator\") | .spec.template.spec.containers[0].env[] | select (.name == \"VERSION\") | .value) = \"${CURRENT_VERSION}\"" \
