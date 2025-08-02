@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6d5a6576c83816edcc0da7ed62ba69df8f6ad3cbe659adde2891bfbec4dbf187 as base
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:0d7cfb0704f6d389942150a01a20cb182dc8ca872004ebf19010e2b622818926 as base
 FROM scratch
 
 COPY .konflux/olm-catalog/bundle/kodata /kodata
