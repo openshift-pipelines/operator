@@ -96,6 +96,19 @@ yq e -i "(.spec.install.spec.deployments[] | select (.name == \"openshift-pipeli
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 # FIXME: we *may* need to clean some of those generated files
 
+# fix serve-tkn-cli wrong image
+SERVE_REF=$(yq e '.images[] | select(.name == "IMAGE_ADDONS_TKN_CLI_SERVE") | .value' project.yaml)
+
+env SERVE_REF="$SERVE_REF" yq e -i '
+(.spec.install.spec.deployments[].spec.template.spec.containers[].env[] 
+  | select(.name == "IMAGE_ADDONS_TKN_CLI_SERVE")).value = strenv(SERVE_REF)' \
+  .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+
+env SERVE_REF="$SERVE_REF" yq e -i '
+(.spec.relatedImages[] 
+  | select(.name == "IMAGE_ADDONS_TKN_CLI_SERVE")).image = strenv(SERVE_REF)' \
+  .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+
 # Mutate pipelines-as-code payload
 for d in controller watcher webhook; do
     yq e -i "(select (.kind == \"Deployment\") | select (.metadata.name == \"pipelines-as-code-${d}\") | .spec.template.spec.containers[0].command) = [\"/ko-app/pipelines-as-code-${d}\"]" .konflux/olm-catalog/bundle/kodata/tekton-addon/pipelines-as-code/*/release.yaml
