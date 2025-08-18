@@ -356,13 +356,13 @@ spec:
 
     - Tekton Chains: v0.25.1
 
-    - Tekton Hub (tech-preview): v1.22.1
+    - Tekton Hub (tech-preview): v1.22.2
 
     - Tekton Results (tech-preview): v0.15.3
 
     - Manual Approval Gate (tech-preview): v0.7.0
 
-    - Tekton Pruner (tech-preview): v0.1.0
+    - Tekton Pruner (tech-preview): v0.2.0
 
 
     ## Getting Started
@@ -1231,9 +1231,9 @@ spec:
                       - name: IMAGE_ADDONS_SKOPEO_COPY
                         value: registry.redhat.io/rhel9/skopeo@sha256:993f799d58c48151ecae7a84e63860f6c0039e8e18efed5ad67e7752f4b7e408
                       - name: IMAGE_ADDONS_GENERATE
-                        value: registry.redhat.io/source-to-image/source-to-image-rhel8@sha256:3696cf724ce7865626ae408d82fd87727c741e4d3eb3475c271ec6d56f0882a4
+                        value: registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:70293cb8a80aa548933ff5f502bac89945a5cd08801c4ca3aac08a10dd01f62f
                       - name: IMAGE_ADDONS_GEN_ENV_FILE
-                        value: registry.redhat.io/source-to-image/source-to-image-rhel8@sha256:3696cf724ce7865626ae408d82fd87727c741e4d3eb3475c271ec6d56f0882a4
+                        value: registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:70293cb8a80aa548933ff5f502bac89945a5cd08801c4ca3aac08a10dd01f62f
                       - name: IMAGE_ADDONS_PARAM_MAVEN_IMAGE
                         value: registry.redhat.io/ubi9/openjdk-17@sha256:cdbd64ba1b7826d09bc180fa19aa6fbc09ddb5bff5e02b7e1351353bbabebb78
                       - name: IMAGE_ADDONS_OC
@@ -1261,9 +1261,9 @@ spec:
                       - name: IMAGE_ADDONS_PREPARE_AND_RUN
                         value: quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:bff455112443bd20c97e5c44f213f56ed726ee3039cd7ae478691e046ad3c5ab
                       - name: IMAGE_ADDONS_CACHE_UPLOAD
-                        value: quay.io/openshift-pipeline/pipelines-cache-rhel9@sha256:af9e3efd304fdd621fa32ee816b7377f9b42160f8b3f49d69fd2691bce190c69
+                        value: registry.redhat.io/openshift-pipelines/pipelines-cache-rhel9@
                       - name: IMAGE_ADDONS_CACHE_FETCH
-                        value: quay.io/openshift-pipeline/pipelines-cache-rhel9@sha256:af9e3efd304fdd621fa32ee816b7377f9b42160f8b3f49d69fd2691bce190c69
+                        value: registry.redhat.io/openshift-pipelines/pipelines-cache-rhel9@
                       - name: IMAGE_PIPELINES_ARG__WORKINGDIRINIT_IMAGE
                         value: quay.io/openshift-pipeline/pipelines-workingdirinit-rhel9@sha256:4a96fbf54d9e13f87b35046a734e1c690c9abda7d0daf541453425fb59df4164
                       - name: IMAGE_PIPELINES_ARG__SIDECARLOGRESULTS_IMAGE
@@ -1291,7 +1291,7 @@ spec:
                       - name: IMAGE_ADDONS_S2I_BUILD
                         value: registry.redhat.io/rhel9/buildah@sha256:a6e04c061b8d261dba85d01dcb64d3f7dba8c0b9765e03f05ec79850a248d75a
                       - name: IMAGE_ADDONS_S2I_GENERATE
-                        value: registry.redhat.io/source-to-image/source-to-image-rhel8@sha256:3696cf724ce7865626ae408d82fd87727c741e4d3eb3475c271ec6d56f0882a4
+                        value: registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:70293cb8a80aa548933ff5f502bac89945a5cd08801c4ca3aac08a10dd01f62f
                       - name: IMAGE_ADDONS_LOAD_SCRIPTS
                         value: registry.redhat.io/ubi9/ubi-minimal@sha256:14f14e03d68f7fd5f2b18a13478b6b127c341b346c86b6e0b886ed2b7573b8e0
                       - name: IMAGE_ADDONS_MAVEN_GENERATE
@@ -1313,7 +1313,7 @@ spec:
                       - name: IMAGE_HUB_TEKTON_HUB_API
                         value: quay.io/openshift-pipeline/pipelines-hub-api-rhel9@sha256:25483862e2ca59f046a450efad3bb24e263f3a072d107621d7e71ef214b4a26e
                       - name: IMAGE_HUB_TEKTON_HUB_UI
-                        value: quay.io/openshift-pipeline/pipelines-hub-ui-rhel9@sha256:bb2a3e9552c91d3db52696bcfca7d99d6b176dd5847e23b290f9a52bb4d51c36
+                        value: registry.redhat.io/openshift-pipelines/pipelines-hub-ui-rhel9@
                       - name: IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER
                         value: quay.io/openshift-pipeline/pipelines-manual-approval-gate-controller-rhel9@sha256:6f794841447ecd9eefc982d5988d5a9d0ff0bc211eb55750bcd49fba623f4842
                       - name: IMAGE_MAG_MANUAL_APPROVAL
@@ -1507,9 +1507,9 @@ spec:
       name: IMAGE_ADDONS_GIT_CLONE
     - image: quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:bff455112443bd20c97e5c44f213f56ed726ee3039cd7ae478691e046ad3c5ab
       name: IMAGE_ADDONS_PREPARE_AND_RUN
-    - image: quay.io/openshift-pipeline/pipelines-cache-rhel9@sha256:af9e3efd304fdd621fa32ee816b7377f9b42160f8b3f49d69fd2691bce190c69
+    - image: registry.redhat.io/openshift-pipelines/pipelines-cache-rhel9@
       name: IMAGE_ADDONS_CACHE_UPLOAD
-    - image: quay.io/openshift-pipeline/pipelines-cache-rhel9@sha256:af9e3efd304fdd621fa32ee816b7377f9b42160f8b3f49d69fd2691bce190c69
+    - image: registry.redhat.io/openshift-pipelines/pipelines-cache-rhel9@
       name: IMAGE_ADDONS_CACHE_FETCH
     - image: quay.io/openshift-pipeline/pipelines-workingdirinit-rhel9@sha256:4a96fbf54d9e13f87b35046a734e1c690c9abda7d0daf541453425fb59df4164
       name: IMAGE_PIPELINES_ARG__WORKINGDIRINIT_IMAGE
@@ -1543,11 +1543,11 @@ spec:
       name: IMAGE_ADDONS_BUILD
     - image: registry.redhat.io/rhel9/buildah@sha256:a6e04c061b8d261dba85d01dcb64d3f7dba8c0b9765e03f05ec79850a248d75a
       name: IMAGE_ADDONS_S2I_BUILD
-    - image: registry.redhat.io/source-to-image/source-to-image-rhel8@sha256:3696cf724ce7865626ae408d82fd87727c741e4d3eb3475c271ec6d56f0882a4
+    - image: registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:70293cb8a80aa548933ff5f502bac89945a5cd08801c4ca3aac08a10dd01f62f
       name: IMAGE_ADDONS_GENERATE
-    - image: registry.redhat.io/source-to-image/source-to-image-rhel8@sha256:3696cf724ce7865626ae408d82fd87727c741e4d3eb3475c271ec6d56f0882a4
+    - image: registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:70293cb8a80aa548933ff5f502bac89945a5cd08801c4ca3aac08a10dd01f62f
       name: IMAGE_ADDONS_GEN_ENV_FILE
-    - image: registry.redhat.io/source-to-image/source-to-image-rhel8@sha256:3696cf724ce7865626ae408d82fd87727c741e4d3eb3475c271ec6d56f0882a4
+    - image: registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:70293cb8a80aa548933ff5f502bac89945a5cd08801c4ca3aac08a10dd01f62f
       name: IMAGE_ADDONS_S2I_GENERATE
     - image: registry.redhat.io/ubi9/ubi-minimal@sha256:14f14e03d68f7fd5f2b18a13478b6b127c341b346c86b6e0b886ed2b7573b8e0
       name: IMAGE_ADDONS_MVN_SETTINGS
@@ -1577,7 +1577,7 @@ spec:
       name: IMAGE_HUB_TEKTON_HUB_DB_MIGRATION
     - image: quay.io/openshift-pipeline/pipelines-hub-api-rhel9@sha256:25483862e2ca59f046a450efad3bb24e263f3a072d107621d7e71ef214b4a26e
       name: IMAGE_HUB_TEKTON_HUB_API
-    - image: quay.io/openshift-pipeline/pipelines-hub-ui-rhel9@sha256:bb2a3e9552c91d3db52696bcfca7d99d6b176dd5847e23b290f9a52bb4d51c36
+    - image: registry.redhat.io/openshift-pipelines/pipelines-hub-ui-rhel9@
       name: IMAGE_HUB_TEKTON_HUB_UI
     - image: quay.io/openshift-pipeline/pipelines-manual-approval-gate-controller-rhel9@sha256:6f794841447ecd9eefc982d5988d5a9d0ff0bc211eb55750bcd49fba623f4842
       name: IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER

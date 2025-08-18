@@ -16,7 +16,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: tekton-pruner-controller-cluster-access
   labels:
-    pruner.tekton.dev/release: "v0.1.0"
+    pruner.tekton.dev/release: "v0.2.0"
 rules:
   # Write permissions to publish events.
   - apiGroups:
@@ -97,7 +97,7 @@ metadata:
   name: tekton-pruner-controller
   namespace: tekton-pipelines
   labels:
-    pruner.tekton.dev/release: "v0.1.0"
+    pruner.tekton.dev/release: "v0.2.0"
 rules:
   # Needed to watch and load configuration and secret data.
   - apiGroups: [""]
@@ -130,7 +130,7 @@ metadata:
   name: tekton-pruner-controller
   namespace: tekton-pipelines
   labels:
-    pruner.tekton.dev/release: "v0.1.0"
+    pruner.tekton.dev/release: "v0.2.0"
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pruner
@@ -154,7 +154,7 @@ kind: ClusterRoleBinding
 metadata:
   name: tekton-pruner-controller-cluster-access
   labels:
-    pruner.tekton.dev/release: "v0.1.0"
+    pruner.tekton.dev/release: "v0.2.0"
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pruner
@@ -187,7 +187,7 @@ metadata:
   name: tekton-pruner-controller
   namespace: tekton-pipelines
   labels:
-    pruner.tekton.dev/release: "v0.1.0"
+    pruner.tekton.dev/release: "v0.2.0"
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pruner
@@ -269,7 +269,7 @@ metadata:
   name: config-logging-tekton-pruner
   namespace: tekton-pipelines
   labels:
-    pruner.tekton.dev/release: "v0.1.0"
+    pruner.tekton.dev/release: "v0.2.0"
 data:
   _example: |
     ################################
@@ -333,8 +333,17 @@ metadata:
   name: config-observability-tekton-pruner
   namespace: tekton-pipelines
   labels:
-    pruner.tekton.dev/release: "v0.1.0"
+    pruner.tekton.dev/release: "v0.2.0"
 data:
+  # New Knative observability config format (required for v0.0.0-20250811181739-e06d4c9af190+)
+  metrics-protocol: "prometheus"
+  metrics-endpoint: ":9090"
+  tracing-protocol: "none"
+  # Legacy format for backward compatibility - TODO: Remove these after confirming new format works everywhere
+  metrics.backend-destination: "prometheus"
+  metrics.request-metrics-backend-destination: "prometheus"
+  metrics.allow-stackdriver-custom-metrics: "false"
+  tracing.backend: "none"
   _example: |
     ################################
     #                              #
@@ -422,17 +431,36 @@ metadata:
   name: tekton-pruner-controller
   namespace: tekton-pipelines
   labels:
-    pruner.tekton.dev/release: "v0.1.0"
+    app.kubernetes.io/name: controller
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/version: "devel"
+    app.kubernetes.io/part-of: tekton-pruner
+    pruner.tekton.dev/release: "v0.2.0"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: controller
+      app: tekton-pruner-controller
+      app.kubernetes.io/name: controller
+      app.kubernetes.io/component: controller
+      app.kubernetes.io/instance: default
+      app.kubernetes.io/part-of: tekton-pruner
   template:
     metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
       labels:
-        app: controller
-        pruner.tekton.dev/release: "v0.1.0"
+        app: tekton-pruner-controller
+        app.kubernetes.io/name: controller
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: default
+        app.kubernetes.io/version: "devel"
+        app.kubernetes.io/part-of: tekton-pruner
+        version: "devel"
+        pruner.tekton.dev/release: "v0.2.0"
     spec:
       # To avoid node becoming SPOF, spread our replicas to different nodes.
       affinity:
@@ -442,6 +470,10 @@ spec:
                 labelSelector:
                   matchLabels:
                     app: controller
+                    app.kubernetes.io/name: controller
+                    app.kubernetes.io/component: controller
+                    app.kubernetes.io/instance: default
+                    app.kubernetes.io/part-of: tekton-pruner
                 topologyKey: kubernetes.io/hostname
               weight: 100
       serviceAccountName: tekton-pruner-controller
@@ -449,7 +481,7 @@ spec:
         - name: controller
           # This is the Go import path for the binary that is containerized
           # and substituted here.
-          image: ghcr.io/openshift-pipelines/tektoncd-pruner/controller:v0.1.0@sha256:6d8604915fd3450624b6f7844319709a8b32586d6ed7b46e8983ad906126d346
+          image: ghcr.io/openshift-pipelines/tektoncd-pruner/controller:v0.2.0@sha256:be622e8687b77007149a03c278e7abe5972124bbcd2263dade1e8d9f58747b19
           resources:
             requests:
               cpu: 100m
@@ -473,6 +505,8 @@ spec:
               value: pruner.tekton.dev
             - name: CONFIG_LEADERELECTION_NAME
               value: config-leader-election-tekton-pruner-controller
+            - name: KUBERNETES_MIN_VERSION
+              value: "1.0.0"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -485,5 +519,35 @@ spec:
             runAsNonRoot: true
             seccompProfile:
               type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: controller
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/version: "devel"
+    app.kubernetes.io/part-of: tekton-pruner
+    pruner.tekton.dev/release: "v0.2.0"
+    app: tekton-pruner-controller
+    version: "devel"
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+  name: tekton-pruner-controller
+  namespace: tekton-pipelines
+spec:
+  ports:
+    - name: http-metrics
+      protocol: TCP
+      targetPort: 9090
+      port: 9090
+  selector:
+    app.kubernetes.io/name: controller
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-pruner
 
 ---
