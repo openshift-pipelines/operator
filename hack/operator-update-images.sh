@@ -18,7 +18,7 @@ case "$ENVIRONMENT" in
 esac
 
 function update_image_reference() {
-    SOURCE_PATTEN="quay.io/.*/(pipeline-)?(.*@sha256:.+)"
+    SOURCE_PATTEN="quay.io/redhat-user-workloads/.+/(pipeline-)?(.*@sha256:.+)"
     TARGET_PATTEN="${TARGET_REGISTRY}/pipelines-\2"
     input=$1
     output=$(echo "$input" | sed -E "s|$SOURCE_PATTEN|$TARGET_PATTEN|g")
