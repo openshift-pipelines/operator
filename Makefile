@@ -13,6 +13,10 @@ update-payload-and-reference: ## Update tektoncd operator payloads, bundle manif
 	@./hack/operator-fetch-payload.sh
 	@./hack/operator-update-images.sh
 
+update-payload-and-reference-release: ## Update payloads and images for releases (no version increment)
+        @./hack/operator-fetch-payload.sh
+        @./hack/operator-update-images.sh
+
 fetch-payload: ## Update tektoncd operator payloads and bundle manifests
 	@./hack/operator-fetch-payload.sh
 
