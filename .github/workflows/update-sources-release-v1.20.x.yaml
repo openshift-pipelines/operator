@@ -50,8 +50,9 @@ jobs:
         source sync-sources/bin/activate
         pip3 install -r requirements.txt
     
-        # Update operator's payload and stuff
-        make update-payload-and-reference
+        # Update operator's payload without release bump like nightly
+        make update-payload-and-reference-release
+
         pushd upstream
         rm -fR cmd/openshift/operator/kodata operatorhub
         git checkout HEAD .
