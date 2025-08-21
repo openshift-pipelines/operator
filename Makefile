@@ -5,7 +5,7 @@ RUNTIME       = docker
 
 update-payload-and-reference: update-payload-and-version
 
-update-payload-and-version: ## Update tektoncd operator build number, payloads, bundle manifests, image referenc
+update-payload-and-version: ## Update tektoncd operator build number, payloads, bundle manifests, image references
 	@./hack/update-version.sh
 	@./hack/operator-fetch-payload.sh
 	@./hack/operator-update-images.sh
@@ -17,7 +17,7 @@ update-payload-and-reference-release: ## Update payloads and images for releases
 fetch-payload: ## Update tektoncd operator payloads and bundle manifests
 	@./hack/operator-fetch-payload.sh
 
-update-reference: ## Update references in the generate clusterserviceversion.yaml
+update-reference: ## Update references in the generated clusterserviceversion.yaml
 	@./hack/operator-update-images.sh
 
 # update/version/update-payload:
