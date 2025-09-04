@@ -202,6 +202,16 @@ spec:
               do
               oc get tektonconfig config
               oc get po -n openshift-pipelines
+              
+              # Check pod status for errors
+              error_pods=$(oc get po -n openshift-pipelines --no-headers | awk '$3 !~ /Running|Pending|ContainerCreating|Completed/ {print}' || true)
+              if [ -n "$error_pods" ]; then
+                echo "Error: Pods in failed state detected:"
+                echo "$error_pods"
+                echo "TektonConfig installation failed due to pod errors"
+                exit 1
+              fi
+              
               sleep 30
               elapsed=$((elapsed + 30))
               if [ $elapsed -ge $timeout ]; then
