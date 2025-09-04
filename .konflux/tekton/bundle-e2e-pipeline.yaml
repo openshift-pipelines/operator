@@ -188,6 +188,21 @@ spec:
                   source: "custom-osp-nightly"
                   sourceNamespace: openshift-marketplace
               EOF
+          - name: check-tekton-config
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+            script: |
+              #!/usr/bin/env bash
+              oc get tektonconfig config
+              PHASE=$(oc get tektonconfig config -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+              while [ "$PHASE" != "True" ];
+              do
+              oc get tektonconfig config
+              sleep 30
+              PHASE=$(oc get tektonconfig config -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+              done
+              
     - name: e2e-test-pipelines
       runAfter:
         - deploy-operator
