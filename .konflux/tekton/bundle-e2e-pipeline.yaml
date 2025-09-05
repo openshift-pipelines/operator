@@ -236,6 +236,9 @@ spec:
               PHASE=$(oc get tektonconfig config -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
               done
               
+              echo "✅ TektonConfig is ready!"
+              oc get tektonconfig config
+              
     - name: e2e-test-pipelines
       runAfter:
         - deploy-operator
