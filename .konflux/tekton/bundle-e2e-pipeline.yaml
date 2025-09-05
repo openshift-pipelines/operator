@@ -203,11 +203,22 @@ spec:
               oc get tektonconfig config
               oc get po -n openshift-pipelines
               
-              # Check pod status for errors
-              error_pods=$(oc get po -n openshift-pipelines --no-headers | awk '$3 !~ /Running|Pending|ContainerCreating|Completed/ {print}' || true)
+              # Check pod status for actual error states only (exclude normal transitional states)
+              error_pods=$(oc get po -n openshift-pipelines --no-headers | grep -E "(Error|Failed|CrashLoopBackOff|ImagePullBackOff|ErrImagePull|InvalidImageName|CreateContainerConfigError|CreateContainerError|OOMKilled|Evicted)" || true)
               if [ -n "$error_pods" ]; then
                 echo "Error: Pods in failed state detected:"
                 echo "$error_pods"
+                echo ""
+                # Show actual error messages for each failed pod
+                while IFS= read -r pod_line; do
+                  if [ -n "$pod_line" ]; then
+                    pod_name=$(echo "$pod_line" | tr -s ' ' | cut -d' ' -f1)
+                    echo "Error for pod $pod_name:"
+                    # Get the actual error message from events
+                    oc describe pod "$pod_name" -n openshift-pipelines | grep -E "(Failed|Error|Warning)" | tail -3 || echo "No specific error found"
+                    echo ""
+                  fi
+                done <<< "$error_pods"
                 echo "TektonConfig installation failed due to pod errors"
                 exit 1
               fi
@@ -216,6 +227,10 @@ spec:
               elapsed=$((elapsed + 30))
               if [ $elapsed -ge $timeout ]; then
                 echo "Timeout: TektonConfig not ready after 30 minutes"
+                echo "TektonConfig status:"
+                oc get tektonconfig config || echo "Failed to get TektonConfig"
+                echo "Pods:"
+                oc get po -n openshift-pipelines || echo "Failed to get pods"
                 exit 1
               fi
               PHASE=$(oc get tektonconfig config -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
