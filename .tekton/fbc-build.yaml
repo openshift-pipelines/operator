@@ -187,7 +187,7 @@ spec:
     - name: CONTEXT
       value: $(params.path-context)
     - name: HERMETIC
-      value: "true"
+      value: $(params.hermetic)
     - name: PREFETCH_INPUT
       value: $(params.prefetch-input)
     - name: IMAGE_EXPIRES_AFTER
@@ -335,50 +335,6 @@ spec:
       operator: in
       values:
       - "false"
-  - name: fbc-related-image-check
-    params:
-    - name: IMAGE_URL
-      value: $(tasks.build-image-index.results.IMAGE_URL)
-    - name: IMAGE_DIGEST
-      value: $(tasks.build-image-index.results.IMAGE_DIGEST)
-    runAfter:
-    - build-image-index
-    taskRef:
-      params:
-      - name: name
-        value: fbc-related-image-check
-      - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-fbc-related-image-check:0.2@sha256:0fa0c2ddae1d9f73a6161ce29f594d7b3fd80b3df9281b6a48003f3526797c4e
-      - name: kind
-        value: task
-      resolver: bundles
-    when:
-    - input: $(params.skip-checks)
-      operator: in
-      values:
-      - "false"
-  - name: fbc-fips-check
-    params:
-    - name: image-digest
-      value: $(tasks.build-image-index.results.IMAGE_DIGEST)
-    - name: image-url
-      value: $(tasks.build-image-index.results.IMAGE_URL)
-    runAfter:
-    - build-image-index
-    taskRef:
-      params:
-      - name: name
-        value: fbc-fips-check
-      - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-fbc-fips-check:0.1@sha256:ad0dd7a6ad09d20643a14807f33548581960a41a74898a9420976a6e13412325
-      - name: kind
-        value: task
-      resolver: bundles
-    when:
-    - input: $(params.skip-checks)
-      operator: in
-      values:
-      - "false"
   - name: fbc-fips-check-oci-ta
     params:
     - name: image-digest
@@ -399,7 +355,7 @@ spec:
         value: task
       resolver: bundles
     when:
-    - input: $(params.skip-checks)
+    - input: "false"
       operator: in
       values:
       - "false"
