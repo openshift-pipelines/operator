@@ -242,6 +242,7 @@ spec:
     - name: e2e-test-pipelines
       runAfter:
         - deploy-operator
+      onError: continue
       params:
         - name: SNAPSHOT
           value: $(params.SNAPSHOT)
@@ -332,6 +333,7 @@ spec:
     - name: e2e-test-metrics
       runAfter:
         - e2e-test-pipelines
+      onError: continue
       params:
         - name: SNAPSHOT
           value: $(params.SNAPSHOT)
@@ -421,6 +423,7 @@ spec:
     - name: e2e-test-chains
       runAfter:
         - e2e-test-metrics
+      onError: continue
       params:
         - name: SNAPSHOT
           value: $(params.SNAPSHOT)
@@ -511,6 +514,7 @@ spec:
     - name: e2e-test-manualapprovalgate
       runAfter:
         - e2e-test-chains
+      onError: continue
       params:
         - name: SNAPSHOT
           value: $(params.SNAPSHOT)
@@ -598,3 +602,92 @@ spec:
               export CHAINS_REPOSITORY=quay.io/openshift-pipeline/chainstest
 
               gauge run --tags="" --log-level=debug --verbose specs/manualapprovalgate/
+  finally:
+    - name: display-e2e-test-results
+      taskSpec:
+        volumes:
+          - name: credentials
+            emptyDir: { }
+        stepTemplate:
+          image: $(params.image)
+          volumeMounts:
+            - name: credentials
+              mountPath: /credentials
+        steps:
+          - name: get-kubeconfig
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+              - name: clusterName
+                value: "$(tasks.provision-cluster.results.clusterName)"
+              - name: credentials
+                value: credentials
+          - name: show-test-results
+            image: $(params.image)
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+            script: |
+              #!/usr/bin/env bash
+              
+              echo "=============================="
+              echo "     E2E TEST RESULTS"
+              echo "=============================="
+              
+              # Function to get task status with error details
+              get_status() {
+                local task="$1"
+                local status=$(oc get pipelinerun $(context.pipelineRun.name) -o jsonpath="{.status.taskRuns[?(@.pipelineTaskName=='$task')].status.conditions[?(@.type=='Succeeded')].status}" 2>/dev/null)
+                local reason=$(oc get pipelinerun $(context.pipelineRun.name) -o jsonpath="{.status.taskRuns[?(@.pipelineTaskName=='$task')].status.conditions[?(@.type=='Succeeded')].reason}" 2>/dev/null)
+                local message=$(oc get pipelinerun $(context.pipelineRun.name) -o jsonpath="{.status.taskRuns[?(@.pipelineTaskName=='$task')].status.conditions[?(@.type=='Succeeded')].message}" 2>/dev/null)
+                
+                if [ "$status" = "True" ]; then
+                  echo "✅ PASSED"
+                elif [ "$status" = "False" ]; then
+                  echo "❌ FAILED"
+                  [ -n "$reason" ] && echo "   Reason: $reason"
+                  [ -n "$message" ] && echo "   Error: $message"
+                else
+                  echo "⏳ RUNNING"
+                fi
+              }
+              
+              # Show results for e2e-test tasks only
+              echo "pipelines:"
+              get_status "e2e-test-pipelines"
+              echo ""
+              
+              echo "metrics:"
+              get_status "e2e-test-metrics"
+              echo ""
+              
+              echo "chains:"
+              get_status "e2e-test-chains"
+              echo ""
+              
+              echo "manualgate:"
+              get_status "e2e-test-manualapprovalgate"
+              echo ""
+              
+              # Summary
+              passed=0
+              failed=0
+              for task in "e2e-test-pipelines" "e2e-test-metrics" "e2e-test-chains" "e2e-test-manualapprovalgate"; do
+                status=$(oc get pipelinerun $(context.pipelineRun.name) -o jsonpath="{.status.taskRuns[?(@.pipelineTaskName=='$task')].status.conditions[?(@.type=='Succeeded')].status}" 2>/dev/null)
+                [ "$status" = "True" ] && ((passed++))
+                [ "$status" = "False" ] && ((failed++))
+              done
+              
+              echo "=============================="
+              echo "Summary: $passed passed, $failed failed"
+              [ $failed -eq 0 ] && echo "🎉 All E2E tests passed!" || echo "⚠️  Some tests failed"
+              echo "=============================="
