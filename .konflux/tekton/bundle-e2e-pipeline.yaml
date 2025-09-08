@@ -602,4 +602,28 @@ spec:
               export CHAINS_REPOSITORY=quay.io/openshift-pipeline/chainstest
 
               gauge run --tags="" --log-level=debug --verbose specs/manualapprovalgate/
+  
+  finally:
+    # Verify aggregate status and fail pipeline if any e2e task failed
+    - name: verify-e2e-tests-status
+      params:
+        - name: aggregateStatus
+          value: "$(tasks.status)"
+      taskSpec:
+        params:
+          - name: aggregateStatus
+        steps:
+          - image: mirror.gcr.io/alpine
+            name: verify-aggregate-status
+            script: |
+              #!/bin/sh
+              echo "📋 Aggregate Status: $(params.aggregateStatus)"
+
+              if [[ "$(params.aggregateStatus)" != "Succeeded" ]]; then
+                echo "❌ Pipeline contains failed tasks!"
+                echo "💡 Check individual task logs for detailed error information"
+                exit 1
+              fi
+              
+              echo "✅ All tasks succeeded!"
               
