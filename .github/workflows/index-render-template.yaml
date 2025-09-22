@@ -3,7 +3,7 @@ name: index-render-template
 on:
   push:
     branches:
-      - next
+      - release-v1.20.x
     paths:
       - nightly-bundle.yaml
   workflow_dispatch:
@@ -15,8 +15,8 @@ on:
         type: choice
         options:
           - devel
-  schedule:
-    - cron: "0 1 * * *" # At 1AM everyday
+          - staging
+          - production
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
