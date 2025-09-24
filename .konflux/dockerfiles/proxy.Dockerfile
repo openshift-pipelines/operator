@@ -28,6 +28,7 @@ LABEL \
       summary="Red Hat OpenShift Pipelines Operator Proxy" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Proxy" \
+      cpe="cpe:/a:redhat:openshift_pipelines:1.15::el8" \
       io.k8s.display-name="Red Hat OpenShift Pipelines Operator Proxy" \
       io.k8s.description="Red Hat OpenShift Pipelines Operator Proxy" \
       io.openshift.tags="operator,tekton,openshift,proxy"
