@@ -33,7 +33,8 @@ LABEL \
       description="Red Hat OpenShift Pipelines Operator" \
       io.k8s.display-name="Red Hat OpenShift Pipelines Operator" \
       io.k8s.description="Red Hat OpenShift Pipelines Operator" \
-      io.openshift.tags="operator,tekton,openshift"
+      io.openshift.tags="operator,tekton,openshift" \
+      cpe="cpe:/a:redhat:openshift_pipelines:1.18::el9"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
