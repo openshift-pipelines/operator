@@ -26,6 +26,7 @@ LABEL \
       com.redhat.component="openshift-pipelines-operator-proxy-rhel8-container" \
       name="openshift-pipelines/pipelines-operator-proxy-rhel8" \
       version="1.17.x" \
+      cpe="cpe:/a:redhat:openshift_pipelines:1.17::el8" \
       summary="Red Hat OpenShift Pipelines Operator Proxy" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Proxy" \
