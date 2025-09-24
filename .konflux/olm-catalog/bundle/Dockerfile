@@ -16,8 +16,9 @@ LABEL operators.operatorframework.io.bundle.channels.v1="latest,pipelines-1.18"
 
 LABEL \
       com.redhat.component="openshift-pipelines-operator-bundle-container" \
-      name="openshift-pipelines/pipelines-operator-bundle-container" \
+      name="openshift-pipelines/pipelines-operator-bundle" \
       version="1.18.1" \
+      cpe="cpe:/a:redhat:openshift_pipelines:1.18::el9" \
       summary="Red Hat OpenShift Pipelines Operator Bundle" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Bundle" \
