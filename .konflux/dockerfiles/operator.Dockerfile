@@ -27,6 +27,7 @@ LABEL \
       com.redhat.component="openshift-pipelines-rhel8-operator-container" \
       name="openshift-pipelines/pipelines-rhel8-operator" \
       version="1.15.3" \
+      cpe="cpe:/a:redhat:openshift_pipelines:1.15::el8" \
       summary="Red Hat OpenShift Pipelines Operator" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator" \
