@@ -28,6 +28,7 @@ LABEL \
       com.redhat.component="openshift-pipelines-operator-webhook-rhel9-container" \
       name="openshift-pipelines/pipelines-operator-webhook-rhel9" \
       version="1.18.0" \
+      cpe="cpe:/a:redhat:openshift_pipelines:1.18::el9" \
       summary="Red Hat OpenShift Pipelines Operator Webhook" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Webhook" \
