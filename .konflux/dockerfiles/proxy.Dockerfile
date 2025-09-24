@@ -29,7 +29,8 @@ LABEL \
       description="Red Hat OpenShift Pipelines Operator Proxy" \
       io.k8s.display-name="Red Hat OpenShift Pipelines Operator Proxy" \
       io.k8s.description="Red Hat OpenShift Pipelines Operator Proxy" \
-      io.openshift.tags="operator,tekton,openshift,proxy"
+      io.openshift.tags="operator,tekton,openshift,proxy" \
+      cpe="cpe:/a:redhat:openshift_pipelines:1.14::el8"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
