@@ -1,6 +1,8 @@
 module github.com/tektoncd/operator
 
-go 1.19
+go 1.21
+
+toolchain go1.24.6
 
 require (
 	github.com/Masterminds/semver v1.5.0
@@ -53,7 +55,7 @@ replace (
 require (
 	cloud.google.com/go/compute v1.23.3 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
-	contrib.go.opencensus.io/exporter/ocagent v0.7.1-0.20200907061046-05415f1de66d // indirect
+	contrib.go.opencensus.io/exporter/ocagent v0.7.1-0.20230502190836-7399e0f8ee5e // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2 // indirect
 	cuelang.org/go v0.6.0 // indirect
 	filippo.io/edwards25519 v1.0.0 // indirect
