@@ -1,8 +1,8 @@
 module github.com/tektoncd/operator
 
-go 1.23.4
+go 1.24.0
 
-toolchain go1.23.6
+toolchain go1.24.6
 
 require (
 	github.com/Masterminds/semver v1.5.0
@@ -288,9 +288,9 @@ require (
 	golang.org/x/tools v0.29.0 // indirect
 	google.golang.org/api v0.219.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250115164207-1a7da9e5054f // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250124145028-65684f501c47 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250922171735-9219d122eba9 // indirect
 	google.golang.org/grpc v1.70.0 // indirect
-	google.golang.org/protobuf v1.36.4 // indirect
+	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
