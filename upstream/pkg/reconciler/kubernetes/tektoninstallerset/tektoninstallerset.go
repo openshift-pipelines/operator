@@ -73,7 +73,7 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, installerSet *v1alpha1.T
 	installerSet.Status.InitializeConditions()
 	logger := logging.FromContext(ctx).With("installerSet", fmt.Sprintf("%s/%s", installerSet.Namespace, installerSet.Name))
 
-	logger.Debugw("Starting TektonInstallerSet reconciliation",
+	logger.Infow("Starting TektonInstallerSet reconciliation",
 		"resourceVersion", installerSet.ResourceVersion,
 		"status", installerSet.Status.GetCondition(apis.ConditionReady))
 
@@ -104,7 +104,7 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, installerSet *v1alpha1.T
 	installer := NewInstaller(&installManifests, r.mfClient, r.kubeClientSet, logger)
 
 	// Install CRDs
-	logger.Debug("Installing CRDs")
+	logger.Info("Installing CRDs")
 	err = installer.EnsureCRDs()
 	if err != nil {
 		logger.Errorw("CRD installation failed", "error", err)
@@ -114,10 +114,10 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, installerSet *v1alpha1.T
 
 	// Update Status for CRD condition
 	installerSet.Status.MarkCRDsInstalled()
-	logger.Debug("CRDs installed successfully")
+	logger.Info("CRDs installed successfully")
 
 	// Install ClusterScoped Resources
-	logger.Debug("Installing cluster-scoped resources")
+	logger.Info("Installing cluster-scoped resources")
 	err = installer.EnsureClusterScopedResources()
 	if err != nil {
 		logger.Errorw("Cluster-scoped resources installation failed", "error", err)
@@ -127,10 +127,10 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, installerSet *v1alpha1.T
 
 	// Update Status for ClustersScope Condition
 	installerSet.Status.MarkClustersScopedResourcesInstalled()
-	logger.Debug("Cluster-scoped resources installed successfully")
+	logger.Info("Cluster-scoped resources installed successfully")
 
 	// Install NamespaceScoped Resources
-	logger.Debug("Installing namespace-scoped resources")
+	logger.Info("Installing namespace-scoped resources")
 	err = installer.EnsureNamespaceScopedResources()
 	if err != nil {
 		logger.Errorw("Namespace-scoped resources installation failed", "error", err)
@@ -140,10 +140,10 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, installerSet *v1alpha1.T
 
 	// Update Status for NamespaceScope Condition
 	installerSet.Status.MarkNamespaceScopedResourcesInstalled()
-	logger.Debug("Namespace-scoped resources installed successfully")
+	logger.Info("Namespace-scoped resources installed successfully")
 
 	// Install Job Resources
-	logger.Debug("Installing job resources")
+	logger.Info("Installing job resources")
 	err = installer.EnsureJobResources()
 	if err != nil {
 		logger.Errorw("Job resources installation failed", "error", err)
@@ -153,10 +153,10 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, installerSet *v1alpha1.T
 
 	// Update Status for Job Resources
 	installerSet.Status.MarkJobsInstalled()
-	logger.Debug("Job resources installed successfully")
+	logger.Info("Job resources installed successfully")
 
 	// Install Deployment Resources
-	logger.Debug("Installing deployment resources")
+	logger.Info("Installing deployment resources")
 	err = installer.EnsureDeploymentResources(ctx)
 	if err != nil {
 		logger.Errorw("Deployment resources installation failed", "error", err)
@@ -166,10 +166,10 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, installerSet *v1alpha1.T
 
 	// Update Status for Deployment Resources
 	installerSet.Status.MarkDeploymentsAvailable()
-	logger.Debug("Deployment resources installed successfully")
+	logger.Info("Deployment resources installed successfully")
 
 	// Install StatefulSet Resources
-	logger.Debug("Installing statefulset resources")
+	logger.Info("Installing statefulset resources")
 	err = installer.EnsureStatefulSetResources(ctx)
 	if err != nil {
 		logger.Errorw("StatefulSet resources installation failed", "error", err)
@@ -179,10 +179,10 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, installerSet *v1alpha1.T
 
 	// Update Status for StatefulSet Resources
 	installerSet.Status.MarkStatefulSetReady()
-	logger.Debug("StatefulSet resources installed successfully")
+	logger.Info("StatefulSet resources installed successfully")
 
 	// Check if webhook is ready
-	logger.Debugw("Checking webhook readiness")
+	logger.Infow("Checking webhook readiness")
 	err = installer.IsWebhookReady()
 	if err != nil {
 		logger.Warnw("Webhook not ready", "error", err)
@@ -192,10 +192,10 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, installerSet *v1alpha1.T
 
 	// Update Status for Webhook
 	installerSet.Status.MarkWebhookReady()
-	logger.Debug("Webhook is ready")
+	logger.Info("Webhook is ready")
 
 	// Check if controller is ready
-	logger.Debug("Checking controller readiness")
+	logger.Info("Checking controller readiness")
 	err = installer.IsControllerReady()
 	if err != nil {
 		logger.Warnw("Controller not ready", "error", err)
@@ -205,7 +205,7 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, installerSet *v1alpha1.T
 
 	// Update Ready status of Controller
 	installerSet.Status.MarkControllerReady()
-	logger.Debug("Controller is ready")
+	logger.Info("Controller is ready")
 
 	// job
 	labels := installerSet.GetLabels()
@@ -216,7 +216,7 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, installerSet *v1alpha1.T
 		logger.Warnw("Jobs not completed", "error", err)
 		return err
 	}
-	logger.Debug("All jobs completed successfully")
+	logger.Info("All jobs completed successfully")
 
 	// Check if any other deployment exists other than controller
 	// and webhook and is ready
@@ -230,9 +230,9 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, installerSet *v1alpha1.T
 
 	// Mark all deployments ready
 	installerSet.Status.MarkAllDeploymentsReady()
-	logger.Debug("All deployments are ready")
+	logger.Info("All deployments are ready")
 
-	logger.Debugw("TektonInstallerSet reconciliation completed successfully",
+	logger.Infow("TektonInstallerSet reconciliation completed successfully",
 		"ready", installerSet.Status.GetCondition(apis.ConditionReady))
 
 	return nil

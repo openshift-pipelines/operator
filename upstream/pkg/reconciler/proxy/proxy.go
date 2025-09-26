@@ -31,6 +31,7 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -310,7 +311,17 @@ func setDefaults(client kubernetes.Interface, ctx context.Context, patches duck.
 		}
 	}
 
-	after = updateVolumeOptional(after)
+	trustedConfigMapExists, err := checkConfigMapExist(client, ctx, after.Namespace, common.TrustedCAConfigMapName)
+	if err != nil {
+		return nil, err
+	}
+	serviceConfigMapExists, err := checkConfigMapExist(client, ctx, after.Namespace, common.ServiceCAConfigMapName)
+	if err != nil {
+		return nil, err
+	}
+	if trustedConfigMapExists && serviceConfigMapExists {
+		after = updateVolume(after)
+	}
 	patch, err := duck.CreatePatch(before, after)
 	if err != nil {
 		return nil, err
@@ -319,14 +330,28 @@ func setDefaults(client kubernetes.Interface, ctx context.Context, patches duck.
 	return append(patches, patch...), nil
 }
 
-// updateVolumeOptional adds CA bundle ConfigMaps as optional volumes to avoid API call overhead.
-// This function uses optional ConfigMap volumes that allow pods to start even when ConfigMaps don't exist,
-// eliminating the need for expensive API calls during webhook processing.
-func updateVolumeOptional(pod corev1.Pod) corev1.Pod {
-	// Add the trusted and service CA bundle ConfigMaps as optional volumes
-	pod.Spec.Volumes = common.AddCABundleConfigMapsToVolumesOptional(pod.Spec.Volumes)
+// Ensure Configmap exist or not
+func checkConfigMapExist(client kubernetes.Interface, ctx context.Context, ns string, name string) (bool, error) {
+	logger := logging.FromContext(ctx)
+	logger.Info("finding configmap: %s/%s", ns, name)
+	_, err := client.CoreV1().ConfigMaps(ns).Get(ctx, name, metav1.GetOptions{})
+	if err != nil && errors.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil && !errors.IsNotFound(err) {
+		return false, err
+	}
+	return true, nil
+}
 
-	// Mount the volumes in all containers
+// update volume and volume mounts to mount the certs configmap
+func updateVolume(pod corev1.Pod) corev1.Pod {
+	// Let's add the trusted and service CA bundle ConfigMaps as a volume in
+	// the PodSpec which will later be mounted to add certs in the pod
+	pod.Spec.Volumes = common.AddCABundleConfigMapsToVolumes(pod.Spec.Volumes)
+
+	// Now that the ConfigMaps have been added as volumes, let's
+	// mount them via VolumeMounts in the containers
 	for i, c := range pod.Spec.Containers {
 		common.AddCABundlesToContainerVolumes(&c)
 		pod.Spec.Containers[i] = c

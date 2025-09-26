@@ -27,9 +27,7 @@ import (
 
 func transformers(ctx context.Context, manifest *mf.Manifest, comp v1alpha1.TektonComponent, addnTfs ...mf.Transformer) error {
 	instance := comp.(*v1alpha1.TektonAddon)
-
-	imagesRaw := common.ToLowerCaseKeys(common.ImagesFromEnv(common.AddonsImagePrefix))
-	addonImages := common.ImageRegistryDomainOverride(imagesRaw)
+	addonImages := common.ToLowerCaseKeys(common.ImagesFromEnv(common.AddonsImagePrefix))
 
 	addonTfs := []mf.Transformer{
 		// using common.InjectOperandNameLabelPreserveExisting instead of common.InjectLabelOverwriteExisting

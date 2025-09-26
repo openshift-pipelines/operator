@@ -143,7 +143,7 @@ func (i *installer) ensureResources(resources []unstructured.Unstructured) error
 		res, err := i.mfClient.Get(&r)
 		if err != nil {
 			if apierrs.IsNotFound(err) {
-				ressourceLogger.Debug("creating new resource")
+				ressourceLogger.Info("creating new resource")
 				// add hash on the resource of expected manifest and create
 				anno := r.GetAnnotations()
 				if anno == nil {
@@ -156,7 +156,7 @@ func (i *installer) ensureResources(resources []unstructured.Unstructured) error
 					ressourceLogger.Error("failed to create resource", "error", err)
 					return err
 				}
-				ressourceLogger.Debug("resource created successfully")
+				ressourceLogger.Info("resource created successfully")
 				continue
 			}
 			ressourceLogger.Error("failed to get resource", "error", err)
@@ -179,7 +179,7 @@ func (i *installer) ensureResources(resources []unstructured.Unstructured) error
 			continue
 		}
 
-		ressourceLogger.Debug("resource needs update",
+		ressourceLogger.Info("resource needs update",
 			"currentHash", hashOnResource,
 			"expectedHash", expectedHash)
 
@@ -199,7 +199,7 @@ func (i *installer) ensureResources(resources []unstructured.Unstructured) error
 			ressourceLogger.Error("failed to apply manifest", "error", err)
 			return err
 		}
-		ressourceLogger.Debug("resource updated successfully")
+		ressourceLogger.Info("resource updated successfully")
 	}
 	return nil
 }
@@ -410,13 +410,13 @@ func (i *installer) ensureResource(ctx context.Context, expected *unstructured.U
 	if err != nil {
 		// If the resource doesn't exist, then create new
 		if apierrs.IsNotFound(err) {
-			loggerWithContext.Debug("resource not found, creating")
+			loggerWithContext.Info("resource not found, creating")
 			err = i.mfClient.Create(expected)
 			if err != nil {
 				loggerWithContext.Errorw("failed to create resource", "error", err)
 				return err
 			}
-			loggerWithContext.Debug("resource created successfully")
+			loggerWithContext.Info("resource created successfully")
 		}
 		loggerWithContext.Errorw("failed to get resource", "error", err)
 		return err
@@ -455,7 +455,7 @@ func (i *installer) ensureResource(ctx context.Context, expected *unstructured.U
 
 	// if change detected in hash value, update the resource with changes
 	if existingHashValue != expectedHashValue {
-		loggerWithContext.Debugw("change detected, updating resource",
+		loggerWithContext.Infow("change detected, updating resource",
 			"existingHash", existingHashValue,
 			"expectedHash", expectedHashValue,
 		)
@@ -472,7 +472,7 @@ func (i *installer) ensureResource(ctx context.Context, expected *unstructured.U
 			return v1alpha1.RECONCILE_AGAIN_ERR
 		}
 
-		loggerWithContext.Debug("resource updated successfully")
+		loggerWithContext.Info("resource updated successfully")
 		return nil
 	}
 	loggerWithContext.Debug("no changes detected, resource is up-to-date")
