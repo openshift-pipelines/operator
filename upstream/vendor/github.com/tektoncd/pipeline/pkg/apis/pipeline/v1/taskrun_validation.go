@@ -109,15 +109,16 @@ func (ts *TaskRunSpec) Validate(ctx context.Context) (errs *apis.FieldError) {
 	if ts.Retries < 0 {
 		errs = errs.Also(apis.ErrInvalidValue(fmt.Sprintf("%d should be >= 0", ts.Retries), "retries"))
 	}
+	if ts.Timeout != nil {
+		// timeout should be a valid duration of at least 0.
+		if ts.Timeout.Duration < 0 {
+			errs = errs.Also(apis.ErrInvalidValue(ts.Timeout.Duration.String()+" should be >= 0", "timeout"))
+		}
+	}
 
 	if ts.PodTemplate != nil {
 		errs = errs.Also(validatePodTemplateEnv(ctx, *ts.PodTemplate))
 	}
-
-	if ts.Timeout != nil && ts.Timeout.Duration < 0 {
-		errs = errs.Also(apis.ErrInvalidValue(ts.Timeout.Duration.String()+" should be >= 0", "timeout"))
-	}
-
 	return errs
 }
 
@@ -130,33 +131,20 @@ func (ts *TaskRunSpec) ValidateUpdate(ctx context.Context) (errs *apis.FieldErro
 	if !ok || oldObj == nil {
 		return
 	}
-	if oldObj.IsDone() {
-		// try comparing without any copying first
-		// this handles the common case where only finalizers changed
-		if equality.Semantic.DeepEqual(&oldObj.Spec, ts) {
-			return nil // Specs identical, allow update
-		}
+	old := &oldObj.Spec
 
-		// Specs differ, this could be due to different defaults after upgrade
-		// Apply current defaults to old spec to normalize
-		oldCopy := oldObj.Spec.DeepCopy()
-		oldCopy.SetDefaults(ctx)
-
-		if equality.Semantic.DeepEqual(oldCopy, ts) {
-			return nil // Difference was only defaults, allow update
-		}
-
-		// Real spec changes detected, reject update
-		errs = errs.Also(apis.ErrInvalidValue("Once the TaskRun is complete, no updates are allowed", ""))
-		return errs
+	// If already in the done state, the spec cannot be modified.
+	// Otherwise, only the status, statusMessage field can be modified.
+	tips := "Once the TaskRun is complete, no updates are allowed"
+	if !oldObj.IsDone() {
+		old = old.DeepCopy()
+		old.Status = ts.Status
+		old.StatusMessage = ts.StatusMessage
+		tips = "Once the TaskRun has started, only status and statusMessage updates are allowed"
 	}
 
-	// Handle started but not done case
-	old := oldObj.Spec.DeepCopy()
-	old.Status = ts.Status
-	old.StatusMessage = ts.StatusMessage
 	if !equality.Semantic.DeepEqual(old, ts) {
-		errs = errs.Also(apis.ErrInvalidValue("Once the TaskRun has started, only status and statusMessage updates are allowed", ""))
+		errs = errs.Also(apis.ErrInvalidValue(tips, ""))
 	}
 
 	return

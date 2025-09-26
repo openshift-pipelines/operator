@@ -48,8 +48,7 @@ func filterAndTransform(extension common.Extension) client.FilterAndTransform {
 		// to skip it we filter out namespace
 		pacManifest := manifest.Filter(mf.Not(mf.ByKind("Namespace")))
 
-		imagesRaw := common.ToLowerCaseKeys(common.ImagesFromEnv(common.PacImagePrefix))
-		images := common.ImageRegistryDomainOverride(imagesRaw)
+		images := common.ToLowerCaseKeys(common.ImagesFromEnv(common.PacImagePrefix))
 		// Run transformers
 		tfs := []mf.Transformer{
 			common.InjectOperandNameLabelOverwriteExisting(openshift.OperandOpenShiftPipelineAsCode),
@@ -81,8 +80,7 @@ func additionalControllerTransform(extension common.Extension, name string) clie
 		pac := comp.(*v1alpha1.OpenShiftPipelinesAsCode)
 		additionalPACControllerConfig := pac.Spec.PACSettings.AdditionalPACControllers[name]
 
-		imagesRaw := common.ToLowerCaseKeys(common.ImagesFromEnv(common.PacImagePrefix))
-		images := common.ImageRegistryDomainOverride(imagesRaw)
+		images := common.ToLowerCaseKeys(common.ImagesFromEnv(common.PacImagePrefix))
 		// Run transformers
 		tfs := []mf.Transformer{
 			common.InjectOperandNameLabelOverwriteExisting(openshift.OperandOpenShiftPipelineAsCode),

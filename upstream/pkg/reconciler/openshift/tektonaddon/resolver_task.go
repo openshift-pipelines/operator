@@ -36,8 +36,7 @@ func (r *Reconciler) EnsureResolverStepAction(ctx context.Context, enable string
 }
 
 func (r *Reconciler) getTransformer(ctx context.Context, kind string, isVersioned bool) []mf.Transformer {
-	imagesRaw := common.ToLowerCaseKeys(common.ImagesFromEnv(common.AddonsImagePrefix))
-	addonImages := common.ImageRegistryDomainOverride(imagesRaw)
+	addonImages := common.ToLowerCaseKeys(common.ImagesFromEnv(common.AddonsImagePrefix))
 	var (
 		mfTransformer, mfVersioned mf.Transformer
 	)
