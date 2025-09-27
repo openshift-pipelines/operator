@@ -14,9 +14,9 @@ require (
 	github.com/markbates/inflect v1.0.4
 	github.com/openshift-pipelines/pipelines-as-code v0.37.0
 	github.com/openshift-pipelines/tektoncd-pruner v0.0.0-20250711075231-9c8624123820
-	github.com/openshift/api v0.0.0-20240521185306-0314f31e7774
-	github.com/openshift/apiserver-library-go v0.0.0-20230816171015-6bfafa975bfb
-	github.com/openshift/client-go v0.0.0-20240523113335-452272e0496d
+	github.com/openshift/api v0.0.0-20250710004639-926605d3338b
+	github.com/openshift/apiserver-library-go v0.0.0-20250917015549-a8019f39f670
+	github.com/openshift/client-go v0.0.0-20250710075018-396b36f983ee
 	github.com/sigstore/cosign/v2 v2.5.2
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
@@ -32,11 +32,11 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.5.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.2
-	k8s.io/api v0.33.1
-	k8s.io/apiextensions-apiserver v0.32.9
+	k8s.io/api v0.33.2
+	k8s.io/apiextensions-apiserver v0.33.2
 	k8s.io/apimachinery v0.33.3
 	k8s.io/client-go v1.5.2
-	k8s.io/code-generator v0.32.9
+	k8s.io/code-generator v0.33.2
 	knative.dev/pkg v0.0.0-20250424013628-d5e74d29daa3
 	sigs.k8s.io/yaml v1.6.0
 )
@@ -291,7 +291,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9 // indirect
+	k8s.io/gengo/v2 v2.0.0-20250207200755-1244d31929d7 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979 // indirect
