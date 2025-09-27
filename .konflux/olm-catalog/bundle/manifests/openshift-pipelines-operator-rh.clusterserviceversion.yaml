@@ -18,7 +18,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.19.0 <5.0.5-687'
+    olm.skipRange: '>=1.19.0 <5.0.5-688'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
@@ -30,7 +30,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v5.0.5-687
+  name: openshift-pipelines-operator-rh.v5.0.5-688
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -1205,7 +1205,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 5.0.5-687
+                        value: 5.0.5-688
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1321,11 +1321,11 @@ spec:
                       - name: IMAGE_PRUNER_CONTROLLER
                         value: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:927870d5703d9caf89a802230c21371b3a7972e455634541db4b67afd0d49c3a
                       - name: IMAGE_PAC_PAC_CONTROLLER
-                        value: quay.io/openshift-pipeline/pipelines-pipelines-as-code-controller-rhel9@sha256:03e2807aa027874d603600712005820a7cf0961a454344cf5e2e3b70148379de
+                        value: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-rhel9@
                       - name: IMAGE_PAC_PAC_WEBHOOK
-                        value: quay.io/openshift-pipeline/pipelines-pipelines-as-code-webhook-rhel9@sha256:6d6122ec424d243e72d465e936a26c24576ee98df1da3335b59452f9275521ef
+                        value: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-rhel9@
                       - name: IMAGE_PAC_PAC_WATCHER
-                        value: quay.io/openshift-pipeline/pipelines-pipelines-as-code-watcher-rhel9@sha256:5887db9658dc4f148e3c515577a365c0934ce3de39f8769dcf07e62e3fa9e2af
+                        value: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-rhel9@
                       - name: IMAGE_PAC_PAC_CLI
                         value: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-rhel9@
                       - name: IMAGE_RESULTS_WATCHER
@@ -1585,11 +1585,11 @@ spec:
       name: IMAGE_MAG_MANUAL_APPROVAL
     - image: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:927870d5703d9caf89a802230c21371b3a7972e455634541db4b67afd0d49c3a
       name: IMAGE_PRUNER_CONTROLLER
-    - image: quay.io/openshift-pipeline/pipelines-pipelines-as-code-controller-rhel9@sha256:03e2807aa027874d603600712005820a7cf0961a454344cf5e2e3b70148379de
+    - image: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-rhel9@
       name: IMAGE_PAC_PAC_CONTROLLER
-    - image: quay.io/openshift-pipeline/pipelines-pipelines-as-code-webhook-rhel9@sha256:6d6122ec424d243e72d465e936a26c24576ee98df1da3335b59452f9275521ef
+    - image: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-rhel9@
       name: IMAGE_PAC_PAC_WEBHOOK
-    - image: quay.io/openshift-pipeline/pipelines-pipelines-as-code-watcher-rhel9@sha256:5887db9658dc4f148e3c515577a365c0934ce3de39f8769dcf07e62e3fa9e2af
+    - image: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-rhel9@
       name: IMAGE_PAC_PAC_WATCHER
     - image: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-rhel9@
       name: IMAGE_PAC_PAC_CLI
@@ -1605,5 +1605,5 @@ spec:
       name: IMAGE_ADDONS_MAVEN_GOALS
     - image: registry.redhat.io/openshift-pipelines/pipelines-console-plugin-rhel9@
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
-  replaces: openshift-pipelines-operator-rh.v5.0.5-686
-  version: 5.0.5-687
+  replaces: openshift-pipelines-operator-rh.v5.0.5-687
+  version: 5.0.5-688
