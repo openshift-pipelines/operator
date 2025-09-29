@@ -1,8 +1,8 @@
 module github.com/tektoncd/operator
 
-go 1.23.8
+go 1.24.0
 
-toolchain go1.24.1
+toolchain go1.24.6
 
 require (
 	github.com/Masterminds/semver v1.5.0
@@ -13,9 +13,9 @@ require (
 	github.com/manifestival/manifestival v0.7.2
 	github.com/markbates/inflect v1.0.4
 	github.com/openshift-pipelines/pipelines-as-code v0.35.0
-	github.com/openshift/api v0.0.0-20240521185306-0314f31e7774
+	github.com/openshift/api v0.0.0-20250922161302-04f99ea228f5
 	github.com/openshift/apiserver-library-go v0.0.0-20230816171015-6bfafa975bfb
-	github.com/openshift/client-go v0.0.0-20240523113335-452272e0496d
+	github.com/openshift/client-go v0.0.0-20250922201106-dd37bfd2e597
 	github.com/sigstore/cosign/v2 v2.5.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
@@ -30,11 +30,11 @@ require (
 	golang.org/x/sync v0.14.0
 	gomodules.xyz/jsonpatch/v2 v2.5.0
 	gotest.tools/v3 v3.5.2
-	k8s.io/api v0.32.5
+	k8s.io/api v0.33.2
 	k8s.io/apiextensions-apiserver v0.32.5
-	k8s.io/apimachinery v0.33.0
+	k8s.io/apimachinery v0.33.2
 	k8s.io/client-go v1.5.2
-	k8s.io/code-generator v0.32.5
+	k8s.io/code-generator v0.33.2
 	knative.dev/pkg v0.0.0-20250424013628-d5e74d29daa3
 	sigs.k8s.io/yaml v1.4.0
 )
@@ -291,7 +291,7 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9 // indirect
+	k8s.io/gengo/v2 v2.0.0-20250207200755-1244d31929d7 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979 // indirect
