@@ -55,7 +55,7 @@ require (
 	cel.dev/expr v0.24.0 // indirect
 	cloud.google.com/go/auth v0.16.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
-	cloud.google.com/go/compute/metadata v0.7.0 // indirect
+	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	contrib.go.opencensus.io/exporter/ocagent v0.7.1-0.20230502190836-7399e0f8ee5e // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2 // indirect
 	cuelabs.dev/go/oci/ociregistry v0.0.0-20241125120445-2c00c104c6e1 // indirect
@@ -277,7 +277,7 @@ require (
 	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/term v0.33.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
