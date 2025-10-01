@@ -290,7 +290,7 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/gengo v0.0.0-20240129211411-f967bbeff4b4 // indirect
+	k8s.io/gengo v0.0.0-20250922181213-ec3ebc5fd46b // indirect
 	k8s.io/klog/v2 v2.120.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240403164606-bc84c2ddaf99 // indirect
 	k8s.io/utils v0.0.0-20240310230437-4693a0247e57 // indirect
