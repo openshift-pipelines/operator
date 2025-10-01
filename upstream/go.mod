@@ -2,7 +2,7 @@ module github.com/tektoncd/operator
 
 go 1.23.4
 
-toolchain go1.23.6
+toolchain go1.25.1
 
 require (
 	github.com/Masterminds/semver v1.5.0
