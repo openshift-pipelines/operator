@@ -163,7 +163,8 @@ func (p *CopyPropagator) Apply(query ast.Body) ast.Body {
 	// to the current result.
 
 	// Invariant: Live vars are bound (above) and reserved vars are implicitly ground.
-	safe := ast.ReservedVars.Copy()
+	safe := ast.NewVarSetOfSize(len(p.livevars) + len(ast.ReservedVars) + 6)
+	safe.Update(ast.ReservedVars)
 	safe.Update(p.livevars)
 	safe.Update(ast.OutputVarsFromBody(p.compiler, result, safe))
 	unsafe := result.Vars(ast.SafetyCheckVisitorParams).Diff(safe)
@@ -173,9 +174,8 @@ func (p *CopyPropagator) Apply(query ast.Body) ast.Body {
 
 		providesSafety := false
 		outputVars := ast.OutputVarsFromExpr(p.compiler, removedEq, safe)
-		diff := unsafe.Diff(outputVars)
-		if len(diff) < len(unsafe) {
-			unsafe = diff
+		if unsafe.DiffCount(outputVars) < len(unsafe) {
+			unsafe = unsafe.Diff(outputVars)
 			providesSafety = true
 		}
 
@@ -209,7 +209,7 @@ func (p *CopyPropagator) Apply(query ast.Body) ast.Body {
 
 // plugBindings applies the binding list and union-find to x. This process
 // removes as many variables as possible.
-func (p *CopyPropagator) plugBindings(pctx *plugContext, expr *ast.Expr) *ast.Expr {
+func (*CopyPropagator) plugBindings(pctx *plugContext, expr *ast.Expr) *ast.Expr {
 
 	xform := bindingPlugTransform{
 		pctx: pctx,
@@ -233,7 +233,7 @@ type bindingPlugTransform struct {
 	pctx *plugContext
 }
 
-func (t bindingPlugTransform) Transform(x interface{}) (interface{}, error) {
+func (t bindingPlugTransform) Transform(x any) (any, error) {
 	switch x := x.(type) {
 	case ast.Var:
 		return t.plugBindingsVar(t.pctx, x), nil
@@ -244,7 +244,7 @@ func (t bindingPlugTransform) Transform(x interface{}) (interface{}, error) {
 	}
 }
 
-func (t bindingPlugTransform) plugBindingsVar(pctx *plugContext, v ast.Var) ast.Value {
+func (bindingPlugTransform) plugBindingsVar(pctx *plugContext, v ast.Var) ast.Value {
 
 	var result ast.Value = v
 
@@ -274,7 +274,7 @@ func (t bindingPlugTransform) plugBindingsVar(pctx *plugContext, v ast.Var) ast.
 	return b
 }
 
-func (t bindingPlugTransform) plugBindingsRef(pctx *plugContext, v ast.Ref) ast.Ref {
+func (bindingPlugTransform) plugBindingsRef(pctx *plugContext, v ast.Ref) ast.Ref {
 
 	// Apply union-find to remove redundant variables from input.
 	if root, ok := pctx.uf.Find(v[0].Value); ok {
@@ -385,11 +385,11 @@ type binding struct {
 	k, v ast.Value
 }
 
-func containedIn(value ast.Value, x interface{}) bool {
+func containedIn(value ast.Value, x any) bool {
 	var stop bool
 
 	var vis *ast.GenericVisitor
-	vis = ast.NewGenericVisitor(func(x interface{}) bool {
+	vis = ast.NewGenericVisitor(func(x any) bool {
 		switch x := x.(type) {
 		case *ast.Every: // skip body
 			vis.Walk(x.Key)

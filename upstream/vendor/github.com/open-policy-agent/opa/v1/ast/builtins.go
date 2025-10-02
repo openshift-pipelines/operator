@@ -15,11 +15,22 @@ import (
 var Builtins []*Builtin
 
 // RegisterBuiltin adds a new built-in function to the registry.
+// NOTE: The underlying map storing built-ins is **not** thread-safe,
+// and it's recommended to call this only during initialization, and never
+// later. Registering built-ins after that point is unsupported and will
+// likely lead to concurrent map read/write panics.
 func RegisterBuiltin(b *Builtin) {
 	Builtins = append(Builtins, b)
 	BuiltinMap[b.Name] = b
 	if len(b.Infix) > 0 {
 		BuiltinMap[b.Infix] = b
+
+		InternStringTerm(b.Infix)
+	}
+
+	InternStringTerm(b.Name)
+	if strings.Contains(b.Name, ".") {
+		InternStringTerm(strings.Split(b.Name, ".")...)
 	}
 }
 
@@ -187,6 +198,7 @@ var DefaultBuiltins = [...]*Builtin{
 	JWTVerifyES256,
 	JWTVerifyES384,
 	JWTVerifyES512,
+	JWTVerifyEdDSA,
 	JWTVerifyHS256,
 	JWTVerifyHS384,
 	JWTVerifyHS512,
@@ -299,6 +311,9 @@ var DefaultBuiltins = [...]*Builtin{
 	// Printing
 	Print,
 	InternalPrint,
+
+	// Testing
+	InternalTestCase,
 }
 
 // BuiltinMap provides a convenient mapping of built-in names to
@@ -332,6 +347,7 @@ var Equality = &Builtin{
 		types.Args(types.A, types.A),
 		types.B,
 	),
+	canSkipBctx: true,
 }
 
 /**
@@ -346,6 +362,7 @@ var Assign = &Builtin{
 		types.Args(types.A, types.A),
 		types.B,
 	),
+	canSkipBctx: true,
 }
 
 // Member represents the `in` (infix) operator.
@@ -359,6 +376,7 @@ var Member = &Builtin{
 		),
 		types.B,
 	),
+	canSkipBctx: true,
 }
 
 // MemberWithKey represents the `in` (infix) operator when used
@@ -374,6 +392,7 @@ var MemberWithKey = &Builtin{
 		),
 		types.B,
 	),
+	canSkipBctx: true,
 }
 
 /**
@@ -392,6 +411,7 @@ var GreaterThan = &Builtin{
 		),
 		types.Named("result", types.B).Description("true if `x` is greater than `y`; false otherwise"),
 	),
+	canSkipBctx: true,
 }
 
 var GreaterThanEq = &Builtin{
@@ -405,6 +425,7 @@ var GreaterThanEq = &Builtin{
 		),
 		types.Named("result", types.B).Description("true if `x` is greater or equal to `y`; false otherwise"),
 	),
+	canSkipBctx: true,
 }
 
 // LessThan represents the "<" comparison operator.
@@ -419,6 +440,7 @@ var LessThan = &Builtin{
 		),
 		types.Named("result", types.B).Description("true if `x` is less than `y`; false otherwise"),
 	),
+	canSkipBctx: true,
 }
 
 var LessThanEq = &Builtin{
@@ -432,6 +454,7 @@ var LessThanEq = &Builtin{
 		),
 		types.Named("result", types.B).Description("true if `x` is less than or equal to `y`; false otherwise"),
 	),
+	canSkipBctx: true,
 }
 
 var NotEqual = &Builtin{
@@ -445,6 +468,7 @@ var NotEqual = &Builtin{
 		),
 		types.Named("result", types.B).Description("true if `x` is not equal to `y`; false otherwise"),
 	),
+	canSkipBctx: true,
 }
 
 // Equal represents the "==" comparison operator.
@@ -459,6 +483,7 @@ var Equal = &Builtin{
 		),
 		types.Named("result", types.B).Description("true if `x` is equal to `y`; false otherwise"),
 	),
+	canSkipBctx: true,
 }
 
 /**
@@ -477,7 +502,8 @@ var Plus = &Builtin{
 		),
 		types.Named("z", types.N).Description("the sum of `x` and `y`"),
 	),
-	Categories: number,
+	Categories:  number,
+	canSkipBctx: true,
 }
 
 var Minus = &Builtin{
@@ -486,12 +512,13 @@ var Minus = &Builtin{
 	Description: "Minus subtracts the second number from the first number or computes the difference between two sets.",
 	Decl: types.NewFunction(
 		types.Args(
-			types.Named("x", types.NewAny(types.N, types.NewSet(types.A))),
-			types.Named("y", types.NewAny(types.N, types.NewSet(types.A))),
+			types.Named("x", types.NewAny(types.N, types.SetOfAny)),
+			types.Named("y", types.NewAny(types.N, types.SetOfAny)),
 		),
-		types.Named("z", types.NewAny(types.N, types.NewSet(types.A))).Description("the difference of `x` and `y`"),
+		types.Named("z", types.NewAny(types.N, types.SetOfAny)).Description("the difference of `x` and `y`"),
 	),
-	Categories: category("sets", "numbers"),
+	Categories:  category("sets", "numbers"),
+	canSkipBctx: true,
 }
 
 var Multiply = &Builtin{
@@ -505,7 +532,8 @@ var Multiply = &Builtin{
 		),
 		types.Named("z", types.N).Description("the product of `x` and `y`"),
 	),
-	Categories: number,
+	Categories:  number,
+	canSkipBctx: true,
 }
 
 var Divide = &Builtin{
@@ -519,7 +547,8 @@ var Divide = &Builtin{
 		),
 		types.Named("z", types.N).Description("the result of `x` divided by `y`"),
 	),
-	Categories: number,
+	Categories:  number,
+	canSkipBctx: true,
 }
 
 var Round = &Builtin{
@@ -531,7 +560,8 @@ var Round = &Builtin{
 		),
 		types.Named("y", types.N).Description("the result of rounding `x`"),
 	),
-	Categories: number,
+	Categories:  number,
+	canSkipBctx: true,
 }
 
 var Ceil = &Builtin{
@@ -543,7 +573,8 @@ var Ceil = &Builtin{
 		),
 		types.Named("y", types.N).Description("the result of rounding `x` _up_"),
 	),
-	Categories: number,
+	Categories:  number,
+	canSkipBctx: true,
 }
 
 var Floor = &Builtin{
@@ -555,7 +586,8 @@ var Floor = &Builtin{
 		),
 		types.Named("y", types.N).Description("the result of rounding `x` _down_"),
 	),
-	Categories: number,
+	Categories:  number,
+	canSkipBctx: true,
 }
 
 var Abs = &Builtin{
@@ -567,7 +599,8 @@ var Abs = &Builtin{
 		),
 		types.Named("y", types.N).Description("the absolute value of `x`"),
 	),
-	Categories: number,
+	Categories:  number,
+	canSkipBctx: true,
 }
 
 var Rem = &Builtin{
@@ -581,7 +614,8 @@ var Rem = &Builtin{
 		),
 		types.Named("z", types.N).Description("the remainder"),
 	),
-	Categories: number,
+	Categories:  number,
+	canSkipBctx: true,
 }
 
 /**
@@ -598,6 +632,7 @@ var BitsOr = &Builtin{
 		),
 		types.Named("z", types.N).Description("the bitwise OR of `x` and `y`"),
 	),
+	canSkipBctx: true,
 }
 
 var BitsAnd = &Builtin{
@@ -610,6 +645,7 @@ var BitsAnd = &Builtin{
 		),
 		types.Named("z", types.N).Description("the bitwise AND of `x` and `y`"),
 	),
+	canSkipBctx: true,
 }
 
 var BitsNegate = &Builtin{
@@ -621,6 +657,7 @@ var BitsNegate = &Builtin{
 		),
 		types.Named("z", types.N).Description("the bitwise negation of `x`"),
 	),
+	canSkipBctx: true,
 }
 
 var BitsXOr = &Builtin{
@@ -633,6 +670,7 @@ var BitsXOr = &Builtin{
 		),
 		types.Named("z", types.N).Description("the bitwise XOR of `x` and `y`"),
 	),
+	canSkipBctx: true,
 }
 
 var BitsShiftLeft = &Builtin{
@@ -645,6 +683,7 @@ var BitsShiftLeft = &Builtin{
 		),
 		types.Named("z", types.N).Description("the result of shifting `x` `s` bits to the left"),
 	),
+	canSkipBctx: true,
 }
 
 var BitsShiftRight = &Builtin{
@@ -657,6 +696,7 @@ var BitsShiftRight = &Builtin{
 		),
 		types.Named("z", types.N).Description("the result of shifting `x` `s` bits to the right"),
 	),
+	canSkipBctx: true,
 }
 
 /**
@@ -671,12 +711,13 @@ var And = &Builtin{
 	Description: "Returns the intersection of two sets.",
 	Decl: types.NewFunction(
 		types.Args(
-			types.Named("x", types.NewSet(types.A)).Description("the first set"),
-			types.Named("y", types.NewSet(types.A)).Description("the second set"),
+			types.Named("x", types.SetOfAny).Description("the first set"),
+			types.Named("y", types.SetOfAny).Description("the second set"),
 		),
-		types.Named("z", types.NewSet(types.A)).Description("the intersection of `x` and `y`"),
+		types.Named("z", types.SetOfAny).Description("the intersection of `x` and `y`"),
 	),
-	Categories: sets,
+	Categories:  sets,
+	canSkipBctx: true,
 }
 
 // Or performs a union operation on sets.
@@ -686,12 +727,13 @@ var Or = &Builtin{
 	Description: "Returns the union of two sets.",
 	Decl: types.NewFunction(
 		types.Args(
-			types.Named("x", types.NewSet(types.A)),
-			types.Named("y", types.NewSet(types.A)),
+			types.Named("x", types.SetOfAny),
+			types.Named("y", types.SetOfAny),
 		),
-		types.Named("z", types.NewSet(types.A)).Description("the union of `x` and `y`"),
+		types.Named("z", types.SetOfAny).Description("the union of `x` and `y`"),
 	),
-	Categories: sets,
+	Categories:  sets,
+	canSkipBctx: true,
 }
 
 var Intersection = &Builtin{
@@ -699,11 +741,12 @@ var Intersection = &Builtin{
 	Description: "Returns the intersection of the given input sets.",
 	Decl: types.NewFunction(
 		types.Args(
-			types.Named("xs", types.NewSet(types.NewSet(types.A))).Description("set of sets to intersect"),
+			types.Named("xs", types.NewSet(types.SetOfAny)).Description("set of sets to intersect"),
 		),
-		types.Named("y", types.NewSet(types.A)).Description("the intersection of all `xs` sets"),
+		types.Named("y", types.SetOfAny).Description("the intersection of all `xs` sets"),
 	),
-	Categories: sets,
+	Categories:  sets,
+	canSkipBctx: true,
 }
 
 var Union = &Builtin{
@@ -711,11 +754,12 @@ var Union = &Builtin{
 	Description: "Returns the union of the given input sets.",
 	Decl: types.NewFunction(
 		types.Args(
-			types.Named("xs", types.NewSet(types.NewSet(types.A))).Description("set of sets to merge"),
+			types.Named("xs", types.NewSet(types.SetOfAny)).Description("set of sets to merge"),
 		),
-		types.Named("y", types.NewSet(types.A)).Description("the union of all `xs` sets"),
+		types.Named("y", types.SetOfAny).Description("the union of all `xs` sets"),
 	),
-	Categories: sets,
+	Categories:  sets,
+	canSkipBctx: true,
 }
 
 /**
@@ -726,11 +770,11 @@ var aggregates = category("aggregates")
 
 var Count = &Builtin{
 	Name:        "count",
-	Description: " Count takes a collection or string and returns the number of elements (or characters) in it.",
+	Description: "Count takes a collection or string and returns the number of elements (or characters) in it.",
 	Decl: types.NewFunction(
 		types.Args(
 			types.Named("collection", types.NewAny(
-				types.NewSet(types.A),
+				types.SetOfAny,
 				types.NewArray(nil, types.A),
 				types.NewObject(nil, types.NewDynamicProperty(types.A, types.A)),
 				types.S,
@@ -738,7 +782,8 @@ var Count = &Builtin{
 		),
 		types.Named("n", types.N).Description("the count of elements, key/val pairs, or characters, respectively."),
 	),
-	Categories: aggregates,
+	Categories:  aggregates,
+	canSkipBctx: true,
 }
 
 var Sum = &Builtin{
@@ -747,13 +792,14 @@ var Sum = &Builtin{
 	Decl: types.NewFunction(
 		types.Args(
 			types.Named("collection", types.NewAny(
-				types.NewSet(types.N),
+				types.SetOfNum,
 				types.NewArray(nil, types.N),
 			)).Description("the set or array of numbers to sum"),
 		),
 		types.Named("n", types.N).Description("the sum of all elements"),
 	),
-	Categories: aggregates,
+	Categories:  aggregates,
+	canSkipBctx: true,
 }
 
 var Product = &Builtin{
@@ -762,13 +808,14 @@ var Product = &Builtin{
 	Decl: types.NewFunction(
 		types.Args(
 			types.Named("collection", types.NewAny(
-				types.NewSet(types.N),
+				types.SetOfNum,
 				types.NewArray(nil, types.N),
 			)).Description("the set or array of numbers to multiply"),
 		),
 		types.Named("n", types.N).Description("the product of all elements"),
 	),
-	Categories: aggregates,
+	Categories:  aggregates,
+	canSkipBctx: true,
 }
 
 var Max = &Builtin{
@@ -777,13 +824,14 @@ var Max = &Builtin{
 	Decl: types.NewFunction(
 		types.Args(
 			types.Named("collection", types.NewAny(
-				types.NewSet(types.A),
+				types.SetOfAny,
 				types.NewArray(nil, types.A),
 			)).Description("the set or array to be searched"),
 		),
 		types.Named("n", types.A).Description("the maximum of all elements"),
 	),
-	Categories: aggregates,
+	Categories:  aggregates,
+	canSkipBctx: true,
 }
 
 var Min = &Builtin{
@@ -792,13 +840,14 @@ var Min = &Builtin{
 	Decl: types.NewFunction(
 		types.Args(
 			types.Named("collection", types.NewAny(
-				types.NewSet(types.A),
+				types.SetOfAny,
 				types.NewArray(nil, types.A),
 			)).Description("the set or array to be searched"),
 		),
 		types.Named("n", types.A).Description("the minimum of all elements"),
 	),
-	Categories: aggregates,
+	Categories:  aggregates,
+	canSkipBctx: true,
 }
 
 /**
@@ -812,12 +861,13 @@ var Sort = &Builtin{
 		types.Args(
 			types.Named("collection", types.NewAny(
 				types.NewArray(nil, types.A),
-				types.NewSet(types.A),
+				types.SetOfAny,
 			)).Description("the array or set to be sorted"),
 		),
 		types.Named("n", types.NewArray(nil, types.A)).Description("the sorted array"),
 	),
-	Categories: aggregates,
+	Categories:  aggregates,
+	canSkipBctx: true,
 }
 
 /**
@@ -834,6 +884,7 @@ var ArrayConcat = &Builtin{
 		),
 		types.Named("z", types.NewArray(nil, types.A)).Description("the concatenation of `x` and `y`"),
 	),
+	canSkipBctx: true,
 }
 
 var ArraySlice = &Builtin{
@@ -842,11 +893,12 @@ var ArraySlice = &Builtin{
 	Decl: types.NewFunction(
 		types.Args(
 			types.Named("arr", types.NewArray(nil, types.A)).Description("the array to be sliced"),
-			types.Named("start", types.NewNumber()).Description("the start index of the returned slice; if less than zero, it's clamped to 0"),
-			types.Named("stop", types.NewNumber()).Description("the stop index of the returned slice; if larger than `count(arr)`, it's clamped to `count(arr)`"),
+			types.Named("start", types.N).Description("the start index of the returned slice; if less than zero, it's clamped to 0"),
+			types.Named("stop", types.N).Description("the stop index of the returned slice; if larger than `count(arr)`, it's clamped to `count(arr)`"),
 		),
 		types.Named("slice", types.NewArray(nil, types.A)).Description("the subslice of `array`, from `start` to `end`, including `arr[start]`, but excluding `arr[end]`"),
 	),
+	canSkipBctx: true,
 } // NOTE(sr): this function really needs examples
 
 var ArrayReverse = &Builtin{
@@ -858,6 +910,7 @@ var ArrayReverse = &Builtin{
 		),
 		types.Named("rev", types.NewArray(nil, types.A)).Description("an array containing the elements of `arr` in reverse order"),
 	),
+	canSkipBctx: true,
 }
 
 /**
@@ -874,12 +927,13 @@ var ToNumber = &Builtin{
 				types.N,
 				types.S,
 				types.B,
-				types.NewNull(),
+				types.Nl,
 			)).Description("value to convert"),
 		),
 		types.Named("num", types.N).Description("the numeric representation of `x`"),
 	),
-	Categories: conversions,
+	Categories:  conversions,
+	canSkipBctx: true,
 }
 
 /**
@@ -907,6 +961,7 @@ var RegexIsValid = &Builtin{
 		),
 		types.Named("result", types.B).Description("true if `pattern` is a valid regular expression"),
 	),
+	canSkipBctx: true,
 }
 
 var RegexFindAllStringSubmatch = &Builtin{
@@ -920,6 +975,7 @@ var RegexFindAllStringSubmatch = &Builtin{
 		),
 		types.Named("output", types.NewArray(nil, types.NewArray(nil, types.S))).Description("array of all matches"),
 	),
+	canSkipBctx: false,
 }
 
 var RegexTemplateMatch = &Builtin{
@@ -934,6 +990,7 @@ var RegexTemplateMatch = &Builtin{
 		),
 		types.Named("result", types.B).Description("true if `value` matches the `template`"),
 	),
+	canSkipBctx: true,
 } // TODO(sr): example:`regex.template_match("urn:foo:{.*}", "urn:foo:bar:baz", "{", "}")`` returns ``true``.
 
 var RegexSplit = &Builtin{
@@ -946,6 +1003,7 @@ var RegexSplit = &Builtin{
 		),
 		types.Named("output", types.NewArray(nil, types.S)).Description("the parts obtained by splitting `value`"),
 	),
+	canSkipBctx: false,
 }
 
 // RegexFind takes two strings and a number, the pattern, the value and number of match values to
@@ -961,6 +1019,7 @@ var RegexFind = &Builtin{
 		),
 		types.Named("output", types.NewArray(nil, types.S)).Description("collected matches"),
 	),
+	canSkipBctx: false,
 }
 
 // GlobsMatch takes two strings regexp-style strings and evaluates to true if their
@@ -979,6 +1038,7 @@ The set of regex symbols is limited for this builtin: only ` + "`.`, `*`, `+`, `
 		),
 		types.Named("result", types.B).Description("true if the intersection of `glob1` and `glob2` matches a non-empty set of non-empty strings"),
 	),
+	canSkipBctx: true,
 }
 
 /**
@@ -993,18 +1053,19 @@ var AnyPrefixMatch = &Builtin{
 		types.Args(
 			types.Named("search", types.NewAny(
 				types.S,
-				types.NewSet(types.S),
+				types.SetOfStr,
 				types.NewArray(nil, types.S),
 			)).Description("search string(s)"),
 			types.Named("base", types.NewAny(
 				types.S,
-				types.NewSet(types.S),
+				types.SetOfStr,
 				types.NewArray(nil, types.S),
 			)).Description("base string(s)"),
 		),
 		types.Named("result", types.B).Description("result of the prefix check"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var AnySuffixMatch = &Builtin{
@@ -1014,18 +1075,19 @@ var AnySuffixMatch = &Builtin{
 		types.Args(
 			types.Named("search", types.NewAny(
 				types.S,
-				types.NewSet(types.S),
+				types.SetOfStr,
 				types.NewArray(nil, types.S),
 			)).Description("search string(s)"),
 			types.Named("base", types.NewAny(
 				types.S,
-				types.NewSet(types.S),
+				types.SetOfStr,
 				types.NewArray(nil, types.S),
 			)).Description("base string(s)"),
 		),
 		types.Named("result", types.B).Description("result of the suffix check"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var Concat = &Builtin{
@@ -1035,13 +1097,14 @@ var Concat = &Builtin{
 		types.Args(
 			types.Named("delimiter", types.S).Description("string to use as a delimiter"),
 			types.Named("collection", types.NewAny(
-				types.NewSet(types.S),
+				types.SetOfStr,
 				types.NewArray(nil, types.S),
 			)).Description("strings to join"),
 		),
 		types.Named("output", types.S).Description("the joined string"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var FormatInt = &Builtin{
@@ -1054,7 +1117,8 @@ var FormatInt = &Builtin{
 		),
 		types.Named("output", types.S).Description("formatted number"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var IndexOf = &Builtin{
@@ -1067,7 +1131,8 @@ var IndexOf = &Builtin{
 		),
 		types.Named("output", types.N).Description("index of first occurrence, `-1` if not found"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var IndexOfN = &Builtin{
@@ -1080,7 +1145,8 @@ var IndexOfN = &Builtin{
 		),
 		types.Named("output", types.NewArray(nil, types.N)).Description("all indices at which `needle` occurs in `haystack`, may be empty"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var Substring = &Builtin{
@@ -1094,7 +1160,8 @@ var Substring = &Builtin{
 		),
 		types.Named("output", types.S).Description("substring of `value` from `offset`, of length `length`"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var Contains = &Builtin{
@@ -1107,7 +1174,8 @@ var Contains = &Builtin{
 		),
 		types.Named("result", types.B).Description("result of the containment check"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var StringCount = &Builtin{
@@ -1120,7 +1188,8 @@ var StringCount = &Builtin{
 		),
 		types.Named("output", types.N).Description("count of occurrences, `0` if not found"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var StartsWith = &Builtin{
@@ -1133,7 +1202,8 @@ var StartsWith = &Builtin{
 		),
 		types.Named("result", types.B).Description("result of the prefix check"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var EndsWith = &Builtin{
@@ -1146,7 +1216,8 @@ var EndsWith = &Builtin{
 		),
 		types.Named("result", types.B).Description("result of the suffix check"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var Lower = &Builtin{
@@ -1158,7 +1229,8 @@ var Lower = &Builtin{
 		),
 		types.Named("y", types.S).Description("lower-case of x"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var Upper = &Builtin{
@@ -1170,7 +1242,8 @@ var Upper = &Builtin{
 		),
 		types.Named("y", types.S).Description("upper-case of x"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var Split = &Builtin{
@@ -1183,7 +1256,8 @@ var Split = &Builtin{
 		),
 		types.Named("ys", types.NewArray(nil, types.S)).Description("split parts"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var Replace = &Builtin{
@@ -1197,7 +1271,8 @@ var Replace = &Builtin{
 		),
 		types.Named("y", types.S).Description("string with replaced substrings"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var ReplaceN = &Builtin{
@@ -1217,6 +1292,7 @@ The old string comparisons are done in argument order.`,
 		),
 		types.Named("output", types.S).Description("string with replaced substrings"),
 	),
+	canSkipBctx: true,
 }
 
 var RegexReplace = &Builtin{
@@ -1230,6 +1306,7 @@ var RegexReplace = &Builtin{
 		),
 		types.Named("output", types.S).Description("string with replaced substrings"),
 	),
+	canSkipBctx: false,
 }
 
 var Trim = &Builtin{
@@ -1242,7 +1319,8 @@ var Trim = &Builtin{
 		),
 		types.Named("output", types.S).Description("string trimmed of `cutset` characters"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var TrimLeft = &Builtin{
@@ -1255,7 +1333,8 @@ var TrimLeft = &Builtin{
 		),
 		types.Named("output", types.S).Description("string left-trimmed of `cutset` characters"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var TrimPrefix = &Builtin{
@@ -1268,7 +1347,8 @@ var TrimPrefix = &Builtin{
 		),
 		types.Named("output", types.S).Description("string with `prefix` cut off"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var TrimRight = &Builtin{
@@ -1281,7 +1361,8 @@ var TrimRight = &Builtin{
 		),
 		types.Named("output", types.S).Description("string right-trimmed of `cutset` characters"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var TrimSuffix = &Builtin{
@@ -1294,7 +1375,8 @@ var TrimSuffix = &Builtin{
 		),
 		types.Named("output", types.S).Description("string with `suffix` cut off"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var TrimSpace = &Builtin{
@@ -1306,7 +1388,8 @@ var TrimSpace = &Builtin{
 		),
 		types.Named("output", types.S).Description("string leading and trailing white space cut off"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var Sprintf = &Builtin{
@@ -1319,7 +1402,8 @@ var Sprintf = &Builtin{
 		),
 		types.Named("output", types.S).Description("`format` formatted by the values in `values`"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var StringReverse = &Builtin{
@@ -1331,7 +1415,8 @@ var StringReverse = &Builtin{
 		),
 		types.Named("y", types.S).Description("reversed string"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 var RenderTemplate = &Builtin{
@@ -1345,7 +1430,8 @@ var RenderTemplate = &Builtin{
 		),
 		types.Named("result", types.S).Description("rendered template with template variables injected"),
 	),
-	Categories: stringsCat,
+	Categories:  stringsCat,
+	canSkipBctx: true,
 }
 
 /**
@@ -1366,6 +1452,7 @@ var RandIntn = &Builtin{
 	),
 	Categories:       number,
 	Nondeterministic: true,
+	canSkipBctx:      false,
 }
 
 var NumbersRange = &Builtin{
@@ -1378,6 +1465,7 @@ var NumbersRange = &Builtin{
 		),
 		types.Named("range", types.NewArray(nil, types.N)).Description("the range between `a` and `b`"),
 	),
+	canSkipBctx: false, // needed for context timeout check
 }
 
 var NumbersRangeStep = &Builtin{
@@ -1395,6 +1483,7 @@ var NumbersRangeStep = &Builtin{
 		),
 		types.Named("range", types.NewArray(nil, types.N)).Description("the range between `a` and `b` in `step` increments"),
 	),
+	canSkipBctx: false, // needed for context timeout check
 }
 
 /**
@@ -1419,6 +1508,7 @@ respectively. Other units are case-insensitive.`,
 		),
 		types.Named("y", types.N).Description("the parsed number"),
 	),
+	canSkipBctx: true,
 }
 
 var UnitsParseBytes = &Builtin{
@@ -1437,6 +1527,7 @@ and "MiB" are equivalent).`,
 		),
 		types.Named("y", types.N).Description("the parsed number"),
 	),
+	canSkipBctx: true,
 }
 
 //
@@ -1456,6 +1547,7 @@ var UUIDRFC4122 = &Builtin{
 		types.Named("output", types.S).Description("a version 4 UUID; for any given `k`, the output will be consistent throughout a query evaluation"),
 	),
 	Nondeterministic: true,
+	canSkipBctx:      false,
 }
 
 var UUIDParse = &Builtin{
@@ -1468,7 +1560,8 @@ var UUIDParse = &Builtin{
 		),
 		types.Named("result", types.NewObject(nil, types.NewDynamicProperty(types.S, types.A))).Description("Properties of UUID if valid (version, variant, etc). Undefined otherwise."),
 	),
-	Relation: false,
+	Relation:    false,
+	canSkipBctx: true,
 }
 
 /**
@@ -1512,7 +1605,8 @@ var JSONFilter = &Builtin{
 		),
 		types.Named("filtered", types.A).Description("remaining data from `object` with only keys specified in `paths`"),
 	),
-	Categories: objectCat,
+	Categories:  objectCat,
+	canSkipBctx: true,
 }
 
 var JSONRemove = &Builtin{
@@ -1550,7 +1644,8 @@ var JSONRemove = &Builtin{
 		),
 		types.Named("output", types.A).Description("result of removing all keys specified in `paths`"),
 	),
-	Categories: objectCat,
+	Categories:  objectCat,
+	canSkipBctx: true,
 }
 
 var JSONPatch = &Builtin{
@@ -1575,7 +1670,8 @@ var JSONPatch = &Builtin{
 		),
 		types.Named("output", types.A).Description("result obtained after consecutively applying all patch operations in `patches`"),
 	),
-	Categories: objectCat,
+	Categories:  objectCat,
+	canSkipBctx: true,
 }
 
 var ObjectSubset = &Builtin{
@@ -1597,18 +1693,19 @@ var ObjectSubset = &Builtin{
 			types.Named("super", types.NewAny(types.NewObject(
 				nil,
 				types.NewDynamicProperty(types.A, types.A),
-			), types.NewSet(types.A),
+			), types.SetOfAny,
 				types.NewArray(nil, types.A),
 			)).Description("object to test if sub is a subset of"),
 			types.Named("sub", types.NewAny(types.NewObject(
 				nil,
 				types.NewDynamicProperty(types.A, types.A),
-			), types.NewSet(types.A),
+			), types.SetOfAny,
 				types.NewArray(nil, types.A),
 			)).Description("object to test if super is a superset of"),
 		),
 		types.Named("result", types.A).Description("`true` if `sub` is a subset of `super`"),
 	),
+	canSkipBctx: true,
 }
 
 var ObjectUnion = &Builtin{
@@ -1628,6 +1725,7 @@ var ObjectUnion = &Builtin{
 		),
 		types.Named("output", types.A).Description("a new object which is the result of an asymmetric recursive union of two objects where conflicts are resolved by choosing the key from the right-hand object `b`"),
 	), // TODO(sr): types.A?  ^^^^^^^ (also below)
+	canSkipBctx: true,
 }
 
 var ObjectUnionN = &Builtin{
@@ -1643,6 +1741,7 @@ var ObjectUnionN = &Builtin{
 		),
 		types.Named("output", types.A).Description("asymmetric recursive union of all objects in `objects`, merged from left to right, where conflicts are resolved by choosing the key from the right-hand object"),
 	),
+	canSkipBctx: true,
 }
 
 var ObjectRemove = &Builtin{
@@ -1656,12 +1755,13 @@ var ObjectRemove = &Builtin{
 			)).Description("object to remove keys from"),
 			types.Named("keys", types.NewAny(
 				types.NewArray(nil, types.A),
-				types.NewSet(types.A),
+				types.SetOfAny,
 				types.NewObject(nil, types.NewDynamicProperty(types.A, types.A)),
 			)).Description("keys to remove from x"),
 		),
 		types.Named("output", types.A).Description("result of removing the specified `keys` from `object`"),
 	),
+	canSkipBctx: true,
 }
 
 var ObjectFilter = &Builtin{
@@ -1676,12 +1776,13 @@ var ObjectFilter = &Builtin{
 			)).Description("object to filter keys"),
 			types.Named("keys", types.NewAny(
 				types.NewArray(nil, types.A),
-				types.NewSet(types.A),
+				types.SetOfAny,
 				types.NewObject(nil, types.NewDynamicProperty(types.A, types.A)),
 			)).Description("keys to keep in `object`"),
 		),
 		types.Named("filtered", types.A).Description("remaining data from `object` with only keys specified in `keys`"),
 	),
+	canSkipBctx: true,
 }
 
 var ObjectGet = &Builtin{
@@ -1697,6 +1798,7 @@ var ObjectGet = &Builtin{
 		),
 		types.Named("value", types.A).Description("`object[key]` if present, otherwise `default`"),
 	),
+	canSkipBctx: true,
 }
 
 var ObjectKeys = &Builtin{
@@ -1707,8 +1809,9 @@ var ObjectKeys = &Builtin{
 		types.Args(
 			types.Named("object", types.NewObject(nil, types.NewDynamicProperty(types.A, types.A))).Description("object to get keys from"),
 		),
-		types.Named("value", types.NewSet(types.A)).Description("set of `object`'s keys"),
+		types.Named("value", types.SetOfAny).Description("set of `object`'s keys"),
 	),
+	canSkipBctx: true,
 }
 
 /*
@@ -1725,7 +1828,8 @@ var JSONMarshal = &Builtin{
 		),
 		types.Named("y", types.S).Description("the JSON string representation of `x`"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var JSONMarshalWithOptions = &Builtin{
@@ -1746,7 +1850,8 @@ var JSONMarshalWithOptions = &Builtin{
 		),
 		types.Named("y", types.S).Description("the JSON string representation of `x`, with configured prefix/indent string(s) as appropriate"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var JSONUnmarshal = &Builtin{
@@ -1758,7 +1863,8 @@ var JSONUnmarshal = &Builtin{
 		),
 		types.Named("y", types.A).Description("the term deserialized from `x`"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var JSONIsValid = &Builtin{
@@ -1770,7 +1876,8 @@ var JSONIsValid = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `x` is valid JSON, `false` otherwise"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var Base64Encode = &Builtin{
@@ -1782,7 +1889,8 @@ var Base64Encode = &Builtin{
 		),
 		types.Named("y", types.S).Description("base64 serialization of `x`"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var Base64Decode = &Builtin{
@@ -1794,7 +1902,8 @@ var Base64Decode = &Builtin{
 		),
 		types.Named("y", types.S).Description("base64 deserialization of `x`"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var Base64IsValid = &Builtin{
@@ -1806,7 +1915,8 @@ var Base64IsValid = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `x` is valid base64 encoded value, `false` otherwise"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var Base64UrlEncode = &Builtin{
@@ -1818,7 +1928,8 @@ var Base64UrlEncode = &Builtin{
 		),
 		types.Named("y", types.S).Description("base64url serialization of `x`"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var Base64UrlEncodeNoPad = &Builtin{
@@ -1830,7 +1941,8 @@ var Base64UrlEncodeNoPad = &Builtin{
 		),
 		types.Named("y", types.S).Description("base64url serialization of `x`"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var Base64UrlDecode = &Builtin{
@@ -1842,7 +1954,8 @@ var Base64UrlDecode = &Builtin{
 		),
 		types.Named("y", types.S).Description("base64url deserialization of `x`"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var URLQueryDecode = &Builtin{
@@ -1854,7 +1967,8 @@ var URLQueryDecode = &Builtin{
 		),
 		types.Named("y", types.S).Description("URL-encoding deserialization of `x`"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var URLQueryEncode = &Builtin{
@@ -1866,7 +1980,8 @@ var URLQueryEncode = &Builtin{
 		),
 		types.Named("y", types.S).Description("URL-encoding serialization of `x`"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var URLQueryEncodeObject = &Builtin{
@@ -1881,14 +1996,16 @@ var URLQueryEncodeObject = &Builtin{
 					types.NewAny(
 						types.S,
 						types.NewArray(nil, types.S),
-						types.NewSet(types.S)),
+						types.SetOfStr,
+					),
 				),
 			),
 			).Description("the object to encode"),
 		),
 		types.Named("y", types.S).Description("the URL-encoded serialization of `object`"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var URLQueryDecodeObject = &Builtin{
@@ -1902,7 +2019,8 @@ var URLQueryDecodeObject = &Builtin{
 			types.S,
 			types.NewArray(nil, types.S)))).Description("the resulting object"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var YAMLMarshal = &Builtin{
@@ -1914,7 +2032,8 @@ var YAMLMarshal = &Builtin{
 		),
 		types.Named("y", types.S).Description("the YAML string representation of `x`"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var YAMLUnmarshal = &Builtin{
@@ -1926,7 +2045,8 @@ var YAMLUnmarshal = &Builtin{
 		),
 		types.Named("y", types.A).Description("the term deserialized from `x`"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 // YAMLIsValid verifies the input string is a valid YAML document.
@@ -1939,7 +2059,8 @@ var YAMLIsValid = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `x` is valid YAML, `false` otherwise"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var HexEncode = &Builtin{
@@ -1951,7 +2072,8 @@ var HexEncode = &Builtin{
 		),
 		types.Named("y", types.S).Description("serialization of `x` using hex-encoding"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 var HexDecode = &Builtin{
@@ -1963,7 +2085,8 @@ var HexDecode = &Builtin{
 		),
 		types.Named("y", types.S).Description("deserialized from `x`"),
 	),
-	Categories: encoding,
+	Categories:  encoding,
+	canSkipBctx: true,
 }
 
 /**
@@ -1984,7 +2107,8 @@ var JWTDecode = &Builtin{
 			types.S,
 		}, nil)).Description("`[header, payload, sig]`, where `header` and `payload` are objects; `sig` is the hexadecimal representation of the signature on the token."),
 	),
-	Categories: tokensCat,
+	Categories:  tokensCat,
+	canSkipBctx: true,
 }
 
 var JWTVerifyRS256 = &Builtin{
@@ -1997,7 +2121,8 @@ var JWTVerifyRS256 = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if the signature is valid, `false` otherwise"),
 	),
-	Categories: tokensCat,
+	Categories:  tokensCat,
+	canSkipBctx: false,
 }
 
 var JWTVerifyRS384 = &Builtin{
@@ -2010,7 +2135,8 @@ var JWTVerifyRS384 = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if the signature is valid, `false` otherwise"),
 	),
-	Categories: tokensCat,
+	Categories:  tokensCat,
+	canSkipBctx: false,
 }
 
 var JWTVerifyRS512 = &Builtin{
@@ -2023,7 +2149,8 @@ var JWTVerifyRS512 = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if the signature is valid, `false` otherwise"),
 	),
-	Categories: tokensCat,
+	Categories:  tokensCat,
+	canSkipBctx: false,
 }
 
 var JWTVerifyPS256 = &Builtin{
@@ -2036,7 +2163,8 @@ var JWTVerifyPS256 = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if the signature is valid, `false` otherwise"),
 	),
-	Categories: tokensCat,
+	Categories:  tokensCat,
+	canSkipBctx: false,
 }
 
 var JWTVerifyPS384 = &Builtin{
@@ -2049,7 +2177,8 @@ var JWTVerifyPS384 = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if the signature is valid, `false` otherwise"),
 	),
-	Categories: tokensCat,
+	Categories:  tokensCat,
+	canSkipBctx: false,
 }
 
 var JWTVerifyPS512 = &Builtin{
@@ -2062,7 +2191,8 @@ var JWTVerifyPS512 = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if the signature is valid, `false` otherwise"),
 	),
-	Categories: tokensCat,
+	Categories:  tokensCat,
+	canSkipBctx: false,
 }
 
 var JWTVerifyES256 = &Builtin{
@@ -2075,7 +2205,8 @@ var JWTVerifyES256 = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if the signature is valid, `false` otherwise"),
 	),
-	Categories: tokensCat,
+	Categories:  tokensCat,
+	canSkipBctx: false,
 }
 
 var JWTVerifyES384 = &Builtin{
@@ -2088,7 +2219,8 @@ var JWTVerifyES384 = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if the signature is valid, `false` otherwise"),
 	),
-	Categories: tokensCat,
+	Categories:  tokensCat,
+	canSkipBctx: false,
 }
 
 var JWTVerifyES512 = &Builtin{
@@ -2101,7 +2233,22 @@ var JWTVerifyES512 = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if the signature is valid, `false` otherwise"),
 	),
-	Categories: tokensCat,
+	Categories:  tokensCat,
+	canSkipBctx: false,
+}
+
+var JWTVerifyEdDSA = &Builtin{
+	Name:        "io.jwt.verify_eddsa",
+	Description: "Verifies if an EdDSA JWT signature is valid.",
+	Decl: types.NewFunction(
+		types.Args(
+			types.Named("jwt", types.S).Description("JWT token whose signature is to be verified"),
+			types.Named("certificate", types.S).Description("PEM encoded certificate, PEM encoded public key, or the JWK key (set) used to verify the signature"),
+		),
+		types.Named("result", types.B).Description("`true` if the signature is valid, `false` otherwise"),
+	),
+	Categories:  tokensCat,
+	canSkipBctx: false,
 }
 
 var JWTVerifyHS256 = &Builtin{
@@ -2114,7 +2261,8 @@ var JWTVerifyHS256 = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if the signature is valid, `false` otherwise"),
 	),
-	Categories: tokensCat,
+	Categories:  tokensCat,
+	canSkipBctx: false,
 }
 
 var JWTVerifyHS384 = &Builtin{
@@ -2127,7 +2275,8 @@ var JWTVerifyHS384 = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if the signature is valid, `false` otherwise"),
 	),
-	Categories: tokensCat,
+	Categories:  tokensCat,
+	canSkipBctx: false,
 }
 
 var JWTVerifyHS512 = &Builtin{
@@ -2140,14 +2289,15 @@ var JWTVerifyHS512 = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if the signature is valid, `false` otherwise"),
 	),
-	Categories: tokensCat,
+	Categories:  tokensCat,
+	canSkipBctx: false,
 }
 
 // Marked non-deterministic because it relies on time internally.
 var JWTDecodeVerify = &Builtin{
 	Name: "io.jwt.decode_verify",
 	Description: `Verifies a JWT signature under parameterized constraints and decodes the claims if it is valid.
-Supports the following algorithms: HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, ES512, PS256, PS384 and PS512.`,
+Supports the following algorithms: HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, ES512, PS256, PS384, PS512, and EdDSA.`,
 	Decl: types.NewFunction(
 		types.Args(
 			types.Named("jwt", types.S).Description("JWT token whose signature is to be verified and whose claims are to be checked"),
@@ -2161,6 +2311,7 @@ Supports the following algorithms: HS256, HS384, HS512, RS256, RS384, RS512, ES2
 	),
 	Categories:       tokensCat,
 	Nondeterministic: true,
+	canSkipBctx:      false,
 }
 
 var tokenSign = category("tokensign")
@@ -2179,6 +2330,7 @@ var JWTEncodeSignRaw = &Builtin{
 	),
 	Categories:       tokenSign,
 	Nondeterministic: true,
+	canSkipBctx:      false,
 }
 
 // Marked non-deterministic because it relies on RNG internally.
@@ -2195,6 +2347,7 @@ var JWTEncodeSign = &Builtin{
 	),
 	Categories:       tokenSign,
 	Nondeterministic: true,
+	canSkipBctx:      false,
 }
 
 /**
@@ -2210,6 +2363,7 @@ var NowNanos = &Builtin{
 		types.Named("now", types.N).Description("nanoseconds since epoch"),
 	),
 	Nondeterministic: true,
+	canSkipBctx:      false,
 }
 
 var ParseNanos = &Builtin{
@@ -2222,6 +2376,7 @@ var ParseNanos = &Builtin{
 		),
 		types.Named("ns", types.N).Description("`value` in nanoseconds since epoch"),
 	),
+	canSkipBctx: true,
 }
 
 var ParseRFC3339Nanos = &Builtin{
@@ -2233,6 +2388,7 @@ var ParseRFC3339Nanos = &Builtin{
 		),
 		types.Named("ns", types.N).Description("`value` in nanoseconds since epoch"),
 	),
+	canSkipBctx: true,
 }
 
 var ParseDurationNanos = &Builtin{
@@ -2244,6 +2400,7 @@ var ParseDurationNanos = &Builtin{
 		),
 		types.Named("ns", types.N).Description("the `duration` in nanoseconds"),
 	),
+	canSkipBctx: true,
 }
 
 var Format = &Builtin{
@@ -2259,6 +2416,7 @@ var Format = &Builtin{
 		),
 		types.Named("formatted timestamp", types.S).Description("the formatted timestamp represented for the nanoseconds since the epoch in the supplied timezone (or UTC)"),
 	),
+	canSkipBctx: true,
 }
 
 var Date = &Builtin{
@@ -2273,6 +2431,7 @@ var Date = &Builtin{
 		),
 		types.Named("date", types.NewArray([]types.Type{types.N, types.N, types.N}, nil)).Description("an array of `year`, `month` (1-12), and `day` (1-31)"),
 	),
+	canSkipBctx: true,
 }
 
 var Clock = &Builtin{
@@ -2288,6 +2447,7 @@ var Clock = &Builtin{
 		types.Named("output", types.NewArray([]types.Type{types.N, types.N, types.N}, nil)).
 			Description("the `hour`, `minute` (0-59), and `second` (0-59) representing the time of day for the nanoseconds since epoch in the supplied timezone (or UTC)"),
 	),
+	canSkipBctx: true,
 }
 
 var Weekday = &Builtin{
@@ -2302,6 +2462,7 @@ var Weekday = &Builtin{
 		),
 		types.Named("day", types.S).Description("the weekday represented by `ns` nanoseconds since the epoch in the supplied timezone (or UTC)"),
 	),
+	canSkipBctx: true,
 }
 
 var AddDate = &Builtin{
@@ -2316,6 +2477,7 @@ var AddDate = &Builtin{
 		),
 		types.Named("output", types.N).Description("nanoseconds since the epoch representing the input time, with years, months and days added"),
 	),
+	canSkipBctx: true,
 }
 
 var Diff = &Builtin{
@@ -2334,6 +2496,7 @@ var Diff = &Builtin{
 		),
 		types.Named("output", types.NewArray([]types.Type{types.N, types.N, types.N, types.N, types.N, types.N}, nil)).Description("difference between `ns1` and `ns2` (in their supplied timezones, if supplied, or UTC) as array of numbers: `[years, months, days, hours, minutes, seconds]`"),
 	),
+	canSkipBctx: true,
 }
 
 /**
@@ -2353,6 +2516,7 @@ concatenated PEM blocks. The whole input of concatenated PEM blocks can optional
 		),
 		types.Named("output", types.NewArray(nil, types.NewObject(nil, types.NewDynamicProperty(types.S, types.A)))).Description("parsed X.509 certificates represented as objects"),
 	),
+	canSkipBctx: true,
 }
 
 var CryptoX509ParseAndVerifyCertificates = &Builtin{
@@ -2372,6 +2536,7 @@ with all others being treated as intermediates.`,
 			types.NewArray(nil, types.NewObject(nil, types.NewDynamicProperty(types.S, types.A))),
 		}, nil)).Description("array of `[valid, certs]`: if the input certificate chain could be verified then `valid` is `true` and `certs` is an array of X.509 certificates represented as objects; if the input certificate chain could not be verified then `valid` is `false` and `certs` is `[]`"),
 	),
+	canSkipBctx: true,
 }
 
 var CryptoX509ParseAndVerifyCertificatesWithOptions = &Builtin{
@@ -2383,7 +2548,6 @@ be used to configure the validation options used.
 
 The first certificate is treated as the root and the last is treated as the leaf,
 with all others being treated as intermediates.`,
-
 	Decl: types.NewFunction(
 		types.Args(
 			types.Named("certs", types.S).Description("base64 encoded DER or PEM data containing two or more certificates where the first is a root CA, the last is a leaf certificate, and all others are intermediate CAs"),
@@ -2397,6 +2561,7 @@ with all others being treated as intermediates.`,
 			types.NewArray(nil, types.NewObject(nil, types.NewDynamicProperty(types.S, types.A))),
 		}, nil)).Description("array of `[valid, certs]`: if the input certificate chain could be verified then `valid` is `true` and `certs` is an array of X.509 certificates represented as objects; if the input certificate chain could not be verified then `valid` is `false` and `certs` is `[]`"),
 	),
+	canSkipBctx: true,
 }
 
 var CryptoX509ParseCertificateRequest = &Builtin{
@@ -2408,6 +2573,7 @@ var CryptoX509ParseCertificateRequest = &Builtin{
 		),
 		types.Named("output", types.NewObject(nil, types.NewDynamicProperty(types.S, types.A))).Description("X.509 CSR represented as an object"),
 	),
+	canSkipBctx: true,
 }
 
 var CryptoX509ParseKeyPair = &Builtin{
@@ -2420,7 +2586,9 @@ var CryptoX509ParseKeyPair = &Builtin{
 		),
 		types.Named("output", types.NewObject(nil, types.NewDynamicProperty(types.S, types.A))).Description("if key pair is valid, returns the tls.certificate(https://pkg.go.dev/crypto/tls#Certificate) as an object. If the key pair is invalid, nil and an error are returned."),
 	),
+	canSkipBctx: true,
 }
+
 var CryptoX509ParseRSAPrivateKey = &Builtin{
 	Name:        "crypto.x509.parse_rsa_private_key",
 	Description: "Returns a JWK for signing a JWT from the given PEM-encoded RSA private key.",
@@ -2430,6 +2598,7 @@ var CryptoX509ParseRSAPrivateKey = &Builtin{
 		),
 		types.Named("output", types.NewObject(nil, types.NewDynamicProperty(types.S, types.A))).Description("JWK as an object"),
 	),
+	canSkipBctx: true,
 }
 
 var CryptoParsePrivateKeys = &Builtin{
@@ -2443,6 +2612,7 @@ If the input is empty, the function will return null. The input string should be
 		),
 		types.Named("output", types.NewArray(nil, types.NewObject(nil, types.NewDynamicProperty(types.S, types.A)))).Description("parsed private keys represented as objects"),
 	),
+	canSkipBctx: true,
 }
 
 var CryptoMd5 = &Builtin{
@@ -2454,6 +2624,7 @@ var CryptoMd5 = &Builtin{
 		),
 		types.Named("y", types.S).Description("MD5-hash of `x`"),
 	),
+	canSkipBctx: true,
 }
 
 var CryptoSha1 = &Builtin{
@@ -2465,6 +2636,7 @@ var CryptoSha1 = &Builtin{
 		),
 		types.Named("y", types.S).Description("SHA1-hash of `x`"),
 	),
+	canSkipBctx: true,
 }
 
 var CryptoSha256 = &Builtin{
@@ -2476,6 +2648,7 @@ var CryptoSha256 = &Builtin{
 		),
 		types.Named("y", types.S).Description("SHA256-hash of `x`"),
 	),
+	canSkipBctx: true,
 }
 
 var CryptoHmacMd5 = &Builtin{
@@ -2488,6 +2661,7 @@ var CryptoHmacMd5 = &Builtin{
 		),
 		types.Named("y", types.S).Description("MD5-HMAC of `x`"),
 	),
+	canSkipBctx: true,
 }
 
 var CryptoHmacSha1 = &Builtin{
@@ -2500,6 +2674,7 @@ var CryptoHmacSha1 = &Builtin{
 		),
 		types.Named("y", types.S).Description("SHA1-HMAC of `x`"),
 	),
+	canSkipBctx: true,
 }
 
 var CryptoHmacSha256 = &Builtin{
@@ -2512,6 +2687,7 @@ var CryptoHmacSha256 = &Builtin{
 		),
 		types.Named("y", types.S).Description("SHA256-HMAC of `x`"),
 	),
+	canSkipBctx: true,
 }
 
 var CryptoHmacSha512 = &Builtin{
@@ -2524,6 +2700,7 @@ var CryptoHmacSha512 = &Builtin{
 		),
 		types.Named("y", types.S).Description("SHA512-HMAC of `x`"),
 	),
+	canSkipBctx: true,
 }
 
 var CryptoHmacEqual = &Builtin{
@@ -2536,6 +2713,7 @@ var CryptoHmacEqual = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if the MACs are equals, `false` otherwise"),
 	),
+	canSkipBctx: true,
 }
 
 /**
@@ -2559,7 +2737,8 @@ var WalkBuiltin = &Builtin{
 			nil,
 		)).Description("pairs of `path` and `value`: `path` is an array representing the pointer to `value` in `x`. If `path` is assigned a wildcard (`_`), the `walk` function will skip path creation entirely for faster evaluation."),
 	),
-	Categories: graphs,
+	Categories:  graphs,
+	canSkipBctx: true,
 }
 
 var ReachableBuiltin = &Builtin{
@@ -2572,14 +2751,15 @@ var ReachableBuiltin = &Builtin{
 				types.NewDynamicProperty(
 					types.A,
 					types.NewAny(
-						types.NewSet(types.A),
+						types.SetOfAny,
 						types.NewArray(nil, types.A)),
 				)),
 			).Description("object containing a set or array of neighboring vertices"),
-			types.Named("initial", types.NewAny(types.NewSet(types.A), types.NewArray(nil, types.A))).Description("set or array of root vertices"),
+			types.Named("initial", types.NewAny(types.SetOfAny, types.NewArray(nil, types.A))).Description("set or array of root vertices"),
 		),
-		types.Named("output", types.NewSet(types.A)).Description("set of vertices reachable from the `initial` vertices in the directed `graph`"),
+		types.Named("output", types.SetOfAny).Description("set of vertices reachable from the `initial` vertices in the directed `graph`"),
 	),
+	canSkipBctx: true,
 }
 
 var ReachablePathsBuiltin = &Builtin{
@@ -2592,14 +2772,15 @@ var ReachablePathsBuiltin = &Builtin{
 				types.NewDynamicProperty(
 					types.A,
 					types.NewAny(
-						types.NewSet(types.A),
+						types.SetOfAny,
 						types.NewArray(nil, types.A)),
 				)),
 			).Description("object containing a set or array of root vertices"),
-			types.Named("initial", types.NewAny(types.NewSet(types.A), types.NewArray(nil, types.A))).Description("initial paths"), // TODO(sr): copied. is that correct?
+			types.Named("initial", types.NewAny(types.SetOfAny, types.NewArray(nil, types.A))).Description("initial paths"), // TODO(sr): copied. is that correct?
 		),
 		types.Named("output", types.NewSet(types.NewArray(nil, types.A))).Description("paths reachable from the `initial` vertices in the directed `graph`"),
 	),
+	canSkipBctx: true,
 }
 
 /**
@@ -2616,7 +2797,8 @@ var IsNumber = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `x` is a number, `false` otherwise."),
 	),
-	Categories: typesCat,
+	Categories:  typesCat,
+	canSkipBctx: true,
 }
 
 var IsString = &Builtin{
@@ -2628,7 +2810,8 @@ var IsString = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `x` is a string, `false` otherwise."),
 	),
-	Categories: typesCat,
+	Categories:  typesCat,
+	canSkipBctx: true,
 }
 
 var IsBoolean = &Builtin{
@@ -2640,7 +2823,8 @@ var IsBoolean = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `x` is an boolean, `false` otherwise."),
 	),
-	Categories: typesCat,
+	Categories:  typesCat,
+	canSkipBctx: true,
 }
 
 var IsArray = &Builtin{
@@ -2652,7 +2836,8 @@ var IsArray = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `x` is an array, `false` otherwise."),
 	),
-	Categories: typesCat,
+	Categories:  typesCat,
+	canSkipBctx: true,
 }
 
 var IsSet = &Builtin{
@@ -2664,7 +2849,8 @@ var IsSet = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `x` is a set, `false` otherwise."),
 	),
-	Categories: typesCat,
+	Categories:  typesCat,
+	canSkipBctx: true,
 }
 
 var IsObject = &Builtin{
@@ -2676,7 +2862,8 @@ var IsObject = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `x` is an object, `false` otherwise."),
 	),
-	Categories: typesCat,
+	Categories:  typesCat,
+	canSkipBctx: true,
 }
 
 var IsNull = &Builtin{
@@ -2688,7 +2875,8 @@ var IsNull = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `x` is null, `false` otherwise."),
 	),
-	Categories: typesCat,
+	Categories:  typesCat,
+	canSkipBctx: true,
 }
 
 /**
@@ -2705,7 +2893,8 @@ var TypeNameBuiltin = &Builtin{
 		),
 		types.Named("type", types.S).Description(`one of "null", "boolean", "number", "string", "array", "object", "set"`),
 	),
-	Categories: typesCat,
+	Categories:  typesCat,
+	canSkipBctx: true,
 }
 
 /**
@@ -2725,6 +2914,7 @@ var HTTPSend = &Builtin{
 			Description("the HTTP response object"),
 	),
 	Nondeterministic: true,
+	canSkipBctx:      false,
 }
 
 /**
@@ -2747,6 +2937,7 @@ var GraphQLParse = &Builtin{
 			types.NewObject(nil, types.NewDynamicProperty(types.A, types.A)),
 		}, nil)).Description("`output` is of the form `[query_ast, schema_ast]`. If the GraphQL query is valid given the provided schema, then `query_ast` and `schema_ast` are objects describing the ASTs for the query and schema."),
 	),
+	canSkipBctx: false,
 }
 
 // GraphQLParseAndVerify returns a boolean and a pair of AST object from parsing/validation.
@@ -2766,6 +2957,7 @@ var GraphQLParseAndVerify = &Builtin{
 			types.NewObject(nil, types.NewDynamicProperty(types.A, types.A)),
 		}, nil)).Description(" `output` is of the form `[valid, query_ast, schema_ast]`. If the query is valid given the provided schema, then `valid` is `true`, and `query_ast` and `schema_ast` are objects describing the ASTs for the GraphQL query and schema. Otherwise, `valid` is `false` and `query_ast` and `schema_ast` are `{}`."),
 	),
+	canSkipBctx: false,
 }
 
 // GraphQLParseQuery parses the input GraphQL query and returns a JSON
@@ -2779,6 +2971,7 @@ var GraphQLParseQuery = &Builtin{
 		),
 		types.Named("output", types.NewObject(nil, types.NewDynamicProperty(types.A, types.A))).Description("AST object for the GraphQL query."),
 	),
+	canSkipBctx: true,
 }
 
 // GraphQLParseSchema parses the input GraphQL schema and returns a JSON
@@ -2792,6 +2985,7 @@ var GraphQLParseSchema = &Builtin{
 		),
 		types.Named("output", types.NewObject(nil, types.NewDynamicProperty(types.A, types.A))).Description("AST object for the GraphQL schema."),
 	),
+	canSkipBctx: false,
 }
 
 // GraphQLIsValid returns true if a GraphQL query is valid with a given
@@ -2808,6 +3002,7 @@ var GraphQLIsValid = &Builtin{
 		),
 		types.Named("output", types.B).Description("`true` if the query is valid under the given schema. `false` otherwise."),
 	),
+	canSkipBctx: false,
 }
 
 // GraphQLSchemaIsValid returns true if the input is valid GraphQL schema,
@@ -2822,6 +3017,7 @@ var GraphQLSchemaIsValid = &Builtin{
 		),
 		types.Named("output", types.B).Description("`true` if the schema is a valid GraphQL schema. `false` otherwise."),
 	),
+	canSkipBctx: false,
 }
 
 /**
@@ -2844,7 +3040,8 @@ var JSONSchemaVerify = &Builtin{
 		}, nil)).
 			Description("`output` is of the form `[valid, error]`. If the schema is valid, then `valid` is `true`, and `error` is `null`. Otherwise, `valid` is `false` and `error` is a string describing the error."),
 	),
-	Categories: objectCat,
+	Categories:  objectCat,
+	canSkipBctx: true,
 }
 
 // JSONMatchSchema returns empty array if the document matches the JSON schema,
@@ -2875,7 +3072,8 @@ var JSONMatchSchema = &Builtin{
 		}, nil)).
 			Description("`output` is of the form `[match, errors]`. If the document is valid given the schema, then `match` is `true`, and `errors` is an empty array. Otherwise, `match` is `false` and `errors` is an array of objects describing the error(s)."),
 	),
-	Categories: objectCat,
+	Categories:  objectCat,
+	canSkipBctx: false,
 }
 
 /**
@@ -2897,7 +3095,8 @@ var ProvidersAWSSignReqObj = &Builtin{
 		types.Named("signed_request", types.NewObject(nil, types.NewDynamicProperty(types.A, types.A))).
 			Description("HTTP request object with `Authorization` header"),
 	),
-	Categories: providersAWSCat,
+	Categories:  providersAWSCat,
+	canSkipBctx: true,
 }
 
 /**
@@ -2915,6 +3114,7 @@ var RegoParseModule = &Builtin{
 		types.Named("output", types.NewObject(nil, types.NewDynamicProperty(types.S, types.A))).
 			Description("AST object for the Rego module"),
 	),
+	canSkipBctx: true,
 }
 
 var RegoMetadataChain = &Builtin{
@@ -2927,6 +3127,7 @@ The first entry in the chain always points to the active rule, even if it has no
 		types.Args(),
 		types.Named("chain", types.NewArray(nil, types.A)).Description("each array entry represents a node in the path ancestry (chain) of the active rule that also has declared annotations"),
 	),
+	canSkipBctx: true,
 }
 
 // RegoMetadataRule returns the metadata for the active rule
@@ -2937,6 +3138,7 @@ var RegoMetadataRule = &Builtin{
 		types.Args(),
 		types.Named("output", types.A).Description("\"rule\" scope annotations for this rule; empty object if no annotations exist"),
 	),
+	canSkipBctx: true,
 }
 
 /**
@@ -2953,6 +3155,7 @@ var OPARuntime = &Builtin{
 			Description("includes a `config` key if OPA was started with a configuration file; an `env` key containing the environment variables that the OPA process was started with; includes `version` and `commit` keys containing the version and build commit of OPA."),
 	),
 	Nondeterministic: true,
+	canSkipBctx:      false,
 }
 
 /**
@@ -2969,7 +3172,8 @@ var Trace = &Builtin{
 		),
 		types.Named("result", types.B).Description("always `true`"),
 	),
-	Categories: tracing,
+	Categories:  tracing,
+	canSkipBctx: false,
 }
 
 /**
@@ -2984,12 +3188,13 @@ var GlobMatch = &Builtin{
 			types.Named("pattern", types.S).Description("glob pattern"),
 			types.Named("delimiters", types.NewAny(
 				types.NewArray(nil, types.S),
-				types.NewNull(),
+				types.Nl,
 			)).Description("glob pattern delimiters, e.g. `[\".\", \":\"]`, defaults to `[\".\"]` if unset. If `delimiters` is `null`, glob match without delimiter."),
 			types.Named("match", types.S).Description("string to match against `pattern`"),
 		),
 		types.Named("result", types.B).Description("true if `match` can be found in `pattern` which is separated by `delimiters`"),
 	),
+	canSkipBctx: false,
 }
 
 var GlobQuoteMeta = &Builtin{
@@ -3001,6 +3206,7 @@ var GlobQuoteMeta = &Builtin{
 		),
 		types.Named("output", types.S).Description("the escaped string of `pattern`"),
 	),
+	canSkipBctx: true,
 	// TODO(sr): example for this was: Calling ``glob.quote_meta("*.github.com", output)`` returns ``\\*.github.com`` as ``output``.
 }
 
@@ -3018,6 +3224,7 @@ var NetCIDRIntersects = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `cidr1` intersects with `cidr2`"),
 	),
+	canSkipBctx: true,
 }
 
 var NetCIDRExpand = &Builtin{
@@ -3027,8 +3234,9 @@ var NetCIDRExpand = &Builtin{
 		types.Args(
 			types.Named("cidr", types.S).Description("CIDR to expand"),
 		),
-		types.Named("hosts", types.NewSet(types.S)).Description("set of IP addresses the CIDR `cidr` expands to"),
+		types.Named("hosts", types.SetOfStr).Description("set of IP addresses the CIDR `cidr` expands to"),
 	),
+	canSkipBctx: false,
 }
 
 var NetCIDRContains = &Builtin{
@@ -3041,6 +3249,7 @@ var NetCIDRContains = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `cidr_or_ip` is contained within `cidr`"),
 	),
+	canSkipBctx: true,
 }
 
 var NetCIDRContainsMatches = &Builtin{
@@ -3054,6 +3263,7 @@ var NetCIDRContainsMatches = &Builtin{
 		),
 		types.Named("output", types.NewSet(types.NewArray([]types.Type{types.A, types.A}, nil))).Description("tuples identifying matches where `cidrs_or_ips` are contained within `cidrs`"),
 	),
+	canSkipBctx: true,
 }
 
 var NetCIDRMerge = &Builtin{
@@ -3065,11 +3275,12 @@ Supports both IPv4 and IPv6 notations. IPv6 inputs need a prefix length (e.g. "/
 		types.Args(
 			types.Named("addrs", types.NewAny(
 				types.NewArray(nil, types.NewAny(types.S)),
-				types.NewSet(types.S),
+				types.SetOfStr,
 			)).Description("CIDRs or IP addresses"),
 		),
-		types.Named("output", types.NewSet(types.S)).Description("smallest possible set of CIDRs obtained after merging the provided list of IP addresses and subnets in `addrs`"),
+		types.Named("output", types.SetOfStr).Description("smallest possible set of CIDRs obtained after merging the provided list of IP addresses and subnets in `addrs`"),
 	),
+	canSkipBctx: true,
 }
 
 var NetCIDRIsValid = &Builtin{
@@ -3081,6 +3292,7 @@ var NetCIDRIsValid = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `cidr` is a valid CIDR"),
 	),
+	canSkipBctx: true,
 }
 
 var netCidrContainsMatchesOperandType = types.NewAny(
@@ -3110,9 +3322,10 @@ var NetLookupIPAddr = &Builtin{
 		types.Args(
 			types.Named("name", types.S).Description("domain name to resolve"),
 		),
-		types.Named("addrs", types.NewSet(types.S)).Description("IP addresses (v4 and v6) that `name` resolves to"),
+		types.Named("addrs", types.SetOfStr).Description("IP addresses (v4 and v6) that `name` resolves to"),
 	),
 	Nondeterministic: true,
+	canSkipBctx:      false,
 }
 
 /**
@@ -3128,6 +3341,7 @@ var SemVerIsValid = &Builtin{
 		),
 		types.Named("result", types.B).Description("`true` if `vsn` is a valid SemVer; `false` otherwise"),
 	),
+	canSkipBctx: true,
 }
 
 var SemVerCompare = &Builtin{
@@ -3140,6 +3354,7 @@ var SemVerCompare = &Builtin{
 		),
 		types.Named("result", types.N).Description("`-1` if `a < b`; `1` if `a > b`; `0` if `a == b`"),
 	),
+	canSkipBctx: true,
 }
 
 /**
@@ -3160,7 +3375,12 @@ var Print = &Builtin{
 // The compiler rewrites print() calls to refer to the internal implementation.
 var InternalPrint = &Builtin{
 	Name: "internal.print",
-	Decl: types.NewFunction([]types.Type{types.NewArray(nil, types.NewSet(types.A))}, nil),
+	Decl: types.NewFunction([]types.Type{types.NewArray(nil, types.SetOfAny)}, nil),
+}
+
+var InternalTestCase = &Builtin{
+	Name: "internal.test_case",
+	Decl: types.NewFunction([]types.Type{types.NewArray(nil, types.A)}, nil),
 }
 
 /**
@@ -3172,12 +3392,13 @@ var SetDiff = &Builtin{
 	Name: "set_diff",
 	Decl: types.NewFunction(
 		types.Args(
-			types.NewSet(types.A),
-			types.NewSet(types.A),
+			types.SetOfAny,
+			types.SetOfAny,
 		),
-		types.NewSet(types.A),
+		types.SetOfAny,
 	),
-	deprecated: true,
+	deprecated:  true,
+	canSkipBctx: true,
 }
 
 // NetCIDROverlap has been replaced by the `net.cidr_contains` built-in.
@@ -3190,7 +3411,8 @@ var NetCIDROverlap = &Builtin{
 		),
 		types.B,
 	),
-	deprecated: true,
+	deprecated:  true,
+	canSkipBctx: true,
 }
 
 // CastArray checks the underlying type of the input. If it is array or set, an array
@@ -3201,7 +3423,8 @@ var CastArray = &Builtin{
 		types.Args(types.A),
 		types.NewArray(nil, types.A),
 	),
-	deprecated: true,
+	deprecated:  true,
+	canSkipBctx: true,
 }
 
 // CastSet checks the underlying type of the input.
@@ -3212,9 +3435,10 @@ var CastSet = &Builtin{
 	Name: "cast_set",
 	Decl: types.NewFunction(
 		types.Args(types.A),
-		types.NewSet(types.A),
+		types.SetOfAny,
 	),
-	deprecated: true,
+	deprecated:  true,
+	canSkipBctx: true,
 }
 
 // CastString returns input if it is a string; if not returns error.
@@ -3225,7 +3449,8 @@ var CastString = &Builtin{
 		types.Args(types.A),
 		types.S,
 	),
-	deprecated: true,
+	deprecated:  true,
+	canSkipBctx: true,
 }
 
 // CastBoolean returns input if it is a boolean; if not returns error.
@@ -3235,7 +3460,8 @@ var CastBoolean = &Builtin{
 		types.Args(types.A),
 		types.B,
 	),
-	deprecated: true,
+	deprecated:  true,
+	canSkipBctx: true,
 }
 
 // CastNull returns null if input is null; if not returns error.
@@ -3243,9 +3469,10 @@ var CastNull = &Builtin{
 	Name: "cast_null",
 	Decl: types.NewFunction(
 		types.Args(types.A),
-		types.NewNull(),
+		types.Nl,
 	),
-	deprecated: true,
+	deprecated:  true,
+	canSkipBctx: true,
 }
 
 // CastObject returns the given object if it is null; throws an error otherwise
@@ -3255,7 +3482,8 @@ var CastObject = &Builtin{
 		types.Args(types.A),
 		types.NewObject(nil, types.NewDynamicProperty(types.A, types.A)),
 	),
-	deprecated: true,
+	deprecated:  true,
+	canSkipBctx: true,
 }
 
 // RegexMatchDeprecated declares `re_match` which has been deprecated. Use `regex.match` instead.
@@ -3268,7 +3496,8 @@ var RegexMatchDeprecated = &Builtin{
 		),
 		types.B,
 	),
-	deprecated: true,
+	deprecated:  true,
+	canSkipBctx: false,
 }
 
 // All takes a list and returns true if all of the items
@@ -3278,13 +3507,14 @@ var All = &Builtin{
 	Decl: types.NewFunction(
 		types.Args(
 			types.NewAny(
-				types.NewSet(types.A),
+				types.SetOfAny,
 				types.NewArray(nil, types.A),
 			),
 		),
 		types.B,
 	),
-	deprecated: true,
+	deprecated:  true,
+	canSkipBctx: true,
 }
 
 // Any takes a collection and returns true if any of the items
@@ -3294,13 +3524,14 @@ var Any = &Builtin{
 	Decl: types.NewFunction(
 		types.Args(
 			types.NewAny(
-				types.NewSet(types.A),
+				types.SetOfAny,
 				types.NewArray(nil, types.A),
 			),
 		),
 		types.B,
 	),
-	deprecated: true,
+	deprecated:  true,
+	canSkipBctx: true,
 }
 
 // Builtin represents a built-in function supported by OPA. Every built-in
@@ -3318,6 +3549,7 @@ type Builtin struct {
 	Infix            string          `json:"infix,omitempty"`    // Unique name of infix operator. Default should be unset.
 	Relation         bool            `json:"relation,omitempty"` // Indicates if the built-in acts as a relation.
 	deprecated       bool            // Indicates if the built-in has been deprecated.
+	canSkipBctx      bool            // Built-in needs no data from the built-in context.
 	Nondeterministic bool            `json:"nondeterministic,omitempty"` // Indicates if the built-in returns non-deterministic results.
 }
 
@@ -3379,7 +3611,7 @@ func (b *Builtin) Ref() Ref {
 	ref := make(Ref, len(parts))
 	ref[0] = VarTerm(parts[0])
 	for i := 1; i < len(parts); i++ {
-		ref[i] = StringTerm(parts[i])
+		ref[i] = InternedTerm(parts[i])
 	}
 	return ref
 }
@@ -3390,9 +3622,16 @@ func (b *Builtin) IsTargetPos(i int) bool {
 	return b.Decl.Arity() == i
 }
 
+// NeedsBuiltInContext returns true if the built-in depends on the built-in context.
+func (b *Builtin) NeedsBuiltInContext() bool {
+	// Negated, so built-ins we don't know about (and who don't know about this option)
+	// will get a built-in context provided to them.
+	return !b.canSkipBctx
+}
+
 func init() {
 	BuiltinMap = map[string]*Builtin{}
-	for _, b := range DefaultBuiltins {
+	for _, b := range &DefaultBuiltins {
 		RegisterBuiltin(b)
 	}
 }

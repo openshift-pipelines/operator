@@ -6,6 +6,7 @@ package wasm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -16,7 +17,7 @@ import (
 
 // New creates a new Resolver instance which is using the Wasm module
 // policy for the given entrypoint ref.
-func New(entrypoints []ast.Ref, policy []byte, data interface{}) (*Resolver, error) {
+func New(entrypoints []ast.Ref, policy []byte, data any) (*Resolver, error) {
 	e, err := opa.LookupEngine("wasm")
 	if err != nil {
 		return nil, err
@@ -96,9 +97,9 @@ func (r *Resolver) Eval(ctx context.Context, input resolver.Input) (resolver.Res
 		return resolver.Result{}, fmt.Errorf("internal error: invalid entrypoint id %s", numValue)
 	}
 
-	var in *interface{}
+	var in *any
 	if input.Input != nil {
-		var str interface{} = []byte(input.Input.String())
+		var str any = []byte(input.Input.String())
 		in = &str
 	}
 
@@ -121,12 +122,12 @@ func (r *Resolver) Eval(ctx context.Context, input resolver.Input) (resolver.Res
 }
 
 // SetData will update the external data for the Wasm instance.
-func (r *Resolver) SetData(ctx context.Context, data interface{}) error {
+func (r *Resolver) SetData(ctx context.Context, data any) error {
 	return r.o.SetData(ctx, data)
 }
 
 // SetDataPath will set the provided data on the wasm instance at the specified path.
-func (r *Resolver) SetDataPath(ctx context.Context, path []string, data interface{}) error {
+func (r *Resolver) SetDataPath(ctx context.Context, path []string, data any) error {
 	return r.o.SetDataPath(ctx, path, data)
 }
 
@@ -144,7 +145,7 @@ func getResult(evalResult *opa.Result) (ast.Value, error) {
 
 	resultSet, ok := parsed.Value.(ast.Set)
 	if !ok {
-		return nil, fmt.Errorf("illegal result type")
+		return nil, errors.New("illegal result type")
 	}
 
 	if resultSet.Len() == 0 {
@@ -152,14 +153,14 @@ func getResult(evalResult *opa.Result) (ast.Value, error) {
 	}
 
 	if resultSet.Len() > 1 {
-		return nil, fmt.Errorf("illegal result type")
+		return nil, errors.New("illegal result type")
 	}
 
 	var obj ast.Object
 	err = resultSet.Iter(func(term *ast.Term) error {
 		obj, ok = term.Value.(ast.Object)
 		if !ok || obj.Len() != 1 {
-			return fmt.Errorf("illegal result type")
+			return errors.New("illegal result type")
 		}
 		return nil
 	})
@@ -167,7 +168,7 @@ func getResult(evalResult *opa.Result) (ast.Value, error) {
 		return nil, err
 	}
 
-	result := obj.Get(ast.StringTerm("result"))
+	result := obj.Get(ast.InternedTerm("result"))
 
 	return result.Value, nil
 }

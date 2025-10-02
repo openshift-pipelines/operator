@@ -6,7 +6,7 @@ package topdown
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"math"
 	"math/big"
 	"strconv"
@@ -29,7 +29,7 @@ var maxDateAllowedForNsConversion = time.Unix(0, math.MaxInt64)
 
 func toSafeUnixNano(t time.Time, iter func(*ast.Term) error) error {
 	if t.Before(minDateAllowedForNsConversion) || t.After(maxDateAllowedForNsConversion) {
-		return fmt.Errorf("time outside of valid range")
+		return errors.New("time outside of valid range")
 	}
 
 	return iter(ast.NewTerm(ast.Number(int64ToJSONNumber(t.UnixNano()))))
@@ -127,8 +127,8 @@ func builtinDate(_ BuiltinContext, operands []*ast.Term, iter func(*ast.Term) er
 		return err
 	}
 	year, month, day := t.Date()
-	result := ast.NewArray(ast.InternedIntNumberTerm(year), ast.InternedIntNumberTerm(int(month)), ast.InternedIntNumberTerm(day))
-	return iter(ast.NewTerm(result))
+
+	return iter(ast.ArrayTerm(ast.InternedTerm(year), ast.InternedTerm(int(month)), ast.InternedTerm(day)))
 }
 
 func builtinClock(_ BuiltinContext, operands []*ast.Term, iter func(*ast.Term) error) error {
@@ -137,7 +137,7 @@ func builtinClock(_ BuiltinContext, operands []*ast.Term, iter func(*ast.Term) e
 		return err
 	}
 	hour, minute, second := t.Clock()
-	result := ast.NewArray(ast.InternedIntNumberTerm(hour), ast.InternedIntNumberTerm(minute), ast.InternedIntNumberTerm(second))
+	result := ast.NewArray(ast.InternedTerm(hour), ast.InternedTerm(minute), ast.InternedTerm(second))
 	return iter(ast.NewTerm(result))
 }
 
@@ -238,8 +238,8 @@ func builtinDiff(_ BuiltinContext, operands []*ast.Term, iter func(*ast.Term) er
 	}
 	// END REDISTRIBUTION FROM APACHE 2.0 LICENSED PROJECT
 
-	return iter(ast.ArrayTerm(ast.InternedIntNumberTerm(year), ast.InternedIntNumberTerm(month), ast.InternedIntNumberTerm(day),
-		ast.InternedIntNumberTerm(hour), ast.InternedIntNumberTerm(min), ast.InternedIntNumberTerm(sec)))
+	return iter(ast.ArrayTerm(ast.InternedTerm(year), ast.InternedTerm(month), ast.InternedTerm(day),
+		ast.InternedTerm(hour), ast.InternedTerm(min), ast.InternedTerm(sec)))
 }
 
 func tzTime(a ast.Value) (t time.Time, lay string, err error) {
@@ -313,7 +313,7 @@ func tzTime(a ast.Value) (t time.Time, lay string, err error) {
 	f := builtins.NumberToFloat(value)
 	i64, acc := f.Int64()
 	if acc != big.Exact {
-		return time.Time{}, layout, fmt.Errorf("timestamp too big")
+		return time.Time{}, layout, errors.New("timestamp too big")
 	}
 
 	t = time.Unix(0, i64).In(loc)

@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/open-policy-agent/opa/internal/deepcopy"
@@ -18,7 +18,6 @@ import (
 
 const (
 	annotationScopePackage     = "package"
-	annotationScopeImport      = "import"
 	annotationScopeRule        = "rule"
 	annotationScopeDocument    = "document"
 	annotationScopeSubpackages = "subpackages"
@@ -35,7 +34,8 @@ type (
 		RelatedResources []*RelatedResourceAnnotation `json:"related_resources,omitempty"`
 		Authors          []*AuthorAnnotation          `json:"authors,omitempty"`
 		Schemas          []*SchemaAnnotation          `json:"schemas,omitempty"`
-		Custom           map[string]interface{}       `json:"custom,omitempty"`
+		Compile          *CompileAnnotation           `json:"compile,omitempty"`
+		Custom           map[string]any               `json:"custom,omitempty"`
 		Location         *Location                    `json:"location,omitempty"`
 
 		comments []*Comment
@@ -44,9 +44,14 @@ type (
 
 	// SchemaAnnotation contains a schema declaration for the document identified by the path.
 	SchemaAnnotation struct {
-		Path       Ref          `json:"path"`
-		Schema     Ref          `json:"schema,omitempty"`
-		Definition *interface{} `json:"definition,omitempty"`
+		Path       Ref  `json:"path"`
+		Schema     Ref  `json:"schema,omitempty"`
+		Definition *any `json:"definition,omitempty"`
+	}
+
+	CompileAnnotation struct {
+		Unknowns []Ref `json:"unknowns,omitempty"`
+		MaskRule Ref   `json:"mask_rule,omitempty"` // NOTE: This doesn't need to start with "data.package", it can be relative
 	}
 
 	AuthorAnnotation struct {
@@ -152,6 +157,10 @@ func (a *Annotations) Compare(other *Annotations) int {
 		return cmp
 	}
 
+	if cmp := a.Compile.Compare(other.Compile); cmp != 0 {
+		return cmp
+	}
+
 	if a.Entrypoint != other.Entrypoint {
 		if a.Entrypoint {
 			return 1
@@ -183,7 +192,7 @@ func (a *Annotations) MarshalJSON() ([]byte, error) {
 		return []byte(`{"scope":""}`), nil
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"scope": a.Scope,
 	}
 
@@ -263,7 +272,7 @@ func (ar *AnnotationsRef) GetRule() *Rule {
 }
 
 func (ar *AnnotationsRef) MarshalJSON() ([]byte, error) {
-	data := map[string]interface{}{
+	data := map[string]any{
 		"path": ar.Path,
 	}
 
@@ -291,7 +300,6 @@ func (ar *AnnotationsRef) MarshalJSON() ([]byte, error) {
 }
 
 func scopeCompare(s1, s2 string) int {
-
 	o1 := scopeOrder(s1)
 	o2 := scopeOrder(s2)
 
@@ -311,8 +319,7 @@ func scopeCompare(s1, s2 string) int {
 }
 
 func scopeOrder(s string) int {
-	switch s {
-	case annotationScopeRule:
+	if s == annotationScopeRule {
 		return 1
 	}
 	return 0
@@ -325,7 +332,7 @@ func compareAuthors(a, b []*AuthorAnnotation) int {
 		return -1
 	}
 
-	for i := 0; i < len(a); i++ {
+	for i := range a {
 		if cmp := a[i].Compare(b[i]); cmp != 0 {
 			return cmp
 		}
@@ -341,8 +348,8 @@ func compareRelatedResources(a, b []*RelatedResourceAnnotation) int {
 		return -1
 	}
 
-	for i := 0; i < len(a); i++ {
-		if cmp := strings.Compare(a[i].String(), b[i].String()); cmp != 0 {
+	for i := range a {
+		if cmp := a[i].Compare(b[i]); cmp != 0 {
 			return cmp
 		}
 	}
@@ -351,12 +358,9 @@ func compareRelatedResources(a, b []*RelatedResourceAnnotation) int {
 }
 
 func compareSchemas(a, b []*SchemaAnnotation) int {
-	maxLen := len(a)
-	if len(b) < maxLen {
-		maxLen = len(b)
-	}
+	maxLen := min(len(b), len(a))
 
-	for i := 0; i < maxLen; i++ {
+	for i := range maxLen {
 		if cmp := a[i].Compare(b[i]); cmp != 0 {
 			return cmp
 		}
@@ -378,7 +382,7 @@ func compareStringLists(a, b []string) int {
 		return -1
 	}
 
-	for i := 0; i < len(a); i++ {
+	for i := range a {
 		if cmp := strings.Compare(a[i], b[i]); cmp != 0 {
 			return cmp
 		}
@@ -409,7 +413,11 @@ func (a *Annotations) Copy(node Node) *Annotations {
 		cpy.Schemas[i] = a.Schemas[i].Copy()
 	}
 
-	cpy.Custom = deepcopy.Map(a.Custom)
+	cpy.Compile = a.Compile.Copy()
+
+	if a.Custom != nil {
+		cpy.Custom = deepcopy.Map(a.Custom)
+	}
 
 	cpy.node = node
 
@@ -425,19 +433,30 @@ func (a *Annotations) toObject() (*Object, *Error) {
 	}
 
 	if len(a.Scope) > 0 {
-		obj.Insert(StringTerm("scope"), StringTerm(a.Scope))
+		switch a.Scope {
+		case annotationScopeDocument:
+			obj.Insert(InternedTerm("scope"), InternedTerm("document"))
+		case annotationScopePackage:
+			obj.Insert(InternedTerm("scope"), InternedTerm("package"))
+		case annotationScopeRule:
+			obj.Insert(InternedTerm("scope"), InternedTerm("rule"))
+		case annotationScopeSubpackages:
+			obj.Insert(InternedTerm("scope"), InternedTerm("subpackages"))
+		default:
+			obj.Insert(InternedTerm("scope"), StringTerm(a.Scope))
+		}
 	}
 
 	if len(a.Title) > 0 {
-		obj.Insert(StringTerm("title"), StringTerm(a.Title))
+		obj.Insert(InternedTerm("title"), StringTerm(a.Title))
 	}
 
 	if a.Entrypoint {
-		obj.Insert(StringTerm("entrypoint"), BooleanTerm(true))
+		obj.Insert(InternedTerm("entrypoint"), InternedTerm(true))
 	}
 
 	if len(a.Description) > 0 {
-		obj.Insert(StringTerm("description"), StringTerm(a.Description))
+		obj.Insert(InternedTerm("description"), StringTerm(a.Description))
 	}
 
 	if len(a.Organizations) > 0 {
@@ -445,19 +464,19 @@ func (a *Annotations) toObject() (*Object, *Error) {
 		for _, org := range a.Organizations {
 			orgs = append(orgs, StringTerm(org))
 		}
-		obj.Insert(StringTerm("organizations"), ArrayTerm(orgs...))
+		obj.Insert(InternedTerm("organizations"), ArrayTerm(orgs...))
 	}
 
 	if len(a.RelatedResources) > 0 {
 		rrs := make([]*Term, 0, len(a.RelatedResources))
 		for _, rr := range a.RelatedResources {
-			rrObj := NewObject(Item(StringTerm("ref"), StringTerm(rr.Ref.String())))
+			rrObj := NewObject(Item(InternedTerm("ref"), StringTerm(rr.Ref.String())))
 			if len(rr.Description) > 0 {
-				rrObj.Insert(StringTerm("description"), StringTerm(rr.Description))
+				rrObj.Insert(InternedTerm("description"), StringTerm(rr.Description))
 			}
 			rrs = append(rrs, NewTerm(rrObj))
 		}
-		obj.Insert(StringTerm("related_resources"), ArrayTerm(rrs...))
+		obj.Insert(InternedTerm("related_resources"), ArrayTerm(rrs...))
 	}
 
 	if len(a.Authors) > 0 {
@@ -465,14 +484,14 @@ func (a *Annotations) toObject() (*Object, *Error) {
 		for _, author := range a.Authors {
 			aObj := NewObject()
 			if len(author.Name) > 0 {
-				aObj.Insert(StringTerm("name"), StringTerm(author.Name))
+				aObj.Insert(InternedTerm("name"), StringTerm(author.Name))
 			}
 			if len(author.Email) > 0 {
-				aObj.Insert(StringTerm("email"), StringTerm(author.Email))
+				aObj.Insert(InternedTerm("email"), StringTerm(author.Email))
 			}
 			as = append(as, NewTerm(aObj))
 		}
-		obj.Insert(StringTerm("authors"), ArrayTerm(as...))
+		obj.Insert(InternedTerm("authors"), ArrayTerm(as...))
 	}
 
 	if len(a.Schemas) > 0 {
@@ -480,21 +499,21 @@ func (a *Annotations) toObject() (*Object, *Error) {
 		for _, s := range a.Schemas {
 			sObj := NewObject()
 			if len(s.Path) > 0 {
-				sObj.Insert(StringTerm("path"), NewTerm(s.Path.toArray()))
+				sObj.Insert(InternedTerm("path"), NewTerm(s.Path.toArray()))
 			}
 			if len(s.Schema) > 0 {
-				sObj.Insert(StringTerm("schema"), NewTerm(s.Schema.toArray()))
+				sObj.Insert(InternedTerm("schema"), NewTerm(s.Schema.toArray()))
 			}
 			if s.Definition != nil {
 				def, err := InterfaceToValue(s.Definition)
 				if err != nil {
 					return nil, NewError(CompileErr, a.Location, "invalid definition in schema annotation: %s", err.Error())
 				}
-				sObj.Insert(StringTerm("definition"), NewTerm(def))
+				sObj.Insert(InternedTerm("definition"), NewTerm(def))
 			}
 			ss = append(ss, NewTerm(sObj))
 		}
-		obj.Insert(StringTerm("schemas"), ArrayTerm(ss...))
+		obj.Insert(InternedTerm("schemas"), ArrayTerm(ss...))
 	}
 
 	if len(a.Custom) > 0 {
@@ -502,7 +521,7 @@ func (a *Annotations) toObject() (*Object, *Error) {
 		if err != nil {
 			return nil, NewError(CompileErr, a.Location, "invalid custom annotation %s", err.Error())
 		}
-		obj.Insert(StringTerm("custom"), NewTerm(c))
+		obj.Insert(InternedTerm("custom"), NewTerm(c))
 	}
 
 	return &obj, nil
@@ -531,7 +550,7 @@ func attachRuleAnnotations(mod *Module) {
 		}
 
 		if found && j < len(cpy) {
-			cpy = append(cpy[:j], cpy[j+1:]...)
+			cpy = slices.Delete(cpy, j, j+1)
 		}
 	}
 }
@@ -563,7 +582,11 @@ func attachAnnotationsNodes(mod *Module) Errors {
 			case *Package:
 				a.Scope = annotationScopePackage
 			case *Import:
-				a.Scope = annotationScopeImport
+				// Note that this isn't a valid scope, but set here so that the
+				// validate function called below can print an error message with
+				// a context that makes sense ("invalid scope: 'import'" instead of
+				// "invalid scope: '')
+				a.Scope = "import"
 			}
 		}
 
@@ -661,7 +684,7 @@ func (rr *RelatedResourceAnnotation) String() string {
 }
 
 func (rr *RelatedResourceAnnotation) MarshalJSON() ([]byte, error) {
-	d := map[string]interface{}{
+	d := map[string]any{
 		"ref": rr.Ref.String(),
 	}
 
@@ -681,7 +704,6 @@ func (s *SchemaAnnotation) Copy() *SchemaAnnotation {
 // Compare returns an integer indicating if s is less than, equal to, or greater
 // than other.
 func (s *SchemaAnnotation) Compare(other *SchemaAnnotation) int {
-
 	if cmp := s.Path.Compare(other.Path); cmp != 0 {
 		return cmp
 	}
@@ -703,6 +725,44 @@ func (s *SchemaAnnotation) Compare(other *SchemaAnnotation) int {
 
 func (s *SchemaAnnotation) String() string {
 	bs, _ := json.Marshal(s)
+	return string(bs)
+}
+
+// Copy returns a deep copy of s.
+func (c *CompileAnnotation) Copy() *CompileAnnotation {
+	if c == nil {
+		return nil
+	}
+	cpy := *c
+	for i := range c.Unknowns {
+		cpy.Unknowns[i] = c.Unknowns[i].Copy()
+	}
+	return &cpy
+}
+
+// Compare returns an integer indicating if s is less than, equal to, or greater
+// than other.
+func (c *CompileAnnotation) Compare(other *CompileAnnotation) int {
+	switch {
+	case c == nil && other == nil:
+		return 0
+	case c != nil && other == nil:
+		return 1
+	case c == nil && other != nil:
+		return -1
+	}
+
+	if cmp := slices.CompareFunc(c.Unknowns, other.Unknowns,
+		func(x, y Ref) int {
+			return x.Compare(y)
+		}); cmp != 0 {
+		return cmp
+	}
+	return c.MaskRule.Compare(other.MaskRule)
+}
+
+func (c *CompileAnnotation) String() string {
+	bs, _ := json.Marshal(c)
 	return string(bs)
 }
 
@@ -819,9 +879,7 @@ func (as *AnnotationSet) Flatten() FlatAnnotationsRefSet {
 	}
 
 	// Sort by path, then annotation location, for stable output
-	sort.SliceStable(refs, func(i, j int) bool {
-		return refs[i].Compare(refs[j]) < 0
-	})
+	slices.SortStableFunc(refs, (*AnnotationsRef).Compare)
 
 	return refs
 }
@@ -853,8 +911,8 @@ func (as *AnnotationSet) Chain(rule *Rule) AnnotationsRefSet {
 
 	if len(refs) > 1 {
 		// Sort by annotation location; chain must start with annotations declared closest to rule, then going outward
-		sort.SliceStable(refs, func(i, j int) bool {
-			return refs[i].Annotations.Location.Compare(refs[j].Annotations.Location) > 0
+		slices.SortStableFunc(refs, func(a, b *AnnotationsRef) int {
+			return -a.Annotations.Location.Compare(b.Annotations.Location)
 		})
 	}
 

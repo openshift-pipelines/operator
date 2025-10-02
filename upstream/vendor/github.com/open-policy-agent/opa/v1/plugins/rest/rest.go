@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httputil"
 	"reflect"
@@ -94,7 +95,7 @@ func (c *Config) AuthPlugin(lookup AuthPluginLookupFunc) (HTTPAuthPlugin, error)
 	}
 	// reflection avoids need for this code to change as auth plugins are added
 	s := reflect.ValueOf(c.Credentials)
-	for i := 0; i < s.NumField(); i++ {
+	for i := range s.NumField() {
 		if s.Field(i).IsNil() {
 			continue
 		}
@@ -132,12 +133,12 @@ func (c *Config) authPrepare(req *http.Request, lookup AuthPluginLookupFunc) err
 // services.
 type Client struct {
 	bytes                 *[]byte
-	json                  *interface{}
+	json                  *any
 	config                Config
 	headers               map[string]string
 	authPluginLookup      AuthPluginLookupFunc
 	logger                logging.Logger
-	loggerFields          map[string]interface{}
+	loggerFields          map[string]any
 	distributedTacingOpts tracing.Options
 }
 
@@ -233,7 +234,7 @@ func (c Client) Logger() logging.Logger {
 }
 
 // LoggerFields returns the fields used for log statements used by Client
-func (c Client) LoggerFields() map[string]interface{} {
+func (c Client) LoggerFields() map[string]any {
 	return c.loggerFields
 }
 
@@ -253,7 +254,7 @@ func (c Client) WithHeader(k, v string) Client {
 // WithJSON returns a shallow copy of the client with the JSON value set as the
 // message body to include the requests. This function sets the Content-Type
 // header.
-func (c Client) WithJSON(body interface{}) Client {
+func (c Client) WithJSON(body any) Client {
 	c = c.WithHeader("Content-Type", "application/json")
 	c.json = &body
 	return c
@@ -293,7 +294,7 @@ func (c Client) Do(ctx context.Context, method, path string) (*http.Response, er
 	}
 
 	url := c.config.URL + "/" + path
-	req, err := http.NewRequest(method, url, body)
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -303,28 +304,21 @@ func (c Client) Do(ctx context.Context, method, path string) (*http.Response, er
 	}
 
 	// Copy custom headers from config.
-	for key, value := range c.config.Headers {
-		headers[key] = value
-	}
+	maps.Copy(headers, c.config.Headers)
 
 	// Overwrite with headers set directly on client.
-	for key, value := range c.headers {
-		headers[key] = value
-	}
+	maps.Copy(headers, c.headers)
 
 	for key, value := range headers {
 		req.Header.Add(key, value)
 	}
 
-	req = req.WithContext(ctx)
-
-	err = c.config.authPrepare(req, c.authPluginLookup)
-	if err != nil {
+	if err = c.config.authPrepare(req, c.authPluginLookup); err != nil {
 		return nil, err
 	}
 
 	if c.logger.GetLevel() >= logging.Debug {
-		c.loggerFields = map[string]interface{}{
+		c.loggerFields = map[string]any{
 			"method":  method,
 			"url":     url,
 			"headers": withMaskedHeaders(req.Header),
@@ -347,7 +341,7 @@ func (c Client) Do(ctx context.Context, method, path string) (*http.Response, er
 				return nil, err
 			}
 
-			if len(string(dump)) < defaultResponseSizeLimitBytes {
+			if len(dump) < defaultResponseSizeLimitBytes {
 				c.loggerFields["response"] = string(dump)
 			} else {
 				c.loggerFields["response"] = fmt.Sprintf("%v...", string(dump[:defaultResponseSizeLimitBytes]))

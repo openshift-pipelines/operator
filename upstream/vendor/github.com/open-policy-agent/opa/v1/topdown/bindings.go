@@ -6,6 +6,7 @@ package topdown
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/open-policy-agent/opa/v1/ast"
@@ -92,7 +93,7 @@ func (u *bindings) plugNamespaced(a *ast.Term, caller *bindings) *ast.Term {
 		}
 		cpy := *a
 		arr := make([]*ast.Term, v.Len())
-		for i := 0; i < len(arr); i++ {
+		for i := range arr {
 			arr[i] = u.plugNamespaced(v.Elem(i), caller)
 		}
 		cpy.Value = ast.NewArray(arr...)
@@ -118,7 +119,7 @@ func (u *bindings) plugNamespaced(a *ast.Term, caller *bindings) *ast.Term {
 	case ast.Ref:
 		cpy := *a
 		ref := make(ast.Ref, len(v))
-		for i := 0; i < len(ref); i++ {
+		for i := range ref {
 			ref[i] = u.plugNamespaced(v[i], caller)
 		}
 		cpy.Value = ref
@@ -184,7 +185,7 @@ func (u *bindings) namespaceVar(v *ast.Term, caller *bindings) *ast.Term {
 		// Root documents (i.e., data, input) should never be namespaced because they
 		// are globally unique.
 		if !ast.RootDocumentNames.Contains(v) {
-			return ast.NewTerm(ast.Var(string(name) + fmt.Sprint(u.id)))
+			return ast.VarTerm(string(name) + strconv.FormatUint(u.id, 10))
 		}
 	}
 	return v
@@ -211,7 +212,7 @@ type namespacingVisitor struct {
 	caller *bindings
 }
 
-func (vis namespacingVisitor) Visit(x interface{}) bool {
+func (vis namespacingVisitor) Visit(x any) bool {
 	switch x := x.(type) {
 	case *ast.ArrayComprehension:
 		x.Term = vis.namespaceTerm(x.Term)
@@ -253,7 +254,7 @@ func (vis namespacingVisitor) namespaceTerm(a *ast.Term) *ast.Term {
 		}
 		cpy := *a
 		arr := make([]*ast.Term, v.Len())
-		for i := 0; i < len(arr); i++ {
+		for i := range arr {
 			arr[i] = vis.namespaceTerm(v.Elem(i))
 		}
 		cpy.Value = ast.NewArray(arr...)
@@ -279,7 +280,7 @@ func (vis namespacingVisitor) namespaceTerm(a *ast.Term) *ast.Term {
 	case ast.Ref:
 		cpy := *a
 		ref := make(ast.Ref, len(v))
-		for i := 0; i < len(ref); i++ {
+		for i := range ref {
 			ref[i] = vis.namespaceTerm(v[i])
 		}
 		cpy.Value = ref
@@ -313,12 +314,12 @@ func (b *bindingsArrayHashmap) Put(key *ast.Term, value value) {
 		if b.a == nil {
 			b.a = new([maxLinearScan]bindingArrayKeyValue)
 		} else if i := b.find(key); i >= 0 {
-			(*b.a)[i].value = value
+			b.a[i].value = value
 			return
 		}
 
 		if b.n < maxLinearScan {
-			(*b.a)[b.n] = bindingArrayKeyValue{key, value}
+			b.a[b.n] = bindingArrayKeyValue{key, value}
 			b.n++
 			return
 		}
@@ -341,7 +342,7 @@ func (b *bindingsArrayHashmap) Put(key *ast.Term, value value) {
 func (b *bindingsArrayHashmap) Get(key *ast.Term) (value, bool) {
 	if b.m == nil {
 		if i := b.find(key); i >= 0 {
-			return (*b.a)[i].value, true
+			return b.a[i].value, true
 		}
 
 		return value{}, false
@@ -360,7 +361,7 @@ func (b *bindingsArrayHashmap) Delete(key *ast.Term) {
 		if i := b.find(key); i >= 0 {
 			n := b.n - 1
 			if i < n {
-				(*b.a)[i] = (*b.a)[n]
+				b.a[i] = b.a[n]
 			}
 
 			b.n = n
@@ -373,8 +374,8 @@ func (b *bindingsArrayHashmap) Delete(key *ast.Term) {
 
 func (b *bindingsArrayHashmap) Iter(f func(k *ast.Term, v value) bool) {
 	if b.m == nil {
-		for i := 0; i < b.n; i++ {
-			if f((*b.a)[i].key, (*b.a)[i].value) {
+		for i := range b.n {
+			if f(b.a[i].key, b.a[i].value) {
 				return
 			}
 		}
@@ -390,8 +391,8 @@ func (b *bindingsArrayHashmap) Iter(f func(k *ast.Term, v value) bool) {
 
 func (b *bindingsArrayHashmap) find(key *ast.Term) int {
 	v := key.Value.(ast.Var)
-	for i := 0; i < b.n; i++ {
-		if (*b.a)[i].key.Value.(ast.Var) == v {
+	for i := range b.n {
+		if b.a[i].key.Value.(ast.Var) == v {
 			return i
 		}
 	}

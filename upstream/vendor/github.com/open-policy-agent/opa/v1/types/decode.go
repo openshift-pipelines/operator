@@ -31,13 +31,13 @@ func Unmarshal(bs []byte) (result Type, err error) {
 	if err = util.UnmarshalJSON(bs, &hint); err == nil {
 		switch hint.Type {
 		case typeNull:
-			result = NewNull()
+			result = Nl
 		case typeBoolean:
-			result = NewBoolean()
+			result = B
 		case typeNumber:
-			result = NewNumber()
+			result = N
 		case typeString:
-			result = NewString()
+			result = S
 		case typeArray:
 			var arr rawarray
 			if err = util.UnmarshalJSON(bs, &arr); err == nil {
@@ -131,7 +131,7 @@ type rawobject struct {
 }
 
 type rawstaticproperty struct {
-	Key   interface{}     `json:"key"`
+	Key   any             `json:"key"`
 	Value json.RawMessage `json:"value"`
 }
 

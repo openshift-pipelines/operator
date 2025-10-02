@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -155,7 +156,7 @@ func MustParseTerm(input string) *Term {
 func ParseRuleFromBody(module *Module, body Body) (*Rule, error) {
 
 	if len(body) != 1 {
-		return nil, fmt.Errorf("multiple expressions cannot be used for rule head")
+		return nil, errors.New("multiple expressions cannot be used for rule head")
 	}
 
 	return ParseRuleFromExpr(module, body[0])
@@ -166,11 +167,11 @@ func ParseRuleFromBody(module *Module, body Body) (*Rule, error) {
 func ParseRuleFromExpr(module *Module, expr *Expr) (*Rule, error) {
 
 	if len(expr.With) > 0 {
-		return nil, fmt.Errorf("expressions using with keyword cannot be used for rule head")
+		return nil, errors.New("expressions using with keyword cannot be used for rule head")
 	}
 
 	if expr.Negated {
-		return nil, fmt.Errorf("negated expressions cannot be used for rule head")
+		return nil, errors.New("negated expressions cannot be used for rule head")
 	}
 
 	if _, ok := expr.Terms.(*SomeDecl); ok {
@@ -207,7 +208,7 @@ func ParseRuleFromExpr(module *Module, expr *Expr) (*Rule, error) {
 	}
 
 	if _, ok := BuiltinMap[expr.Operator().String()]; ok {
-		return nil, fmt.Errorf("rule name conflicts with built-in function")
+		return nil, errors.New("rule name conflicts with built-in function")
 	}
 
 	return ParseRuleFromCallExpr(module, expr.Terms.([]*Term))
@@ -272,7 +273,7 @@ func ParseCompleteDocRuleFromEqExpr(module *Module, lhs, rhs *Term) (*Rule, erro
 		}
 		head = RefHead(r)
 		if len(r) > 1 && !r[len(r)-1].IsGround() {
-			return nil, fmt.Errorf("ref not ground")
+			return nil, errors.New("ref not ground")
 		}
 	} else {
 		return nil, fmt.Errorf("%v cannot be used for rule name", ValueName(lhs.Value))
@@ -387,7 +388,7 @@ func ParseRuleFromCallEqExpr(module *Module, lhs, rhs *Term) (*Rule, error) {
 
 	call, ok := lhs.Value.(Call)
 	if !ok {
-		return nil, fmt.Errorf("must be call")
+		return nil, errors.New("must be call")
 	}
 
 	ref, ok := call[0].Value.(Ref)
@@ -419,7 +420,7 @@ func ParseRuleFromCallEqExpr(module *Module, lhs, rhs *Term) (*Rule, error) {
 func ParseRuleFromCallExpr(module *Module, terms []*Term) (*Rule, error) {
 
 	if len(terms) <= 1 {
-		return nil, fmt.Errorf("rule argument list must take at least one argument")
+		return nil, errors.New("rule argument list must take at least one argument")
 	}
 
 	loc := terms[0].Location
@@ -600,7 +601,7 @@ func ParseStatement(input string) (Statement, error) {
 		return nil, err
 	}
 	if len(stmts) != 1 {
-		return nil, fmt.Errorf("expected exactly one statement")
+		return nil, errors.New("expected exactly one statement")
 	}
 	return stmts[0], nil
 }
@@ -611,7 +612,7 @@ func ParseStatementWithOpts(input string, popts ParserOptions) (Statement, error
 		return nil, err
 	}
 	if len(stmts) != 1 {
-		return nil, fmt.Errorf("expected exactly one statement")
+		return nil, errors.New("expected exactly one statement")
 	}
 	return stmts[0], nil
 }
@@ -686,7 +687,7 @@ func parseModule(filename string, stmts []Statement, comments []*Comment, regoCo
 		case Body:
 			rule, err := ParseRuleFromBody(mod, stmt)
 			if err != nil {
-				errs = append(errs, NewError(ParseErr, stmt[0].Location, err.Error())) //nolint:govet
+				errs = append(errs, NewError(ParseErr, stmt[0].Location, "%s", err.Error()))
 				continue
 			}
 			rule.generatedBody = true
@@ -731,12 +732,7 @@ func parseModule(filename string, stmts []Statement, comments []*Comment, regoCo
 }
 
 func ruleDeclarationHasKeyword(rule *Rule, keyword tokens.Token) bool {
-	for _, kw := range rule.Head.keywords {
-		if kw == keyword {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(rule.Head.keywords, keyword)
 }
 
 func newScopeAttachmentErr(a *Annotations, want string) *Error {
@@ -809,10 +805,7 @@ func newParserErrorDetail(bs []byte, offset int) *ParserErrorDetail {
 func (d ParserErrorDetail) Lines() []string {
 	line := strings.TrimLeft(d.Line, "\t") // remove leading tabs
 	tabCount := len(d.Line) - len(line)
-	indent := d.Idx - tabCount
-	if indent < 0 {
-		indent = 0
-	}
+	indent := max(d.Idx-tabCount, 0)
 	return []string{line, strings.Repeat(" ", indent) + "^"}
 }
 

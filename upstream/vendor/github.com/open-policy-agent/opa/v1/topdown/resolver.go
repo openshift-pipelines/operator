@@ -35,6 +35,10 @@ func (t *resolverTrie) Put(ref ast.Ref, r resolver.Resolver) {
 func (t *resolverTrie) Resolve(e *eval, ref ast.Ref) (ast.Value, error) {
 	e.metrics.Timer(metrics.RegoExternalResolve).Start()
 	defer e.metrics.Timer(metrics.RegoExternalResolve).Stop()
+
+	if t == nil {
+		return nil, nil
+	}
 	node := t
 	for i, t := range ref {
 		child, ok := node.children[t.Value]
@@ -48,7 +52,11 @@ func (t *resolverTrie) Resolve(e *eval, ref ast.Ref) (ast.Value, error) {
 				Input:   e.input,
 				Metrics: e.metrics,
 			}
-			e.traceWasm(e.query[e.index], &in.Ref)
+			if e.traceEnabled {
+				// avoid leaking pointer if trace is disabled
+				cpy := in.Ref
+				e.traceWasm(e.query[e.index], &cpy)
+			}
 			if e.data != nil {
 				return nil, errInScopeWithStmt
 			}
@@ -75,7 +83,10 @@ func (t *resolverTrie) Resolve(e *eval, ref ast.Ref) (ast.Value, error) {
 
 func (t *resolverTrie) mktree(e *eval, in resolver.Input) (ast.Value, error) {
 	if t.r != nil {
-		e.traceWasm(e.query[e.index], &in.Ref)
+		if e.traceEnabled {
+			cpy := in.Ref
+			e.traceWasm(e.query[e.index], &cpy)
+		}
 		if e.data != nil {
 			return nil, errInScopeWithStmt
 		}

@@ -36,7 +36,7 @@ import (
 // Sets are considered equal if and only if the symmetric difference of a and b
 // is empty.
 // Other comparisons are consistent but not defined.
-func Compare(a, b interface{}) int {
+func Compare(a, b any) int {
 
 	if t, ok := a.(*Term); ok {
 		if t == nil {
@@ -236,10 +236,10 @@ func Compare(a, b interface{}) int {
 type termSlice []*Term
 
 func (s termSlice) Less(i, j int) bool { return Compare(s[i].Value, s[j].Value) < 0 }
-func (s termSlice) Swap(i, j int)      { x := s[i]; s[i] = s[j]; s[j] = x }
+func (s termSlice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func (s termSlice) Len() int           { return len(s) }
 
-func sortOrder(x interface{}) int {
+func sortOrder(x any) int {
 	switch x.(type) {
 	case Null:
 		return 0
@@ -296,11 +296,8 @@ func sortOrder(x interface{}) int {
 }
 
 func importsCompare(a, b []*Import) int {
-	minLen := len(a)
-	if len(b) < minLen {
-		minLen = len(b)
-	}
-	for i := 0; i < minLen; i++ {
+	minLen := min(len(b), len(a))
+	for i := range minLen {
 		if cmp := a[i].Compare(b[i]); cmp != 0 {
 			return cmp
 		}
@@ -315,11 +312,8 @@ func importsCompare(a, b []*Import) int {
 }
 
 func annotationsCompare(a, b []*Annotations) int {
-	minLen := len(a)
-	if len(b) < minLen {
-		minLen = len(b)
-	}
-	for i := 0; i < minLen; i++ {
+	minLen := min(len(b), len(a))
+	for i := range minLen {
 		if cmp := a[i].Compare(b[i]); cmp != 0 {
 			return cmp
 		}
@@ -334,11 +328,8 @@ func annotationsCompare(a, b []*Annotations) int {
 }
 
 func rulesCompare(a, b []*Rule) int {
-	minLen := len(a)
-	if len(b) < minLen {
-		minLen = len(b)
-	}
-	for i := 0; i < minLen; i++ {
+	minLen := min(len(b), len(a))
+	for i := range minLen {
 		if cmp := a[i].Compare(b[i]); cmp != 0 {
 			return cmp
 		}
@@ -353,11 +344,8 @@ func rulesCompare(a, b []*Rule) int {
 }
 
 func termSliceCompare(a, b []*Term) int {
-	minLen := len(a)
-	if len(b) < minLen {
-		minLen = len(b)
-	}
-	for i := 0; i < minLen; i++ {
+	minLen := min(len(b), len(a))
+	for i := range minLen {
 		if cmp := Compare(a[i], b[i]); cmp != 0 {
 			return cmp
 		}
@@ -371,11 +359,8 @@ func termSliceCompare(a, b []*Term) int {
 }
 
 func withSliceCompare(a, b []*With) int {
-	minLen := len(a)
-	if len(b) < minLen {
-		minLen = len(b)
-	}
-	for i := 0; i < minLen; i++ {
+	minLen := min(len(b), len(a))
+	for i := range minLen {
 		if cmp := Compare(a[i], b[i]); cmp != 0 {
 			return cmp
 		}
@@ -400,6 +385,10 @@ func VarCompare(a, b Var) int {
 
 func TermValueCompare(a, b *Term) int {
 	return a.Value.Compare(b.Value)
+}
+
+func TermValueEqual(a, b *Term) bool {
+	return ValueEqual(a.Value, b.Value)
 }
 
 func ValueEqual(a, b Value) bool {

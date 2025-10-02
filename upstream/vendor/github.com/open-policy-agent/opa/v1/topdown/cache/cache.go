@@ -43,10 +43,38 @@ type Config struct {
 	InterQueryBuiltinValueCache InterQueryBuiltinValueCacheConfig `json:"inter_query_builtin_value_cache"`
 }
 
+// Clone creates a deep copy of Config.
+func (c *Config) Clone() *Config {
+	if c == nil {
+		return nil
+	}
+
+	return &Config{
+		InterQueryBuiltinCache:      *c.InterQueryBuiltinCache.Clone(),
+		InterQueryBuiltinValueCache: *c.InterQueryBuiltinValueCache.Clone(),
+	}
+}
+
 // NamedValueCacheConfig represents the configuration of a named cache that built-in functions can utilize.
 // A default configuration to be used if not explicitly configured can be registered using RegisterDefaultInterQueryBuiltinValueCacheConfig.
 type NamedValueCacheConfig struct {
 	MaxNumEntries *int `json:"max_num_entries,omitempty"`
+}
+
+// Clone creates a deep copy of NamedValueCacheConfig.
+func (n *NamedValueCacheConfig) Clone() *NamedValueCacheConfig {
+	if n == nil {
+		return nil
+	}
+
+	clone := &NamedValueCacheConfig{}
+
+	if n.MaxNumEntries != nil {
+		maxEntries := *n.MaxNumEntries
+		clone.MaxNumEntries = &maxEntries
+	}
+
+	return clone
 }
 
 // InterQueryBuiltinValueCacheConfig represents the configuration of the inter-query value cache that built-in functions can utilize.
@@ -54,6 +82,29 @@ type NamedValueCacheConfig struct {
 type InterQueryBuiltinValueCacheConfig struct {
 	MaxNumEntries     *int                              `json:"max_num_entries,omitempty"`
 	NamedCacheConfigs map[string]*NamedValueCacheConfig `json:"named,omitempty"`
+}
+
+// Clone creates a deep copy of InterQueryBuiltinValueCacheConfig.
+func (i *InterQueryBuiltinValueCacheConfig) Clone() *InterQueryBuiltinValueCacheConfig {
+	if i == nil {
+		return nil
+	}
+
+	clone := &InterQueryBuiltinValueCacheConfig{}
+
+	if i.MaxNumEntries != nil {
+		maxEntries := *i.MaxNumEntries
+		clone.MaxNumEntries = &maxEntries
+	}
+
+	if i.NamedCacheConfigs != nil {
+		clone.NamedCacheConfigs = make(map[string]*NamedValueCacheConfig, len(i.NamedCacheConfigs))
+		for k, v := range i.NamedCacheConfigs {
+			clone.NamedCacheConfigs[k] = v.Clone()
+		}
+	}
+
+	return clone
 }
 
 // InterQueryBuiltinCacheConfig represents the configuration of the inter-query cache that built-in functions can utilize.
@@ -64,6 +115,32 @@ type InterQueryBuiltinCacheConfig struct {
 	MaxSizeBytes                      *int64 `json:"max_size_bytes,omitempty"`
 	ForcedEvictionThresholdPercentage *int64 `json:"forced_eviction_threshold_percentage,omitempty"`
 	StaleEntryEvictionPeriodSeconds   *int64 `json:"stale_entry_eviction_period_seconds,omitempty"`
+}
+
+// Clone creates a deep copy of InterQueryBuiltinCacheConfig.
+func (i *InterQueryBuiltinCacheConfig) Clone() *InterQueryBuiltinCacheConfig {
+	if i == nil {
+		return nil
+	}
+
+	clone := &InterQueryBuiltinCacheConfig{}
+
+	if i.MaxSizeBytes != nil {
+		maxSize := *i.MaxSizeBytes
+		clone.MaxSizeBytes = &maxSize
+	}
+
+	if i.ForcedEvictionThresholdPercentage != nil {
+		threshold := *i.ForcedEvictionThresholdPercentage
+		clone.ForcedEvictionThresholdPercentage = &threshold
+	}
+
+	if i.StaleEntryEvictionPeriodSeconds != nil {
+		period := *i.StaleEntryEvictionPeriodSeconds
+		clone.StaleEntryEvictionPeriodSeconds = &period
+	}
+
+	return clone
 }
 
 // ParseCachingConfig returns the config for the inter-query cache.
@@ -325,7 +402,7 @@ func (c *cache) unsafeDelete(k ast.Value) {
 	c.l.Remove(cacheItem.keyElement)
 }
 
-func (c *cache) unsafeClone(value InterQueryCacheValue) (InterQueryCacheValue, error) {
+func (*cache) unsafeClone(value InterQueryCacheValue) (InterQueryCacheValue, error) {
 	return value.Clone()
 }
 
@@ -372,19 +449,13 @@ type InterQueryValueCacheBucket interface {
 }
 
 type interQueryValueCacheBucket struct {
-	items  util.TypedHashMap[ast.Value, any]
+	items  util.HasherMap[ast.Value, any]
 	config *NamedValueCacheConfig
 	mtx    sync.RWMutex
 }
 
-func newItemsMap() *util.TypedHashMap[ast.Value, any] {
-	return util.NewTypedHashMap[ast.Value, any](
-		func(a, b ast.Value) bool { return a.Compare(b) == 0 },
-		func(any, any) bool { return false }, // map equality not supported
-		func(a ast.Value) int { return a.Hash() },
-		func(any) int { return 0 }, // map equality not supported
-		nil,
-	)
+func newItemsMap() *util.HasherMap[ast.Value, any] {
+	return util.NewHasherMap[ast.Value, any](ast.ValueEqual)
 }
 
 func (c *interQueryValueCacheBucket) Get(k ast.Value) (any, bool) {

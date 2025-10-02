@@ -7,6 +7,7 @@ package builtins
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -17,15 +18,15 @@ import (
 
 // Cache defines the built-in cache used by the top-down evaluation. The keys
 // must be comparable and should not be of type string.
-type Cache map[interface{}]interface{}
+type Cache map[any]any
 
 // Put updates the cache for the named built-in.
-func (c Cache) Put(k, v interface{}) {
+func (c Cache) Put(k, v any) {
 	c[k] = v
 }
 
 // Get returns the cached value for k.
-func (c Cache) Get(k interface{}) (interface{}, bool) {
+func (c Cache) Get(k any) (any, bool) {
 	v, ok := c[k]
 	return v, ok
 }
@@ -38,7 +39,7 @@ type NDBCache map[string]ast.Object
 func (c NDBCache) AsValue() ast.Value {
 	out := ast.NewObject()
 	for bname, obj := range c {
-		out.Insert(ast.StringTerm(bname), ast.NewTerm(obj))
+		out.Insert(ast.InternedTerm(bname), ast.NewTerm(obj))
 	}
 	return out
 }
@@ -75,7 +76,7 @@ func (c NDBCache) MarshalJSON() ([]byte, error) {
 
 func (c *NDBCache) UnmarshalJSON(data []byte) error {
 	out := map[string]ast.Object{}
-	var incoming interface{}
+	var incoming any
 
 	// Note: We use util.Unmarshal instead of json.Unmarshal to get
 	// correct deserialization of number types.
@@ -97,7 +98,7 @@ func (c *NDBCache) UnmarshalJSON(data []byte) error {
 				out[string(k.Value.(ast.String))] = obj
 				return nil
 			}
-			return fmt.Errorf("expected Object, got other Value type in conversion")
+			return errors.New("expected Object, got other Value type in conversion")
 		})
 		if err != nil {
 			return err
@@ -119,7 +120,7 @@ func (err ErrOperand) Error() string {
 }
 
 // NewOperandErr returns a generic operand error.
-func NewOperandErr(pos int, f string, a ...interface{}) error {
+func NewOperandErr(pos int, f string, a ...any) error {
 	f = fmt.Sprintf("operand %v ", pos) + f
 	return ErrOperand(fmt.Sprintf(f, a...))
 }
@@ -262,7 +263,7 @@ func NumberToInt(n ast.Number) (*big.Int, error) {
 	f := NumberToFloat(n)
 	r, accuracy := f.Int(nil)
 	if accuracy != big.Exact {
-		return nil, fmt.Errorf("illegal value")
+		return nil, errors.New("illegal value")
 	}
 	return r, nil
 }
@@ -309,7 +310,7 @@ func RuneSliceOperand(x ast.Value, pos int) ([]rune, error) {
 	}
 
 	var f = make([]rune, a.Len())
-	for k := 0; k < a.Len(); k++ {
+	for k := range a.Len() {
 		b := a.Elem(k)
 		c, ok := b.Value.(ast.String)
 		if !ok {

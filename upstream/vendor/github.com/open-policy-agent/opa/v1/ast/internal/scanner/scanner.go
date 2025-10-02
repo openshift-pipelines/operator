@@ -9,9 +9,9 @@ import (
 	"io"
 	"unicode"
 	"unicode/utf8"
-	"unsafe"
 
 	"github.com/open-policy-agent/opa/v1/ast/internal/tokens"
+	"github.com/open-policy-agent/opa/v1/util"
 )
 
 const bom = 0xFEFF
@@ -101,8 +101,8 @@ func (s *Scanner) Keyword(lit string) tokens.Token {
 func (s *Scanner) AddKeyword(kw string, tok tokens.Token) {
 	s.keywords[kw] = tok
 
-	switch tok {
-	case tokens.Every: // importing 'every' means also importing 'in'
+	if tok == tokens.Every {
+		// importing 'every' means also importing 'in'
 		s.keywords["in"] = tokens.In
 	}
 }
@@ -114,6 +114,11 @@ func (s *Scanner) HasKeyword(keywords map[string]tokens.Token) bool {
 		}
 	}
 	return false
+}
+
+func (s *Scanner) IsKeyword(str string) bool {
+	_, ok := s.keywords[str]
+	return ok
 }
 
 func (s *Scanner) SetRegoV1Compatible() {
@@ -165,7 +170,21 @@ func (s *Scanner) Scan() (tokens.Token, Position, string, []Error) {
 	var lit string
 
 	if s.isWhitespace() {
-		lit = string(s.curr)
+		// string(rune) is an unnecessary heap allocation in this case as we know all
+		// the possible whitespace values, and can simply translate to string ourselves
+		switch s.curr {
+		case ' ':
+			lit = " "
+		case '\t':
+			lit = "\t"
+		case '\n':
+			lit = "\n"
+		case '\r':
+			lit = "\r"
+		default:
+			// unreachable unless isWhitespace changes
+			lit = string(s.curr)
+		}
 		s.next()
 		tok = tokens.Whitespace
 	} else if isLetter(s.curr) {
@@ -272,7 +291,7 @@ func (s *Scanner) scanIdentifier() string {
 		s.next()
 	}
 
-	return byteSliceToString(s.bs[start : s.offset-1])
+	return util.ByteSliceToString(s.bs[start : s.offset-1])
 }
 
 func (s *Scanner) scanNumber() string {
@@ -323,7 +342,7 @@ func (s *Scanner) scanNumber() string {
 		}
 	}
 
-	return byteSliceToString(s.bs[start : s.offset-1])
+	return util.ByteSliceToString(s.bs[start : s.offset-1])
 }
 
 func (s *Scanner) scanString() string {
@@ -357,7 +376,7 @@ func (s *Scanner) scanString() string {
 		}
 	}
 
-	return byteSliceToString(s.bs[start : s.offset-1])
+	return util.ByteSliceToString(s.bs[start : s.offset-1])
 }
 
 func (s *Scanner) scanRawString() string {
@@ -373,7 +392,7 @@ func (s *Scanner) scanRawString() string {
 		}
 	}
 
-	return byteSliceToString(s.bs[start : s.offset-1])
+	return util.ByteSliceToString(s.bs[start : s.offset-1])
 }
 
 func (s *Scanner) scanComment() string {
@@ -384,10 +403,10 @@ func (s *Scanner) scanComment() string {
 	end := s.offset - 1
 	// Trim carriage returns that precede the newline
 	if s.offset > 1 && s.bs[s.offset-2] == '\r' {
-		end = end - 1
+		end -= 1
 	}
 
-	return byteSliceToString(s.bs[start:end])
+	return util.ByteSliceToString(s.bs[start:end])
 }
 
 func (s *Scanner) next() {
@@ -456,8 +475,4 @@ func (s *Scanner) error(reason string) {
 		Row:    s.row,
 		Col:    s.col,
 	}, Message: reason})
-}
-
-func byteSliceToString(bs []byte) string {
-	return unsafe.String(unsafe.SliceData(bs), len(bs))
 }
