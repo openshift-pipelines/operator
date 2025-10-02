@@ -37,6 +37,7 @@ import (
 	"cuelang.org/go/encoding/protobuf/jsonpb"
 	"cuelang.org/go/encoding/protobuf/textproto"
 	"cuelang.org/go/encoding/toml"
+	"cuelang.org/go/encoding/xml/koala"
 	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/encoding/yaml"
 	"cuelang.org/go/internal/filetypes"
@@ -148,7 +149,8 @@ type Config struct {
 	InlineImports bool // expand references to non-core imports
 	ProtoPath     []string
 	Format        []format.Option
-	ParseFile     func(name string, src interface{}) (*ast.File, error)
+	ParserConfig  parser.Config
+	ParseFile     func(name string, src interface{}, cfg parser.Config) (*ast.File, error)
 }
 
 // NewDecoder returns a stream of non-rooted data expressions. The encoding
@@ -159,6 +161,10 @@ type Config struct {
 func NewDecoder(ctx *cue.Context, f *build.File, cfg *Config) *Decoder {
 	if cfg == nil {
 		cfg = &Config{}
+	}
+	if !cfg.ParserConfig.IsValid() {
+		// Avoid mutating cfg.
+		cfg.ParserConfig = parser.NewConfig(parser.ParseComments)
 	}
 	i := &Decoder{filename: f.Filename, ctx: ctx, cfg: cfg}
 	i.next = func() (ast.Expr, error) {
@@ -174,10 +180,10 @@ func NewDecoder(ctx *cue.Context, f *build.File, cfg *Config) *Decoder {
 		return i
 	}
 
-	var srcr io.Reader
+	var r io.Reader
 	if f.Source == nil && f.Filename == "-" {
 		// TODO: should we allow this?
-		srcr = cfg.Stdin
+		r = cfg.Stdin
 	} else {
 		rc, err := source.Open(f.Filename, f.Source)
 		i.closer = rc
@@ -185,16 +191,8 @@ func NewDecoder(ctx *cue.Context, f *build.File, cfg *Config) *Decoder {
 		if i.err != nil {
 			return i
 		}
-		srcr = rc
+		r = rc
 	}
-
-	// For now we assume that all encodings require UTF-8. This will not be the
-	// case for some binary protocols. We need to exempt those explicitly here
-	// once we introduce them.
-	// TODO: this code also allows UTF16, which is too permissive for some
-	// encodings. Switch to unicode.UTF8Sig once available.
-	t := unicode.BOMOverride(unicode.UTF8.NewDecoder())
-	r := transform.NewReader(srcr, t)
 
 	switch f.Interpretation {
 	case "":
@@ -224,13 +222,26 @@ func NewDecoder(ctx *cue.Context, f *build.File, cfg *Config) *Decoder {
 		i.err = fmt.Errorf("unsupported interpretation %q", f.Interpretation)
 	}
 
+	// Binary encodings should not be treated as UTF-8, so read directly from the file.
+	// Other encodings are interepted as UTF-8 with an optional BOM prefix.
+	//
+	// TODO: perhaps each encoding could have a "binary" boolean attribute
+	// so that we can use that here rather than hard-coding which encodings are binary.
+	// In the near future, others like [build.BinaryProto] should also be treated as binary.
+	if f.Encoding != build.Binary {
+		// TODO: this code also allows UTF16, which is too permissive for some
+		// encodings. Switch to unicode.UTF8Sig once available.
+		t := unicode.BOMOverride(unicode.UTF8.NewDecoder())
+		r = transform.NewReader(r, t)
+	}
+
 	path := f.Filename
 	switch f.Encoding {
 	case build.CUE:
 		if cfg.ParseFile == nil {
-			i.file, i.err = parser.ParseFile(path, r, parser.ParseComments)
+			i.file, i.err = parser.ParseFile(path, r, cfg.ParserConfig)
 		} else {
-			i.file, i.err = cfg.ParseFile(path, r)
+			i.file, i.err = cfg.ParseFile(path, r, cfg.ParserConfig)
 		}
 		i.validate(i.file, f)
 		if i.err == nil {
@@ -257,6 +268,14 @@ func NewDecoder(ctx *cue.Context, f *build.File, cfg *Config) *Decoder {
 	case build.TOML:
 		i.next = toml.NewDecoder(path, r).Decode
 		i.Next()
+	case build.XML:
+		switch {
+		case f.BoolTags["koala"]:
+			i.next = koala.NewDecoder(path, r).Decode
+			i.Next()
+		default:
+			i.err = fmt.Errorf("xml requires a variant, such as: xml+koala")
+		}
 	case build.Text:
 		b, err := io.ReadAll(r)
 		i.err = err
