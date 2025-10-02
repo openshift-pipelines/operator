@@ -103,7 +103,9 @@ func (s *subsumer) values(a, b adt.Value) (result bool) {
 
 	case *adt.BuiltinValidator:
 		state := s.ctx.PushState(s.ctx.Env(0), b.Source())
-		b1 := s.ctx.Validate(x, b)
+		// TODO: is this always correct?
+		cx := adt.MakeRootConjunct(s.ctx.Env(0), x)
+		b1 := s.ctx.Validate(cx, b)
 		if b1 != nil {
 			s.errs = errors.Append(s.errs, b1.Err)
 		}
@@ -310,7 +312,7 @@ func (s *subsumer) bound(x *adt.BoundValue, v adt.Value) bool {
 }
 
 func test(ctx *adt.OpContext, src adt.Node, op adt.Op, gt, lt adt.Value) bool {
-	x := adt.BinOp(ctx, op, gt, lt)
+	x := adt.BinOp(ctx, src, op, gt, lt)
 	b, ok := x.(*adt.Bool)
 	return ok && b.B
 }

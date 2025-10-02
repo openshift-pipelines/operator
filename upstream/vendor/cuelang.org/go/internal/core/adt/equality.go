@@ -24,10 +24,18 @@ const (
 	// CheckStructural indicates that closedness information should be
 	// considered for equality. Equal may return false even when values are
 	// equal.
-	CheckStructural Flag = 1 << iota
+	CheckStructural
+
+	// RegularOnly indicates that only regular fields should be considered,
+	// thus excluding hidden and definition fields.
+	RegularOnly
 )
 
 func Equal(ctx *OpContext, v, w Value, flags Flag) bool {
+	if flags&CheckStructural == 0 {
+		v = Default(v)
+		w = Default(w)
+	}
 	if x, ok := v.(*Vertex); ok {
 		return equalVertex(ctx, x, w, flags)
 	}
@@ -67,7 +75,7 @@ func equalVertex(ctx *OpContext, x *Vertex, v Value, flags Flag) bool {
 		return false
 	}
 
-	maxArcType := ArcMember
+	maxArcType := ArcRequired
 	if flags&CheckStructural != 0 {
 		// Do not ignore optional fields
 		// TODO(required): consider making this unconditional
@@ -75,7 +83,7 @@ func equalVertex(ctx *OpContext, x *Vertex, v Value, flags Flag) bool {
 	}
 
 	// TODO: this really should be subsumption.
-	if flags != 0 {
+	if flags&CheckStructural != 0 {
 		if x.IsClosedStruct() != y.IsClosedStruct() {
 			return false
 		}
@@ -87,9 +95,11 @@ func equalVertex(ctx *OpContext, x *Vertex, v Value, flags Flag) bool {
 		}
 	}
 
+	skipRegular := flags&RegularOnly != 0
+
 loop1:
 	for _, a := range x.Arcs {
-		if a.ArcType > maxArcType {
+		if (skipRegular && !a.Label.IsRegular()) || a.ArcType > maxArcType {
 			continue
 		}
 		for _, b := range y.Arcs {
@@ -105,7 +115,7 @@ loop1:
 
 loop2:
 	for _, b := range y.Arcs {
-		if b.ArcType > maxArcType {
+		if (skipRegular && !b.Label.IsRegular()) || b.ArcType > maxArcType {
 			continue
 		}
 		for _, a := range x.Arcs {
@@ -181,7 +191,7 @@ func equalTerminal(ctx *OpContext, v, w Value, flags Flag) bool {
 		return ok
 
 	case *Num, *String, *Bool, *Bytes, *Null:
-		if b, ok := BinOp(ctx, EqualOp, v, w).(*Bool); ok {
+		if b, ok := BinOp(ctx, errOnDiffType, EqualOp, v, w).(*Bool); ok {
 			return b.B
 		}
 		return false
