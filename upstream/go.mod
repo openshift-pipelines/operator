@@ -1,6 +1,8 @@
 module github.com/tektoncd/operator
 
-go 1.19
+go 1.21
+
+toolchain go1.24.6
 
 require (
 	github.com/Masterminds/semver v1.5.0
@@ -247,7 +249,7 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.1.6 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
