@@ -7,9 +7,9 @@
 package mvs
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
-	"sort"
 	"sync"
 
 	"cuelang.org/go/internal/par"
@@ -257,8 +257,7 @@ func Req[V comparable](mainModule V, base []string, reqs Reqs[V]) ([]V, error) {
 		haveBase[path] = true
 	}
 	// Now the reverse postorder to bring in anything else.
-	for i := len(postorder) - 1; i >= 0; i-- {
-		m := postorder[i]
+	for _, m := range slices.Backward(postorder) {
 		if max[reqs.Path(m)] != reqs.Version(m) {
 			// Older version.
 			continue
@@ -268,8 +267,8 @@ func Req[V comparable](mainModule V, base []string, reqs Reqs[V]) ([]V, error) {
 			walk(m)
 		}
 	}
-	sort.Slice(min, func(i, j int) bool {
-		return reqs.Path(min[i]) < reqs.Path(min[j])
+	slices.SortFunc(min, func(a, b V) int {
+		return cmp.Compare(reqs.Path(a), reqs.Path(b))
 	})
 	return min, nil
 }
@@ -298,7 +297,7 @@ func Upgrade[V comparable](target V, reqs UpgradeReqs[V], upgrade ...V) ([]V, er
 	for _, m := range list {
 		pathInList[reqs.Path(m)] = true
 	}
-	list = append([]V(nil), list...)
+	list = slices.Clone(list)
 
 	upgradeTo := make(map[string]string, len(upgrade))
 	for _, u := range upgrade {

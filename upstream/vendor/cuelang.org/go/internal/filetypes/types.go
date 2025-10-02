@@ -16,25 +16,18 @@ package filetypes
 
 import (
 	_ "embed"
-	"sync"
-
-	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/cuecontext"
 )
 
-//go:embed types.cue
-var typesCUE string
+//go:generate go run golang.org/x/tools/cmd/stringer -type=TagType -linecomment
 
-var typesValue cue.Value
-var knownExtensions map[string]bool
+type TagType int
 
-var typesInit = sync.OnceFunc(func() {
-	ctx := cuecontext.New()
-	typesValue = ctx.CompileString(typesCUE, cue.Filename("types.cue"))
-	if err := typesValue.Err(); err != nil {
-		panic(err)
-	}
-	if err := typesValue.LookupPath(cue.MakePath(cue.Str("knownExtensions"))).Decode(&knownExtensions); err != nil {
-		panic(err)
-	}
-})
+const (
+	TagUnknown TagType = iota
+	TagTopLevel
+	TagSubsidiaryBool
+	TagSubsidiaryString
+)
+
+// initialized by types_gen.go
+var tagTypes map[string]TagType

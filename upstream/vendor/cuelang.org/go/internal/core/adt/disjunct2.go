@@ -14,6 +14,8 @@
 
 package adt
 
+import "slices"
+
 // # Overview
 //
 // This files contains the disjunction algorithm of the CUE evaluator. It works
@@ -129,7 +131,7 @@ package adt
 //
 // ## Evaluating equality of partially evaluated nodes
 //
-// Because unevaluated expressions may depend on results that have yet been
+// Because unevaluated expressions may depend on results that have yet to be
 // computed, we cannot reliably compare the results of a Vertex to determine
 // equality. We need a different strategy.
 //
@@ -203,48 +205,34 @@ type disjunct struct {
 	mode      defaultMode
 }
 
-// disjunctHole associates a closeContext copy representing a disjunct hole with
-// the underlying closeContext from which it originally was branched.
-// We could include this information in the closeContext itself, but since this
-// is relatively rare, we keep it separate to avoid bloating the closeContext.
-type disjunctHole struct {
-	cc         *closeContext
-	underlying *closeContext
-}
-
 func (n *nodeContext) scheduleDisjunction(d envDisjunct) {
 	if len(n.disjunctions) == 0 {
 		// This processes all disjunctions in a single pass.
 		n.scheduleTask(handleDisjunctions, nil, nil, CloseInfo{})
 	}
 
-	// ccHole is the closeContext in which the individual disjuncts are
-	// scheduled.
-	ccHole := d.cloneID.cc
-
-	// This counter can be decremented after either a disjunct has been
-	// scheduled in the clone. Note that it will not be closed in the original
-	// as the result will either be an error, a single disjunct, in which
-	// case mergeVertex will override the original value, or multiple disjuncts,
-	// in which case the original is set to the disjunct itself.
-	ccHole.incDisjunct(n.ctx, DISJUNCT)
-
 	n.disjunctions = append(n.disjunctions, d)
-
-	n.disjunctCCs = append(n.disjunctCCs, disjunctHole{
-		cc:         ccHole, // this value is cloned in doDisjunct.
-		underlying: ccHole,
-	})
+	n.hasDisjunction = true
 }
 
-func initArcs(ctx *OpContext, v *Vertex) {
+func initArcs(ctx *OpContext, v *Vertex) bool {
 	for _, a := range v.Arcs {
-		a.getState(ctx)
-		initArcs(ctx, a)
+		s := a.getState(ctx)
+		if s != nil && s.errs != nil {
+			if a.ArcType == ArcMember {
+				return false
+			}
+		} else if !initArcs(ctx, a) {
+			return false
+		}
 	}
+	return true
 }
 
 func (n *nodeContext) processDisjunctions() *Bottom {
+	ID := n.pushDisjunctionTask()
+	defer ID.pop()
+
 	defer func() {
 		// TODO:
 		// Clear the buffers.
@@ -254,10 +242,37 @@ func (n *nodeContext) processDisjunctions() *Bottom {
 		// disjunction list length.
 	}()
 
-	a := n.disjunctions
+	// TODO(perf): check scalar errors so far to avoid unnecessary work.
+
+	// TODO: during processing disjunctions, new disjunctions may be added.
+	// We copy the slice to prevent the original slice from being overwritten.
+	// TODO(perf): use some pre-existing buffer or use a persising position
+	// so that disjunctions can be processed incrementally.
+	a := slices.Clone(n.disjunctions)
 	n.disjunctions = n.disjunctions[:0]
 
-	initArcs(n.ctx, n.node)
+	if !initArcs(n.ctx, n.node) {
+		return n.getError()
+	}
+
+	// If the disjunct of an enclosing disjunction operation has an attemptOnly
+	// runMode, this disjunct should have this also and may not finalize.
+	// Finalization may cause incoming dependencies to be broken. If an outer
+	// disjunction still has open holes, this means that more conjuncts may be
+	// incoming and that finalization would prematurely prevent those from being
+	// added. In practice, this may result in the infamous "already closed"
+	// panic.
+	var outerRunMode runMode
+	for p := n.node; p != nil; p = p.Parent {
+		if p.IsDisjunct {
+			if p.state == nil {
+				outerRunMode = finalize
+			} else {
+				outerRunMode = p.state.runMode
+			}
+			break
+		}
+	}
 
 	// TODO(perf): single pass for quick filter on all disjunctions.
 	// n.node.unify(n.ctx, allKnown, attemptOnly)
@@ -271,27 +286,28 @@ func (n *nodeContext) processDisjunctions() *Bottom {
 	// evaluation adds more disjunctions.
 	for i := 0; i < len(a); i++ {
 		d := &a[i]
+		n.nextDisjunction(i, len(a), d.holeID)
 
+		// We need to only finalize the last series of disjunctions. However,
+		// disjunctions can be nested.
 		mode := attemptOnly
-		if i == len(a)-1 {
+		switch {
+		case outerRunMode != 0:
+			mode = outerRunMode
+			if i < len(a)-1 {
+				mode = attemptOnly
+			}
+		case i == len(a)-1:
 			mode = finalize
 		}
+
+		// Mark no final in nodeContext and observe later.
 		results = n.crossProduct(results, cross, d, mode)
 
 		// TODO: do we unwind only at the end or also intermittently?
 		switch len(results) {
 		case 0:
 			// TODO: now we have disjunct counters, do we plug holes at all?
-
-			// We add a "top" value to disable closedness checking for this
-			// disjunction to avoid a spurious "field not allowed" error.
-			// We return the errors below, which will, in turn, be reported as
-			// the error.
-			// TODO: probably no longer needed:
-			for i++; i < len(a); i++ {
-				c := MakeConjunct(d.env, top, a[i].cloneID)
-				n.scheduleConjunct(c, d.cloneID)
-			}
 
 			// Empty intermediate result. Further processing will not result in
 			// any new result, so we can terminate here.
@@ -307,6 +323,12 @@ func (n *nodeContext) processDisjunctions() *Bottom {
 			// this for now.
 		}
 
+		if i > 0 {
+			for _, n := range cross {
+				n.freeDisjunct()
+			}
+		}
+
 		// switch up buffers.
 		cross, results = results, cross[:0]
 	}
@@ -317,13 +339,43 @@ func (n *nodeContext) processDisjunctions() *Bottom {
 
 	case 1:
 		d := cross[0].node
-		n.node.BaseValue = d
-		n.defaultMode = cross[0].defaultMode
+		n.setBaseValue(d)
+		if n.defaultMode == maybeDefault {
+			n.defaultMode = cross[0].defaultMode
+		}
+		if n.defaultAttemptInCycle != nil && n.defaultMode != isDefault {
+			c := n.ctx
+			path := c.PathToString(n.defaultAttemptInCycle.Path())
+
+			index := c.MarkPositions()
+			c.AddPosition(n.defaultAttemptInCycle)
+			err := c.Newf("ambiguous default elimination by referencing %v", path)
+			c.ReleasePositions(index)
+
+			b := &Bottom{Code: CycleError, Err: err}
+			n.setBaseValue(b)
+			return b
+		}
 
 	default:
 		// append, rather than assign, to allow reusing the memory of
 		// a pre-existing slice.
 		n.disjuncts = append(n.disjuncts, cross...)
+	}
+
+	var completed condition
+	numDefaults := 0
+	if len(n.disjuncts) == 1 {
+		completed = n.disjuncts[0].completed
+	}
+	for _, d := range n.disjuncts {
+		if d.defaultMode == isDefault {
+			numDefaults++
+			completed = d.completed
+		}
+	}
+	if numDefaults == 1 || len(n.disjuncts) == 1 {
+		n.signal(completed)
 	}
 
 	return nil
@@ -335,14 +387,25 @@ func (n *nodeContext) crossProduct(dst, cross []*nodeContext, dn *envDisjunct, m
 	defer n.unmarkDepth(n.markDepth())
 	defer n.unmarkOptional(n.markOptional())
 
-	for _, p := range cross {
+	// TODO(perf): use a pre-allocated buffer in n.ctx. Note that the actual
+	// buffer may grow and has a max size of len(cross) * len(dn.disjuncts).
+	tmp := make([]*nodeContext, 0, len(cross))
+
+	leftDropsDefault := true
+	rightDropsDefault := true
+
+	for i, p := range cross {
+		ID := n.nextCrossProduct(i, len(cross), p)
+
 		// TODO: use a partial unify instead
 		// p.completeNodeConjuncts()
 		initArcs(n.ctx, p.node)
 
 		for j, d := range dn.disjuncts {
+			ID.node.nextDisjunct(j, len(dn.disjuncts), d.expr)
+
 			c := MakeConjunct(dn.env, d.expr, dn.cloneID)
-			r, err := p.doDisjunct(c, d.mode, mode)
+			r, err := p.doDisjunct(c, d.mode, mode, n.node)
 
 			if err != nil {
 				// TODO: store more error context
@@ -350,78 +413,148 @@ func (n *nodeContext) crossProduct(dst, cross []*nodeContext, dn *envDisjunct, m
 				continue
 			}
 
-			// Unroll nested disjunctions.
-			switch len(r.disjuncts) {
-			case 0:
-				// r did not have a nested disjunction.
-				dst = appendDisjunct(n.ctx, dst, r)
-
-			case 1:
-				panic("unexpected number of disjuncts")
-
-			default:
-				for _, x := range r.disjuncts {
-					dst = appendDisjunct(n.ctx, dst, x)
-				}
+			tmp = append(tmp, r)
+			if p.defaultMode == isDefault || p.origDefaultMode == isDefault {
+				leftDropsDefault = false
+			}
+			if d.mode == isDefault {
+				rightDropsDefault = false
 			}
 		}
 	}
+
+	hasNonMaybe := false
+	for _, r := range tmp {
+		// Unroll nested disjunctions.
+		switch len(r.disjuncts) {
+		case 0:
+			r.defaultMode = combineDefault2(r.defaultMode, r.origDefaultMode, leftDropsDefault, rightDropsDefault)
+			// r did not have a nested disjunction.
+			dst = appendDisjunct(n.ctx, dst, r)
+
+		case 1:
+			panic("unexpected number of disjuncts")
+
+		default:
+			for _, x := range r.disjuncts {
+				m := combineDefault(r.origDefaultMode, x.defaultMode)
+
+				// TODO(defaults): using rightHasDefault instead of false here
+				// is not according to the spec, but may result in better user
+				// ergononmics. See Issue #1304.
+				x.defaultMode = combineDefault2(r.defaultMode, m, leftDropsDefault, false)
+				if x.defaultMode != maybeDefault {
+					hasNonMaybe = true
+				}
+				dst = appendDisjunct(n.ctx, dst, x)
+			}
+		}
+	}
+
+	if hasNonMaybe {
+		for _, r := range dst {
+			if r.defaultMode == maybeDefault {
+				r.defaultMode = notDefault
+			}
+		}
+	}
+
 	return dst
+}
+
+func combineDefault2(a, b defaultMode, dropsDefaultA, dropsDefaultB bool) defaultMode {
+	if dropsDefaultA {
+		a = maybeDefault
+	}
+	if dropsDefaultB {
+		b = maybeDefault
+	}
+	return combineDefault(a, b)
 }
 
 // collectErrors collects errors from a failed disjunctions.
 func (n *nodeContext) collectErrors(dn *envDisjunct) (errs *Bottom) {
+	code := EvalError
+	hasUserError := false
 	for _, d := range dn.disjuncts {
-		if d.err != nil {
-			errs = CombineErrors(dn.src.Source(), errs, d.err)
+		if b := d.err; b != nil {
+			if b.Code > code {
+				code = b.Code
+			}
+			switch {
+			case b.Code == UserError:
+				if !hasUserError {
+					n.disjunctErrs = n.disjunctErrs[:0]
+				}
+				hasUserError = true
+
+			case hasUserError:
+				continue
+			}
+			n.disjunctErrs = append(n.disjunctErrs, b)
 		}
 	}
-	return errs
+
+	b := &Bottom{
+		Code: code,
+		Err:  n.disjunctError(),
+		Node: n.node,
+	}
+	return b
 }
 
-func (n *nodeContext) doDisjunct(c Conjunct, m defaultMode, mode runMode) (*nodeContext, *Bottom) {
-	if c.CloseInfo.cc == nil {
-		panic("nil closeContext during init")
-	}
-	n.ctx.stats.Disjuncts++
+// doDisjunct computes a single disjunct. n is the current disjunct that is
+// augmented, whereas orig is the original node where disjunction processing
+// started. orig is used to clean up Environments.
+func (n *nodeContext) doDisjunct(c Conjunct, m defaultMode, mode runMode, orig *Vertex) (*nodeContext, *Bottom) {
+	ID := n.logDoDisjunct()
+	_ = ID // Do not remove, used for debugging.
 
 	oc := newOverlayContext(n.ctx)
 
-	var ccHole *closeContext
+	// Complete as much of the pending work of this node and its parent before
+	// copying. Note that once a copy is made, the disjunct is no longer able
+	// to receive conjuncts from the original.
+	n.completeNodeTasks(mode)
 
-	// TODO(perf): resuse buffer, for instance by keeping a buffer handy in oc
-	// and then swapping it with disjunctCCs in the new nodeContext.
-	holes := make([]disjunctHole, 0, len(n.disjunctCCs))
-
-	// Clone the closeContexts of all open disjunctions and dependencies.
-	for _, d := range n.disjunctCCs {
-		// TODO: remove filled holes.
-
-		// Note that the root is already cloned as part of cloneVertex and that
-		// a closeContext corresponding to a disjunction always has a parent.
-		// We therefore do not need to check whether x.parent is nil.
-		o := oc.allocCC(d.cc)
-		if c.CloseInfo.cc == d.underlying {
-			ccHole = o
-		}
-		holes = append(holes, disjunctHole{o, d.underlying})
-	}
-
-	if ccHole == nil {
-		panic("expected non-nil overlay closeContext")
-	}
+	// TODO: we may need to process incoming notifications for all arcs in
+	// the copied disjunct, but only those notifications not coming from
+	// within the arc itself.
 
 	n.scheduler.blocking = n.scheduler.blocking[:0]
 
+	// TODO(perf): do not set to nil, but rather maintain an index to unwind
+	// to avoid allocting new arrays.
+	// TODO: ideally, we move unresolved tasks to the original vertex for
+	// disambiguated disjuncts.
+	saved := n.ctx.blocking
+	n.ctx.blocking = nil
+	defer func() { n.ctx.blocking = saved }()
+
+	// We forward the original base value to the disjunct. This allows for
+	// lookups with the disjunct to the original value.
+	var savedBase BaseValue
+	if !orig.IsDisjunct {
+		savedBase = orig.BaseValue
+		defer func() { orig.BaseValue = savedBase }()
+	}
+
 	d := oc.cloneRoot(n)
 
-	d.defaultMode = combineDefault(m, n.defaultMode)
+	// This mechanism only works if the original is not a disjunct.
+	if !orig.IsDisjunct {
+		orig.BaseValue = d.node
+	}
+
+	n.ctx.pushOverlay(n.node, oc.vertexMap)
+	defer n.ctx.popOverlay()
+
+	d.runMode = mode
+	c.Env = oc.derefDisjunctsEnv(c.Env)
 
 	v := d.node
 
-	saved := n.node.BaseValue
-	n.node.BaseValue = v
-	defer func() { n.node.BaseValue = saved }()
+	defer n.setBaseValue(n.swapBaseValue(v))
 
 	// Clear relevant scheduler states.
 	// TODO: do something more principled: just ensure that a node that has
@@ -429,21 +562,22 @@ func (n *nodeContext) doDisjunct(c Conjunct, m defaultMode, mode runMode) (*node
 	// a special mode, or evaluating more aggressively if finalize is not given.
 	v.status = unprocessed
 
-	d.overlays = n
-	d.disjunctCCs = append(d.disjunctCCs, holes...)
-	d.disjunct = c
-	c.CloseInfo.cc = ccHole
 	d.scheduleConjunct(c, c.CloseInfo)
-	ccHole.decDisjunct(n.ctx, DISJUNCT)
 
 	oc.unlinkOverlay()
 
-	v.unify(n.ctx, allKnown, mode)
+	d.defaultMode = n.defaultMode
+	d.origDefaultMode = m
 
-	if err := d.getError(); err != nil && !isCyclePlaceholder(err) {
-		d.free()
+	v.unify(n.ctx, allKnown, mode, true)
+
+	if err := d.getErrorAll(); err != nil && !isCyclePlaceholder(err) {
+		d.freeDisjunct()
 		return nil, err
 	}
+
+	d.node.DerefDisjunct().state.origDefaultMode = d.origDefaultMode
+	d = d.node.DerefDisjunct().state // TODO: maybe do not unroll at all.
 
 	return d, nil
 }
@@ -457,8 +591,20 @@ func (n *nodeContext) finalizeDisjunctions() {
 	// This is especially relevant for the API. Ideally, though, we should
 	// update Conjuncts to reflect the actual conjunct that went into the
 	// disjuncts.
+	numErrs := 0
 	for _, x := range n.disjuncts {
 		x.node.Conjuncts = nil
+
+		if b := x.getErr(); b != nil {
+			n.disjunctErrs = append(n.disjunctErrs, b)
+			numErrs++
+			continue
+		}
+	}
+
+	if len(n.disjuncts) == numErrs {
+		n.makeError()
+		return
 	}
 
 	a := make([]Value, len(n.disjuncts))
@@ -487,12 +633,45 @@ func (n *nodeContext) finalizeDisjunctions() {
 	}
 
 	v := n.node
-	v.BaseValue = d
+
+	if n.defaultAttemptInCycle == nil || d.NumDefaults == 1 {
+		n.setBaseValue(d)
+	} else {
+		c := n.ctx
+		path := c.PathToString(n.defaultAttemptInCycle.Path())
+
+		index := c.MarkPositions()
+		c.AddPosition(n.defaultAttemptInCycle)
+		err := c.Newf("cycle across unresolved disjunction referenced by %v", path)
+		c.ReleasePositions(index)
+
+		b := &Bottom{Code: CycleError, Err: err}
+		n.setBaseValue(b)
+	}
 
 	// The conjuncts will have too much information. Better have no
 	// information than incorrect information.
-	v.Arcs = nil
+	v.clearArcs(n.ctx)
 	v.ChildErrors = nil
+}
+
+func (n *nodeContext) getErrorAll() *Bottom {
+	err := n.getError()
+	if err != nil {
+		return err
+	}
+	for _, a := range n.node.Arcs {
+		if a.ArcType > ArcRequired || a.Label.IsLet() {
+			return nil
+		}
+		n := a.getState(n.ctx)
+		if n != nil {
+			if err := n.getErrorAll(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (n *nodeContext) getError() *Bottom {
@@ -528,27 +707,26 @@ func appendDisjunct(ctx *OpContext, a []*nodeContext, x *nodeContext) []*nodeCon
 	// (overlayed) closeContexts are identical.
 outer:
 	for _, xn := range a {
+		// TODO: for some reason, r may already have been added to dst in some
+		// cases, so we need to check for this.
+		if xn == x {
+			return a
+		}
 		xv := xn.node.DerefValue()
 		if xv.status != finalized || nv.status != finalized {
 			// Partial node
 
-			// TODO: we could consider supporting an option here to disable
-			// the filter. This way, if there is a bug, users could disable
-			// it, trading correctness for performance.
-			// If enabled, we would simply "continue" here.
-
-			for i, h := range xn.disjunctCCs { // TODO(perf): only iterate over completed
-				x, y := findIntersections(h.cc, x.disjunctCCs[i].cc)
-				if !equalPartialNode(xn.ctx, x, y) {
-					continue outer
+			if !equalPartialNode(xn.ctx, x.node, xn.node) {
+				continue outer
+			}
+			if len(xn.tasks) != xn.taskPos || len(x.tasks) != x.taskPos {
+				if len(xn.tasks) != len(x.tasks) {
+					continue
 				}
 			}
-			if len(xn.tasks) != len(x.tasks) {
-				continue
-			}
-			for i, t := range xn.tasks {
+			for i, t := range xn.tasks[xn.taskPos:] {
 				s := x.tasks[i]
-				if s.x != t.x || s.id.cc != t.id.cc {
+				if s.x != t.x {
 					continue outer
 				}
 			}
@@ -573,57 +751,21 @@ outer:
 		if x.defaultMode == isDefault {
 			xn.defaultMode = isDefault
 		}
-		x.free()
+		mergeCloseInfo(xn, x)
+		x.freeDisjunct()
 		return a
 	}
 
 	return append(a, x)
 }
 
-// isPartialNode reports whether a node must be evaluated as a partial node.
-func isPartialNode(d *nodeContext) bool {
-	if d.node.status == finalized {
-		return true
-	}
-	// TODO: further optimizations
-	return false
-}
-
-// findIntersections reports the closeContext, relative to the two given
-// disjunction holds, that should be used in comparing the arc set.
-// x and y MUST both be originating from the same disjunct hole. This ensures
-// that the depth of the parent chain is the same and that they have the
-// same underlying closeContext.
-//
-// Currently, we just take the parent. We should investigate if that is always
-// sufficient.
-//
-// Tradeoffs: if we do not go up enough, the two nodes may not be equal and we
-// miss the opportunity to filter. On the other hand, if we go up too far, we
-// end up comparing more arcs than potentially necessary.
-//
-// TODO: Add a unit test when this function is fully implemented.
-func findIntersections(x, y *closeContext) (cx, cy *closeContext) {
-	cx = x.parent
-	cy = y.parent
-
-	// TODO: why could this happen? Investigate. Note that it is okay to just
-	// return x and y. In the worst case we will just miss some possible
-	// deduplication.
-	if cx == nil || cy == nil {
-		return x, y
-	}
-
-	return cx, cy
-}
-
-func equalPartialNode(ctx *OpContext, x, y *closeContext) bool {
-	nx := x.src.getState(ctx)
-	ny := y.src.getState(ctx)
+func equalPartialNode(ctx *OpContext, x, y *Vertex) bool {
+	nx := x.state
+	ny := y.state
 
 	if nx == nil && ny == nil {
 		// Both nodes were finalized. We can compare them directly.
-		return Equal(ctx, x.src, y.src, CheckStructural)
+		return Equal(ctx, x, y, CheckStructural)
 	}
 
 	// TODO: process the nodes with allKnown, attemptOnly.
@@ -636,38 +778,35 @@ func equalPartialNode(ctx *OpContext, x, y *closeContext) bool {
 		return false
 	}
 
-	if len(x.Patterns) != len(y.Patterns) {
+	switch cx, cy := x.PatternConstraints, y.PatternConstraints; {
+	case cx == nil && cy == nil:
+	case cx == nil || cy == nil:
 		return false
-	}
-	// Assume patterns are in the same order.
-	for i, p := range x.Patterns {
-		if !Equal(ctx, p, y.Patterns[i], 0) {
-			return false
+	case len(cx.Pairs) != len(cy.Pairs):
+		return false
+	default:
+		// Assume patterns are in the same order.
+		for i, p := range cx.Pairs {
+			p.Constraint.Finalize(ctx)
+			cy.Pairs[i].Constraint.Finalize(ctx)
+			if !Equal(ctx, p.Constraint, cy.Pairs[i].Constraint, CheckStructural) {
+				return false
+			}
 		}
 	}
 
-	if !Equal(ctx, x.Expr, y.Expr, 0) {
-		return false
-	}
-
-	if len(x.arcs) != len(y.arcs) {
+	if len(x.Arcs) != len(y.Arcs) {
 		return false
 	}
 
 	// TODO(perf): use merge sort
 outer:
-	for _, a := range x.arcs {
-		if a.kind != ARC {
-			continue outer
-		}
-		for _, b := range y.arcs {
-			if b.kind != ARC {
+	for _, a := range x.Arcs {
+		for _, b := range y.Arcs {
+			if a.Label != b.Label {
 				continue
 			}
-			if a.key.src.Label != b.key.src.Label {
-				continue
-			}
-			if !equalPartialNode(ctx, a.cc, b.cc) {
+			if !equalPartialNode(ctx, a, b) {
 				return false
 			}
 			continue outer
@@ -706,7 +845,7 @@ func isEqualNodeValue(x, y *nodeContext) bool {
 	if x.hasTop != y.hasTop {
 		return false
 	}
-	if !isEqualBaseValue(x.ctx, x.scalar, y.scalar) {
+	if !isEqualValue(x.ctx, x.scalar, y.scalar) {
 		return false
 	}
 
@@ -714,50 +853,80 @@ func isEqualNodeValue(x, y *nodeContext) bool {
 	if len(x.checks) != len(y.checks) {
 		return false
 	}
-	if len(x.tasks) != len(y.tasks) {
-		return false
+	if len(x.tasks) != x.taskPos || len(y.tasks) != y.taskPos {
+		if len(x.tasks) != len(y.tasks) {
+			return false
+		}
 	}
 
-	if !isEqualBaseValue(x.ctx, x.lowerBound, y.lowerBound) {
+	if !isEqualValue(x.ctx, x.lowerBound, y.lowerBound) {
 		return false
 	}
-	if !isEqualBaseValue(x.ctx, x.upperBound, y.upperBound) {
+	if !isEqualValue(x.ctx, x.upperBound, y.upperBound) {
 		return false
 	}
 
 	// Assume that checks are added in the same order.
 	for i, c := range x.checks {
 		d := y.checks[i]
-		if !Equal(x.ctx, c, d, CheckStructural) {
+		if !Equal(x.ctx, c.x.(Value), d.x.(Value), CheckStructural) {
 			return false
 		}
 	}
 
-	for i, t := range x.tasks {
+	for i, t := range x.tasks[x.taskPos:] {
 		s := y.tasks[i]
 		if s.x != t.x {
 			return false
-		}
-		if s.id.cc != t.id.cc {
-			// FIXME: we should compare this too. For this to work we need to
-			// have access to the underlying closeContext, which we do not
-			// have at the moment.
-			// return false
 		}
 	}
 
 	return true
 }
 
-func isEqualBaseValue(ctx *OpContext, x, y BaseValue) bool {
+type ComparableValue interface {
+	comparable
+	Value
+}
+
+func isEqualValue[P ComparableValue](ctx *OpContext, x, y P) bool {
+	var zero P
+
 	if x == y {
 		return true
 	}
-	xv, _ := x.(Value)
-	yv, _ := y.(Value)
-	if xv == nil || yv == nil {
+	if x == zero || y == zero {
 		return false
 	}
 
-	return Equal(ctx, xv, yv, CheckStructural)
+	return Equal(ctx, x, y, CheckStructural)
+}
+
+// IsFromDisjunction reports whether any conjunct of v was a disjunction.
+// There are three cases:
+//  1. v is a disjunction itself. This happens when the result is an
+//     unresolved disjunction.
+//  2. v is a disjunct. This happens when only a single disjunct remains. In this
+//     case there will be a forwarded node that is marked with IsDisjunct.
+//  3. the disjunction was erroneous and none of the disjuncts failed.
+//
+// TODO(evalv3): one case that is not covered by this is erroneous disjunctions.
+// This is not the worst, but fixing it may lead to better error messages.
+func (v *Vertex) IsFromDisjunction() bool {
+	_, ok := v.BaseValue.(*Disjunction)
+	return ok || v.isDisjunct()
+}
+
+// TODO: export this instead of IsDisjunct
+func (v *Vertex) isDisjunct() bool {
+	for {
+		if v.IsDisjunct {
+			return true
+		}
+		arc, ok := v.BaseValue.(*Vertex)
+		if !ok {
+			return false
+		}
+		v = arc
+	}
 }
