@@ -1,6 +1,8 @@
 module github.com/tektoncd/operator
 
-go 1.21
+go 1.22
+
+toolchain go1.24.6
 
 require (
 	github.com/Masterminds/semver v1.5.0
@@ -107,7 +109,7 @@ require (
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/buildkite/agent/v3 v3.62.0 // indirect
 	github.com/buildkite/go-pipeline v0.3.2 // indirect
-	github.com/buildkite/interpolate v0.0.0-20200526001904-07f35b4ae251 // indirect
+	github.com/buildkite/interpolate v0.1.5 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chrismellard/docker-credential-acr-env v0.0.0-20230304212654-82a0ddb27589 // indirect
