@@ -14,7 +14,7 @@ require (
 	github.com/markbates/inflect v1.0.4
 	github.com/openshift-pipelines/pipelines-as-code v0.37.0
 	github.com/openshift-pipelines/tektoncd-pruner v0.0.0-20250711075231-9c8624123820
-	github.com/openshift/api v0.0.0-20250926020921-1517fca97fe3
+	github.com/openshift/api 230d0e045316
 	github.com/openshift/apiserver-library-go v0.0.0-20230816171015-6bfafa975bfb
 	github.com/openshift/client-go v0.0.0-20240523113335-452272e0496d
 	github.com/sigstore/cosign/v2 v2.5.2
