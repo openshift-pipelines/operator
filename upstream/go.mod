@@ -14,7 +14,7 @@ require (
 	github.com/markbates/inflect v1.0.4
 	github.com/openshift-pipelines/pipelines-as-code v0.37.0
 	github.com/openshift-pipelines/tektoncd-pruner v0.0.0-20250711075231-9c8624123820
-	github.com/openshift/api v0.0.0-20250926020921-1517fca97fe3
+	github.com/openshift/api v0.0.0-20240521185306-0314f31e7774
 	github.com/openshift/apiserver-library-go v0.0.0-20230816171015-6bfafa975bfb
 	github.com/openshift/client-go v0.0.0-20240523113335-452272e0496d
 	github.com/sigstore/cosign/v2 v2.5.2
@@ -22,7 +22,7 @@ require (
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
 	github.com/tektoncd/pipeline v1.3.1
-	github.com/tektoncd/plumbing v0.0.0-20250930080013-7726322e5d78
+	github.com/tektoncd/plumbing v0.0.0-20250630062957-f863d38f433a
 	github.com/tektoncd/triggers v0.32.0
 	go.opencensus.io v0.24.0
 	go.uber.org/zap v1.27.0
@@ -32,12 +32,12 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.5.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.2
-	k8s.io/api v0.33.2
+	k8s.io/api v0.33.1
 	k8s.io/apiextensions-apiserver v0.32.9
 	k8s.io/apimachinery v0.33.3
 	k8s.io/client-go v1.5.2
 	k8s.io/code-generator v0.32.9
-	knative.dev/pkg db4c336acdbe
+	knative.dev/pkg v0.0.0-20250424013628-d5e74d29daa3
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -78,12 +78,11 @@ require (
 	github.com/alibabacloud-go/cr-20160607 v1.0.1 // indirect
 	github.com/alibabacloud-go/cr-20181201 v1.0.10 // indirect
 	github.com/alibabacloud-go/darabonba-openapi v0.2.1 // indirect
-	github.com/alibabacloud-go/debug v1.0.1 // indirect
+	github.com/alibabacloud-go/debug v1.0.0 // indirect
 	github.com/alibabacloud-go/endpoint-util v1.1.1 // indirect
-	github.com/alibabacloud-go/openapi-util v0.1.1 // indirect
-	github.com/alibabacloud-go/tea v1.2.2 // indirect
+	github.com/alibabacloud-go/openapi-util v0.1.0 // indirect
+	github.com/alibabacloud-go/tea v1.2.1 // indirect
 	github.com/alibabacloud-go/tea-utils v1.4.5 // indirect
-	github.com/alibabacloud-go/tea-utils/v2 v2.0.6 // indirect
 	github.com/alibabacloud-go/tea-xml v1.1.3 // indirect
 	github.com/aliyun/credentials-go v1.3.2 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
