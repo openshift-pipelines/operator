@@ -3,8 +3,8 @@ name: update-sources-release-v1.20.x
 
 on:
   workflow_dispatch: {}
-  #schedule:
-  #- cron: "0 1 * * *" # At 1AM everyday
+  schedule:
+  - cron: "0 1 * * *" # At 1AM everyday
 
 jobs:
 
@@ -25,7 +25,7 @@ jobs:
         rm -fR upstream
         git clone https://github.com/tektoncd/operator upstream
         pushd upstream
-         git checkout -B release-v0.77.x origin/release-v0.77.x
+        git checkout -B release-v0.77.x origin/release-v0.77.x
         popd
     - name: fetch-payload
       run: |
@@ -50,9 +50,8 @@ jobs:
         source sync-sources/bin/activate
         pip3 install -r requirements.txt
     
-        # Update operator's payload without release bump like nightly
-        make update-payload-and-reference-release
-
+        # Update operator's payload and stuff
+        make update-payload-and-reference
         pushd upstream
         rm -fR cmd/openshift/operator/kodata operatorhub
         git checkout HEAD .
