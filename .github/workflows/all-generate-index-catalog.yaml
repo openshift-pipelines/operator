@@ -1,0 +1,64 @@
+name: all-generate-index-catalog
+
+on:
+  push:
+    branches:
+      - main
+      - next
+      - release-v*
+    paths:
+      - nightly-bundle.yaml
+      - all-generate-index-catalog.yaml
+      - .github/workflows/index-render-template.yaml
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Select Environment'
+        required: true
+        default: 'devel'
+        type: choice
+        options:
+          - devel
+  schedule:
+    - cron: "0 1 * * *" # At 1AM everyday
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  collect-branches:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Get branches matching pattern
+        id: set-matrix
+        run: |
+          # List all branches and filter
+          branches=$(gh api repos/${{ github.repository }}/branches --paginate -q '.[] | .name' | grep -E '^(release-v|next$|main$)')
+
+          echo "Found branches:"
+          echo "$branches"
+          
+          # Convert to JSON array for matrix
+          json=$(jq -nc --argjson arr "$(printf '%s\n' "$branches" | jq -R . | jq -s .)" '{branch: $arr}')
+          echo "Matrix JSON: $json"
+          
+          echo "matrix=$json" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  build:
+    needs: collect-branches
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJSON(needs.collect-branches.outputs.matrix) }}
+    steps:
+      - name: Trigger index-render-template workflow for ${{ matrix.branch }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Triggering workflow for branch: ${{ matrix.branch }}"
+          
+          gh workflow run "index-render-template.yaml" \
+            --ref "${{ matrix.branch }}" \
+            --repo "${{ github.repository }}"
