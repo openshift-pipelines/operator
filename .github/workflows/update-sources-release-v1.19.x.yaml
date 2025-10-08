@@ -57,30 +57,6 @@ jobs:
         git checkout HEAD .
         popd
     
-    - name: Generate patches
-      run: |
-        pushd upstream
-        rm ../.konflux/patches/0000-go1.23.patch || true
-        
-        # Change 'go 1.23.8' to 'go 1.23.6' in go.mod 
-        sed -i 's|^go 1\.23\.8$|go 1.23.6|' go.mod
-        
-        # Change 'toolchain go1.24.x' to 'toolchain go1.23' in go.mod
-        sed -i 's|^toolchain go1\.24\..*$|toolchain go1.23|' go.mod
-        
-        # Change 'go 1.23.8' to 'go 1.23.6' in vendor/modules.txt (within comments or specific lines)
-        sed -i 's|go 1\.23\.8|go 1.23.6|g' vendor/modules.txt
-        
-        if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
-              echo "No change, exiting"
-              exit 0
-        else
-          git diff > ../.konflux/patches/0000-go1.23.patch
-        fi
-        # clean after yourself >:D
-        git checkout HEAD go.mod vendor/modules.txt
-        
-        popd
     - name: Commit new changes
       run: |
         git config user.name openshift-pipelines-bot
