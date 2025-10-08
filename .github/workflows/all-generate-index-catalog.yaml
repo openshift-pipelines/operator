@@ -8,7 +8,7 @@ on:
       - release-v*
     paths:
       - nightly-bundle.yaml
-      - all-generate-index-catalog.yaml
+      - .github/workflows/all-generate-index-catalog.yaml
       - .github/workflows/index-render-template.yaml
   workflow_dispatch:
     inputs:
@@ -35,7 +35,7 @@ jobs:
         id: set-matrix
         run: |
           # List all branches and filter
-          branches=$(gh api repos/${{ github.repository }}/branches --paginate -q '.[] | .name' | grep -E '^(release-v|next$|main$)')
+          branches=$(gh api repos/${{ github.repository }}/branches --paginate -q '.[] | .name' | grep -E '^(release-v.*\.x$|next$|main$)')
 
           echo "Found branches:"
           echo "$branches"
