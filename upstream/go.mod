@@ -13,7 +13,7 @@ require (
 	github.com/openshift-pipelines/pipelines-as-code v0.24.5
 	github.com/openshift/api v0.0.0-20230503133300-8bbcb7ca7183
 	github.com/openshift/apiserver-library-go v0.0.0-20230503174907-d9b2bf6185e9
-	github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb
+	github.com/openshift/client-go db0dee36e235
 	github.com/sigstore/cosign/v2 v2.2.2
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
