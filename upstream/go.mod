@@ -1,6 +1,8 @@
 module github.com/tektoncd/operator
 
-go 1.19
+go 1.21
+
+toolchain go1.24.6
 
 require (
 	github.com/Masterminds/semver v1.5.0
@@ -77,7 +79,7 @@ require (
 	github.com/alibabacloud-go/cr-20160607 v1.0.1 // indirect
 	github.com/alibabacloud-go/cr-20181201 v1.0.10 // indirect
 	github.com/alibabacloud-go/darabonba-openapi v0.2.1 // indirect
-	github.com/alibabacloud-go/debug v1.0.0 // indirect
+	github.com/alibabacloud-go/debug v1.0.1 // indirect
 	github.com/alibabacloud-go/endpoint-util v1.1.1 // indirect
 	github.com/alibabacloud-go/openapi-util v0.1.0 // indirect
 	github.com/alibabacloud-go/tea v1.2.1 // indirect
