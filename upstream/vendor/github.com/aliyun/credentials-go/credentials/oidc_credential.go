@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/alibabacloud-go/tea/tea"
 	"github.com/aliyun/credentials-go/credentials/request"
 	"github.com/aliyun/credentials-go/credentials/utils"
 )
-
-const defaultOIDCDurationSeconds = 3600
 
 // OIDCCredential is a kind of credentials
 type OIDCCredential struct {
@@ -153,6 +152,9 @@ func (r *OIDCCredential) updateCredential() (err error) {
 	request.BodyParams["OIDCToken"] = tea.StringValue(token)
 	if r.Policy != "" {
 		request.QueryParams["Policy"] = r.Policy
+	}
+	if r.RoleSessionExpiration > 0 {
+		request.QueryParams["DurationSeconds"] = strconv.Itoa(r.RoleSessionExpiration)
 	}
 	request.QueryParams["RoleSessionName"] = r.RoleSessionName
 	request.QueryParams["Version"] = "2015-04-01"
