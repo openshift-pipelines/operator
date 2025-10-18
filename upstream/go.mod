@@ -1,8 +1,8 @@
 module github.com/tektoncd/operator
 
-go 1.23.8
+go 1.24.0
 
-toolchain go1.24.1
+toolchain go1.24.6
 
 require (
 	github.com/Masterminds/semver v1.5.0
@@ -41,7 +41,7 @@ require (
 
 replace (
 	github.com/alibabacloud-go/cr-20160607 => github.com/vdemeester/cr-20160607 v1.0.1
-	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.0.5
+	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.3
 	k8s.io/api => k8s.io/api v0.32.4
 	k8s.io/apimachinery => k8s.io/apimachinery v0.32.4
 	k8s.io/client-go => k8s.io/client-go v0.32.4
@@ -139,7 +139,7 @@ require (
 	github.com/go-chi/chi v4.1.2+incompatible // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/analysis v0.23.0 // indirect
