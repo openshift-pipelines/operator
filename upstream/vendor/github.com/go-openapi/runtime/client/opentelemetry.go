@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -131,8 +131,14 @@ func (t *openTelemetryTransport) Submit(op *runtime.ClientOperation) (interface{
 	op.Reader = runtime.ClientResponseReaderFunc(func(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 		if span != nil {
 			statusCode := response.Code()
-			span.SetAttributes(attribute.Int(string(semconv.HTTPStatusCodeKey), statusCode))
-			span.SetStatus(semconv.SpanStatusFromHTTPStatusCodeAndSpanKind(statusCode, trace.SpanKindClient))
+			// NOTE: this is replaced by semconv.HTTPResponseStatusCode in semconv v1.21
+			span.SetAttributes(semconv.HTTPResponseStatusCode(statusCode))
+			// NOTE: the conversion from HTTP status code to trace code is no longer available with
+			// semconv v1.21
+			const minHTTPStatusIsError = 400
+			if statusCode >= minHTTPStatusIsError {
+				span.SetStatus(codes.Error, http.StatusText(statusCode))
+			}
 		}
 
 		return reader.ReadResponse(response, consumer)
@@ -169,7 +175,7 @@ func (t *openTelemetryTransport) newOpenTelemetrySpan(op *runtime.ClientOperatio
 	span.SetAttributes(
 		attribute.String("net.peer.name", t.host),
 		attribute.String(string(semconv.HTTPRouteKey), op.PathPattern),
-		attribute.String(string(semconv.HTTPMethodKey), op.Method),
+		attribute.String(string(semconv.HTTPRequestMethodKey), op.Method),
 		attribute.String("span.kind", trace.SpanKindClient.String()),
 		attribute.String("http.scheme", scheme),
 	)

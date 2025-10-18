@@ -25,6 +25,11 @@ const (
 	isSpace
 )
 
+const (
+	asciiMaxControlChar = 31
+	asciiMaxChar        = 127
+)
+
 func init() {
 	// OCTET      = <any 8-bit sequence of data>
 	// CHAR       = <any US-ASCII character (octets 0 - 127)>
@@ -42,10 +47,10 @@ func init() {
 	// token      = 1*<any CHAR except CTLs or separators>
 	// qdtext     = <any TEXT except <">>
 
-	for c := 0; c < 256; c++ {
+	for c := range 256 {
 		var t octetType
-		isCtl := c <= 31 || c == 127
-		isChar := 0 <= c && c <= 127
+		isCtl := c <= asciiMaxControlChar || c == asciiMaxChar
+		isChar := 0 <= c && c <= asciiMaxChar
 		isSeparator := strings.ContainsRune(" \t\"(),/:;<=>?@[]\\{}", rune(c))
 		if strings.ContainsRune(" \t\r\n", rune(c)) {
 			t |= isSpace
@@ -92,7 +97,7 @@ func ParseList(header http.Header, key string) []string {
 		end := 0
 		escape := false
 		quote := false
-		for i := 0; i < len(s); i++ {
+		for i := range len(s) {
 			b := s[i]
 			switch {
 			case escape:
@@ -195,7 +200,8 @@ func ParseAccept2(header http.Header, key string) (specs []AcceptSpec) {
 }
 
 // ParseAccept parses Accept* headers.
-func ParseAccept(header http.Header, key string) (specs []AcceptSpec) {
+func ParseAccept(header http.Header, key string) []AcceptSpec {
+	var specs []AcceptSpec
 loop:
 	for _, s := range header[key] {
 		for {
@@ -218,6 +224,7 @@ loop:
 					}
 				}
 			}
+
 			specs = append(specs, spec)
 			s = skipSpace(s)
 			if !strings.HasPrefix(s, ",") {
@@ -226,7 +233,8 @@ loop:
 			s = skipSpace(s[1:])
 		}
 	}
-	return
+
+	return specs
 }
 
 func skipSpace(s string) (rest string) {
@@ -306,7 +314,7 @@ func expectTokenOrQuoted(s string) (value string, rest string) {
 			p := make([]byte, len(s)-1)
 			j := copy(p, s[:i])
 			escape := true
-			for i = i + 1; i < len(s); i++ {
+			for i++; i < len(s); i++ {
 				b := s[i]
 				switch {
 				case escape:
