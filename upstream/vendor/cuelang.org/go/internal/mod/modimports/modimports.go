@@ -1,10 +1,13 @@
 package modimports
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
+	"iter"
+	"maps"
 	"path"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -30,37 +33,25 @@ type ModuleFile struct {
 // AllImports returns a sorted list of all the package paths
 // imported by the module files produced by modFilesIter
 // in canonical form.
-func AllImports(modFilesIter func(func(ModuleFile, error) bool)) (_ []string, retErr error) {
+func AllImports(modFilesIter iter.Seq2[ModuleFile, error]) ([]string, error) {
 	pkgPaths := make(map[string]bool)
-	modFilesIter(func(mf ModuleFile, err error) bool {
+	for mf, err := range modFilesIter {
 		if err != nil {
-			retErr = fmt.Errorf("cannot read %q: %v", mf.FilePath, err)
-			return false
+			return nil, fmt.Errorf("cannot read %q: %v", mf.FilePath, err)
 		}
 		// TODO look at build tags and omit files with "ignore" tags.
 		for _, imp := range mf.Syntax.Imports {
 			pkgPath, err := strconv.Unquote(imp.Path.Value)
 			if err != nil {
 				// TODO location formatting
-				retErr = fmt.Errorf("invalid import path %q in %s", imp.Path.Value, mf.FilePath)
-				return false
+				return nil, fmt.Errorf("invalid import path %q in %s", imp.Path.Value, mf.FilePath)
 			}
 			// Canonicalize the path.
-			pkgPath = module.ParseImportPath(pkgPath).Canonical().String()
+			pkgPath = ast.ParseImportPath(pkgPath).Canonical().String()
 			pkgPaths[pkgPath] = true
 		}
-		return true
-	})
-	if retErr != nil {
-		return nil, retErr
 	}
-	// TODO use maps.Keys when we can.
-	pkgPathSlice := make([]string, 0, len(pkgPaths))
-	for p := range pkgPaths {
-		pkgPathSlice = append(pkgPathSlice, p)
-	}
-	sort.Strings(pkgPathSlice)
-	return pkgPathSlice, nil
+	return slices.Sorted(maps.Keys(pkgPaths)), nil
 }
 
 // PackageFiles returns an iterator that produces all the CUE files
@@ -69,7 +60,7 @@ func AllImports(modFilesIter func(func(ModuleFile, error) bool)) (_ []string, re
 //
 // TODO(mvdan): this should now be called InstanceFiles, to follow the naming from
 // https://cuelang.org/docs/concept/modules-packages-instances/#instances.
-func PackageFiles(fsys fs.FS, dir string, pkgQualifier string) func(func(ModuleFile, error) bool) {
+func PackageFiles(fsys fs.FS, dir string, pkgQualifier string) iter.Seq2[ModuleFile, error] {
 	return func(yield func(ModuleFile, error) bool) {
 		// Start at the target directory, but also include package files
 		// from packages with the same name(s) in parent directories.
@@ -104,6 +95,13 @@ func PackageFiles(fsys fs.FS, dir string, pkgQualifier string) func(func(ModuleF
 			for _, e := range entries {
 				if e.Name() == "cue.mod" {
 					inModRoot = true
+				}
+				if e.IsDir() {
+					// Directories are never package files, even when their filename ends with ".cue".
+					continue
+				}
+				if isHidden(e.Name()) {
+					continue
 				}
 				pkgName, cont := yieldPackageFile(fsys, path.Join(dir, e.Name()), selectPackage, yield)
 				if !cont {
@@ -143,7 +141,7 @@ func PackageFiles(fsys fs.FS, dir string, pkgQualifier string) func(func(ModuleF
 // module at the given root.
 //
 // The caller may assume that files from the same package are always adjacent.
-func AllModuleFiles(fsys fs.FS, root string) func(func(ModuleFile, error) bool) {
+func AllModuleFiles(fsys fs.FS, root string) iter.Seq2[ModuleFile, error] {
 	return func(yield func(ModuleFile, error) bool) {
 		yieldAllModFiles(fsys, root, true, yield)
 	}
@@ -179,6 +177,9 @@ func yieldAllModFiles(fsys fs.FS, fpath string, topDir bool, yield func(ModuleFi
 		if entry.IsDir() {
 			continue
 		}
+		if isHidden(entry.Name()) {
+			continue
+		}
 		fpath := path.Join(fpath, entry.Name())
 		if _, ok := yieldPackageFile(fsys, fpath, func(string) bool { return true }, yield); !ok {
 			return false
@@ -190,7 +191,7 @@ func yieldAllModFiles(fsys fs.FS, fpath string, topDir bool, yield func(ModuleFi
 		if !entry.IsDir() {
 			continue
 		}
-		if name == "cue.mod" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
+		if name == "cue.mod" || isHidden(name) {
 			continue
 		}
 		fpath := path.Join(fpath, name)
@@ -214,26 +215,47 @@ func yieldPackageFile(fsys fs.FS, fpath string, selectPackage func(pkgName strin
 	pf := ModuleFile{
 		FilePath: fpath,
 	}
-	f, err := fsys.Open(fpath)
-	if err != nil {
-		return "", yield(pf, err)
+	var syntax *ast.File
+	var err error
+	if cueFS, ok := fsys.(module.ReadCUEFS); ok {
+		// The FS implementation supports reading CUE syntax directly.
+		// A notable FS implementation that does this is the one
+		// provided by cue/load, allowing that package to cache
+		// the parsed CUE.
+		// TODO maybe we should make the options here match
+		// the default parser options used by cue/load for better
+		// cache behavior.
+		syntax, err = cueFS.ReadCUEFile(fpath, parser.NewConfig(parser.ImportsOnly))
+		if err != nil && !errors.Is(err, errors.ErrUnsupported) {
+			return "", yield(pf, err)
+		}
 	}
-	defer f.Close()
+	if syntax == nil {
+		// Either the FS doesn't implement [module.ReadCUEFS]
+		// or the ReadCUEFile method returned ErrUnsupported,
+		// so we need to acquire the syntax ourselves.
 
-	// Note that we use cueimports.Read before parser.ParseFile as cue/parser
-	// will always consume the whole input reader, which is often wasteful.
-	//
-	// TODO(mvdan): the need for cueimports.Read can go once cue/parser can work
-	// on a reader in a streaming manner.
-	data, err := cueimports.Read(f)
-	if err != nil {
-		return "", yield(pf, err)
-	}
-	// Add a leading "./" so that a parse error filename is consistent
-	// with the other error filenames created elsewhere in the codebase.
-	syntax, err := parser.ParseFile("./"+fpath, data, parser.ImportsOnly)
-	if err != nil {
-		return "", yield(pf, err)
+		f, err := fsys.Open(fpath)
+		if err != nil {
+			return "", yield(pf, err)
+		}
+		defer f.Close()
+
+		// Note that we use cueimports.Read before parser.ParseFile as cue/parser
+		// will always consume the whole input reader, which is often wasteful.
+		//
+		// TODO(mvdan): the need for cueimports.Read can go once cue/parser can work
+		// on a reader in a streaming manner.
+		data, err := cueimports.Read(f)
+		if err != nil {
+			return "", yield(pf, err)
+		}
+		// Add a leading "./" so that a parse error filename is consistent
+		// with the other error filenames created elsewhere in the codebase.
+		syntax, err = parser.ParseFile("./"+fpath, data, parser.ImportsOnly)
+		if err != nil {
+			return "", yield(pf, err)
+		}
 	}
 
 	if !selectPackage(syntax.PackageName()) {
@@ -241,4 +263,8 @@ func yieldPackageFile(fsys fs.FS, fpath string, selectPackage func(pkgName strin
 	}
 	pf.Syntax = syntax
 	return syntax.PackageName(), yield(pf, nil)
+}
+
+func isHidden(name string) bool {
+	return name == "" || name[0] == '.' || name[0] == '_'
 }

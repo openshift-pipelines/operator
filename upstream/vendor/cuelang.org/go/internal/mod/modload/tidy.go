@@ -5,12 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"iter"
 	"log"
 	"maps"
 	"path"
 	"runtime"
 	"slices"
+	"strings"
 
+	"cuelang.org/go/internal/buildattr"
 	"cuelang.org/go/internal/mod/modimports"
 	"cuelang.org/go/internal/mod/modpkgload"
 	"cuelang.org/go/internal/mod/modrequirements"
@@ -64,7 +67,10 @@ func tidy(ctx context.Context, fsys fs.FS, modRoot string, reg Registry, checkTi
 	}
 	// TODO check that module path is well formed etc
 	origRs := modrequirements.NewRequirements(mf.QualifiedModule(), reg, mf.DepVersions(), mf.DefaultMajorVersions())
-	rootPkgPaths, err := modimports.AllImports(modimports.AllModuleFiles(fsys, modRoot))
+	// Note: we can ignore build tags and the fact that we might
+	// have _tool.cue and _test.cue files, because we want to include
+	// all of those, but we do need to consider @ignore() attributes.
+	rootPkgPaths, err := modimports.AllImports(withoutIgnoredFiles(modimports.AllModuleFiles(fsys, modRoot)))
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +142,7 @@ func readModuleFile(fsys fs.FS, modRoot string) (module.Version, *modfile.File, 
 	}
 	mainModuleVersion, err := module.NewVersion(mf.QualifiedModule(), "")
 	if err != nil {
-		return module.Version{}, nil, fmt.Errorf("invalid module path %q: %v", mf.QualifiedModule(), err)
+		return module.Version{}, nil, fmt.Errorf("%s: invalid module path: %v", modFilePath, err)
 	}
 	return mainModuleVersion, mf, nil
 }
@@ -151,6 +157,7 @@ func modfileFromRequirements(old *modfile.File, rs *modrequirements.Requirements
 		Language: old.Language,
 		Deps:     make(map[string]*modfile.Dep),
 		Source:   old.Source,
+		Custom:   old.Custom,
 	}
 	defaults := rs.DefaultMajorVersions()
 	for _, v := range rs.RootModules() {
@@ -165,10 +172,39 @@ func modfileFromRequirements(old *modfile.File, rs *modrequirements.Requirements
 	return mf
 }
 
+// shouldIncludePkgFile reports whether a file from a package should be included
+// for dependency-analysis purposes.
+//
+// In general a file should always be considered unless it's a _tool.cue file
+// that's not in the main module.
+func (ld *loader) shouldIncludePkgFile(pkgPath string, mod module.Version, fsys fs.FS, mf modimports.ModuleFile) (_ok bool) {
+	if buildattr.ShouldIgnoreFile(mf.Syntax) {
+		// The file is marked to be explicitly ignored.
+		return false
+	}
+	if mod.Path() == ld.mainModule.Path() {
+		// All files in the main module are considered.
+		return true
+	}
+	if strings.HasSuffix(mf.FilePath, "_tool.cue") || strings.HasSuffix(mf.FilePath, "_test.cue") {
+		// tool and test files are only considered when they are part of the main module.
+		return false
+	}
+	ok, _, err := buildattr.ShouldBuildFile(mf.Syntax, func(key string) bool {
+		// Keys of build attributes are considered always false when
+		// outside the main module.
+		return false
+	})
+	if err != nil {
+		return false
+	}
+	return ok
+}
+
 func (ld *loader) resolveDependencies(ctx context.Context, rootPkgPaths []string, rs *modrequirements.Requirements) (*modrequirements.Requirements, *modpkgload.Packages, error) {
 	for {
 		logf("---- LOADING from requirements %q", rs.RootModules())
-		pkgs := modpkgload.LoadPackages(ctx, ld.mainModule.Path(), ld.mainModuleLoc, rs, ld.registry, rootPkgPaths)
+		pkgs := modpkgload.LoadPackages(ctx, ld.mainModule.Path(), ld.mainModuleLoc, rs, ld.registry, rootPkgPaths, ld.shouldIncludePkgFile)
 		if ld.checkTidy {
 			for _, pkg := range pkgs.All() {
 				err := pkg.Error()
@@ -206,13 +242,10 @@ func (ld *loader) resolveDependencies(ctx context.Context, rootPkgPaths []string
 			logf("dependencies are stable at %q", rs.RootModules())
 			return rs, pkgs, nil
 		}
-		toAdd := make([]module.Version, 0, len(modAddedBy))
-		// TODO use maps.Keys when we can.
 		for m, p := range modAddedBy {
-			logf("added: %v (by %v)", modAddedBy, p.ImportPath())
-			toAdd = append(toAdd, m)
+			logf("added: %v (by %v)", m, p.ImportPath())
 		}
-		module.Sort(toAdd) // to make errors deterministic
+		toAdd := slices.SortedFunc(maps.Keys(modAddedBy), module.Version.Compare) // to make errors deterministic
 		oldRs := rs
 		var err error
 		rs, err = ld.updateRoots(ctx, rs, pkgs, toAdd)
@@ -374,7 +407,7 @@ func (ld *loader) updateRoots(ctx context.Context, rs *modrequirements.Requireme
 		}
 	}
 	if needSort {
-		module.Sort(roots)
+		slices.SortFunc(roots, module.Version.Compare)
 	}
 
 	// "Each root appears only once, at the selected version of its path ….”
@@ -492,7 +525,6 @@ func (ld *loader) resolveMissingImports(ctx context.Context, pkgs *modpkgload.Pa
 	var pkgMods []pkgMod
 	work := par.NewQueue(runtime.GOMAXPROCS(0))
 	for _, pkg := range pkgs.All() {
-		pkg := pkg
 		if pkg.Error() == nil {
 			continue
 		}
@@ -532,10 +564,7 @@ func (ld *loader) resolveMissingImports(ctx context.Context, pkgs *modpkgload.Pa
 	<-work.Idle()
 
 	modAddedBy = map[module.Version]*modpkgload.Package{}
-	defaultMajorVersions = make(map[string]string)
-	for m, v := range rs.DefaultMajorVersions() {
-		defaultMajorVersions[m] = v
-	}
+	defaultMajorVersions = maps.Clone(rs.DefaultMajorVersions())
 	for _, pm := range pkgMods {
 		pkg, mods, needsDefault := pm.pkg, *pm.mods, *pm.needsDefault
 		for _, mod := range mods {
@@ -599,7 +628,7 @@ func (ld *loader) tidyRoots(ctx context.Context, old *modrequirements.Requiremen
 		queue = append(queue, pkg)
 		queued[pkg] = true
 	}
-	module.Sort(roots)
+	slices.SortFunc(roots, module.Version.Compare)
 	tidy := modrequirements.NewRequirements(ld.mainModule.Path(), ld.registry, roots, old.DefaultMajorVersions())
 
 	for len(queue) > 0 {
@@ -631,7 +660,7 @@ func (ld *loader) tidyRoots(ctx context.Context, old *modrequirements.Requiremen
 		}
 
 		if tidyRoots := tidy.RootModules(); len(roots) > len(tidyRoots) {
-			module.Sort(roots)
+			slices.SortFunc(roots, module.Version.Compare)
 			tidy = modrequirements.NewRequirements(ld.mainModule.Path(), ld.registry, roots, tidy.DefaultMajorVersions())
 		}
 	}
@@ -655,7 +684,6 @@ func (ld *loader) spotCheckRoots(ctx context.Context, rs *modrequirements.Requir
 
 	work := par.NewQueue(runtime.GOMAXPROCS(0))
 	for m := range mods {
-		m := m
 		work.Add(func() {
 			if ctx.Err() != nil {
 				return
@@ -684,6 +712,19 @@ func (ld *loader) spotCheckRoots(ctx context.Context, rs *modrequirements.Requir
 	}
 
 	return true
+}
+
+func withoutIgnoredFiles(modFiles iter.Seq2[modimports.ModuleFile, error]) iter.Seq2[modimports.ModuleFile, error] {
+	return func(yield func(modimports.ModuleFile, error) bool) {
+		for mf, err := range modFiles {
+			if err == nil && buildattr.ShouldIgnoreFile(mf.Syntax) {
+				continue
+			}
+			if !yield(mf, err) {
+				break
+			}
+		}
+	}
 }
 
 func logf(f string, a ...any) {
