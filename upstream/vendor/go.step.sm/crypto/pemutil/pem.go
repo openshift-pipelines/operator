@@ -20,10 +20,11 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"go.step.sm/crypto/internal/utils"
+	"golang.org/x/crypto/ssh"
+
+	fileutils "go.step.sm/crypto/internal/utils/file"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/x25519"
-	"golang.org/x/crypto/ssh"
 )
 
 // DefaultEncCipher is the default algorithm used when encrypting sensitive
@@ -45,7 +46,7 @@ var PromptPassword PasswordPrompter
 // WriteFile is a method used to write a file, by default it uses a wrapper over
 // ioutil.WriteFile, but it can be set to a custom method, that for example can
 // check if a file exists and prompts the user if it should be overwritten.
-var WriteFile FileWriter = utils.WriteFile
+var WriteFile FileWriter = fileutils.WriteFile
 
 // PEMBlockHeader is the expected header for any PEM formatted block.
 var PEMBlockHeader = []byte("-----BEGIN ")
@@ -67,7 +68,7 @@ type context struct {
 func newContext(name string) *context {
 	return &context{
 		filename: name,
-		perm:     0600,
+		perm:     0o600,
 	}
 }
 
@@ -127,7 +128,7 @@ func WithFilename(name string) Options {
 		ctx.filename = name
 		// Default perm mode if not set
 		if ctx.perm == 0 {
-			ctx.perm = 0600
+			ctx.perm = 0o600
 		}
 		return nil
 	}
@@ -154,11 +155,28 @@ func WithPassword(pass []byte) Options {
 // WithPasswordFile is a method that adds the password in a file to the context.
 func WithPasswordFile(filename string) Options {
 	return func(ctx *context) error {
-		b, err := utils.ReadPasswordFromFile(filename)
+		b, err := fileutils.ReadPasswordFromFile(filename)
 		if err != nil {
 			return err
 		}
 		ctx.password = b
+		return nil
+	}
+}
+
+// WithMinLengthPasswordFile is a method that adds the password in a file to the
+// context. If the password does not meet the minimum length requirement an
+// error is returned. If minimum length input is <=0 then the requirement is
+// ignored.
+func WithMinLengthPasswordFile(filename string, minLength int) Options {
+	return func(ctx *context) error {
+		if err := WithPasswordFile(filename)(ctx); err != nil {
+			return err
+		}
+
+		if minLength > 0 && len(ctx.password) < minLength {
+			return fmt.Errorf("password does not meet minimum length requirement; must be at least %v characters", minLength)
+		}
 		return nil
 	}
 }
@@ -398,7 +416,7 @@ func ReadCertificate(filename string, opts ...Options) (*x509.Certificate, error
 // - supports PEM and DER certificate formats
 //   - If a DER-formatted file is given only one certificate will be returned.
 func ReadCertificateBundle(filename string) ([]*x509.Certificate, error) {
-	b, err := utils.ReadFile(filename)
+	b, err := fileutils.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -416,7 +434,7 @@ func ReadCertificateBundle(filename string) ([]*x509.Certificate, error) {
 // - supports PEM and DER Certificate formats.
 // - supports reading from STDIN with filename `-`.
 func ReadCertificateRequest(filename string) (*x509.CertificateRequest, error) {
-	b, err := utils.ReadFile(filename)
+	b, err := fileutils.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +537,7 @@ func ParseKey(b []byte, opts ...Options) (interface{}, error) {
 // keys are PKCS#1, PKCS#8, RFC5915 for EC, and base64-encoded DER for
 // certificates and public keys.
 func Read(filename string, opts ...Options) (interface{}, error) {
-	b, err := utils.ReadFile(filename)
+	b, err := fileutils.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -640,8 +658,7 @@ func Serialize(in interface{}, opts ...Options) (*pem.Block, error) {
 				}
 			} else {
 				var err error
-				//nolint:staticcheck // required for legacy compatibility
-				p, err = x509.EncryptPEMBlock(rand.Reader, p.Type, p.Bytes, password, DefaultEncCipher)
+				p, err = x509.EncryptPEMBlock(rand.Reader, p.Type, p.Bytes, password, DefaultEncCipher) //nolint:staticcheck // support legacy use cases
 				if err != nil {
 					return nil, errors.Wrap(err, "failed to serialize to PEM")
 				}
@@ -778,7 +795,7 @@ func ParseSSH(b []byte) (interface{}, error) {
 			return nil, errors.Wrap(err, "error unmarshaling key")
 		}
 		return ed25519.PublicKey(w.KeyBytes), nil
-	case ssh.KeyAlgoDSA:
+	case ssh.InsecureKeyAlgoDSA: //nolint:staticcheck // just using the constant; no dependent logic
 		return nil, errors.Errorf("DSA keys not supported")
 	default:
 		return nil, errors.Errorf("unsupported key type %T", key)
