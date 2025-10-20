@@ -71,6 +71,7 @@ var (
 // getRemoteRoot is a var for testing.
 var getRemoteRoot = func() string { return DefaultRemoteRoot }
 
+// Deprecated: Use https://pkg.go.dev/github.com/sigstore/sigstore-go/pkg/tuf
 type TUF struct {
 	sync.Mutex
 	client   *client.Client
@@ -109,6 +110,7 @@ type MetadataStatus struct {
 }
 
 type TargetFile struct {
+	Name   string
 	Target []byte
 	Status StatusKind
 }
@@ -429,7 +431,7 @@ func (t *TUF) GetTargetsByMeta(usage UsageKind, fallbacks []string) ([]TargetFil
 			if err != nil {
 				return nil, fmt.Errorf("error getting target %s by usage: %w", name, err)
 			}
-			matchedTargets = append(matchedTargets, TargetFile{Target: target, Status: scm.Sigstore.Status})
+			matchedTargets = append(matchedTargets, TargetFile{Name: name, Target: target, Status: scm.Sigstore.Status})
 		}
 	}
 	if len(matchedTargets) == 0 {
@@ -439,7 +441,7 @@ func (t *TUF) GetTargetsByMeta(usage UsageKind, fallbacks []string) ([]TargetFil
 				fmt.Fprintf(os.Stderr, "**Warning** Missing fallback target %s, skipping\n", fallback)
 				continue
 			}
-			matchedTargets = append(matchedTargets, TargetFile{Target: target, Status: Active})
+			matchedTargets = append(matchedTargets, TargetFile{Name: fallback, Target: target, Status: Active})
 		}
 	}
 	if len(matchedTargets) == 0 {
