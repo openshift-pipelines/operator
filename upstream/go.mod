@@ -29,7 +29,7 @@ require (
 	golang.org/x/mod v0.25.0
 	golang.org/x/sync v0.15.0
 	gomodules.xyz/jsonpatch/v2 v2.4.0
-	gotest.tools/v3 v3.5.1
+	gotest.tools/v3 v3.5.2
 	k8s.io/api v0.30.0
 	k8s.io/apiextensions-apiserver v0.29.8
 	k8s.io/apimachinery v0.30.0
@@ -107,8 +107,8 @@ require (
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/buildkite/agent/v3 v3.76.2 // indirect
-	github.com/buildkite/go-pipeline v0.10.0 // indirect
-	github.com/buildkite/interpolate v0.1.3 // indirect
+	github.com/buildkite/go-pipeline v0.16.0 // indirect
+	github.com/buildkite/interpolate v0.1.5 // indirect
 	github.com/buildkite/roko v1.2.0 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -212,7 +212,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nozzle/throttler v0.0.0-20180817012639-2ea982251481 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/oleiade/reflections v1.0.1 // indirect
+	github.com/oleiade/reflections v1.1.0 // indirect
 	github.com/open-policy-agent/opa v0.67.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
