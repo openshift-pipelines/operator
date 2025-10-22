@@ -16,11 +16,12 @@ package export
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/ast/astutil"
 	"cuelang.org/go/cue/errors"
+	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/eval"
@@ -183,11 +184,14 @@ func (p *Profile) Expr(r adt.Runtime, pkgID string, n adt.Expr) (ast.Expr, error
 }
 
 func (e *exporter) toFile(v *adt.Vertex, x ast.Expr) *ast.File {
-	f := &ast.File{}
+	fout := &ast.File{}
 
 	if e.cfg.AddPackage {
 		pkgName := ""
-		pkg := &ast.Package{}
+		pkg := &ast.Package{
+			// prevent the file comment from attaching to pkg when there is no pkg comment
+			PackagePos: token.NoPos.WithRel(token.NewSection),
+		}
 		v.VisitLeafConjuncts(func(c adt.Conjunct) bool {
 			f, _ := c.Source().(*ast.File)
 			if f == nil {
@@ -199,8 +203,15 @@ func (e *exporter) toFile(v *adt.Vertex, x ast.Expr) *ast.File {
 			}
 
 			if e.cfg.ShowDocs {
-				if doc := internal.FileComment(f); doc != nil {
-					ast.AddComment(pkg, doc)
+				pkgComments, fileComments := internal.FileComments(f)
+
+				for _, c := range pkgComments {
+					// add a newline between previous file comment and the pkg comments
+					c.List[0].Slash = c.List[0].Slash.WithRel(token.NewSection)
+					ast.AddComment(pkg, c)
+				}
+				for _, c := range fileComments {
+					ast.AddComment(fout, c)
 				}
 			}
 			return true
@@ -208,7 +219,13 @@ func (e *exporter) toFile(v *adt.Vertex, x ast.Expr) *ast.File {
 
 		if pkgName != "" {
 			pkg.Name = ast.NewIdent(pkgName)
-			f.Decls = append(f.Decls, pkg)
+			fout.Decls = append(fout.Decls, pkg)
+			ast.SetComments(pkg, internal.MergeDocs(pkg.Comments()))
+		} else {
+			for _, c := range fout.Comments() {
+				ast.AddComment(pkg, c)
+			}
+			ast.SetComments(fout, internal.MergeDocs(pkg.Comments()))
 		}
 	}
 
@@ -217,13 +234,13 @@ func (e *exporter) toFile(v *adt.Vertex, x ast.Expr) *ast.File {
 		panic("null input")
 
 	case *ast.StructLit:
-		f.Decls = append(f.Decls, st.Elts...)
+		fout.Decls = append(fout.Decls, st.Elts...)
 
 	default:
-		f.Decls = append(f.Decls, &ast.EmbedDecl{Expr: x})
+		fout.Decls = append(fout.Decls, &ast.EmbedDecl{Expr: x})
 	}
 
-	return f
+	return fout
 }
 
 // Vertex exports evaluated values (data mode).
@@ -627,7 +644,7 @@ type featureSet interface {
 }
 
 func (e *exporter) intn(n int) int {
-	return e.rand.Intn(n)
+	return e.rand.IntN(n)
 }
 
 func (e *exporter) makeFeature(s string) (f adt.Feature, ok bool) {
@@ -648,7 +665,7 @@ func (e *exporter) makeFeature(s string) (f adt.Feature, ok bool) {
 // clearer this concerns a generated number.
 func (e *exporter) uniqueFeature(base string) (f adt.Feature, name string) {
 	if e.rand == nil {
-		e.rand = rand.New(rand.NewSource(808))
+		e.rand = rand.New(rand.NewPCG(123, 456)) // ensure determinism between runs
 	}
 	return findUnique(e, base)
 }
@@ -669,7 +686,7 @@ func findUnique(set featureSet, base string) (f adt.Feature, name string) {
 	const mask = 0xff_ffff_ffff_ffff // max bits; stay clear of int64 overflow
 	const shift = 4                  // rate of growth
 	digits := 1
-	for n := int64(0x10); ; n = int64(mask&((n<<shift)-1)) + 1 {
+	for n := int64(0x10); ; n = mask&((n<<shift)-1) + 1 {
 		num := set.intn(int(n)-1) + 1
 		name := fmt.Sprintf("%[1]s_%0[2]*[3]X", base, digits, num)
 		if f, ok := set.makeFeature(name); ok {

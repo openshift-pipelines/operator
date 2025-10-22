@@ -70,6 +70,9 @@ type printer struct {
 	indent string
 	cfg    *Config
 
+	// keep track of vertices to avoid cycles.
+	stack []*adt.Vertex
+
 	// modes:
 	// - show vertex
 	// - show original conjuncts
@@ -128,23 +131,50 @@ func (w *printer) shared(v *adt.Vertex) {
 // printShared prints a reference to a structure-shared node that is a value
 // of v, if it is a shared node. It reports the dereferenced node and whether
 // the node was printed.
-func (w *printer) printShared(v *adt.Vertex) (x *adt.Vertex, ok bool) {
+func (w *printer) printShared(v0 *adt.Vertex) (x *adt.Vertex, ok bool) {
 	// Handle cyclic shared nodes differently.  If a shared node was part of
 	// a disjunction, it will still be wrapped in a disjunct Vertex.
 	// Similarly, a shared node should never point to a disjunct directly,
 	// but rather to the original arc that subsequently points to a
 	// disjunct.
-	v = v.DerefDisjunct()
-	useReference := v.IsShared
-	isCyclic := v.IsCyclic
-	s, ok := v.BaseValue.(*adt.Vertex)
-	v = v.DerefValue()
-	isCyclic = isCyclic || v.IsCyclic
-	if useReference && isCyclic && ok && len(v.Arcs) > 0 {
-		w.shared(s)
-		return v, true
+	v0 = v0.DerefDisjunct()
+	isCyclic := v0.IsCyclic
+	s, ok := v0.BaseValue.(*adt.Vertex)
+	v1 := v0.DerefValue()
+	useReference := v0.IsShared && !v1.Internal()
+	isCyclic = isCyclic || v1.IsCyclic
+	_ = isCyclic
+	// NOTE(debug): use this line instead of the following to expand shared
+	// cases where it is safe to do so.
+	// if useReference && isCyclic && ok && len(v.Arcs) > 0 {
+	if useReference && ok && len(v1.Arcs) > 0 {
+		w.shared(v1)
+		return v1, true
 	}
-	return v, false
+	if !w.pushVertex(v1) {
+		if s != nil {
+			w.shared(s)
+			w.string(" =>")
+		}
+		w.shared(v1)
+		return v1, true
+	}
+	return v1, false
+}
+
+func (w *printer) pushVertex(v *adt.Vertex) bool {
+	for _, x := range w.stack {
+		if x == v {
+			w.string("<TODO: unmarked structural cycle>")
+			return false
+		}
+	}
+	w.stack = append(w.stack, v)
+	return true
+}
+
+func (w *printer) popVertex() {
+	w.stack = w.stack[:len(w.stack)-1]
 }
 
 func (w *printer) shortError(errs errors.Error) {
@@ -194,6 +224,16 @@ func (w *printer) interpolation(x *adt.Interpolation) {
 	w.string(quote)
 }
 
+func (w *printer) arg(n adt.Node) {
+	if x, ok := n.(*adt.Vertex); ok {
+		if x.Label != adt.InvalidLabel {
+			w.path(x)
+			return
+		}
+	}
+	w.node(n)
+}
+
 func (w *printer) node(n adt.Node) {
 	switch x := n.(type) {
 	case *adt.Vertex:
@@ -201,6 +241,7 @@ func (w *printer) node(n adt.Node) {
 		if ok {
 			return
 		}
+		defer w.popVertex()
 
 		var kind adt.Kind
 		if x.BaseValue != nil {
@@ -281,7 +322,7 @@ func (w *printer) node(n adt.Node) {
 					w.string("multi")
 				}
 				w.string(" = ")
-				if c := a.Conjuncts[0]; a.MultiLet {
+				if c := a.ConjunctAt(0); a.MultiLet {
 					w.node(c.Expr())
 					continue
 				}
@@ -526,7 +567,7 @@ func (w *printer) node(n adt.Node) {
 			if i > 0 {
 				w.string(", ")
 			}
-			w.node(a)
+			w.arg(a)
 		}
 		w.string(")")
 
@@ -544,7 +585,7 @@ func (w *printer) node(n adt.Node) {
 			if i > 0 {
 				w.string(", ")
 			}
-			w.node(a)
+			w.arg(a)
 		}
 		w.string(")")
 

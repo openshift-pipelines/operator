@@ -106,7 +106,7 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 	}
 
 	// All arcs in x must exist in y and its values must subsume.
-	xFeatures := export.VertexFeatures(s.ctx, x)
+	xFeatures := export.VertexFeaturesUnsorted(x)
 	for _, f := range xFeatures {
 		if s.Final && !f.IsRegular() {
 			continue
@@ -183,7 +183,7 @@ func (s *subsumer) vertices(x, y *adt.Vertex) bool {
 		return false
 	}
 
-	yFeatures := export.VertexFeatures(s.ctx, y)
+	yFeatures := export.VertexFeaturesUnsorted(y)
 outer:
 	for _, f := range yFeatures {
 		if s.Final && !f.IsRegular() {
@@ -221,7 +221,7 @@ outer:
 
 		a := &adt.Vertex{Label: f}
 		x.MatchAndInsert(ctx, a)
-		if len(a.Conjuncts) == 0 {
+		if !a.HasConjuncts() {
 			// It is accepted and has no further constraints, so all good.
 			continue
 		}
@@ -290,6 +290,9 @@ func (s *subsumer) verticesDev(x, y *adt.Vertex) bool {
 		if final {
 			return true
 		}
+
+	case nil:
+		return false
 
 	default:
 		panic(fmt.Sprintf("unexpected type %T", v))
@@ -413,7 +416,7 @@ outer:
 
 		a := &adt.Vertex{Label: f}
 		x.MatchAndInsert(ctx, a)
-		if len(a.Conjuncts) == 0 {
+		if !a.HasConjuncts() {
 			// It is accepted and has no further constraints, so all good.
 			continue
 		}
@@ -454,6 +457,8 @@ outerConstraint:
 	for _, p := range apc.Pairs {
 		for _, q := range bpc.Pairs {
 			if adt.Equal(s.ctx, p.Pattern, q.Pattern, 0) {
+				p.Constraint.Finalize(s.ctx)
+				q.Constraint.Finalize(s.ctx)
 				if !s.values(p.Constraint, q.Constraint) {
 					return false
 				}
