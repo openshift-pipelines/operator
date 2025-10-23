@@ -5,14 +5,17 @@ run:
 
 linters:
   enable:
-    - errcheck
     - govet
     - ineffassign
     - misspell
     - nolintlint
-    - revive
+    # - revive
     - staticcheck
     - unused
+
+  disable:
+    - errcheck
+    # - staticcheck
 
   settings:
     misspell:
@@ -20,6 +23,10 @@ linters:
     nolintlint:
       allow-unused: false # report any unused nolint directives
       require-specific: false # don't require nolint directives to be specific about which linter is being skipped
+
+  exclusions:
+    paths:
+      - gcsfs/internal/stiface
 
 formatters:
   enable:
@@ -35,3 +42,7 @@ formatters:
         - standard
         - default
         - localmodule
+
+  exclusions:
+    paths:
+      - gcsfs/internal/stiface
