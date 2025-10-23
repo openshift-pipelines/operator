@@ -33,7 +33,7 @@ require (
 	k8s.io/apimachinery v0.29.0
 	k8s.io/client-go v1.5.2
 	k8s.io/code-generator v0.27.6
-	knative.dev/pkg v0.0.0-20231115001034-97c7258e3a98
+	knative.dev/pkg b988e0b4526c
 	sigs.k8s.io/yaml v1.4.0
 )
 
@@ -47,7 +47,7 @@ replace (
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230515203736-54b630e78af5
 
 	// knative.dev/pkg on branch "release-1.11"
-	knative.dev/pkg => knative.dev/pkg v0.0.0-20231103161548-f5b42e8dea44
+	knative.dev/pkg => knative.dev/pkg b988e0b4526c
 )
 
 require (
