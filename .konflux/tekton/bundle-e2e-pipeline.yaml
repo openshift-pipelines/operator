@@ -1,0 +1,283 @@
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: release-tests-e2e-tests
+spec:
+  description: |
+    An integration test which provisions an ephemeral Hypershift cluster and deploys an Operator
+    bundle from a Konflux snapshot.
+  params:
+    - description: Snapshot of the application
+      name: SNAPSHOT
+      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+      type: string
+    - description: Namespace where the the Operator bundle will be deployed.
+      name: NAMESPACE
+      default: openshift-operators
+      type: string
+    - name: image
+      type: string
+      default: quay.io/openshift-pipeline/ci:latest
+    - name: repo_url
+      type: string
+      default: https://github.com/pramodbindal/release-tests
+    - name: revision
+      type: string
+      default: master
+
+  tasks:
+    - name: parse-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/integration-examples
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/test_metadata.yaml
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+    - name: provision-eaas-space
+      runAfter:
+        - parse-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/build-definitions.git
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: task/eaas-provision-space/0.1/eaas-provision-space.yaml
+      params:
+        - name: ownerName
+          value: $(context.pipelineRun.name)
+        - name: ownerUid
+          value: $(context.pipelineRun.uid)
+    - name: provision-cluster
+      runAfter:
+        - provision-eaas-space
+      taskSpec:
+        results:
+          - name: clusterName
+            value: "$(steps.create-cluster.results.clusterName)"
+        steps:
+          - name: get-supported-versions
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-get-supported-ephemeral-cluster-versions/0.1/eaas-get-supported-ephemeral-cluster-versions.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+          - name: pick-version
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-get-latest-openshift-version-by-prefix/0.1/eaas-get-latest-openshift-version-by-prefix.yaml
+            params:
+              - name: prefix
+                value: "$(steps.get-supported-versions.results.versions[0])."
+          - name: create-cluster
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-create-ephemeral-cluster-hypershift-aws/0.1/eaas-create-ephemeral-cluster-hypershift-aws.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+              - name: version
+                value: "$(steps.pick-version.results.version)"
+              - name: instanceType
+                value: m5.2xlarge
+    - name: deploy-operator
+      runAfter:
+        - provision-cluster
+      params:
+        - name: bundleImage
+          value: "$(tasks.parse-metadata.results.component-container-image)"
+        - name: namespace
+          value: "$(params.NAMESPACE)"
+      taskSpec:
+        params:
+          - name: bundleImage
+            type: string
+          - name: namespace
+            type: string
+        volumes:
+          - name: credentials
+            emptyDir: { }
+        stepTemplate:
+          image: $(params.image)
+          volumeMounts:
+            - name: credentials
+              mountPath: /credentials
+        steps:
+          - name: get-kubeconfig
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+              - name: clusterName
+                value: "$(tasks.provision-cluster.results.clusterName)"
+              - name: credentials
+                value: credentials
+          - name: create-catalog
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+            script: |
+              #!/usr/bin/env bash
+              export INDEX_IMAGE=$(params.bundleImage)
+              cat <<EOF | oc apply -f-
+                apiVersion: operators.coreos.com/v1alpha1
+                kind: CatalogSource
+                metadata:
+                  name: "custom-osp-nightly"
+                  namespace: openshift-marketplace
+                spec:
+                  sourceType: grpc
+                  image: $INDEX_IMAGE
+                  displayName: "Custom OSP Nightly"
+                  publisher: Red Hat Local
+                  updateStrategy:
+                  registryPoll:
+                  interval: 30m
+              EOF
+          - name: create-subscription
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+            script: |
+              #!/usr/bin/env bash
+              oc delete subscription openshift-pipelines-operator -n openshift-operators || true
+              cat <<EOF | oc apply -f-
+                apiVersion: operators.coreos.com/v1alpha1
+                kind: Subscription
+                metadata:
+                  name: openshift-pipelines-operator
+                  namespace: openshift-operators
+                spec:
+                  name: openshift-pipelines-operator-rh
+                  source: "custom-osp-nightly"
+                  sourceNamespace: openshift-marketplace
+              EOF
+    - name: e2e-test
+      runAfter:
+        - deploy-operator
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+      taskSpec:
+        params:
+          - name: SNAPSHOT
+        volumes:
+          - name: credentials
+            emptyDir: { }
+          - name: source
+            emptyDir: { }
+        stepTemplate:
+          image: $(params.image)
+          volumeMounts:
+            - name: source
+              mountPath: /source
+            - name: credentials
+              mountPath: /credentials
+        steps:
+          - name: create-repo
+            image: $(params.image)
+            script: |
+              mkdir -p /source/repo
+              chmod 777 /source/repo
+          - name: fetch-repo
+            ref:
+              resolver: http
+              params:
+                - name: url
+                  value: https://raw.githubusercontent.com/openshift-pipelines/tektoncd-catalog/p/stepactions/stepaction-git-clone/0.4.1/stepaction-git-clone.yaml
+            params:
+              - name: OUTPUT_PATH
+                value: /source/repo
+              - name: URL
+                value: $(params.repo_url)
+              - name: REVISION
+                value: $(params.revision)
+
+          - name: get-kubeconfig
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+              - name: clusterName
+                value: "$(tasks.provision-cluster.results.clusterName)"
+              - name: credentials
+                value: credentials
+
+          - name: configure-tekton-config
+            image: $(params.image)
+            workingDir: /source/repo
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+              - name: GITHUB_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    key: github-token
+                    name: github
+                    optional: true
+            script: |
+              gauge run --tags="" --log-level=debug --verbose specs/konflux-olm.spec
+
+          - name: run-e2e-tests
+            image: $(params.image)
+            workingDir: /source/repo
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+              - name: CHAINS_DOCKER_CONFIG_JSON
+                valueFrom:
+                  secretKeyRef:
+                    key: config.json
+                    name: quay-io-dockerconfig
+            script: |
+              
+              export CHAINS_REPOSITORY=quay.io/openshift-pipeline/chainstest
+
+              gauge run --tags="" --log-level=debug --verbose specs/pipelines/
+              gauge run --tags="" --log-level=debug --verbose specs/metrics/
+              gauge run --tags="" --log-level=debug --verbose specs/chains/
+              gauge run --tags="" --log-level=debug --verbose specs/manualapprovalgate/
