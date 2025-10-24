@@ -24,13 +24,47 @@ import (
 type (
 	// DraftNotesServiceInterface defines all the API methods for the DraftNotesService
 	DraftNotesServiceInterface interface {
-		ListDraftNotes(pid interface{}, mergeRequest int, opt *ListDraftNotesOptions, options ...RequestOptionFunc) ([]*DraftNote, *Response, error)
-		GetDraftNote(pid interface{}, mergeRequest int, note int, options ...RequestOptionFunc) (*DraftNote, *Response, error)
-		CreateDraftNote(pid interface{}, mergeRequest int, opt *CreateDraftNoteOptions, options ...RequestOptionFunc) (*DraftNote, *Response, error)
-		UpdateDraftNote(pid interface{}, mergeRequest int, note int, opt *UpdateDraftNoteOptions, options ...RequestOptionFunc) (*DraftNote, *Response, error)
-		DeleteDraftNote(pid interface{}, mergeRequest int, note int, options ...RequestOptionFunc) (*Response, error)
-		PublishDraftNote(pid interface{}, mergeRequest int, note int, options ...RequestOptionFunc) (*Response, error)
-		PublishAllDraftNotes(pid interface{}, mergeRequest int, options ...RequestOptionFunc) (*Response, error)
+		// ListDraftNotes gets a list of all draft notes for a merge request.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/draft_notes/#list-all-merge-request-draft-notes
+		ListDraftNotes(pid any, mergeRequest int, opt *ListDraftNotesOptions, options ...RequestOptionFunc) ([]*DraftNote, *Response, error)
+
+		// GetDraftNote gets a single draft note for a merge request.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/draft_notes/#get-a-single-draft-note
+		GetDraftNote(pid any, mergeRequest int, note int, options ...RequestOptionFunc) (*DraftNote, *Response, error)
+
+		// CreateDraftNote creates a draft note for a merge request.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/draft_notes/#create-a-draft-note
+		CreateDraftNote(pid any, mergeRequest int, opt *CreateDraftNoteOptions, options ...RequestOptionFunc) (*DraftNote, *Response, error)
+
+		// UpdateDraftNote updates a draft note for a merge request.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/draft_notes/#update-a-draft-note
+		UpdateDraftNote(pid any, mergeRequest int, note int, opt *UpdateDraftNoteOptions, options ...RequestOptionFunc) (*DraftNote, *Response, error)
+
+		// DeleteDraftNote deletes a single draft note for a merge request.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/draft_notes/#delete-a-draft-note
+		DeleteDraftNote(pid any, mergeRequest int, note int, options ...RequestOptionFunc) (*Response, error)
+
+		// PublishDraftNote publishes a single draft note for a merge request.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/draft_notes/#publish-a-draft-note
+		PublishDraftNote(pid any, mergeRequest int, note int, options ...RequestOptionFunc) (*Response, error)
+
+		// PublishAllDraftNotes publishes all draft notes for a merge request that belong to the user.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/draft_notes/#publish-a-draft-note
+		PublishAllDraftNotes(pid any, mergeRequest int, options ...RequestOptionFunc) (*Response, error)
 	}
 
 	// DraftNotesService handles communication with the draft notes related methods
@@ -68,11 +102,7 @@ type ListDraftNotesOptions struct {
 	Sort    *string `url:"sort,omitempty" json:"sort,omitempty"`
 }
 
-// ListDraftNotes gets a list of all draft notes for a merge request.
-//
-// Gitlab API docs:
-// https://docs.gitlab.com/api/draft_notes/#list-all-merge-request-draft-notes
-func (s *DraftNotesService) ListDraftNotes(pid interface{}, mergeRequest int, opt *ListDraftNotesOptions, options ...RequestOptionFunc) ([]*DraftNote, *Response, error) {
+func (s *DraftNotesService) ListDraftNotes(pid any, mergeRequest int, opt *ListDraftNotesOptions, options ...RequestOptionFunc) ([]*DraftNote, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -93,11 +123,7 @@ func (s *DraftNotesService) ListDraftNotes(pid interface{}, mergeRequest int, op
 	return n, resp, nil
 }
 
-// GetDraftNote gets a single draft note for a merge request.
-//
-// Gitlab API docs:
-// https://docs.gitlab.com/api/draft_notes/#get-a-single-draft-note
-func (s *DraftNotesService) GetDraftNote(pid interface{}, mergeRequest int, note int, options ...RequestOptionFunc) (*DraftNote, *Response, error) {
+func (s *DraftNotesService) GetDraftNote(pid any, mergeRequest int, note int, options ...RequestOptionFunc) (*DraftNote, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -121,7 +147,7 @@ func (s *DraftNotesService) GetDraftNote(pid interface{}, mergeRequest int, note
 // CreateDraftNoteOptions represents the available CreateDraftNote()
 // options.
 //
-// Gitlab API docs:
+// GitLab API docs:
 // https://docs.gitlab.com/api/draft_notes/#create-a-draft-note
 type CreateDraftNoteOptions struct {
 	Note                  *string          `url:"note" json:"note"`
@@ -131,11 +157,7 @@ type CreateDraftNoteOptions struct {
 	Position              *PositionOptions `url:"position,omitempty" json:"position,omitempty"`
 }
 
-// CreateDraftNote creates a draft note for a merge request.
-//
-// Gitlab API docs:
-// https://docs.gitlab.com/api/draft_notes/#create-a-draft-note
-func (s *DraftNotesService) CreateDraftNote(pid interface{}, mergeRequest int, opt *CreateDraftNoteOptions, options ...RequestOptionFunc) (*DraftNote, *Response, error) {
+func (s *DraftNotesService) CreateDraftNote(pid any, mergeRequest int, opt *CreateDraftNoteOptions, options ...RequestOptionFunc) (*DraftNote, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -159,17 +181,14 @@ func (s *DraftNotesService) CreateDraftNote(pid interface{}, mergeRequest int, o
 // UpdateDraftNoteOptions represents the available UpdateDraftNote()
 // options.
 //
-// Gitlab API docs:
+// GitLab API docs:
 // https://docs.gitlab.com/api/draft_notes/#create-a-draft-note
 type UpdateDraftNoteOptions struct {
 	Note     *string          `url:"note,omitempty" json:"note,omitempty"`
 	Position *PositionOptions `url:"position,omitempty" json:"position,omitempty"`
 }
 
-// UpdateDraftNote updates a draft note for a merge request.
-//
-// Gitlab API docs: https://docs.gitlab.com/api/draft_notes/#create-a-draft-note
-func (s *DraftNotesService) UpdateDraftNote(pid interface{}, mergeRequest int, note int, opt *UpdateDraftNoteOptions, options ...RequestOptionFunc) (*DraftNote, *Response, error) {
+func (s *DraftNotesService) UpdateDraftNote(pid any, mergeRequest int, note int, opt *UpdateDraftNoteOptions, options ...RequestOptionFunc) (*DraftNote, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -190,11 +209,7 @@ func (s *DraftNotesService) UpdateDraftNote(pid interface{}, mergeRequest int, n
 	return n, resp, nil
 }
 
-// DeleteDraftNote deletes a single draft note for a merge request.
-//
-// Gitlab API docs:
-// https://docs.gitlab.com/api/draft_notes/#delete-a-draft-note
-func (s *DraftNotesService) DeleteDraftNote(pid interface{}, mergeRequest int, note int, options ...RequestOptionFunc) (*Response, error) {
+func (s *DraftNotesService) DeleteDraftNote(pid any, mergeRequest int, note int, options ...RequestOptionFunc) (*Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, err
@@ -209,11 +224,7 @@ func (s *DraftNotesService) DeleteDraftNote(pid interface{}, mergeRequest int, n
 	return s.client.Do(req, nil)
 }
 
-// PublishDraftNote publishes a single draft note for a merge request.
-//
-// Gitlab API docs:
-// https://docs.gitlab.com/api/draft_notes/#publish-a-draft-note
-func (s *DraftNotesService) PublishDraftNote(pid interface{}, mergeRequest int, note int, options ...RequestOptionFunc) (*Response, error) {
+func (s *DraftNotesService) PublishDraftNote(pid any, mergeRequest int, note int, options ...RequestOptionFunc) (*Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, err
@@ -228,11 +239,7 @@ func (s *DraftNotesService) PublishDraftNote(pid interface{}, mergeRequest int, 
 	return s.client.Do(req, nil)
 }
 
-// PublishAllDraftNotes publishes all draft notes for a merge request that belong to the user.
-//
-// Gitlab API docs:
-// https://docs.gitlab.com/api/draft_notes/#publish-a-draft-note
-func (s *DraftNotesService) PublishAllDraftNotes(pid interface{}, mergeRequest int, options ...RequestOptionFunc) (*Response, error) {
+func (s *DraftNotesService) PublishAllDraftNotes(pid any, mergeRequest int, options ...RequestOptionFunc) (*Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, err

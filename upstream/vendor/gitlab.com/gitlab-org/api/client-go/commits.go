@@ -29,19 +29,86 @@ import (
 // GitLab API docs: https://docs.gitlab.com/api/commits/
 type (
 	CommitsServiceInterface interface {
-		ListCommits(pid interface{}, opt *ListCommitsOptions, options ...RequestOptionFunc) ([]*Commit, *Response, error)
-		GetCommitRefs(pid interface{}, sha string, opt *GetCommitRefsOptions, options ...RequestOptionFunc) ([]*CommitRef, *Response, error)
-		GetCommit(pid interface{}, sha string, opt *GetCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error)
-		CreateCommit(pid interface{}, opt *CreateCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error)
-		GetCommitDiff(pid interface{}, sha string, opt *GetCommitDiffOptions, options ...RequestOptionFunc) ([]*Diff, *Response, error)
-		GetCommitComments(pid interface{}, sha string, opt *GetCommitCommentsOptions, options ...RequestOptionFunc) ([]*CommitComment, *Response, error)
-		PostCommitComment(pid interface{}, sha string, opt *PostCommitCommentOptions, options ...RequestOptionFunc) (*CommitComment, *Response, error)
-		GetCommitStatuses(pid interface{}, sha string, opt *GetCommitStatusesOptions, options ...RequestOptionFunc) ([]*CommitStatus, *Response, error)
-		SetCommitStatus(pid interface{}, sha string, opt *SetCommitStatusOptions, options ...RequestOptionFunc) (*CommitStatus, *Response, error)
-		ListMergeRequestsByCommit(pid interface{}, sha string, options ...RequestOptionFunc) ([]*BasicMergeRequest, *Response, error)
-		CherryPickCommit(pid interface{}, sha string, opt *CherryPickCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error)
-		RevertCommit(pid interface{}, sha string, opt *RevertCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error)
-		GetGPGSignature(pid interface{}, sha string, options ...RequestOptionFunc) (*GPGSignature, *Response, error)
+		// ListCommits gets a list of repository commits in a project.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/commits/#list-repository-commits
+		ListCommits(pid any, opt *ListCommitsOptions, options ...RequestOptionFunc) ([]*Commit, *Response, error)
+
+		// GetCommitRefs gets all references (from branches or tags) a commit is pushed to.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/commits/#get-references-a-commit-is-pushed-to
+		GetCommitRefs(pid any, sha string, opt *GetCommitRefsOptions, options ...RequestOptionFunc) ([]*CommitRef, *Response, error)
+
+		// GetCommit gets a specific commit identified by the commit hash or name of a
+		// branch or tag.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/commits/#get-a-single-commit
+		GetCommit(pid any, sha string, opt *GetCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error)
+
+		// CreateCommit creates a commit with multiple files and actions.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/commits/#create-a-commit-with-multiple-files-and-actions
+		CreateCommit(pid any, opt *CreateCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error)
+
+		// GetCommitDiff gets the diff of a commit in a project.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/commits/#get-the-diff-of-a-commit
+		GetCommitDiff(pid any, sha string, opt *GetCommitDiffOptions, options ...RequestOptionFunc) ([]*Diff, *Response, error)
+
+		// GetCommitComments gets the comments of a commit in a project.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/commits/#get-the-comments-of-a-commit
+		GetCommitComments(pid any, sha string, opt *GetCommitCommentsOptions, options ...RequestOptionFunc) ([]*CommitComment, *Response, error)
+
+		// PostCommitComment adds a comment to a commit. Optionally you can post
+		// comments on a specific line of a commit. Therefore both path, line_new and
+		// line_old are required.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/commits/#post-comment-to-commit
+		PostCommitComment(pid any, sha string, opt *PostCommitCommentOptions, options ...RequestOptionFunc) (*CommitComment, *Response, error)
+
+		// GetCommitStatuses gets the statuses of a commit in a project.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/commits/#list-the-statuses-of-a-commit
+		GetCommitStatuses(pid any, sha string, opt *GetCommitStatusesOptions, options ...RequestOptionFunc) ([]*CommitStatus, *Response, error)
+
+		// SetCommitStatus sets the status of a commit in a project.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/commits/#set-the-pipeline-status-of-a-commit
+		SetCommitStatus(pid any, sha string, opt *SetCommitStatusOptions, options ...RequestOptionFunc) (*CommitStatus, *Response, error)
+
+		// ListMergeRequestsByCommit gets merge request associated with a commit.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/commits/#list-merge-requests-associated-with-a-commit
+		ListMergeRequestsByCommit(pid any, sha string, options ...RequestOptionFunc) ([]*BasicMergeRequest, *Response, error)
+
+		// CherryPickCommit cherry picks a commit to a given branch.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/commits/#cherry-pick-a-commit
+		CherryPickCommit(pid any, sha string, opt *CherryPickCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error)
+
+		// RevertCommit reverts a commit in a given branch.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/commits/#revert-a-commit
+		RevertCommit(pid any, sha string, opt *RevertCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error)
+
+		// GetGPGSignature gets a GPG signature of a commit.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/commits/#get-signature-of-a-commit
+		GetGPGSignature(pid any, sha string, options ...RequestOptionFunc) (*GPGSignature, *Response, error)
 	}
 
 	// CommitsService handles communication with the commit related methods
@@ -109,10 +176,7 @@ type ListCommitsOptions struct {
 	Trailers    *bool      `url:"trailers,omitempty" json:"trailers,omitempty"`
 }
 
-// ListCommits gets a list of repository commits in a project.
-//
-// GitLab API docs: https://docs.gitlab.com/api/commits/#list-repository-commits
-func (s *CommitsService) ListCommits(pid interface{}, opt *ListCommitsOptions, options ...RequestOptionFunc) ([]*Commit, *Response, error) {
+func (s *CommitsService) ListCommits(pid any, opt *ListCommitsOptions, options ...RequestOptionFunc) ([]*Commit, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -151,11 +215,7 @@ type GetCommitRefsOptions struct {
 	Type *string `url:"type,omitempty" json:"type,omitempty"`
 }
 
-// GetCommitRefs gets all references (from branches or tags) a commit is pushed to
-//
-// GitLab API docs:
-// https://docs.gitlab.com/api/commits/#get-references-a-commit-is-pushed-to
-func (s *CommitsService) GetCommitRefs(pid interface{}, sha string, opt *GetCommitRefsOptions, options ...RequestOptionFunc) ([]*CommitRef, *Response, error) {
+func (s *CommitsService) GetCommitRefs(pid any, sha string, opt *GetCommitRefsOptions, options ...RequestOptionFunc) ([]*CommitRef, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -184,11 +244,7 @@ type GetCommitOptions struct {
 	Stats *bool `url:"stats,omitempty" json:"stats,omitempty"`
 }
 
-// GetCommit gets a specific commit identified by the commit hash or name of a
-// branch or tag.
-//
-// GitLab API docs: https://docs.gitlab.com/api/commits/#get-a-single-commit
-func (s *CommitsService) GetCommit(pid interface{}, sha string, opt *GetCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error) {
+func (s *CommitsService) GetCommit(pid any, sha string, opt *GetCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -242,10 +298,7 @@ type CommitActionOptions struct {
 	ExecuteFilemode *bool            `url:"execute_filemode,omitempty" json:"execute_filemode,omitempty"`
 }
 
-// CreateCommit creates a commit with multiple files and actions.
-//
-// GitLab API docs: https://docs.gitlab.com/api/commits/#create-a-commit-with-multiple-files-and-actions
-func (s *CommitsService) CreateCommit(pid interface{}, opt *CreateCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error) {
+func (s *CommitsService) CreateCommit(pid any, opt *CreateCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -293,11 +346,7 @@ type GetCommitDiffOptions struct {
 	Unidiff *bool `url:"unidiff,omitempty" json:"unidiff,omitempty"`
 }
 
-// GetCommitDiff gets the diff of a commit in a project..
-//
-// GitLab API docs:
-// https://docs.gitlab.com/api/commits/#get-the-diff-of-a-commit
-func (s *CommitsService) GetCommitDiff(pid interface{}, sha string, opt *GetCommitDiffOptions, options ...RequestOptionFunc) ([]*Diff, *Response, error) {
+func (s *CommitsService) GetCommitDiff(pid any, sha string, opt *GetCommitDiffOptions, options ...RequestOptionFunc) ([]*Diff, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -350,11 +399,7 @@ func (c CommitComment) String() string {
 // https://docs.gitlab.com/api/commits/#get-the-comments-of-a-commit
 type GetCommitCommentsOptions ListOptions
 
-// GetCommitComments gets the comments of a commit in a project.
-//
-// GitLab API docs:
-// https://docs.gitlab.com/api/commits/#get-the-comments-of-a-commit
-func (s *CommitsService) GetCommitComments(pid interface{}, sha string, opt *GetCommitCommentsOptions, options ...RequestOptionFunc) ([]*CommitComment, *Response, error) {
+func (s *CommitsService) GetCommitComments(pid any, sha string, opt *GetCommitCommentsOptions, options ...RequestOptionFunc) ([]*CommitComment, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -387,13 +432,7 @@ type PostCommitCommentOptions struct {
 	LineType *string `url:"line_type" json:"line_type"`
 }
 
-// PostCommitComment adds a comment to a commit. Optionally you can post
-// comments on a specific line of a commit. Therefor both path, line_new and
-// line_old are required.
-//
-// GitLab API docs:
-// https://docs.gitlab.com/api/commits/#post-comment-to-commit
-func (s *CommitsService) PostCommitComment(pid interface{}, sha string, opt *PostCommitCommentOptions, options ...RequestOptionFunc) (*CommitComment, *Response, error) {
+func (s *CommitsService) PostCommitComment(pid any, sha string, opt *PostCommitCommentOptions, options ...RequestOptionFunc) (*CommitComment, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -419,10 +458,11 @@ func (s *CommitsService) PostCommitComment(pid interface{}, sha string, opt *Pos
 // GitLab API docs: https://docs.gitlab.com/api/commits/#list-the-statuses-of-a-commit
 type GetCommitStatusesOptions struct {
 	ListOptions
-	Ref   *string `url:"ref,omitempty" json:"ref,omitempty"`
-	Stage *string `url:"stage,omitempty" json:"stage,omitempty"`
-	Name  *string `url:"name,omitempty" json:"name,omitempty"`
-	All   *bool   `url:"all,omitempty" json:"all,omitempty"`
+	Ref        *string `url:"ref,omitempty" json:"ref,omitempty"`
+	Stage      *string `url:"stage,omitempty" json:"stage,omitempty"`
+	Name       *string `url:"name,omitempty" json:"name,omitempty"`
+	PipelineID *int    `url:"pipeline_id,omitempty" json:"pipeline_id,omitempty"`
+	All        *bool   `url:"all,omitempty" json:"all,omitempty"`
 }
 
 // CommitStatus represents a GitLab commit status.
@@ -445,10 +485,7 @@ type CommitStatus struct {
 	TargetURL    string     `json:"target_url"`
 }
 
-// GetCommitStatuses gets the statuses of a commit in a project.
-//
-// GitLab API docs: https://docs.gitlab.com/api/commits/#list-the-statuses-of-a-commit
-func (s *CommitsService) GetCommitStatuses(pid interface{}, sha string, opt *GetCommitStatusesOptions, options ...RequestOptionFunc) ([]*CommitStatus, *Response, error) {
+func (s *CommitsService) GetCommitStatuses(pid any, sha string, opt *GetCommitStatusesOptions, options ...RequestOptionFunc) ([]*CommitStatus, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -483,10 +520,7 @@ type SetCommitStatusOptions struct {
 	PipelineID  *int            `url:"pipeline_id,omitempty" json:"pipeline_id,omitempty"`
 }
 
-// SetCommitStatus sets the status of a commit in a project.
-//
-// GitLab API docs: https://docs.gitlab.com/api/commits/#set-the-pipeline-status-of-a-commit
-func (s *CommitsService) SetCommitStatus(pid interface{}, sha string, opt *SetCommitStatusOptions, options ...RequestOptionFunc) (*CommitStatus, *Response, error) {
+func (s *CommitsService) SetCommitStatus(pid any, sha string, opt *SetCommitStatusOptions, options ...RequestOptionFunc) (*CommitStatus, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -507,11 +541,7 @@ func (s *CommitsService) SetCommitStatus(pid interface{}, sha string, opt *SetCo
 	return cs, resp, nil
 }
 
-// ListMergeRequestsByCommit gets merge request associated with a commit.
-//
-// GitLab API docs:
-// https://docs.gitlab.com/api/commits/#list-merge-requests-associated-with-a-commit
-func (s *CommitsService) ListMergeRequestsByCommit(pid interface{}, sha string, options ...RequestOptionFunc) ([]*BasicMergeRequest, *Response, error) {
+func (s *CommitsService) ListMergeRequestsByCommit(pid any, sha string, options ...RequestOptionFunc) ([]*BasicMergeRequest, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -541,10 +571,7 @@ type CherryPickCommitOptions struct {
 	Message *string `url:"message,omitempty" json:"message,omitempty"`
 }
 
-// CherryPickCommit cherry picks a commit to a given branch.
-//
-// GitLab API docs: https://docs.gitlab.com/api/commits/#cherry-pick-a-commit
-func (s *CommitsService) CherryPickCommit(pid interface{}, sha string, opt *CherryPickCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error) {
+func (s *CommitsService) CherryPickCommit(pid any, sha string, opt *CherryPickCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -572,10 +599,7 @@ type RevertCommitOptions struct {
 	Branch *string `url:"branch,omitempty" json:"branch,omitempty"`
 }
 
-// RevertCommit reverts a commit in a given branch.
-//
-// GitLab API docs: https://docs.gitlab.com/api/commits/#revert-a-commit
-func (s *CommitsService) RevertCommit(pid interface{}, sha string, opt *RevertCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error) {
+func (s *CommitsService) RevertCommit(pid any, sha string, opt *RevertCommitOptions, options ...RequestOptionFunc) (*Commit, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
@@ -609,10 +633,7 @@ type GPGSignature struct {
 	KeySubkeyID        int    `json:"gpg_key_subkey_id"`
 }
 
-// GetGPGSignature gets a GPG signature of a commit.
-//
-// GitLab API docs: https://docs.gitlab.com/api/commits/#get-signature-of-a-commit
-func (s *CommitsService) GetGPGSignature(pid interface{}, sha string, options ...RequestOptionFunc) (*GPGSignature, *Response, error) {
+func (s *CommitsService) GetGPGSignature(pid any, sha string, options ...RequestOptionFunc) (*GPGSignature, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err

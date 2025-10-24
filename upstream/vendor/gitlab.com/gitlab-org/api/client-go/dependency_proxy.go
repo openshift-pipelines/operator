@@ -21,7 +21,12 @@ import (
 
 type (
 	DependencyProxyServiceInterface interface {
-		PurgeGroupDependencyProxy(gid interface{}, options ...RequestOptionFunc) (*Response, error)
+		// PurgeGroupDependencyProxy schedules for deletion the cached manifests and blobs
+		// for a group. This endpoint requires the Owner role for the group.
+		//
+		// GitLab API docs:
+		// https://docs.gitlab.com/api/dependency_proxy/#purge-the-dependency-proxy-for-a-group
+		PurgeGroupDependencyProxy(gid any, options ...RequestOptionFunc) (*Response, error)
 	}
 
 	// DependencyProxyService handles communication with the dependency proxy
@@ -35,12 +40,7 @@ type (
 
 var _ DependencyProxyServiceInterface = (*DependencyProxyService)(nil)
 
-// PurgeGroupDependencyProxy schedules for deletion the cached manifests and blobs
-// for a group. This endpoint requires the Owner role for the group.
-//
-// GitLab API docs:
-// https://docs.gitlab.com/api/dependency_proxy/#purge-the-dependency-proxy-for-a-group
-func (s *DependencyProxyService) PurgeGroupDependencyProxy(gid interface{}, options ...RequestOptionFunc) (*Response, error) {
+func (s *DependencyProxyService) PurgeGroupDependencyProxy(gid any, options ...RequestOptionFunc) (*Response, error) {
 	group, err := parseID(gid)
 	if err != nil {
 		return nil, err

@@ -24,9 +24,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"math/rand"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
 	"sort"
@@ -50,6 +52,9 @@ const (
 
 	headerRateLimit = "RateLimit-Limit"
 	headerRateReset = "RateLimit-Reset"
+
+	AccessTokenHeaderName = "PRIVATE-TOKEN"
+	JobTokenHeaderName    = "JOB-TOKEN"
 )
 
 // AuthType represents an authentication type within GitLab.
@@ -89,20 +94,22 @@ type Client struct {
 	// Limiter is used to limit API calls and prevent 429 responses.
 	limiter RateLimiter
 
-	// Token type used to make authenticated API calls.
-	authType AuthType
+	// authSource is used to obtain authentication headers.
+	authSource AuthSource
 
-	// Username and password used for basic authentication.
-	username, password string
+	// authSourceInit is used to ensure that AuthSources are initialized only
+	// once.
+	authSourceInit sync.Once
 
-	// Token used to make authenticated API calls.
-	token string
-
-	// Protects the token field from concurrent read/write accesses.
-	tokenLock sync.RWMutex
+	// jar is the cookie jar to use with the HTTP client
+	jar http.CookieJar
 
 	// Default request options applied to every request.
 	defaultRequestOptions []RequestOptionFunc
+
+	// interceptors contain the stack of *http.Client round tripper builder func
+	// which are used to decorate the http.Client#Transport value.
+	interceptors []Interceptor
 
 	// User agent used when communicating with the GitLab API.
 	UserAgent string
@@ -161,12 +168,15 @@ type Client struct {
 	GroupCluster                     GroupClustersServiceInterface
 	GroupEpicBoards                  GroupEpicBoardsServiceInterface
 	GroupImportExport                GroupImportExportServiceInterface
+	Integrations                     IntegrationsServiceInterface
 	GroupIssueBoards                 GroupIssueBoardsServiceInterface
 	GroupIterations                  GroupIterationsServiceInterface
 	GroupLabels                      GroupLabelsServiceInterface
+	GroupMarkdownUploads             GroupMarkdownUploadsServiceInterface
 	GroupMembers                     GroupMembersServiceInterface
 	GroupMilestones                  GroupMilestonesServiceInterface
 	GroupProtectedEnvironments       GroupProtectedEnvironmentsServiceInterface
+	GroupRelationsExport             GroupRelationsExportServiceInterface
 	GroupReleases                    GroupReleasesServiceInterface
 	GroupRepositoryStorageMove       GroupRepositoryStorageMoveServiceInterface
 	GroupSCIM                        GroupSCIMServiceInterface
@@ -188,15 +198,16 @@ type Client struct {
 	Labels                           LabelsServiceInterface
 	License                          LicenseServiceInterface
 	LicenseTemplates                 LicenseTemplatesServiceInterface
-	ManagedLicenses                  ManagedLicensesServiceInterface
 	Markdown                         MarkdownServiceInterface
 	MemberRolesService               MemberRolesServiceInterface
 	MergeRequestApprovals            MergeRequestApprovalsServiceInterface
 	MergeRequestApprovalSettings     MergeRequestApprovalSettingsServiceInterface
+	MergeRequestContextCommits       MergeRequestContextCommitsServiceInterface
 	MergeRequests                    MergeRequestsServiceInterface
 	MergeTrains                      MergeTrainsServiceInterface
 	Metadata                         MetadataServiceInterface
 	Milestones                       MilestonesServiceInterface
+	ModelRegistry                    ModelRegistryServiceInterface
 	Namespaces                       NamespacesServiceInterface
 	Notes                            NotesServiceInterface
 	NotificationSettings             NotificationSettingsServiceInterface
@@ -209,6 +220,7 @@ type Client struct {
 	Pipelines                        PipelinesServiceInterface
 	PlanLimits                       PlanLimitsServiceInterface
 	ProjectAccessTokens              ProjectAccessTokensServiceInterface
+	ProjectAliases                   ProjectAliasesServiceInterface
 	ProjectBadges                    ProjectBadgesServiceInterface
 	ProjectCluster                   ProjectClustersServiceInterface
 	ProjectFeatureFlags              ProjectFeatureFlagServiceInterface
@@ -220,12 +232,14 @@ type Client struct {
 	ProjectRepositoryStorageMove     ProjectRepositoryStorageMoveServiceInterface
 	ProjectSecuritySettings          ProjectSecuritySettingsServiceInterface
 	ProjectSnippets                  ProjectSnippetsServiceInterface
+	ProjectStatistics                ProjectStatisticsServiceInterface
 	ProjectTemplates                 ProjectTemplatesServiceInterface
 	ProjectVariables                 ProjectVariablesServiceInterface
 	ProjectVulnerabilities           ProjectVulnerabilitiesServiceInterface
 	Projects                         ProjectsServiceInterface
 	ProtectedBranches                ProtectedBranchesServiceInterface
 	ProtectedEnvironments            ProtectedEnvironmentsServiceInterface
+	ProtectedPackages                ProtectedPackagesServiceInterface
 	ProtectedTags                    ProtectedTagsServiceInterface
 	ReleaseLinks                     ReleaseLinksServiceInterface
 	Releases                         ReleasesServiceInterface
@@ -248,6 +262,7 @@ type Client struct {
 	Snippets                         SnippetsServiceInterface
 	SystemHooks                      SystemHooksServiceInterface
 	Tags                             TagsServiceInterface
+	TerraformStates                  TerraformStatesServiceInterface
 	Todos                            TodosServiceInterface
 	Topics                           TopicsServiceInterface
 	UsageData                        UsageDataServiceInterface
@@ -256,6 +271,32 @@ type Client struct {
 	Version                          VersionServiceInterface
 	Wikis                            WikisServiceInterface
 }
+
+// Interceptor is used to build a *http.Client request pipeline,
+//
+// It receives the next RoundTripper in the chain and returns a new one that
+// will be used for the request.
+//
+// This next RoundTripper might or might not be the actual transporter,
+// which actually does the request call,
+// but it is safe to assume that calling the next will result in the expected HTTP call.
+//
+// Example:
+//
+//	// Simple logger interceptor.
+//	logger := func(next http.RoundTripper) http.RoundTripper {
+//	    return roundtripperFunc(func(req *http.Request) (*http.Response, error) {
+//	        fmt.Printf("Request: %s %s\n", req.Method, req.URL)
+//	        resp, err := next.RoundTrip(req)
+//	        if err == nil {
+//	            fmt.Printf("Response status: %d\n", resp.StatusCode)
+//	        }
+//	        return resp, err
+//	    })
+//	}
+//
+// The Interceptor type lets you add such middlewares to a client by chaining them.
+type Interceptor func(next http.RoundTripper) http.RoundTripper
 
 // ListOptions specifies the optional parameters to various List methods that
 // support pagination.
@@ -282,56 +323,60 @@ type RateLimiter interface {
 // NewClient returns a new GitLab API client. To use API methods which require
 // authentication, provide a valid private or personal token.
 func NewClient(token string, options ...ClientOptionFunc) (*Client, error) {
-	client, err := newClient(options...)
-	if err != nil {
-		return nil, err
-	}
-	client.authType = PrivateToken
-	client.token = token
-	return client, nil
+	as := AccessTokenAuthSource{Token: token}
+	return NewAuthSourceClient(as, options...)
 }
 
-// NewBasicAuthClient returns a new GitLab API client. To use API methods which
-// require authentication, provide a valid username and password.
+// NewBasicAuthClient returns a new GitLab API client using the OAuth 2.0 Resource Owner Password Credentials flow.
+// The provided username and password are used to obtain an OAuth access token
+// from GitLab's token endpoint on the first API request. The token is then
+// cached, reused for subsequent requests, and refreshed when expired.
+//
+// The Resource Owner Password Credentials flow is only suitable for trusted,
+// first-party applications and does not work for users who have two-factor
+// authentication enabled.
+//
+// Note: This method uses OAuth tokens with Bearer authentication, not HTTP Basic Auth.
+//
+// Deprecated: GitLab recommends against using this authentication method.
 func NewBasicAuthClient(username, password string, options ...ClientOptionFunc) (*Client, error) {
-	client, err := newClient(options...)
-	if err != nil {
-		return nil, err
+	as := &PasswordCredentialsAuthSource{
+		Username: username,
+		Password: password,
 	}
 
-	client.authType = BasicAuth
-	client.username = username
-	client.password = password
-
-	return client, nil
+	return NewAuthSourceClient(as, options...)
 }
 
 // NewJobClient returns a new GitLab API client. To use API methods which require
 // authentication, provide a valid job token.
 func NewJobClient(token string, options ...ClientOptionFunc) (*Client, error) {
-	client, err := newClient(options...)
-	if err != nil {
-		return nil, err
-	}
-	client.authType = JobToken
-	client.token = token
-	return client, nil
+	as := JobTokenAuthSource{Token: token}
+	return NewAuthSourceClient(as, options...)
 }
 
-// NewOAuthClient returns a new GitLab API client. To use API methods which
-// require authentication, provide a valid oauth token.
+// NewOAuthClient returns a new GitLab API client using a static OAuth bearer token for authentication.
+//
+// Deprecated: use NewAuthSourceClient with a StaticTokenSource instead. For example:
+//
+//	ts := oauth2.StaticTokenSource(
+//	    &oauth2.Token{AccessToken: "YOUR STATIC TOKEN"},
+//	)
+//	c, err := gitlab.NewAuthSourceClient(gitlab.OAuthTokenSource{ts})
 func NewOAuthClient(token string, options ...ClientOptionFunc) (*Client, error) {
-	client, err := newClient(options...)
-	if err != nil {
-		return nil, err
+	as := OAuthTokenSource{
+		TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token}),
 	}
-	client.authType = OAuthToken
-	client.token = token
-	return client, nil
+
+	return NewAuthSourceClient(as, options...)
 }
 
-func newClient(options ...ClientOptionFunc) (*Client, error) {
-	c := &Client{UserAgent: userAgent}
+// NewAuthSourceClient returns a new GitLab API client that uses the AuthSource for authentication.
+func NewAuthSourceClient(as AuthSource, options ...ClientOptionFunc) (*Client, error) {
+	c := &Client{
+		UserAgent:  userAgent,
+		authSource: as,
+	}
 
 	// Configure the HTTP client.
 	c.client = &retryablehttp.Client{
@@ -355,6 +400,20 @@ func newClient(options ...ClientOptionFunc) (*Client, error) {
 		if err := fn(c); err != nil {
 			return nil, err
 		}
+	}
+
+	decorateHTTPClientTransportWithInterceptors(c)
+
+	// Wire up the cookie jar.
+	// The ClientOptionFunc can't do it directly,
+	// because the user may also specify HTTPClient
+	// and we want the order of passing those to matter
+	// as little as possible.
+	if c.jar != nil {
+		if c.client.HTTPClient.Jar != nil {
+			return nil, errors.New("conflicting option functions when creating client. The provided HTTP Client already has a Jar configured, therefore you can't use gitlab.WithCookieJar")
+		}
+		c.client.HTTPClient.Jar = c.jar
 	}
 
 	// If no custom limiter was set using a client option, configure
@@ -422,12 +481,15 @@ func newClient(options ...ClientOptionFunc) (*Client, error) {
 	c.GroupCluster = &GroupClustersService{client: c}
 	c.GroupEpicBoards = &GroupEpicBoardsService{client: c}
 	c.GroupImportExport = &GroupImportExportService{client: c}
+	c.Integrations = &IntegrationsService{client: c}
 	c.GroupIssueBoards = &GroupIssueBoardsService{client: c}
 	c.GroupIterations = &GroupIterationsService{client: c}
 	c.GroupLabels = &GroupLabelsService{client: c}
+	c.GroupMarkdownUploads = &GroupMarkdownUploadsService{client: c}
 	c.GroupMembers = &GroupMembersService{client: c}
 	c.GroupMilestones = &GroupMilestonesService{client: c}
 	c.GroupProtectedEnvironments = &GroupProtectedEnvironmentsService{client: c}
+	c.GroupRelationsExport = &GroupRelationsExportService{client: c}
 	c.GroupReleases = &GroupReleasesService{client: c}
 	c.GroupRepositoryStorageMove = &GroupRepositoryStorageMoveService{client: c}
 	c.GroupSCIM = &GroupSCIMService{client: c}
@@ -449,15 +511,16 @@ func newClient(options ...ClientOptionFunc) (*Client, error) {
 	c.Labels = &LabelsService{client: c}
 	c.License = &LicenseService{client: c}
 	c.LicenseTemplates = &LicenseTemplatesService{client: c}
-	c.ManagedLicenses = &ManagedLicensesService{client: c}
 	c.Markdown = &MarkdownService{client: c}
 	c.MemberRolesService = &MemberRolesService{client: c}
 	c.MergeRequestApprovals = &MergeRequestApprovalsService{client: c}
 	c.MergeRequestApprovalSettings = &MergeRequestApprovalSettingsService{client: c}
+	c.MergeRequestContextCommits = &MergeRequestContextCommitsService{client: c}
 	c.MergeRequests = &MergeRequestsService{client: c, timeStats: timeStats}
 	c.MergeTrains = &MergeTrainsService{client: c}
 	c.Metadata = &MetadataService{client: c}
 	c.Milestones = &MilestonesService{client: c}
+	c.ModelRegistry = &ModelRegistryService{client: c}
 	c.Namespaces = &NamespacesService{client: c}
 	c.Notes = &NotesService{client: c}
 	c.NotificationSettings = &NotificationSettingsService{client: c}
@@ -470,6 +533,7 @@ func newClient(options ...ClientOptionFunc) (*Client, error) {
 	c.Pipelines = &PipelinesService{client: c}
 	c.PlanLimits = &PlanLimitsService{client: c}
 	c.ProjectAccessTokens = &ProjectAccessTokensService{client: c}
+	c.ProjectAliases = &ProjectAliasesService{client: c}
 	c.ProjectBadges = &ProjectBadgesService{client: c}
 	c.ProjectCluster = &ProjectClustersService{client: c}
 	c.ProjectFeatureFlags = &ProjectFeatureFlagService{client: c}
@@ -481,12 +545,14 @@ func newClient(options ...ClientOptionFunc) (*Client, error) {
 	c.ProjectRepositoryStorageMove = &ProjectRepositoryStorageMoveService{client: c}
 	c.ProjectSecuritySettings = &ProjectSecuritySettingsService{client: c}
 	c.ProjectSnippets = &ProjectSnippetsService{client: c}
+	c.ProjectStatistics = &ProjectStatisticsService{client: c}
 	c.ProjectTemplates = &ProjectTemplatesService{client: c}
 	c.ProjectVariables = &ProjectVariablesService{client: c}
 	c.ProjectVulnerabilities = &ProjectVulnerabilitiesService{client: c}
 	c.Projects = &ProjectsService{client: c}
 	c.ProtectedBranches = &ProtectedBranchesService{client: c}
 	c.ProtectedEnvironments = &ProtectedEnvironmentsService{client: c}
+	c.ProtectedPackages = &ProtectedPackagesService{client: c}
 	c.ProtectedTags = &ProtectedTagsService{client: c}
 	c.ReleaseLinks = &ReleaseLinksService{client: c}
 	c.Releases = &ReleasesService{client: c}
@@ -509,6 +575,7 @@ func newClient(options ...ClientOptionFunc) (*Client, error) {
 	c.SnippetRepositoryStorageMove = &SnippetRepositoryStorageMoveService{client: c}
 	c.SystemHooks = &SystemHooksService{client: c}
 	c.Tags = &TagsService{client: c}
+	c.TerraformStates = &TerraformStatesService{client: c}
 	c.Todos = &TodosService{client: c}
 	c.Topics = &TopicsService{client: c}
 	c.UsageData = &UsageDataService{client: c}
@@ -520,18 +587,119 @@ func newClient(options ...ClientOptionFunc) (*Client, error) {
 	return c, nil
 }
 
+func decorateHTTPClientTransportWithInterceptors(c *Client) {
+	if len(c.interceptors) == 0 {
+		return
+	}
+	c.client.HTTPClient.Transport = chainInterceptors(c.client.HTTPClient.Transport, c.interceptors...)
+}
+
+func chainInterceptors(rt http.RoundTripper, interceptors ...Interceptor) http.RoundTripper {
+	for i := len(interceptors) - 1; i >= 0; i-- {
+		rt = interceptors[i](rt)
+	}
+	return rt
+}
+
+func (c *Client) HTTPClient() *http.Client {
+	return c.client.HTTPClient
+}
+
 // retryHTTPCheck provides a callback for Client.CheckRetry which
-// will retry both rate limit (429) and server (>= 500) errors.
+// respects default retries and retries what is safe to retry.
 func (c *Client) retryHTTPCheck(ctx context.Context, resp *http.Response, err error) (bool, error) {
+	// do not retry if retries are disabled completely
+	if c.disableRetries {
+		return false, nil
+	}
+
+	// do not retry on context.Canceled or context.DeadlineExceeded
 	if ctx.Err() != nil {
 		return false, ctx.Err()
 	}
+
 	if err != nil {
-		return false, err
+		// We should be able to retry requests with assumed idempotent HTTP methods.
+		// In a future iteration we might want to annotate requests that are idempotent
+		// to further improve this logic here.
+		if resp != nil && resp.Request != nil {
+			switch resp.Request.Method {
+			case http.MethodConnect, http.MethodOptions, http.MethodTrace, http.MethodHead, http.MethodGet:
+				return true, nil
+			}
+		}
+
+		// Only retry errors that we know happened before writing to the wire
+		var urlErr *url.Error
+		var netOpErr *net.OpError
+		var dnsErr *net.DNSError
+		// see Go src/net/http/transport.go
+		var potentialTLSHandshakeErr interface {
+			Timeout() bool
+			Temporary() bool
+		}
+
+		switch {
+		// DNS errors are safe - they happen before any connection
+		case errors.As(err, &dnsErr):
+			// NXDOMAIN should not be retried
+			if dnsErr.IsNotFound {
+				return false, err
+			}
+			// Other DNS errors are safe to retry
+			return true, nil
+
+		// Direct net.OpError for dial operations
+		case errors.As(err, &netOpErr):
+			// from the comments in the implementation of net.OpError.Temporary
+			// it seems that it's safe to retry temporary OpErrors.
+			if netOpErr.Temporary() {
+				return true, nil
+			}
+
+			if strings.EqualFold(netOpErr.Op, "dial") {
+				return true, nil
+			}
+
+		// Connection refused errors are safe - they happen at TCP establishment
+		case errors.As(err, &urlErr):
+			if strings.Contains(urlErr.Error(), "connection refused") {
+				return true, nil
+			}
+
+		// TLS handshake errors are safe if we can identify them
+		case errors.As(err, &potentialTLSHandshakeErr):
+			// Check if this is a TLS handshake timeout specifically
+			if strings.Contains(err.Error(), "net/http: TLS handshake timeout") {
+				return true, nil
+			}
+		}
+
+		// we are conservative here and do not want to retry any "unknown" errors, because
+		// they could have happened when the connection was already established and the request
+		// partially fulfilled. We don't have the insights here if the request
+		// was idempotent or not, so we reject a retry.
+		return false, nil
 	}
-	if !c.disableRetries && (resp.StatusCode == 429 || resp.StatusCode >= 500) {
+
+	// 429 Too Many Requests is recoverable. Sometimes the server puts
+	// a Retry-After response header to indicate when the server is
+	// available to start processing request from client.
+	if resp.StatusCode == http.StatusTooManyRequests {
 		return true, nil
 	}
+
+	// Check the response code. We retry on 500-range responses to allow
+	// the server time to recover, as 500's are typically not permanent
+	// errors and may relate to outages on the server side. This will catch
+	// invalid response codes as well, like 0 and 999.
+	// Status code 0 is especially important for AWS ALB:
+	// https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-troubleshooting.html#response-code-000
+	if resp.StatusCode == 0 || (resp.StatusCode >= 500 && resp.StatusCode != http.StatusNotImplemented) {
+		// return true, fmt.Errorf("unexpected HTTP status %s", resp.Status)
+		return true, nil
+	}
+
 	return false, nil
 }
 
@@ -647,7 +815,7 @@ func (c *Client) setBaseURL(urlStr string) error {
 // Relative URL paths should always be specified without a preceding slash.
 // If specified, the value pointed to by body is JSON encoded and included
 // as the request body.
-func (c *Client) NewRequest(method, path string, opt interface{}, options []RequestOptionFunc) (*retryablehttp.Request, error) {
+func (c *Client) NewRequest(method, path string, opt any, options []RequestOptionFunc) (*retryablehttp.Request, error) {
 	u := *c.baseURL
 	unescaped, err := url.PathUnescape(path)
 	if err != nil {
@@ -658,6 +826,14 @@ func (c *Client) NewRequest(method, path string, opt interface{}, options []Requ
 	u.RawPath = c.baseURL.Path + path
 	u.Path = c.baseURL.Path + unescaped
 
+	return c.NewRequestToURL(method, &u, opt, options)
+}
+
+func (c *Client) NewRequestToURL(method string, u *url.URL, opt any, options []RequestOptionFunc) (*retryablehttp.Request, error) {
+	if u.Scheme != c.baseURL.Scheme || u.Host != c.baseURL.Host {
+		return nil, fmt.Errorf("client only allows requests to URLs matching the clients configured base URL. Got %q, base URL is %q", u.String(), c.baseURL.String())
+	}
+
 	// Create a request specific headers map.
 	reqHeaders := make(http.Header)
 	reqHeaders.Set("Accept", "application/json")
@@ -666,16 +842,17 @@ func (c *Client) NewRequest(method, path string, opt interface{}, options []Requ
 		reqHeaders.Set("User-Agent", c.UserAgent)
 	}
 
-	var body interface{}
+	var body any
 	switch {
 	case method == http.MethodPatch || method == http.MethodPost || method == http.MethodPut:
 		reqHeaders.Set("Content-Type", "application/json")
 
 		if opt != nil {
-			body, err = json.Marshal(opt)
+			b, err := json.Marshal(opt)
 			if err != nil {
 				return nil, err
 			}
+			body = b
 		}
 	case opt != nil:
 		q, err := query.Values(opt)
@@ -700,9 +877,7 @@ func (c *Client) NewRequest(method, path string, opt interface{}, options []Requ
 	}
 
 	// Set the request specific headers.
-	for k, v := range reqHeaders {
-		req.Header[k] = v
-	}
+	maps.Copy(req.Header, reqHeaders)
 
 	return req, nil
 }
@@ -712,7 +887,7 @@ func (c *Client) NewRequest(method, path string, opt interface{}, options []Requ
 // URL of the Client. Relative URL paths should always be specified without
 // a preceding slash. If specified, the value pointed to by body is JSON
 // encoded and included as the request body.
-func (c *Client) UploadRequest(method, path string, content io.Reader, filename string, uploadType UploadType, opt interface{}, options []RequestOptionFunc) (*retryablehttp.Request, error) {
+func (c *Client) UploadRequest(method, path string, content io.Reader, filename string, uploadType UploadType, opt any, options []RequestOptionFunc) (*retryablehttp.Request, error) {
 	u := *c.baseURL
 	unescaped, err := url.PathUnescape(path)
 	if err != nil {
@@ -776,9 +951,7 @@ func (c *Client) UploadRequest(method, path string, content io.Reader, filename 
 	}
 
 	// Set the request specific headers.
-	for k, v := range reqHeaders {
-		req.Header[k] = v
-	}
+	maps.Copy(req.Header, reqHeaders)
 
 	return req, nil
 }
@@ -881,58 +1054,45 @@ func (r *Response) populateLinkValues() {
 // error if an API error has occurred. If v implements the io.Writer
 // interface, the raw response body will be written to v, without attempting to
 // first decode it.
-func (c *Client) Do(req *retryablehttp.Request, v interface{}) (*Response, error) {
+func (c *Client) Do(req *retryablehttp.Request, v any) (*Response, error) {
 	// Wait will block until the limiter can obtain a new token.
 	err := c.limiter.Wait(req.Context())
 	if err != nil {
 		return nil, err
 	}
 
-	// Set the correct authentication header. If using basic auth, then check
-	// if we already have a token and if not first authenticate and get one.
-	var basicAuthToken string
-	switch c.authType {
-	case BasicAuth:
-		c.tokenLock.RLock()
-		basicAuthToken = c.token
-		c.tokenLock.RUnlock()
-		if basicAuthToken == "" {
-			// If we don't have a token yet, we first need to request one.
-			basicAuthToken, err = c.requestOAuthToken(req.Context(), basicAuthToken)
-			if err != nil {
-				return nil, err
-			}
-		}
-		req.Header.Set("Authorization", "Bearer "+basicAuthToken)
-	case JobToken:
-		if values := req.Header.Values("JOB-TOKEN"); len(values) == 0 {
-			req.Header.Set("JOB-TOKEN", c.token)
-		}
-	case OAuthToken:
-		if values := req.Header.Values("Authorization"); len(values) == 0 {
-			req.Header.Set("Authorization", "Bearer "+c.token)
-		}
-	case PrivateToken:
-		if values := req.Header.Values("PRIVATE-TOKEN"); len(values) == 0 {
-			req.Header.Set("PRIVATE-TOKEN", c.token)
-		}
+	c.authSourceInit.Do(func() {
+		err = c.authSource.Init(req.Context(), c)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("initializing token source failed: %w", err)
 	}
 
-	resp, err := c.client.Do(req)
+	authKey, authValue, err := c.authSource.Header(req.Context())
 	if err != nil {
 		return nil, err
 	}
 
-	if resp.StatusCode == http.StatusUnauthorized && c.authType == BasicAuth {
-		resp.Body.Close()
-		// The token most likely expired, so we need to request a new one and try again.
-		if _, err := c.requestOAuthToken(req.Context(), basicAuthToken); err != nil {
-			return nil, err
-		}
-		return c.Do(req, v)
+	if v := req.Header.Values(authKey); len(v) == 0 {
+		req.Header.Set(authKey, authValue)
 	}
-	defer resp.Body.Close()
-	defer io.Copy(io.Discard, resp.Body)
+
+	client := c.client
+
+	if cr := checkRetryFromContext(req.Context()); cr != nil {
+		// for avoid overwriting c.client. Use copy of c.client and apply checkRetry from request context
+		client = c.newRetryableHTTPClientWithRetryCheck(cr)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 
 	// If not yet configured, try to configure the rate limiter
 	// using the response headers we just received. Fail silently
@@ -959,46 +1119,36 @@ func (c *Client) Do(req *retryablehttp.Request, v interface{}) (*Response, error
 	return response, err
 }
 
-func (c *Client) requestOAuthToken(ctx context.Context, token string) (string, error) {
-	c.tokenLock.Lock()
-	defer c.tokenLock.Unlock()
+func (c *Client) endpoint() oauth2.Endpoint {
+	baseURL := strings.TrimSuffix(c.baseURL.String(), apiVersionPath)
 
-	// Return early if the token was updated while waiting for the lock.
-	if c.token != token {
-		return c.token, nil
+	return oauth2.Endpoint{
+		AuthURL:       baseURL + "oauth/authorize",
+		TokenURL:      baseURL + "oauth/token",
+		DeviceAuthURL: baseURL + "oauth/authorize_device",
 	}
-
-	config := &oauth2.Config{
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  strings.TrimSuffix(c.baseURL.String(), apiVersionPath) + "oauth/authorize",
-			TokenURL: strings.TrimSuffix(c.baseURL.String(), apiVersionPath) + "oauth/token",
-		},
-	}
-
-	ctx = context.WithValue(ctx, oauth2.HTTPClient, c.client.HTTPClient)
-	t, err := config.PasswordCredentialsToken(ctx, c.username, c.password)
-	if err != nil {
-		return "", err
-	}
-	c.token = t.AccessToken
-
-	return c.token, nil
 }
+
+// ErrInvalidIDType is returned when a function expecting an ID as either an integer
+// or string receives a different type. This error commonly occurs when working with
+// GitLab resources like groups and projects which support both numeric IDs and
+// path-based string identifiers.
+var ErrInvalidIDType = errors.New("the ID must be an int or a string")
 
 // Helper function to accept and format both the project ID or name as project
 // identifier for all API calls.
-func parseID(id interface{}) (string, error) {
+func parseID(id any) (string, error) {
 	switch v := id.(type) {
 	case int:
 		return strconv.Itoa(v), nil
 	case string:
 		return v, nil
 	default:
-		return "", fmt.Errorf("invalid ID type %#v, the ID must be an int or a string", id)
+		return "", fmt.Errorf("invalid ID type %#v, %w", id, ErrInvalidIDType)
 	}
 }
 
-// Helper function to escape a project identifier.
+// PathEscape is a helper function to escape a project identifier.
 func PathEscape(s string) string {
 	return strings.ReplaceAll(url.PathEscape(s), ".", "%2E")
 }
@@ -1027,6 +1177,10 @@ func (e *ErrorResponse) Error() string {
 	}
 }
 
+func (e *ErrorResponse) HasStatusCode(statusCode int) bool {
+	return e != nil && e.Response != nil && e.Response.StatusCode == statusCode
+}
+
 // CheckResponse checks the API response for errors, and returns them if present.
 func CheckResponse(r *http.Response) error {
 	switch r.StatusCode {
@@ -1042,7 +1196,7 @@ func CheckResponse(r *http.Response) error {
 	if err == nil && strings.TrimSpace(string(data)) != "" {
 		errorResponse.Body = data
 
-		var raw interface{}
+		var raw any
 		if err := json.Unmarshal(data, &raw); err != nil {
 			errorResponse.Message = fmt.Sprintf("failed to parse unknown error format: %s", data)
 		} else {
@@ -1072,19 +1226,19 @@ func CheckResponse(r *http.Response) error {
 //	    },
 //	    "error": "<error-message>"
 //	}
-func parseError(raw interface{}) string {
+func parseError(raw any) string {
 	switch raw := raw.(type) {
 	case string:
 		return raw
 
-	case []interface{}:
+	case []any:
 		var errs []string
 		for _, v := range raw {
 			errs = append(errs, parseError(v))
 		}
 		return fmt.Sprintf("[%s]", strings.Join(errs, ", "))
 
-	case map[string]interface{}:
+	case map[string]any:
 		var errs []string
 		for k, v := range raw {
 			errs = append(errs, fmt.Sprintf("{%s: %s}", k, parseError(v)))
@@ -1095,4 +1249,113 @@ func parseError(raw interface{}) string {
 	default:
 		return fmt.Sprintf("failed to parse unexpected error type: %T", raw)
 	}
+}
+
+func HasStatusCode(err error, statusCode int) bool {
+	var errResponse *ErrorResponse
+	if !errors.As(err, &errResponse) {
+		return false
+	}
+
+	return errResponse.HasStatusCode(statusCode)
+}
+
+// newRetryableHTTPClientWithRetryCheck returns a `retryablehttp.Client` clone of itself with the given CheckRetry function
+func (c *Client) newRetryableHTTPClientWithRetryCheck(cr retryablehttp.CheckRetry) *retryablehttp.Client {
+	return &retryablehttp.Client{
+		HTTPClient:     c.client.HTTPClient,
+		Logger:         c.client.Logger,
+		RetryWaitMin:   c.client.RetryWaitMin,
+		RetryWaitMax:   c.client.RetryWaitMax,
+		RetryMax:       c.client.RetryMax,
+		RequestLogHook: c.client.RequestLogHook,
+		CheckRetry:     cr,
+		Backoff:        c.client.Backoff,
+		ErrorHandler:   c.client.ErrorHandler,
+		PrepareRetry:   c.client.PrepareRetry,
+	}
+}
+
+// AuthSource is used to obtain access tokens.
+type AuthSource interface {
+	// Init is called once before making any requests.
+	// If the token source needs access to client to initialize itself, it should do so here.
+	Init(context.Context, *Client) error
+
+	// Header returns an authentication header. When no error is returned, the
+	// key and value should never be empty.
+	Header(ctx context.Context) (key, value string, err error)
+}
+
+// OAuthTokenSource wraps an oauth2.TokenSource to implement the AuthSource interface.
+type OAuthTokenSource struct {
+	TokenSource oauth2.TokenSource
+}
+
+func (OAuthTokenSource) Init(context.Context, *Client) error {
+	return nil
+}
+
+func (as OAuthTokenSource) Header(_ context.Context) (string, string, error) {
+	t, err := as.TokenSource.Token()
+	if err != nil {
+		return "", "", err
+	}
+
+	return "Authorization", "Bearer " + t.AccessToken, nil
+}
+
+// JobTokenAuthSource used as an AuthSource for CI Job Tokens
+type JobTokenAuthSource struct {
+	Token string
+}
+
+func (JobTokenAuthSource) Init(context.Context, *Client) error {
+	return nil
+}
+
+func (s JobTokenAuthSource) Header(_ context.Context) (string, string, error) {
+	return JobTokenHeaderName, s.Token, nil
+}
+
+// AccessTokenAuthSource used as an AuthSource for various access tokens, like Personal-, Project- and Group- Access Tokens.
+// Can be used for all tokens that authorize with the Private-Token header.
+type AccessTokenAuthSource struct {
+	Token string
+}
+
+func (AccessTokenAuthSource) Init(context.Context, *Client) error {
+	return nil
+}
+
+func (s AccessTokenAuthSource) Header(_ context.Context) (string, string, error) {
+	return AccessTokenHeaderName, s.Token, nil
+}
+
+// PasswordCredentialsAuthSource implements the AuthSource interface for the OAuth 2.0
+// resource owner password credentials flow.
+type PasswordCredentialsAuthSource struct {
+	Username string
+	Password string
+
+	AuthSource
+}
+
+func (as *PasswordCredentialsAuthSource) Init(ctx context.Context, client *Client) error {
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, client.client.HTTPClient)
+
+	config := &oauth2.Config{
+		Endpoint: client.endpoint(),
+	}
+
+	pct, err := config.PasswordCredentialsToken(ctx, as.Username, as.Password)
+	if err != nil {
+		return fmt.Errorf("PasswordCredentialsToken(%q, ******): %w", as.Username, err)
+	}
+
+	as.AuthSource = OAuthTokenSource{
+		config.TokenSource(ctx, pct),
+	}
+
+	return nil
 }
