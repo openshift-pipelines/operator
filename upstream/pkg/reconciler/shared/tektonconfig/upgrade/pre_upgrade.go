@@ -194,48 +194,29 @@ func preUpgradePipelinesAsCodeArtifacts(ctx context.Context, logger *zap.Sugared
 	// Fetch PAC settings
 	settings := tc.Spec.Platforms.OpenShift.PipelinesAsCode.PACSettings.Settings
 
-	// Check if hub-catalog-name key exists and is "tekton"
-	if catalogName, exists := settings["hub-catalog-name"]; exists && catalogName == "tekton" {
-		// Create a patch to remove the hub-catalog-name and hub-url fields
-		// Setting the field to null in the patch will remove it
-		patchPACSettings := map[string]interface{}{
-			"hub-catalog-name": nil,
-		}
+	// Set hub-catalog-type to artifacthub if not already set or if it's set to tektonhub
+	if catalogType, exists := settings["hub-catalog-type"]; !exists || catalogType == "tektonhub" {
+		settings["hub-catalog-type"] = "artifacthub"
+		logger.Infof("Updated hub-catalog-type to artifacthub")
+	}
 
-		// Check if hub-url needs to be updated
-		hubURL, hubURLExists := settings["hub-url"]
-		if hubURLExists && hubURL == "https://api.hub.tekton.dev/v1" {
-			patchPACSettings["hub-url"] = nil
-		}
+	// Set hub-url to https://artifacthub.io if not already set or if it's set to the old API URL
+	if hubURL, exists := settings["hub-url"]; !exists || hubURL == "https://artifacthub.io/api/v1" || hubURL == "https://api.hub.tekton.dev/v1" {
+		settings["hub-url"] = "https://artifacthub.io"
+		logger.Infof("Updated hub-url to https://artifacthub.io")
+	}
 
-		// Create the full patch structure
-		patch := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"platforms": map[string]interface{}{
-					"openshift": map[string]interface{}{
-						"pipelinesAsCode": map[string]interface{}{
-							"settings": patchPACSettings,
-						},
-					},
-				},
-			},
-		}
+	// remove hub-catalog-name key from setting if found
+	if _, exists := settings["hub-catalog-name"]; exists {
+		delete(settings, "hub-catalog-name")
+		logger.Infof("Removed hub-catalog-name field from TektonConfig CR")
+	}
 
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			logger.Errorf("failed to marshal patch payload: %v", err)
-			return err
-		}
-
-		// Apply the patch using merge strategy
-		_, err = operatorClient.OperatorV1alpha1().TektonConfigs().Patch(ctx, v1alpha1.ConfigResourceName, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-		if err != nil {
-			logger.Errorf("failed to patch TektonConfig CR: %v", err)
-			return err
-		}
-		logger.Infof("Successfully updated TektonConfig CR with artifact settings")
-	} else {
-		logger.Infof("No PAC settings update needed")
+	// Update the TektonConfig CR
+	_, err = operatorClient.OperatorV1alpha1().TektonConfigs().Update(ctx, tc, metav1.UpdateOptions{})
+	if err != nil {
+		logger.Errorw("error updating TektonConfig CR with artifact settings", err)
+		return err
 	}
 
 	// Also check and update the OpenShiftPipelinesAsCode CR if it exists
@@ -277,19 +258,14 @@ func updatePipelinesAsCodeConfigMap(ctx context.Context, logger *zap.SugaredLogg
 		return nil
 	}
 
-	// Check if hub-catalog-name key exists and is "tekton", and hub-url is "https://api.hub.tekton.dev/v1"
-	if catalogName, exists := cm.Data["hub-catalog-name"]; exists && catalogName == "tekton" {
-		// Create a patch to remove the hub-catalog-name and hub-url fields
+	// Check if hub-catalog-name key exists
+	if val, exists := cm.Data["hub-catalog-name"]; exists {
+		// Create a patch to remove the hub-catalog-name field
 		// Setting the field to null in the patch will remove it
-		patchData := map[string]interface{}{
-			"hub-catalog-name": nil,
-		}
-		hubURL, hubURLExists := cm.Data["hub-url"]
-		if hubURLExists && hubURL == "https://api.hub.tekton.dev/v1" {
-			patchData["hub-url"] = nil
-		}
 		patch := map[string]interface{}{
-			"data": patchData,
+			"data": map[string]interface{}{
+				"hub-catalog-name": nil,
+			},
 		}
 
 		patchBytes, err := json.Marshal(patch)
@@ -298,13 +274,18 @@ func updatePipelinesAsCodeConfigMap(ctx context.Context, logger *zap.SugaredLogg
 			return err
 		}
 
-		// Apply the patch to remove the hub-catalog-name and hub-url fields
+		// Apply the patch to remove the hub-catalog-name field
 		_, err = k8sClient.CoreV1().ConfigMaps(targetNamespace).Patch(ctx, configMapName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 		if err != nil {
 			logger.Errorf("failed to patch pipelines-as-code config map: %v", err)
 			return err
 		}
-		logger.Infof("Removed hub-catalog-name field (value: %s) from pipelines-as-code config map", catalogName)
+
+		if val == "" {
+			logger.Infof("Removed empty hub-catalog-name field from pipelines-as-code config map")
+		} else {
+			logger.Infof("Removed hub-catalog-name field (value: %s) from pipelines-as-code config map", val)
+		}
 		logger.Infof("Successfully updated pipelines-as-code config map")
 	} else {
 		logger.Infof("No catalog name entries found in pipelines-as-code config map, no update needed")
@@ -332,20 +313,15 @@ func updateOpenShiftPipelinesAsCodeCR(ctx context.Context, logger *zap.SugaredLo
 		return nil
 	}
 
-	// Check if hub-catalog-name key exists and is "tekton", and hub-url is "https://api.hub.tekton.dev/v1"
-	if catalogName, exists := pacCR.Spec.PACSettings.Settings["hub-catalog-name"]; exists && catalogName == "tekton" {
-		// Create a patch to remove the hub-catalog-name and hub-url fields
+	// Check if hub-catalog-name key exists
+	if val, exists := pacCR.Spec.PACSettings.Settings["hub-catalog-name"]; exists {
+		// Create a patch to remove the hub-catalog-name field
 		// Setting the field to null in the patch will remove it
-		patchSettings := map[string]interface{}{
-			"hub-catalog-name": nil,
-		}
-		hubURL, hubURLExists := pacCR.Spec.PACSettings.Settings["hub-url"]
-		if hubURLExists && hubURL == "https://api.hub.tekton.dev/v1" {
-			patchSettings["hub-url"] = nil
-		}
 		patch := map[string]interface{}{
 			"spec": map[string]interface{}{
-				"settings": patchSettings,
+				"settings": map[string]interface{}{
+					"hub-catalog-name": nil,
+				},
 			},
 		}
 
@@ -355,13 +331,18 @@ func updateOpenShiftPipelinesAsCodeCR(ctx context.Context, logger *zap.SugaredLo
 			return err
 		}
 
-		// Apply the patch to remove the hub-catalog-name and hub-url fields
+		// Apply the patch to remove the hub-catalog-name field
 		_, err = operatorClient.OperatorV1alpha1().OpenShiftPipelinesAsCodes().Patch(ctx, v1alpha1.OpenShiftPipelinesAsCodeName, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 		if err != nil {
 			logger.Errorf("failed to patch OpenShiftPipelinesAsCode CR: %v", err)
 			return err
 		}
-		logger.Infof("Removed hub-catalog-name field (value: %s) from OpenShiftPipelinesAsCode CR", catalogName)
+
+		if val == "" {
+			logger.Infof("Removed empty hub-catalog-name field from OpenShiftPipelinesAsCode CR")
+		} else {
+			logger.Infof("Removed hub-catalog-name field (value: %s) from OpenShiftPipelinesAsCode CR", val)
+		}
 		logger.Infof("Successfully updated OpenShiftPipelinesAsCode CR")
 	} else {
 		logger.Infof("No catalog name entries found in OpenShiftPipelinesAsCode CR, no update needed")
