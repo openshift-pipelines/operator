@@ -3,7 +3,7 @@ FROM scratch
 
 COPY .konflux/olm-catalog/bundle/kodata /kodata
 COPY .konflux/olm-catalog/bundle/manifests /manifests
-COPY .konflux/olm-catalog/bundle/metadata/annotations.yaml /metadata/annotations.yaml
+COPY .konflux/olm-catalog/bundle/metadata/annotations.yaml /metadata/annotations.yaml 
 
 LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
