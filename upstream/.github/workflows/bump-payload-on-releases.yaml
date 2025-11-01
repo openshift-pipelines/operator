@@ -26,12 +26,12 @@ jobs:
         branch: ${{ fromJSON(needs.build-release-matrix.outputs.branches) }}
         # branch: [release-v0.62.x, release-v0.63.x]
     steps:
-    - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-      with:
-        go-version: 1.21.x
     - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       with:
         ref: ${{ matrix.branch }}
+    - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+      with:
+        go-version-file: "go.mod"
     - name: run operator-tool bump-bugfix
       run: |
         export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
@@ -39,9 +39,9 @@ jobs:
     - name: create pull request
       uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.TEKTON_BOT_TOKEN }}
         commit-message: Bump payloads versions
-        committer: Vincent Demeester <vdemeest@redhat.com>
+        committer: tekton-bot <tekton-bot@users.noreply.github.com>
         author: Vincent Demeester <vdemeest@redhat.com>
         signoff: true
         # author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
