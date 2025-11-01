@@ -168,7 +168,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: tekton-hub-api
-          image: quay.io/tekton-hub/api:v1.22.3
+          image: quay.io/tekton-hub/api:v1.22.4
           resources:
             requests:
               cpu: 100m
@@ -206,6 +206,7 @@ spec:
             timeoutSeconds: 1
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             runAsUser: 65532
             capabilities:
               drop:
