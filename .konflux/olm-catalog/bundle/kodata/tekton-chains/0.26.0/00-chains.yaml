@@ -63,8 +63,8 @@ metadata:
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-chains
-    pipeline.tekton.dev/release: "v0.25.1"
-    version: "v0.25.1"
+    pipeline.tekton.dev/release: "v0.26.0"
+    version: "v0.26.0"
 spec:
   replicas: 1
   selector:
@@ -84,13 +84,33 @@ spec:
         app.kubernetes.io/instance: default
         app.kubernetes.io/part-of: tekton-chains
         # # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-        pipeline.tekton.dev/release: "v0.25.1"
-        version: "v0.25.1"
+        pipeline.tekton.dev/release: "v0.26.0"
+        version: "v0.26.0"
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/os
+                    operator: NotIn
+                    values:
+                      - windows
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: controller
+                    app.kubernetes.io/component: controller
+                    app.kubernetes.io/instance: default
+                    app.kubernetes.io/part-of: tekton-chains
+                topologyKey: kubernetes.io/hostname
+              weight: 100
       serviceAccountName: tekton-chains-controller
       containers:
         - name: tekton-chains-controller
-          image: ghcr.io/tektoncd/chains/controller-92006fd957c0afd31de6a40b3e33b39f:v0.25.1@sha256:05022c671e63971799cbe44af2631de2c0d6608b4a59214c4641af05411e28fc
+          image: ghcr.io/tektoncd/chains/controller-92006fd957c0afd31de6a40b3e33b39f:v0.26.0@sha256:c3167b2a72e0abc64032a3ce28e738d9b15a2e227e01de1063d7335a0ea1da28
           volumeMounts:
             - name: signing-secrets
               mountPath: /etc/signing-secrets
@@ -344,7 +364,7 @@ data:
   # this ConfigMap such that even if we don't have access to
   # other resources in the namespace, we can still access
   # this ConfigMap.
-  version: "v0.25.1"
+  version: "v0.26.0"
 
 ---
 # Copyright 2023 Tekton Authors LLC
