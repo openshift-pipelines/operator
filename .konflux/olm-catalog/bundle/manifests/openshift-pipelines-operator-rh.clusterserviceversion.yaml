@@ -18,7 +18,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.20.0 <5.0.5-722'
+    olm.skipRange: '>=1.20.0 <5.0.5-723'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
@@ -30,7 +30,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v5.0.5-722
+  name: openshift-pipelines-operator-rh.v5.0.5-723
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -350,7 +350,7 @@ spec:
 
     - Tekton Pipelines: v1.6.0
 
-    - Tekton Triggers: v0.33.0
+    - Tekton Triggers: v0.34.0
 
     - Pipelines as Code: v0.39.0
 
@@ -1212,7 +1212,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 5.0.5-722
+                        value: 5.0.5-723
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1280,13 +1280,13 @@ spec:
                       - name: IMAGE_PIPELINES_ARG__SHELL_IMAGE
                         value: quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:4145ae6573cc6c74469cff92f339c3bfa3ebfd4cc13f0f3b4589efa6bcbde7be
                       - name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CONTROLLER
-                        value: quay.io/openshift-pipeline/pipelines-triggers-controller-rhel9@sha256:e16eabc0a1fa28d5fed6d0339472d2b0835cb258d11b7568214e4f4ab7f1c0c6
+                        value: quay.io/openshift-pipeline/pipelines-triggers-controller-rhel9@sha256:f3d55e734884eef3061871526f7ce395923c21dd3dcf85782ef8d57859f0ebef
                       - name: IMAGE_TRIGGERS_WEBHOOK
-                        value: quay.io/openshift-pipeline/pipelines-triggers-webhook-rhel9@sha256:74d8de0fe4ee0cab521f47814cc32a23509feb5b51885b12b5e84a4d630d1d7d
+                        value: quay.io/openshift-pipeline/pipelines-triggers-webhook-rhel9@sha256:990bf9d79abca89735c5182f2ecbecdcecd8cfb8881386249b11275ed8a6cd11
                       - name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CORE_INTERCEPTORS
-                        value: quay.io/openshift-pipeline/pipelines-triggers-core-interceptors-rhel9@sha256:1a255ef3c0772b5cd756cb5f9438987c1569a9ca165c19c8cee3308dc38038a4
+                        value: quay.io/openshift-pipeline/pipelines-triggers-core-interceptors-rhel9@sha256:c3870752bcf6115a1c4ec9c6b7dc2dcb58dcbb3327bb8bb9c02d26c55c36a750
                       - name: IMAGE_TRIGGERS_ARG__EL_IMAGE
-                        value: quay.io/openshift-pipeline/pipelines-triggers-eventlistenersink-rhel9@sha256:3de516ad6b4d53d736782fe9d3b0c02a9c1999e75c7748f4f42e204ec30e5dcd
+                        value: quay.io/openshift-pipeline/pipelines-triggers-eventlistenersink-rhel9@sha256:395d58da6ed623b72125a4eeacb11a6fd476466f041ca2cda7b5b2e48a000259
                       - name: IMAGE_ADDONS_KN
                         value: registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel8@sha256:0fa6d15d38601f266347cdd098e80bec9893f7e6b06e84efc4a8c50b3ff3c6cc
                       - name: IMAGE_ADDONS_OPC
@@ -1526,13 +1526,13 @@ spec:
       name: IMAGE_PIPELINES_ARG__NOP_IMAGE
     - image: quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:4145ae6573cc6c74469cff92f339c3bfa3ebfd4cc13f0f3b4589efa6bcbde7be
       name: IMAGE_PIPELINES_ARG__SHELL_IMAGE
-    - image: quay.io/openshift-pipeline/pipelines-triggers-controller-rhel9@sha256:e16eabc0a1fa28d5fed6d0339472d2b0835cb258d11b7568214e4f4ab7f1c0c6
+    - image: quay.io/openshift-pipeline/pipelines-triggers-controller-rhel9@sha256:f3d55e734884eef3061871526f7ce395923c21dd3dcf85782ef8d57859f0ebef
       name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CONTROLLER
-    - image: quay.io/openshift-pipeline/pipelines-triggers-webhook-rhel9@sha256:74d8de0fe4ee0cab521f47814cc32a23509feb5b51885b12b5e84a4d630d1d7d
+    - image: quay.io/openshift-pipeline/pipelines-triggers-webhook-rhel9@sha256:990bf9d79abca89735c5182f2ecbecdcecd8cfb8881386249b11275ed8a6cd11
       name: IMAGE_TRIGGERS_WEBHOOK
-    - image: quay.io/openshift-pipeline/pipelines-triggers-core-interceptors-rhel9@sha256:1a255ef3c0772b5cd756cb5f9438987c1569a9ca165c19c8cee3308dc38038a4
+    - image: quay.io/openshift-pipeline/pipelines-triggers-core-interceptors-rhel9@sha256:c3870752bcf6115a1c4ec9c6b7dc2dcb58dcbb3327bb8bb9c02d26c55c36a750
       name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CORE_INTERCEPTORS
-    - image: quay.io/openshift-pipeline/pipelines-triggers-eventlistenersink-rhel9@sha256:3de516ad6b4d53d736782fe9d3b0c02a9c1999e75c7748f4f42e204ec30e5dcd
+    - image: quay.io/openshift-pipeline/pipelines-triggers-eventlistenersink-rhel9@sha256:395d58da6ed623b72125a4eeacb11a6fd476466f041ca2cda7b5b2e48a000259
       name: IMAGE_TRIGGERS_ARG__EL_IMAGE
     - image: registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel8@sha256:0fa6d15d38601f266347cdd098e80bec9893f7e6b06e84efc4a8c50b3ff3c6cc
       name: IMAGE_ADDONS_PARAM_KN_IMAGE
@@ -1612,5 +1612,5 @@ spec:
       name: IMAGE_ADDONS_MAVEN_GOALS
     - image: quay.io/openshift-pipeline/pipelines-console-plugin-rhel9@sha256:911a8e56783702717474d60a50c7ddae46a16feb2f17e2bf872be257d554ccd5
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
-  replaces: openshift-pipelines-operator-rh.v5.0.5-721
-  version: 5.0.5-722
+  replaces: openshift-pipelines-operator-rh.v5.0.5-722
+  version: 5.0.5-723
