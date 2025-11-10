@@ -34,7 +34,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: tekton-hub-ui
-          image: quay.io/tekton-hub/ui:v1.22.4
+          image: quay.io/tekton-hub/ui:v1.22.5
           resources:
             requests:
               cpu: 100m
@@ -49,6 +49,11 @@ spec:
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: config-volume
+              mountPath: /tmp/config
+            - name: tmp
+              mountPath: /tmp
           env:
             - name: API_URL
               valueFrom:
@@ -101,6 +106,11 @@ spec:
             periodSeconds: 5
             successThreshold: 1
             timeoutSeconds: 1
+      volumes:
+        - name: config-volume
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
 
 ---
 apiVersion: v1
