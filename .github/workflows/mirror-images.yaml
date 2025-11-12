@@ -8,6 +8,16 @@ on:
     paths:
       - project.yaml
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Select Environment'
+        required: true
+        default: 'devel'
+        type: choice
+        options:
+          - devel
+          - staging
+          - production
 
 jobs:
   mirror-operand-images:
