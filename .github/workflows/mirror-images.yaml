@@ -1,0 +1,43 @@
+name: mirror-operand-images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - project.yaml
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Select Environment'
+        required: true
+        default: 'devel'
+        type: choice
+        options:
+          - devel
+          - staging
+          - production
+
+jobs:
+  mirror-operand-images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout the current repo
+        uses: actions/checkout@v4
+
+      - name: Configure Docker authentication
+        env:
+          DOCKER_CONFIG: /home/runner/.docker
+          DOCKER_JSON: ${{ secrets.QUAY_REGISTRY_SECRET }}
+        run: |
+          echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json
+
+      - name: mirror-images
+        run: |
+          # Update operator's payload and stuff
+          ./hack/mirror-operand-images.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
