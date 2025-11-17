@@ -16,7 +16,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: tekton-pruner-controller-cluster-access
   labels:
-    pruner.tekton.dev/release: "v0.2.0"
+    pruner.tekton.dev/release: "v0.3.0"
 rules:
   # Write permissions to publish events.
   - apiGroups:
@@ -76,6 +76,31 @@ rules:
       - namespaces/finalizers
     verbs:
       - update
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - list
+      - watch
+  # permissions restricted to specific ConfigMap
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    resourceNames:
+      - tekton-pruner-namespace-spec
+    verbs:
+      - get
+  # used in webhook for certificate management
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
 
 ---
 # Copyright 2025 The Tekton Authors
@@ -97,7 +122,7 @@ metadata:
   name: tekton-pruner-controller
   namespace: tekton-pipelines
   labels:
-    pruner.tekton.dev/release: "v0.2.0"
+    pruner.tekton.dev/release: "v0.3.0"
 rules:
   # Needed to watch and load configuration and secret data.
   - apiGroups: [""]
@@ -130,7 +155,7 @@ metadata:
   name: tekton-pruner-controller
   namespace: tekton-pipelines
   labels:
-    pruner.tekton.dev/release: "v0.2.0"
+    pruner.tekton.dev/release: "v0.3.0"
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pruner
@@ -154,7 +179,7 @@ kind: ClusterRoleBinding
 metadata:
   name: tekton-pruner-controller-cluster-access
   labels:
-    pruner.tekton.dev/release: "v0.2.0"
+    pruner.tekton.dev/release: "v0.3.0"
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pruner
@@ -187,7 +212,7 @@ metadata:
   name: tekton-pruner-controller
   namespace: tekton-pipelines
   labels:
-    pruner.tekton.dev/release: "v0.2.0"
+    pruner.tekton.dev/release: "v0.3.0"
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pruner
@@ -219,10 +244,114 @@ kind: ConfigMap
 metadata:
   name: tekton-pruner-default-spec
   namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/part-of: tekton-pruner
+    pruner.tekton.dev/release: "v0.3.0"
+    pruner.tekton.dev/config-type: global
 data:
   global-config: |-
     enforcedConfigLevel: global
     historyLimit: 100
+
+---
+# Copyright 2025 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tekton-pruner-webhook-certs
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-pruner
+    pruner.tekton.dev/release: "v0.3.0"
+# The data is populated at install time.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validation.webhook.pruner.tekton.dev
+  labels:
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-pruner
+    pruner.tekton.dev/release: "v0.3.0"
+webhooks:
+  # Webhook 1: Validates global/cluster-level pruner configuration
+  # Triggers: When tekton-pruner-default-spec ConfigMap with proper labels is created or updated
+  # This ConfigMap is mandatory and must exist with valid configuration when pruner is installed
+  - admissionReviewVersions: ["v1"]
+    clientConfig:
+      service:
+        name: tekton-pruner-webhook
+        namespace: tekton-pipelines
+        path: /validate-configmap
+    failurePolicy: Fail
+    sideEffects: None
+    timeoutSeconds: 5
+    name: validation.webhook.pruner.tekton.dev.global
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["configmaps"]
+        scope: "Namespaced"
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values:
+            - tekton-pipelines
+    objectSelector:
+      matchLabels:
+        app.kubernetes.io/part-of: tekton-pruner
+        pruner.tekton.dev/config-type: global
+  # Webhook 2: Validates namespace-level pruner configuration
+  # Triggers: When ConfigMap with proper labels is created or updated in any user namespace
+  # This ConfigMap is OPTIONAL - namespaces can choose to create it for custom pruning policies
+  # If not present, the namespace will use the global configuration
+  - admissionReviewVersions: ["v1"]
+    clientConfig:
+      service:
+        name: tekton-pruner-webhook
+        namespace: tekton-pipelines
+        path: /validate-configmap
+    failurePolicy: Fail
+    sideEffects: None
+    timeoutSeconds: 5
+    name: validation.webhook.pruner.tekton.dev.namespace
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["configmaps"]
+        scope: "Namespaced"
+    namespaceSelector:
+      matchExpressions:
+        # Exclude system namespaces - webhook only processes user namespaces
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - kube-system
+            - kube-public
+            - kube-node-lease
+    objectSelector:
+      matchLabels:
+        app.kubernetes.io/part-of: tekton-pruner
+        pruner.tekton.dev/config-type: namespace
 
 ---
 # Copyright 2025 The Tekton Authors
@@ -247,7 +376,7 @@ metadata:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tektoncd-pruner
 data:
-  version: "devel"
+  version: "v0.3.0"
 
 ---
 # Copyright 2025 The Tekton Authors
@@ -269,7 +398,8 @@ metadata:
   name: config-logging-tekton-pruner
   namespace: tekton-pipelines
   labels:
-    pruner.tekton.dev/release: "v0.2.0"
+    app.kubernetes.io/part-of: tekton-pruner
+    pruner.tekton.dev/release: "v0.3.0"
 data:
   _example: |
     ################################
@@ -333,7 +463,8 @@ metadata:
   name: config-observability-tekton-pruner
   namespace: tekton-pipelines
   labels:
-    pruner.tekton.dev/release: "v0.2.0"
+    app.kubernetes.io/part-of: tekton-pruner
+    pruner.tekton.dev/release: "v0.3.0"
 data:
   # New Knative observability config format (required for v0.0.0-20250811181739-e06d4c9af190+)
   metrics-protocol: "prometheus"
@@ -434,9 +565,9 @@ metadata:
     app.kubernetes.io/name: controller
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "devel"
+    app.kubernetes.io/version: "v0.3.0"
     app.kubernetes.io/part-of: tekton-pruner
-    pruner.tekton.dev/release: "v0.2.0"
+    pruner.tekton.dev/release: "v0.3.0"
 spec:
   replicas: 1
   selector:
@@ -457,10 +588,10 @@ spec:
         app.kubernetes.io/name: controller
         app.kubernetes.io/component: controller
         app.kubernetes.io/instance: default
-        app.kubernetes.io/version: "devel"
+        app.kubernetes.io/version: "v0.3.0"
         app.kubernetes.io/part-of: tekton-pruner
-        version: "devel"
-        pruner.tekton.dev/release: "v0.2.0"
+        version: "v0.3.0"
+        pruner.tekton.dev/release: "v0.3.0"
     spec:
       # To avoid node becoming SPOF, spread our replicas to different nodes.
       affinity:
@@ -481,7 +612,7 @@ spec:
         - name: controller
           # This is the Go import path for the binary that is containerized
           # and substituted here.
-          image: ghcr.io/openshift-pipelines/tektoncd-pruner/controller:v0.2.0@sha256:8dc19075b3d3e451e4848c6302ff8e37545dd4617a60d7f2bc3bea359078e523
+          image: ghcr.io/tektoncd/pruner/controller-fb9e5cbe6aa14ed1aa64e966d9e4d295:v0.3.0@sha256:ca8eb1b737e9a98d6112fee8b21e5791a9aee7fb893eb23b6818d8e1da84a352
           resources:
             requests:
               cpu: 100m
@@ -527,11 +658,11 @@ metadata:
     app.kubernetes.io/name: controller
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "devel"
+    app.kubernetes.io/version: "v0.3.0"
     app.kubernetes.io/part-of: tekton-pruner
-    pruner.tekton.dev/release: "v0.2.0"
+    pruner.tekton.dev/release: "v0.3.0"
     app: tekton-pruner-controller
-    version: "devel"
+    version: "v0.3.0"
   annotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "9090"
@@ -547,6 +678,105 @@ spec:
   selector:
     app.kubernetes.io/name: controller
     app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-pruner
+
+---
+# Copyright 2025 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tekton-pruner-webhook
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-pruner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: webhook
+      app.kubernetes.io/instance: default
+      app.kubernetes.io/part-of: tekton-pruner
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: webhook
+        app.kubernetes.io/instance: default
+        app.kubernetes.io/part-of: tekton-pruner
+    spec:
+      serviceAccountName: tekton-pruner-controller
+      containers:
+        - name: webhook
+          # This is the Go import path for the binary that is containerized
+          # and substituted here.
+          image: ghcr.io/tektoncd/pruner/webhook-19748cdf3f89caca6b5e27d42f93fa7f:v0.3.0@sha256:abe47db1d699934543433e4fc2f2e4d0474cd49923603cf251a4c3678b0246d8
+          env:
+            - name: SYSTEM_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            # Logging configuration
+            - name: CONFIG_LOGGING_NAME
+              value: config-logging
+            - name: CONFIG_OBSERVABILITY_NAME
+              value: config-observability
+            - name: METRICS_DOMAIN
+              value: tekton.dev/pruner
+            # Webhook configuration
+            - name: WEBHOOK_PORT
+              value: "8443"
+            - name: WEBHOOK_SECRET_NAME
+              value: tekton-pruner-webhook-certs
+            - name: KUBERNETES_MIN_VERSION
+              value: "1.0.0"
+          ports:
+            - name: metrics
+              containerPort: 9090
+            - name: profiling
+              containerPort: 8008
+            - name: https-webhook
+              containerPort: 8443
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 65532
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tekton-pruner-webhook
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/instance: default
+    app.kubernetes.io/part-of: tekton-pruner
+spec:
+  ports:
+    - name: https-webhook
+      port: 443
+      targetPort: 8443
+  selector:
+    app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pruner
 
