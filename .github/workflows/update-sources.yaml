@@ -1,5 +1,5 @@
-# Generated for Konflux Application openshift-pipelines-operator-1.20 by openshift-pipelines/hack. DO NOT EDIT
-name: update-sources-release-v1.20.x
+# Generated for Konflux Application openshift-pipelines-operator-1.21 by openshift-pipelines/hack. DO NOT EDIT
+name: update-sources-release-v1.21.x
 
 on:
   workflow_dispatch: {}
@@ -18,7 +18,7 @@ jobs:
     - name: Checkout the current repo
       uses: actions/checkout@v4
       with:
-        ref: release-v1.20.x
+        ref: release-v1.21.x
 
     - name: Clone tektoncd/operator
       run: |
@@ -61,7 +61,7 @@ jobs:
       run: |
         git config user.name openshift-pipelines-bot
         git config user.email pipelines-extcomm@redhat.com
-        git checkout -b actions/update/sources-release-v1.20.x
+        git checkout -b actions/update/sources-release-v1.21.x
         touch head
         pushd upstream
         OLD_COMMIT=$(cat ../head)
@@ -83,7 +83,7 @@ jobs:
         fi
 
         git commit -F- <<EOF
-        [bot] Update release-v1.20.x from tektoncd/operator to ${NEW_COMMIT}
+        [bot] Update release-v1.21.x from tektoncd/operator to ${NEW_COMMIT}
 
             $ git diff --stat ${NEW_COMMIT}..${OLD_COMMIT}
         $(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)
@@ -91,14 +91,14 @@ jobs:
         https://github.com/tektoncd/operator/compare/${NEW_COMMIT}..${OLD_COMMIT}
         EOF
         
-        git push -f origin actions/update/sources-release-v1.20.x
+        git push -f origin actions/update/sources-release-v1.21.x
 
-        if [ "$(gh pr list --base release-v1.20.x --head actions/update/sources-release-v1.20.x --json url --jq 'length')" = "0" ]; then
+        if [ "$(gh pr list --base release-v1.21.x --head actions/update/sources-release-v1.21.x --json url --jq 'length')" = "0" ]; then
           echo "creating PR..."
-          gh pr create -B release-v1.20.x -H actions/update/sources-release-v1.20.x --label=automated --label=upstream --fill
+          gh pr create -B release-v1.21.x -H actions/update/sources-release-v1.21.x --label=automated --label=upstream --fill
         else
           echo "a PR already exists, editing..."
-          gh pr edit --title "[bot] Update release-v1.20.x from tektoncd/operator to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)"
+          gh pr edit --title "[bot] Update release-v1.21.x from tektoncd/operator to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)"
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

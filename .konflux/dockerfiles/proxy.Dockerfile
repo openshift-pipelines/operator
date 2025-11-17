@@ -23,7 +23,7 @@ COPY head ${KO_DATA_PATH}/HEAD
 LABEL \
       com.redhat.component="openshift-pipelines-operator-proxy-rhel9-container" \
       name="openshift-pipelines/pipelines-operator-proxy-rhel9" \
-      version="1.20.0" \
+      version="1.21.0" \
       summary="Red Hat OpenShift Pipelines Operator Proxy" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Proxy" \
