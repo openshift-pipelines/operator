@@ -18,7 +18,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.19.0 <1.20.1'
+    olm.skipRange: '>=1.19.0 <1.21.0'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
@@ -30,7 +30,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v1.20.1
+  name: openshift-pipelines-operator-rh.v1.21.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -348,19 +348,19 @@ spec:
     ### Components
 
 
-    - Tekton Pipelines: v1.3.2
+    - Tekton Pipelines: v1.6.0
 
-    - Tekton Triggers: v0.33.0
+    - Tekton Triggers: v0.34.0
 
-    - Pipelines as Code: v0.37.2
+    - Pipelines as Code: v0.39.0
 
-    - Tekton Chains: v0.25.1
+    - Tekton Chains: v0.26.0
 
-    - Tekton Hub (tech-preview): v1.22.3
+    - Tekton Hub (tech-preview): v1.23.0
 
-    - Tekton Results (tech-preview): v0.16.0
+    - Tekton Results (tech-preview): v0.17.0
 
-    - Manual Approval Gate (tech-preview): v0.6.0
+    - Manual Approval Gate (tech-preview): v0.7.0
 
     - Tekton Pruner (tech-preview): v0.2.0
 
@@ -368,7 +368,7 @@ spec:
     ## Getting Started
 
 
-    In order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/pipelines/1.20/create/creating-applications-with-cicd-pipelines.html).
+    In order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/pipelines/1.21/create/creating-applications-with-cicd-pipelines.html).
 
 
     ## CLI (tkn)
@@ -1049,6 +1049,13 @@ spec:
                 - update
                 - watch
             - apiGroups:
+                - route.openshift.io
+              resources:
+                - routes/custom-host
+              verbs:
+                - create
+                - update
+            - apiGroups:
                 - coordination.k8s.io
               resources:
                 - leases
@@ -1162,8 +1169,8 @@ spec:
           serviceAccountName: openshift-pipelines-operator
       deployments:
         - label:
-            operator.tekton.dev/release: v0.77.0
-            version: v0.77.0
+            operator.tekton.dev/release: devel
+            version: devel
           name: openshift-pipelines-operator
           spec:
             replicas: 1
@@ -1205,7 +1212,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 1.20.1
+                        value: 1.21.0
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1221,7 +1228,7 @@ spec:
                       - name: CONFIG_LEADERELECTION_NAME
                         value: tekton-operator-controller-config-leader-election
                       - name: IMAGE_HUB_TEKTON_HUB_DB
-                        value: registry.redhat.io/rhel9/postgresql-13@sha256:36647bd6d50d2e0e9c99ecf190bd515577c7ce9476e49d927c4d4065011e3441
+                        value: registry.redhat.io/rhel9/postgresql-16@sha256:6a6bde62273e318b6bc2ee75fa368abf71f71dc1c37f85f1230649f595fde951
                       - name: IMAGE_ADDONS_PARAM_BUILDER_IMAGE
                         value: registry.redhat.io/rhel9/buildah@sha256:18453ab0a62154283aaf4c45efd7543d1c8ecca1aebae46dedc7ddc0f410b232
                       - name: IMAGE_ADDONS_PARAM_KN_IMAGE
@@ -1304,10 +1311,12 @@ spec:
                         value: quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:fe5ff08d2a56f91f6cc95a20e4d20595433503610efca79e8d0dcbb949eabb52
                       - name: IMAGE_ADDONS_TKN_CLI_SERVE
                         value: registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel9@sha256:115eea1a5ca87f3b6b72db1df05b7386bf73dc70c9c2e4dc5e1a66700d960c37
+                      - name: IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG
+                        value: registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel9@
                       - name: IMAGE_CHAINS_TEKTON_CHAINS_CONTROLLER
                         value: quay.io/openshift-pipeline/pipelines-chains-controller-rhel9@sha256:5958219a3c0a928a3ae57e533c52d3a440cf815b0878b5617269bb2913818411
                       - name: IMAGE_RESULTS_POSTGRES
-                        value: registry.redhat.io/rhel9/postgresql-13@sha256:36647bd6d50d2e0e9c99ecf190bd515577c7ce9476e49d927c4d4065011e3441
+                        value: registry.redhat.io/rhel9/postgresql-16@sha256:6a6bde62273e318b6bc2ee75fa368abf71f71dc1c37f85f1230649f595fde951
                       - name: IMAGE_HUB_TEKTON_HUB_DB_MIGRATION
                         value: quay.io/openshift-pipeline/pipelines-hub-db-migration-rhel9@sha256:1bc2929e271f8658487b61d69f19fe4716df790b7a79a23472d46614c81ae908
                       - name: IMAGE_HUB_TEKTON_HUB_API
@@ -1371,7 +1380,7 @@ spec:
                       - name: PROFILING_PORT
                         value: '9009'
                       - name: VERSION
-                        value: v0.77.0
+                        value: devel
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: CONFIG_LEADERELECTION_NAME
@@ -1394,8 +1403,8 @@ spec:
                     type: RuntimeDefault
                 serviceAccountName: openshift-pipelines-operator
         - label:
-            operator.tekton.dev/release: v0.77.0
-            version: v0.77.0
+            operator.tekton.dev/release: devel
+            version: devel
           name: tekton-operator-webhook
           spec:
             replicas: 1
@@ -1565,13 +1574,15 @@ spec:
       name: IMAGE_ADDONS_TKN
     - image: registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel9@sha256:115eea1a5ca87f3b6b72db1df05b7386bf73dc70c9c2e4dc5e1a66700d960c37
       name: IMAGE_ADDONS_TKN_CLI_SERVE
+    - image: registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel9@
+      name: IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG
     - image: quay.io/openshift-pipeline/pipelines-operator-webhook-rhel9@sha256:1eeb48c9be678f7cdf043a62dd204053aeb30b23f51f4820569ec4f0e1adadaa
       name: TEKTON_OPERATOR_WEBHOOK
     - image: quay.io/openshift-pipeline/pipelines-chains-controller-rhel9@sha256:5958219a3c0a928a3ae57e533c52d3a440cf815b0878b5617269bb2913818411
       name: IMAGE_CHAINS_TEKTON_CHAINS_CONTROLLER
-    - image: registry.redhat.io/rhel9/postgresql-13@sha256:36647bd6d50d2e0e9c99ecf190bd515577c7ce9476e49d927c4d4065011e3441
+    - image: registry.redhat.io/rhel9/postgresql-16@sha256:6a6bde62273e318b6bc2ee75fa368abf71f71dc1c37f85f1230649f595fde951
       name: IMAGE_HUB_TEKTON_HUB_DB
-    - image: registry.redhat.io/rhel9/postgresql-13@sha256:36647bd6d50d2e0e9c99ecf190bd515577c7ce9476e49d927c4d4065011e3441
+    - image: registry.redhat.io/rhel9/postgresql-16@sha256:6a6bde62273e318b6bc2ee75fa368abf71f71dc1c37f85f1230649f595fde951
       name: IMAGE_RESULTS_POSTGRES
     - image: quay.io/openshift-pipeline/pipelines-hub-db-migration-rhel9@sha256:1bc2929e271f8658487b61d69f19fe4716df790b7a79a23472d46614c81ae908
       name: IMAGE_HUB_TEKTON_HUB_DB_MIGRATION
@@ -1605,5 +1616,5 @@ spec:
       name: IMAGE_ADDONS_MAVEN_GOALS
     - image: quay.io/openshift-pipeline/pipelines-console-plugin-rhel9@sha256:f19098d1eb60049502d4a55f518743e1b5cc4cbe36f700428c46438459fc828d
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
-  replaces: openshift-pipelines-operator-rh.v1.20.0
-  version: 1.20.1
+  replaces: openshift-pipelines-operator-rh.v1.20.1
+  version: 1.21.0
