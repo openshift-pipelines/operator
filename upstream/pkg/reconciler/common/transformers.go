@@ -46,6 +46,7 @@ import (
 const (
 	AnnotationPreserveNS          = "operator.tekton.dev/preserve-namespace"
 	AnnotationPreserveRBSubjectNS = "operator.tekton.dev/preserve-rb-subject-namespace"
+	ImageRegistryOverride         = "TEKTON_REGISTRY_OVERRIDE"
 	PipelinesImagePrefix          = "IMAGE_PIPELINES_"
 	TriggersImagePrefix           = "IMAGE_TRIGGERS_"
 	AddonsImagePrefix             = "IMAGE_ADDONS_"
@@ -179,6 +180,26 @@ func ImagesFromEnv(prefix string) map[string]string {
 	return images
 }
 
+// ImageRegistryDomainOverride will add or override the registry used in the image list
+func ImageRegistryDomainOverride(images map[string]string) map[string]string {
+	registry := os.Getenv(ImageRegistryOverride)
+	if registry == "" {
+		return images
+	} else {
+		for key, imageName := range images {
+			parts := strings.Split(imageName, "/")
+			if len(parts) > 1 {
+				// if image has registry part, replace it
+				images[key] = registry + "/" + strings.Join(parts[1:], "/")
+			} else {
+				// if image does not have registry part, add it
+				images[key] = registry + "/" + imageName
+			}
+		}
+		return images
+	}
+}
+
 // ToLowerCaseKeys converts key value to lower cases.
 func ToLowerCaseKeys(keyValues map[string]string) map[string]string {
 	newMap := map[string]string{}
@@ -206,6 +227,8 @@ func DeploymentImages(images map[string]string) mf.Transformer {
 
 		containers := d.Spec.Template.Spec.Containers
 		replaceContainerImages(containers, images)
+		initContainers := d.Spec.Template.Spec.InitContainers
+		replaceContainerImages(initContainers, images)
 
 		unstrObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(d)
 		if err != nil {

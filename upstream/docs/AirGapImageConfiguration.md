@@ -10,7 +10,14 @@ When we have our cluster on a air gap or proxy environment,
 we need to copy the actual images into our custom registry and update image details via environment variables on the operator deployment under the container `tekton-operator-lifecycle` as follows,
 This will allow us to use images from our custom registry.
 
-##### Sample: images as environment variable in operator deployment
+## Rewrite image registry 
+
+You can rewrite the registry host of all images managed by the operator by setting the `TEKTON_REGISTRY_OVERRIDE` environment variable on the tekton-operator-lifecycle container. This keeps the original repository path and tag/digest, and only changes the registry host.
+
+If not set, no change is applied (default behavior).
+
+
+We can rewrite the actual registry `ghcr.io` of all images by simply set the environment variable `TEKTON_REGISTRY_OVERRIDE` ad follow:
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -23,10 +30,36 @@ spec:
       containers:
         - name: tekton-operator-lifecycle
           env:
+            # Optional: globally rewrite registry host for all images
+            - name: TEKTON_REGISTRY_OVERRIDE
+              value: my-internal-registry.io/my-tekton-folder
+            # You can still specify per-image values; their registry host will be rewritten to the override above
             - name: IMAGE_DASHBOARD_TEKTON_DASHBOARD
-              value: custom-example.com/tektoncd/dashboard:v0.48.0
+              value: ghcr.io/tektoncd/dashboard:v0.48.0
+```
+Behavior and precedence:
+
+- If `TEKTON_REGISTRY_OVERRIDE` is unset, images are taken from per-image env vars (if set) or from the shipped defaults.
+- If `TEKTON_REGISTRY_OVERRIDE` is set, the operator rewrites the registry host for all resolved images (from per-image env vars and defaults). The repository path and tag/digest are preserved.
+- There is currently no per-image opt-out when the global override is set. To exempt specific images, do not set `TEKTON_REGISTRY_OVERRIDE` and rely solely on per-image env vars.
+
+## Rewrite image one by one
+
+We can also rewrite images one by one using the following:
+
+##### Sample: images as environment variable in operator deployment
+```yaml
+example.com/tektoncd/dashboard:v0.48.0
             - name: IMAGE_JOB_PRUNER_TKN
               value: custom-example.com/tektoncd/tkn:v0.31.0
+```
+
+### Tekton instance update
+
+If you update an existing instance of tekton, you will need also to refresh the `TektonInstallerSets` so the new value can be taken into account.
+
+```bash
+kubectl delete tektoninstallerset <installer-set-name>
 ```
 
 ### List of image environment variables
@@ -98,3 +131,4 @@ Supports all the images listed above in kubernetes and following are specific to
 | Addons                |                                   | `IMAGE_ADDONS_SKOPEO_RESULTS`                       |
 | Addons                |                                   | `IMAGE_ADDONS_TKN`                                  |
 | Addons                |                                   | `IMAGE_ADDONS_TKN_CLI_SERVE`                        |
+| Addons                |                                   | `IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG`            |

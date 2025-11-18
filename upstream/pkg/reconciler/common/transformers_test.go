@@ -25,7 +25,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/openshift-pipelines/tektoncd-pruner/pkg/config"
+	"github.com/tektoncd/pruner/pkg/config"
 	"gopkg.in/yaml.v3"
 
 	"github.com/google/go-cmp/cmp"
@@ -239,6 +239,42 @@ func TestReplaceImages(t *testing.T) {
 		assertParamHasImage(t, newManifest.Resources(), "BUILDER_IMAGE", image)
 		assertTaskImage(t, newManifest.Resources(), "push", "buildah")
 	})
+}
+
+func TestImageRegistryDomainOverride(t *testing.T) {
+	t.Setenv("TEKTON_REGISTRY_OVERRIDE", "custom-registry.io/custom-path")
+	// Array of images to be replaced
+	imageNameList := map[string]string{
+		"IMAGE_A": "docker.io/tekton/controller:latest",
+		"IMAGE_B": "gcr.io/tekton-releases/dogfooding/tekton-controller:latest",
+		"IMAGE_C": "quay.io/tekton/controller:latest",
+	}
+
+	expectedResult := map[string]string{
+		"IMAGE_A": "custom-registry.io/custom-path/tekton/controller:latest",
+		"IMAGE_B": "custom-registry.io/custom-path/tekton-releases/dogfooding/tekton-controller:latest",
+		"IMAGE_C": "custom-registry.io/custom-path/tekton/controller:latest",
+	}
+
+	data := ImageRegistryDomainOverride(imageNameList)
+	if !cmp.Equal(data, expectedResult) {
+		t.Fatalf("Unexpected ImageRegistryDomainOverride: %s", cmp.Diff(data, expectedResult))
+	}
+}
+
+func TestImageRegistryDomainWithoutOverride(t *testing.T) {
+	t.Setenv("TEKTON_REGISTRY_OVERRIDE", "")
+	// Array of images to be replaced
+	imageNameList := map[string]string{
+		"IMAGE_A": "docker.io/tekton/controller:latest",
+		"IMAGE_B": "gcr.io/tekton-releases/dogfooding/tekton-controller:latest",
+		"IMAGE_C": "quay.io/tekton/controller:latest",
+	}
+
+	data := ImageRegistryDomainOverride(imageNameList)
+	if !cmp.Equal(data, imageNameList) {
+		t.Fatalf("Unexpected ImageRegistryDomainOverride: %s", cmp.Diff(data, imageNameList))
+	}
 }
 
 func assertNoError(t *testing.T, err error) {
