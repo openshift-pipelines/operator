@@ -38,10 +38,10 @@ import (
 const (
 	// manifests console plugin yaml directory location
 	routeRBACYamlDirectory  = "static/tekton-results/route-rbac"
-	internalDBYamlDirectory = "static/tekton-results/internal-db"
 	logsRBACYamlDirectory   = "static/tekton-results/logs-rbac"
 	deploymentAPI           = "tekton-results-api"
 	serviceAPI              = "tekton-results-api-service"
+	routeAPI                = "tekton-results-api"
 	secretAPITLS            = "tekton-results-tls"
 	apiContainerName        = "api"
 	boundSAVolume           = "bound-sa-token"
@@ -63,11 +63,6 @@ func OpenShiftExtension(ctx context.Context) common.Extension {
 		logger.Fatalf("Failed to fetch route rbac static manifest: %v", err)
 	}
 
-	internalDBManifest, err := getDBManifest()
-	if err != nil {
-		logger.Fatalf("Failed to fetch internal db static manifest: %v", err)
-	}
-
 	logsRBACManifest, err := getloggingRBACManifest()
 	if err != nil {
 		logger.Fatalf("Failed to fetch logs RBAC manifest: %v", err)
@@ -76,9 +71,8 @@ func OpenShiftExtension(ctx context.Context) common.Extension {
 	ext := &openshiftExtension{
 		installerSetClient: client.NewInstallerSetClient(operatorclient.Get(ctx).OperatorV1alpha1().TektonInstallerSets(),
 			version, "results-ext", v1alpha1.KindTektonResult, nil),
-		internalDBManifest: internalDBManifest,
-		routeManifest:      routeManifest,
-		logsRBACManifest:   logsRBACManifest,
+		routeManifest:    routeManifest,
+		logsRBACManifest: logsRBACManifest,
 	}
 	return ext
 }
@@ -86,9 +80,7 @@ func OpenShiftExtension(ctx context.Context) common.Extension {
 type openshiftExtension struct {
 	installerSetClient *client.InstallerSetClient
 	routeManifest      *mf.Manifest
-	internalDBManifest *mf.Manifest
 	logsRBACManifest   *mf.Manifest
-	removePreset       bool
 }
 
 func (oe openshiftExtension) Transformers(comp v1alpha1.TektonComponent) []mf.Transformer {
@@ -111,16 +103,6 @@ func (oe *openshiftExtension) PreReconcile(ctx context.Context, tc v1alpha1.Tekt
 	result := tc.(*v1alpha1.TektonResult)
 	mf := mf.Manifest{}
 
-	if !result.Spec.IsExternalDB {
-		mf = *oe.internalDBManifest
-		oe.removePreset = true
-	}
-	if result.Spec.IsExternalDB && oe.removePreset {
-		if err := oe.installerSetClient.CleanupPreSet(ctx); err != nil {
-			return err
-		}
-		oe.removePreset = false
-	}
 	if (result.Spec.LokiStackName != "" && result.Spec.LokiStackNamespace != "") ||
 		strings.EqualFold(result.Spec.LogsType, "LOKI") {
 		mf = mf.Append(*oe.logsRBACManifest)
@@ -130,8 +112,18 @@ func (oe *openshiftExtension) PreReconcile(ctx context.Context, tc v1alpha1.Tekt
 }
 
 func (oe openshiftExtension) PostReconcile(ctx context.Context, tc v1alpha1.TektonComponent) error {
-	mf := *oe.routeManifest
-	return oe.installerSetClient.PostSet(ctx, tc, &mf, filterAndTransform())
+	manifest := *oe.routeManifest
+
+	result := tc.(*v1alpha1.TektonResult)
+	if !isEnableRoute(result) {
+		// If route is disable then delete the postset
+		if err := oe.installerSetClient.CleanupPostSet(ctx); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	return oe.installerSetClient.PostSet(ctx, tc, &manifest, filterAndTransform())
 }
 
 func (oe openshiftExtension) Finalize(ctx context.Context, tc v1alpha1.TektonComponent) error {
@@ -153,15 +145,6 @@ func getRouteManifest() (*mf.Manifest, error) {
 	return manifest, nil
 }
 
-func getDBManifest() (*mf.Manifest, error) {
-	manifest := &mf.Manifest{}
-	internalDB := filepath.Join(common.ComponentBaseDir(), internalDBYamlDirectory)
-	if err := common.AppendManifest(manifest, internalDB); err != nil {
-		return nil, err
-	}
-	return manifest, nil
-}
-
 // function to add fine grained access control to results api if results config specifies that
 // pipeline logs are managed by OpenShift Logging with OpenShift logging and OpenShift loki operators
 func getloggingRBACManifest() (*mf.Manifest, error) {
@@ -176,6 +159,7 @@ func getloggingRBACManifest() (*mf.Manifest, error) {
 func filterAndTransform() client.FilterAndTransform {
 	return func(ctx context.Context, manifest *mf.Manifest, comp v1alpha1.TektonComponent) (*mf.Manifest, error) {
 		resultImgs := common.ToLowerCaseKeys(common.ImagesFromEnv(common.ResultsImagePrefix))
+		instance := comp.(*v1alpha1.TektonResult)
 
 		extra := []mf.Transformer{
 			common.InjectOperandNameLabelOverwriteExisting(v1alpha1.OperandTektoncdResults),
@@ -183,6 +167,7 @@ func filterAndTransform() client.FilterAndTransform {
 			common.AddStatefulSetRestrictedPSA(),
 			common.DeploymentImages(resultImgs),
 			common.StatefulSetImages(resultImgs),
+			injectResultsAPIRoute(instance.Spec.ResultsAPIProperties),
 		}
 
 		if err := common.Transform(ctx, manifest, comp, extra...); err != nil {
@@ -350,6 +335,47 @@ func injectLokiStackTLSCACert(prop v1alpha1.LokiStackProperties) mf.Transformer 
 			return err
 		}
 		u.SetUnstructuredContent(uObj)
+		return nil
+	}
+}
+
+// isEnableRoute determines if route should be enabled for results API
+func isEnableRoute(result *v1alpha1.TektonResult) bool {
+	// Default to false if not explicitly set
+	if result.Spec.RouteEnabled == nil {
+		return false
+	}
+	return *result.Spec.RouteEnabled
+}
+
+// injectResultsAPIRoute adds ResultSpec route properties to Results route
+func injectResultsAPIRoute(props v1alpha1.ResultsAPIProperties) mf.Transformer {
+	return func(u *unstructured.Unstructured) error {
+		if u.GetKind() != "Route" || u.GetName() != routeAPI {
+			return nil
+		}
+
+		// Apply custom host if specified
+		if props.RouteHost != "" {
+			if err := unstructured.SetNestedField(u.Object, props.RouteHost, "spec", "host"); err != nil {
+				return err
+			}
+		}
+
+		// Apply custom path if specified
+		if props.RoutePath != "" {
+			if err := unstructured.SetNestedField(u.Object, props.RoutePath, "spec", "path"); err != nil {
+				return err
+			}
+		}
+
+		// Apply custom TLS termination if specified
+		if props.RouteTLSTermination != "" {
+			if err := unstructured.SetNestedField(u.Object, props.RouteTLSTermination, "spec", "tls", "termination"); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	}
 }
