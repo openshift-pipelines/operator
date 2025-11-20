@@ -22,6 +22,8 @@ jobs:
         git config user.email pipelines-extcomm@redhat.com
         # Approve and merge pull-request with no reviews
         for p in $(gh pr list --search "head:actions/update/sources-release-v1.20.x" --json "number" | jq ".[].number"); do
+          gh pr review $p --approve 
+          gh pr edit $p --add-label "approved" --add-label "lgtm"
           gh pr merge --rebase --delete-branch --auto $p
         done
       env:
