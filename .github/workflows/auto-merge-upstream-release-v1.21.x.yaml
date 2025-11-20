@@ -17,13 +17,11 @@ jobs:
       uses: actions/checkout@v4
     - name: auto-merge-upstream-release-v1.21.x
       run: |
-        gh auth status
-        git config user.name openshift-pipelines-bot
-        git config user.email pipelines-extcomm@redhat.com
+        set -x
         # Approve and merge pull-request with no reviews
         for p in $(gh pr list --search "head:actions/update/sources-release-v1.21.x" --json "number" | jq ".[].number"); do
           gh pr merge --rebase --delete-branch --auto $p
         done
       env:
-        GH_TOKEN: ${{ secrets.OPENSHIFT_PIPELINES_ROBOT }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
