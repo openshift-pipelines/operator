@@ -20,10 +20,9 @@ jobs:
           git config user.name openshift-pipelines-bot
           git config user.email pipelines-extcomm@redhat.com
           # Approve and merge pull-request with no reviews
-          BASE_BRANCH=next
           echo "Base branch is $BASE_BRANCH"
           # LGTM pull requests that might have one review but no more lgtm
-          for p in $(gh pr list --search "label:konflux-nudge base:$BASE_BRANCH" --json "number" | jq ".[].number"); do
+          for p in $(gh pr list --search "label:konflux-nudge" --json "number" | jq ".[].number"); do
             echo "Approving PR $p"
             gh pr review $p --approve --body "/lgtm"
             gh pr merge --rebase --delete-branch --auto $p
@@ -38,7 +37,9 @@ jobs:
           # Approve and merge pull-request with no reviews
           BASE_BRANCH=next
           for p in $(gh pr list --search "head:actions/update/sources-$BASE_BRANCH" --json "number" | jq ".[].number"); do
+            echo "Approving PR $p"
             gh pr review $p --approve --body "/lgtm"
+            gh pr merge --rebase --delete-branch --auto $p
           done
         env:
           GH_TOKEN: ${{ secrets.OPENSHIFT_PIPELINES_ROBOT }}
