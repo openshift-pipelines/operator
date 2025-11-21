@@ -421,6 +421,189 @@ spec:
               export CHAINS_REPOSITORY=quay.io/openshift-pipeline/chainstest
               gauge run --tags="" --log-level=debug --verbose specs/metrics/
 
+    - name: e2e-test-chains
+      runAfter:
+        - e2e-test-metrics
+      onError: continue
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+      taskSpec:
+        params:
+          - name: SNAPSHOT
+        volumes:
+          - name: credentials
+            emptyDir: { }
+          - name: source
+            emptyDir: { }
+        stepTemplate:
+          image: $(params.image)
+          volumeMounts:
+            - name: source
+              mountPath: /source
+            - name: credentials
+              mountPath: /credentials
+        steps:
+          - name: create-repo
+            image: $(params.image)
+            script: |
+              mkdir -p /source/repo
+              chmod 777 /source/repo
+          - name: fetch-repo
+            ref:
+              resolver: http
+              params:
+                - name: url
+                  value: https://raw.githubusercontent.com/openshift-pipelines/tektoncd-catalog/p/stepactions/stepaction-git-clone/0.4.1/stepaction-git-clone.yaml
+            params:
+              - name: OUTPUT_PATH
+                value: /source/repo
+              - name: URL
+                value: $(params.repo_url)
+              - name: REVISION
+                value: $(params.revision)
+
+          - name: get-kubeconfig
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+              - name: clusterName
+                value: "$(tasks.provision-cluster.results.clusterName)"
+              - name: credentials
+                value: credentials
+
+          - name: configure-tekton-config
+            image: $(params.image)
+            workingDir: /source/repo
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+              - name: GITHUB_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    key: github-token
+                    name: github
+                    optional: true
+            script: |
+              gauge run --tags="" --log-level=debug --verbose specs/konflux-olm.spec
+
+          - name: run-e2e-tests
+            image: $(params.image)
+            workingDir: /source/repo
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+              - name: CHAINS_DOCKER_CONFIG_JSON
+                valueFrom:
+                  secretKeyRef:
+                    key: config.json
+                    name: quay-io-dockerconfig
+            script: |
+              
+              export CHAINS_REPOSITORY=quay.io/openshift-pipeline/chainstest
+              gauge run --tags="" --log-level=debug --verbose specs/chains/
+
+    - name: e2e-test-manualapprovalgate
+      runAfter:
+        - e2e-test-chains
+      onError: continue
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+      taskSpec:
+        params:
+          - name: SNAPSHOT
+        volumes:
+          - name: credentials
+            emptyDir: { }
+          - name: source
+            emptyDir: { }
+        stepTemplate:
+          image: $(params.image)
+          volumeMounts:
+            - name: source
+              mountPath: /source
+            - name: credentials
+              mountPath: /credentials
+        steps:
+          - name: create-repo
+            image: $(params.image)
+            script: |
+              mkdir -p /source/repo
+              chmod 777 /source/repo
+          - name: fetch-repo
+            ref:
+              resolver: http
+              params:
+                - name: url
+                  value: https://raw.githubusercontent.com/openshift-pipelines/tektoncd-catalog/p/stepactions/stepaction-git-clone/0.4.1/stepaction-git-clone.yaml
+            params:
+              - name: OUTPUT_PATH
+                value: /source/repo
+              - name: URL
+                value: $(params.repo_url)
+              - name: REVISION
+                value: $(params.revision)
+
+          - name: get-kubeconfig
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+              - name: clusterName
+                value: "$(tasks.provision-cluster.results.clusterName)"
+              - name: credentials
+                value: credentials
+
+          - name: configure-tekton-config
+            image: $(params.image)
+            workingDir: /source/repo
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+              - name: GITHUB_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    key: github-token
+                    name: github
+                    optional: true
+            script: |
+              gauge run --tags="" --log-level=debug --verbose specs/konflux-olm.spec
+
+          - name: run-e2e-tests
+            image: $(params.image)
+            workingDir: /source/repo
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+              - name: CHAINS_DOCKER_CONFIG_JSON
+                valueFrom:
+                  secretKeyRef:
+                    key: config.json
+                    name: quay-io-dockerconfig
+            script: |
+              
+              export CHAINS_REPOSITORY=quay.io/openshift-pipeline/chainstest
+
+              gauge run --tags="" --log-level=debug --verbose specs/manualapprovalgate/     
+
   finally:
     # Verify aggregate status and fail pipeline if any e2e task failed
     - name: verify-e2e-tests-status
