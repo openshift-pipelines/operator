@@ -34,7 +34,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: tekton-hub-ui
-          image: quay.io/tekton-hub/ui:v1.22.3
+          image: quay.io/tekton-hub/ui:v1.22.6
           resources:
             requests:
               cpu: 100m
@@ -44,10 +44,24 @@ spec:
               memory: 500Mi
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             runAsUser: 65532
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: config-volume
+              mountPath: /tmp/config
+            - name: tmp
+              mountPath: /tmp
+            - name: nginx-tmp
+              mountPath: /var/lib/nginx/tmp
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+            - name: nginx-logs
+              mountPath: /var/log/nginx
           env:
             - name: API_URL
               valueFrom:
@@ -100,6 +114,19 @@ spec:
             periodSeconds: 5
             successThreshold: 1
             timeoutSeconds: 1
+      volumes:
+        - name: config-volume
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: nginx-tmp
+          emptyDir: {}
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+        - name: nginx-logs
+          emptyDir: {}
 
 ---
 apiVersion: v1
