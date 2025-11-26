@@ -205,16 +205,19 @@ func buildAllEntries(pkg string, bundles []BundleVersion) map[string][]ChannelEn
 		// skipRange rule: previous minor .0
 		var skip string
 		prevMinor := b.Version.Minor - 1
-		if prevMinor < 0 {
-			skip = fmt.Sprintf(">=%d.%d.0 <%s", bundles[i-1].Version.Major, bundles[i-1].Version.Minor, b.Version.Raw)
-
-		} else {
+		if prevMinor > 0 {
 			skip = fmt.Sprintf(">=%d.%d.0 <%s", b.Version.Major, prevMinor, b.Version.Raw)
+		} else if i > 0 {
+			skip = fmt.Sprintf(">=%d.%d.0 <%s", bundles[i-1].Version.Major, bundles[i-1].Version.Minor, b.Version.Raw)
+		} else {
+			skip = fmt.Sprintf(">=%d.%d.%d <%s", b.Version.Major, b.Version.Minor, b.Version.Patch-1, b.Version.Raw)
 		}
 
 		var replaces string
 		if i > 0 {
 			replaces = fmt.Sprintf("%s.v%s", pkg, bundles[i-1].Version.Raw)
+		} else {
+			replaces = fmt.Sprintf("%s.v%d.%d.%d", pkg, b.Version.Major, b.Version.Minor, b.Version.Patch-1)
 		}
 
 		entry := ChannelEntry{
