@@ -1,11 +1,11 @@
-name: render-olm-catalog
+name: index-render-template
 
 on:
   push:
+    branches:
+      - next
     paths:
       - nightly-bundle.yaml
-      - olm/*
-      - .konflux/olm-catalog/index/*
   workflow_dispatch:
     inputs:
       environment:
@@ -60,9 +60,7 @@ jobs:
         run: |
           curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
           chmod +x /usr/local/bin/opm
-          echo "Environment: ${{github.event.inputs.environment}}"
-          echo "Version: ${{matrix.version}}"
-          ./hack/render-catalog.sh ${{matrix.version}} ${{github.event.inputs.environment}}  
+          ./hack/render-catalog.sh ${{matrix.version}} ${{github.event.inputs.environment}}
       - name: Save generated changes
         uses: actions/upload-artifact@v4
         with:
@@ -90,7 +88,7 @@ jobs:
           SOURCE_BRANCH=actions/update/operator-update-catalog-${BASE_BRANCH}
           git checkout -b ${SOURCE_BRANCH}
           
-          git add .konflux/olm-catalog/index/ olm/
+          git add .konflux/olm-catalog/index/
           
           if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
             echo "No change, exiting"

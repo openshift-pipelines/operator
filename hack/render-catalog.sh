@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -e
-OCP_VERSIONS=${1:-"ALL_VERSIONS"}
-ENVIRONMENT=${2:-"devel"}
+ENVIRONMENT=${1:-"devel"}
+OCP_VERSIONS=${2:-"ALL_VERSIONS"}
+
+
 
 BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
