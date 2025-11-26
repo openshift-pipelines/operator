@@ -48,7 +48,7 @@ BUNDLE_VERSION=$(echo $BUNDLE_NAME | awk -F 'v' '{ print $2 }')
 echo "Bundle Version : $BUNDLE_VERSION"
 
 # Update the bundle version in the catalog.json file
-sed -Ei."" "s%5.0.5-[0-9]+%${BUNDLE_VERSION}%g" .konflux/olm-catalog/index/${VERSION}/catalog-template.json
+sed -Ei'' "s%5.0.5-[0-9]+%${BUNDLE_VERSION}%g" .konflux/olm-catalog/index/${VERSION}/catalog-template.json
 
 # as per this doc https://github.com/konflux-ci/olm-operator-konflux-sample/blob/main/docs/konflux-onboarding.md#create-the-fbc-in-the-git-repository
 # Starting with OCP 4.17 we need the --migrate-level=bundle-object-to-csv-metadata flag. For rendering to older versions of OCP.
