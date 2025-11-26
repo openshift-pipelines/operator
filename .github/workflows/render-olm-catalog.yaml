@@ -1,13 +1,10 @@
-name: index-render-template
+name: render-olm-catalog
 
 on:
   push:
-    branches:
-      - next
     paths:
       - nightly-bundle.yaml
       - olm/*
-      - .konflux/olm-catalog/index/*
       - .konflux/olm-catalog/index/*
   workflow_dispatch:
     inputs:
@@ -38,10 +35,21 @@ jobs:
           popd
           echo "Versions: ${VERSIONS}"
           echo "versions=${VERSIONS}" >> $GITHUB_OUTPUT
+      - id: update-bundle-image
+        run: |
+          ./hack/update-olm-config.sh ${{github.event.inputs.environment}}
+      - name: Save generated changes
+        uses: actions/upload-artifact@v4
+        with:
+          name: olm
+          path: olm/
+
     outputs:
       versions: ${{ steps.set-matrix.outputs.versions }}
+
   generate-catalog:
-    needs: build-matrix
+    needs:
+      - build-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -63,7 +71,7 @@ jobs:
         run: |
           curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
           chmod +x /usr/local/bin/opm
-          ./hack/render-catalog.sh ${{matrix.version}} ${{github.event.inputs.environment}}
+          ./hack/render-catalog.sh ${{matrix.version}}
       - name: Save generated changes
         uses: actions/upload-artifact@v4
         with:
@@ -82,6 +90,8 @@ jobs:
       - name: Apply downloaded changes
         run: |
           set -x
+          cp -rvf  downloaded-artifacts/olm/* olm/
+          rm -rf downloaded-artifacts/olm/*
           cp -rvf  downloaded-artifacts/* .konflux/olm-catalog/index/
       - name: Commit Changes and Generate PR
         run: |
