@@ -6,6 +6,9 @@ on:
       - next
     paths:
       - nightly-bundle.yaml
+      - olm/*
+      - .konflux/olm-catalog/index/*
+      - .konflux/olm-catalog/index/*
   workflow_dispatch:
     inputs:
       environment:
@@ -88,7 +91,7 @@ jobs:
           SOURCE_BRANCH=actions/update/operator-update-catalog-${BASE_BRANCH}
           git checkout -b ${SOURCE_BRANCH}
           
-          git add .konflux/olm-catalog/index/
+          git add .konflux/olm-catalog/index/ olm/
           
           if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
             echo "No change, exiting"
