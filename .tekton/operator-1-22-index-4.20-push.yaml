@@ -28,9 +28,13 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-index-4.20-rhel9:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-index-4.20:{{revision}}
   - name: dockerfile
     value: .konflux/olm-catalog/index/v4.20/Dockerfile.catalog
+  - name: additional-tags
+    value:
+      - "1.22"
+      - "1.22.0"
   pipelineRef:
     name: fbc-build
   taskRunTemplate:
