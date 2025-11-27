@@ -19,12 +19,10 @@ esac
 
 function update_image_reference() {
     SOURCE_PATTEN="quay.io/.*/(pipeline-)?(.*@sha256:.+)"
-    TARGET_PATTEN="${TARGET_REGISTRY}/pipelines-\2"
+    TARGET_PATTEN="${TARGET_REGISTRY}/\2"
     input=$1
     output=$(echo "$input" | sed -E "s|$SOURCE_PATTEN|$TARGET_PATTEN|g")
 
-     #Update Operator Image operator-operator to operator
-     output=$(echo "$output" | sed -E "s/operator-operator-rhel9/rhel9-operator/g")
 
      # Check if the image exists in the target registry
     skopeo inspect --raw docker://${output} > /dev/null 2>&1
