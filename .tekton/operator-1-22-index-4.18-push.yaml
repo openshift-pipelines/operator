@@ -1,4 +1,4 @@
-# Generated for Konflux Application openshift-pipelines-index-4.18-next by openshift-pipelines/hack. DO NOT EDIT
+# Generated for Konflux Application openshift-pipelines-index-4.18 by openshift-pipelines/hack. DO NOT EDIT
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
@@ -10,16 +10,16 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "next" &&
+      == "release-v1.22.x" &&
       (( ".konflux/olm-catalog/index/***".pathChanged()) ||
       ".konflux/olm-catalog/index/v4.18/Dockerfile.catalog".pathChanged() ||
-      ".tekton/operator-next-index-4.18-push.yaml".pathChanged())
+      ".tekton/operator-1-22-index-4.18-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: openshift-pipelines-index-4-18-next
-    appstudio.openshift.io/component: operator-next-index-4-18
+    appstudio.openshift.io/application: openshift-pipelines-index-4-18-1-22
+    appstudio.openshift.io/component: operator-index-4-18-1-22
     pipelines.appstudio.openshift.io/type: build
-  name: operator-next-index-4.18-on-push
+  name: operator-1-22-index-4.18-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -28,13 +28,13 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/index-4.18:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/index-4.18-rhel9:{{revision}}
   - name: dockerfile
     value: .konflux/olm-catalog/index/v4.18/Dockerfile.catalog
   pipelineRef:
     name: fbc-build
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-next-index-4-18
+    serviceAccountName: build-pipeline-operator-index-4-18-1-22
   workspaces:
   - name: git-auth
     secret:
