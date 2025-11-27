@@ -58,3 +58,39 @@ function render_catalog() {
     echo "Render template for $VERSION Done"
 
 }
+
+function update_olm_version() {
+  current_version=$(yq e '.versions.current' project.yaml)
+  echo "Current version: $current_version"
+
+  # Check if version contains suffix like X.Y.Z-N
+  if [[ "$current_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+$ ]]; then
+      echo "Pattern: semantic version with suffix"
+
+      # Extract suffix
+      suffix_number=${current_version##*-}
+      new_suffix_number=$(( suffix_number + 1 ))
+
+      # Extract base version
+      base_version=${current_version%-*}
+
+      # Construct new version
+      new_version="$base_version-$new_suffix_number"
+      echo "New version: $new_version"
+
+      # Update project.yaml
+      yq -i e ".versions.current = \"$new_version\"" project.yaml
+      yq -i e ".versions.previous = \"$current_version\"" project.yaml
+
+  else
+      echo "Pattern: semantic only (X.Y.Z), no bump"
+      new_version="$current_version"     # use same version for sync
+  fi
+
+  # Always sync version to Dockerfile and catalog JSON
+  echo "Syncing version to Dockerfile & catalog templates..."
+  sed -Ei "s%version=.*\\\%version=\"$new_version\" \\\%g" .konflux/olm-catalog/bundle/Dockerfile
+
+
+  echo "Done"
+}
