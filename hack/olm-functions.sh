@@ -20,9 +20,9 @@
     echo "Updated bundle image: $BUNDLE_IMAGE" >&2
 
     #Update the bundle image and version in the olm config.yaml file only for 5.0.x versions
-    export BUNDLE_IMAGE BUNDLE_VERSION
-    yq -i e '(.bundles[] | select(.version | test("^5\\.0\\..*"))).image = env(BUNDLE_IMAGE)' $ROOT_DIR/olm/config.yaml
-    yq -i e '(.bundles[] | select(.version | test("^5\\.0\\..*"))).version = env(BUNDLE_VERSION)' $ROOT_DIR/olm/config.yaml
+    BASE_VERSION=${BUNDLE_VERSION%%-*}
+    yq -i e "(.bundles[] | select(.version | test(\"^$BASE_VERSION.*\"))).image = \"${BUNDLE_IMAGE}\"" $ROOT_DIR/olm/config.yaml
+    yq -i e "(.bundles[] | select(.version | test(\"^$BASE_VERSION.*\"))).version = \"${BUNDLE_VERSION}\"" $ROOT_DIR/olm/config.yaml
 }
 
 function target_registry() {
