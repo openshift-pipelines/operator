@@ -34,9 +34,7 @@ const (
 func filterAndTransform(extension common.Extension) client.FilterAndTransform {
 	return func(ctx context.Context, manifest *mf.Manifest, comp v1alpha1.TektonComponent) (*mf.Manifest, error) {
 		trigger := comp.(*v1alpha1.TektonTrigger)
-
-		imagesRaw := common.ToLowerCaseKeys(common.ImagesFromEnv(common.TriggersImagePrefix))
-		triggerImages := common.ImageRegistryDomainOverride(imagesRaw)
+		triggerImages := common.ToLowerCaseKeys(common.ImagesFromEnv(common.TriggersImagePrefix))
 
 		// adding extension's transformers first to run them before `extra` transformers
 		trns := extension.Transformers(trigger)

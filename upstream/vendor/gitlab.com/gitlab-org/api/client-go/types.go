@@ -212,7 +212,7 @@ type AvailabilityValue string
 
 // List of available availability values.
 //
-// Undocumented, see code at:
+// Undocummented, see code at:
 // https://gitlab.com/gitlab-org/gitlab-foss/-/blob/master/app/models/user_status.rb#L22
 const (
 	NotSet AvailabilityValue = "not_set"
@@ -458,7 +458,7 @@ func (t ISOTime) MarshalJSON() ([]byte, error) {
 	}
 
 	if y := time.Time(t).Year(); y < 0 || y >= 10000 {
-		// ISO 8601 uses 4 digits for the years.
+		// ISO 8901 uses 4 digits for the years.
 		return nil, errors.New("json: ISOTime year outside of range [0,9999]")
 	}
 
