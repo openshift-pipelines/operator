@@ -51,9 +51,6 @@ const (
 
 	headerRateLimit = "RateLimit-Limit"
 	headerRateReset = "RateLimit-Reset"
-
-	AccessTokenHeaderName = "PRIVATE-TOKEN"
-	JobTokenHeaderName    = "JOB-TOKEN"
 )
 
 // AuthType represents an authentication type within GitLab.
@@ -100,15 +97,8 @@ type Client struct {
 	// once.
 	authSourceInit sync.Once
 
-	// jar is the cookie jar to use with the HTTP client
-	jar http.CookieJar
-
 	// Default request options applied to every request.
 	defaultRequestOptions []RequestOptionFunc
-
-	// interceptors contain the stack of *http.Client round tripper builder func
-	// which are used to decorate the http.Client#Transport value.
-	interceptors []Interceptor
 
 	// User agent used when communicating with the GitLab API.
 	UserAgent string
@@ -167,7 +157,6 @@ type Client struct {
 	GroupCluster                     GroupClustersServiceInterface
 	GroupEpicBoards                  GroupEpicBoardsServiceInterface
 	GroupImportExport                GroupImportExportServiceInterface
-	Integrations                     IntegrationsServiceInterface
 	GroupIssueBoards                 GroupIssueBoardsServiceInterface
 	GroupIterations                  GroupIterationsServiceInterface
 	GroupLabels                      GroupLabelsServiceInterface
@@ -265,32 +254,6 @@ type Client struct {
 	Wikis                            WikisServiceInterface
 }
 
-// Interceptor is used to build a *http.Client request pipeline,
-//
-// It receives the next RoundTripper in the chain and returns a new one that
-// will be used for the request.
-//
-// This next RoundTripper might or might not be the actual transporter,
-// which actually does the request call,
-// but it is safe to assume that calling the next will result in the expected HTTP call.
-//
-// Example:
-//
-//	// Simple logger interceptor.
-//	logger := func(next http.RoundTripper) http.RoundTripper {
-//	    return roundtripperFunc(func(req *http.Request) (*http.Response, error) {
-//	        fmt.Printf("Request: %s %s\n", req.Method, req.URL)
-//	        resp, err := next.RoundTrip(req)
-//	        if err == nil {
-//	            fmt.Printf("Response status: %d\n", resp.StatusCode)
-//	        }
-//	        return resp, err
-//	    })
-//	}
-//
-// The Interceptor type lets you add such middlewares to a client by chaining them.
-type Interceptor func(next http.RoundTripper) http.RoundTripper
-
 // ListOptions specifies the optional parameters to various List methods that
 // support pagination.
 type ListOptions struct {
@@ -316,7 +279,11 @@ type RateLimiter interface {
 // NewClient returns a new GitLab API client. To use API methods which require
 // authentication, provide a valid private or personal token.
 func NewClient(token string, options ...ClientOptionFunc) (*Client, error) {
-	as := AccessTokenAuthSource{Token: token}
+	as := staticAuthSource{
+		token:    token,
+		authType: PrivateToken,
+	}
+
 	return NewAuthSourceClient(as, options...)
 }
 
@@ -333,9 +300,9 @@ func NewClient(token string, options ...ClientOptionFunc) (*Client, error) {
 //
 // Deprecated: GitLab recommends against using this authentication method.
 func NewBasicAuthClient(username, password string, options ...ClientOptionFunc) (*Client, error) {
-	as := &PasswordCredentialsAuthSource{
-		Username: username,
-		Password: password,
+	as := &passwordCredentialsAuthSource{
+		username: username,
+		password: password,
 	}
 
 	return NewAuthSourceClient(as, options...)
@@ -344,7 +311,11 @@ func NewBasicAuthClient(username, password string, options ...ClientOptionFunc) 
 // NewJobClient returns a new GitLab API client. To use API methods which require
 // authentication, provide a valid job token.
 func NewJobClient(token string, options ...ClientOptionFunc) (*Client, error) {
-	as := JobTokenAuthSource{Token: token}
+	as := staticAuthSource{
+		token:    token,
+		authType: JobToken,
+	}
+
 	return NewAuthSourceClient(as, options...)
 }
 
@@ -364,7 +335,7 @@ func NewOAuthClient(token string, options ...ClientOptionFunc) (*Client, error) 
 	return NewAuthSourceClient(as, options...)
 }
 
-// NewAuthSourceClient returns a new GitLab API client that uses the AuthSource for authentication.
+// NewAuthSourceClient returns a new GitLab API client that uses the AuthSouce for authentication.
 func NewAuthSourceClient(as AuthSource, options ...ClientOptionFunc) (*Client, error) {
 	c := &Client{
 		UserAgent:  userAgent,
@@ -393,20 +364,6 @@ func NewAuthSourceClient(as AuthSource, options ...ClientOptionFunc) (*Client, e
 		if err := fn(c); err != nil {
 			return nil, err
 		}
-	}
-
-	decorateHTTPClientTransportWithInterceptors(c)
-
-	// Wire up the cookie jar.
-	// The ClientOptionFunc can't do it directly,
-	// because the user may also specify HTTPClient
-	// and we want the order of passing those to matter
-	// as little as possible.
-	if c.jar != nil {
-		if c.client.HTTPClient.Jar != nil {
-			return nil, errors.New("conflicting option functions when creating client. The provided HTTP Client already has a Jar configured, therefore you can't use gitlab.WithCookieJar")
-		}
-		c.client.HTTPClient.Jar = c.jar
 	}
 
 	// If no custom limiter was set using a client option, configure
@@ -474,7 +431,6 @@ func NewAuthSourceClient(as AuthSource, options ...ClientOptionFunc) (*Client, e
 	c.GroupCluster = &GroupClustersService{client: c}
 	c.GroupEpicBoards = &GroupEpicBoardsService{client: c}
 	c.GroupImportExport = &GroupImportExportService{client: c}
-	c.Integrations = &IntegrationsService{client: c}
 	c.GroupIssueBoards = &GroupIssueBoardsService{client: c}
 	c.GroupIterations = &GroupIterationsService{client: c}
 	c.GroupLabels = &GroupLabelsService{client: c}
@@ -572,24 +528,6 @@ func NewAuthSourceClient(as AuthSource, options ...ClientOptionFunc) (*Client, e
 	c.Wikis = &WikisService{client: c}
 
 	return c, nil
-}
-
-func decorateHTTPClientTransportWithInterceptors(c *Client) {
-	if len(c.interceptors) == 0 {
-		return
-	}
-	c.client.HTTPClient.Transport = chainInterceptors(c.client.HTTPClient.Transport, c.interceptors...)
-}
-
-func chainInterceptors(rt http.RoundTripper, interceptors ...Interceptor) http.RoundTripper {
-	for i := len(interceptors) - 1; i >= 0; i-- {
-		rt = interceptors[i](rt)
-	}
-	return rt
-}
-
-func (c *Client) HTTPClient() *http.Client {
-	return c.client.HTTPClient
 }
 
 // retryHTTPCheck provides a callback for Client.CheckRetry which
@@ -730,14 +668,6 @@ func (c *Client) NewRequest(method, path string, opt any, options []RequestOptio
 	u.RawPath = c.baseURL.Path + path
 	u.Path = c.baseURL.Path + unescaped
 
-	return c.NewRequestToURL(method, &u, opt, options)
-}
-
-func (c *Client) NewRequestToURL(method string, u *url.URL, opt any, options []RequestOptionFunc) (*retryablehttp.Request, error) {
-	if u.Scheme != c.baseURL.Scheme || u.Host != c.baseURL.Host {
-		return nil, fmt.Errorf("client only allows requests to URLs matching the clients configured base URL. Got %q, base URL is %q", u.String(), c.baseURL.String())
-	}
-
 	// Create a request specific headers map.
 	reqHeaders := make(http.Header)
 	reqHeaders.Set("Accept", "application/json")
@@ -752,11 +682,10 @@ func (c *Client) NewRequestToURL(method string, u *url.URL, opt any, options []R
 		reqHeaders.Set("Content-Type", "application/json")
 
 		if opt != nil {
-			b, err := json.Marshal(opt)
+			body, err = json.Marshal(opt)
 			if err != nil {
 				return nil, err
 			}
-			body = b
 		}
 	case opt != nil:
 		q, err := query.Values(opt)
@@ -1052,7 +981,7 @@ func parseID(id any) (string, error) {
 	}
 }
 
-// PathEscape is a helper function to escape a project identifier.
+// Helper function to escape a project identifier.
 func PathEscape(s string) string {
 	return strings.ReplaceAll(url.PathEscape(s), ".", "%2E")
 }
@@ -1079,10 +1008,6 @@ func (e *ErrorResponse) Error() string {
 	} else {
 		return fmt.Sprintf("%s %s: %d %s", e.Response.Request.Method, url, e.Response.StatusCode, e.Message)
 	}
-}
-
-func (e *ErrorResponse) HasStatusCode(statusCode int) bool {
-	return e != nil && e.Response != nil && e.Response.StatusCode == statusCode
 }
 
 // CheckResponse checks the API response for errors, and returns them if present.
@@ -1155,15 +1080,6 @@ func parseError(raw any) string {
 	}
 }
 
-func HasStatusCode(err error, statusCode int) bool {
-	var errResponse *ErrorResponse
-	if !errors.As(err, &errResponse) {
-		return false
-	}
-
-	return errResponse.HasStatusCode(statusCode)
-}
-
 // newRetryableHTTPClientWithRetryCheck returns a `retryablehttp.Client` clone of itself with the given CheckRetry function
 func (c *Client) newRetryableHTTPClientWithRetryCheck(cr retryablehttp.CheckRetry) *retryablehttp.Client {
 	return &retryablehttp.Client{
@@ -1209,52 +1125,48 @@ func (as OAuthTokenSource) Header(_ context.Context) (string, string, error) {
 	return "Authorization", "Bearer " + t.AccessToken, nil
 }
 
-// JobTokenAuthSource used as an AuthSource for CI Job Tokens
-type JobTokenAuthSource struct {
-	Token string
+// staticAuthSource implements the AuthSource interface for static tokens.
+type staticAuthSource struct {
+	token    string
+	authType AuthType
 }
 
-func (JobTokenAuthSource) Init(context.Context, *Client) error {
+func (staticAuthSource) Init(context.Context, *Client) error {
 	return nil
 }
 
-func (s JobTokenAuthSource) Header(_ context.Context) (string, string, error) {
-	return JobTokenHeaderName, s.Token, nil
+func (as staticAuthSource) Header(_ context.Context) (string, string, error) {
+	switch as.authType {
+	case PrivateToken:
+		return "PRIVATE-TOKEN", as.token, nil
+
+	case JobToken:
+		return "JOB-TOKEN", as.token, nil
+
+	default:
+		return "", "", fmt.Errorf("invalid auth type: %v", as.authType)
+	}
 }
 
-// AccessTokenAuthSource used as an AuthSource for various access tokens, like Personal-, Project- and Group- Access Tokens.
-// Can be used for all tokens that authorize with the Private-Token header.
-type AccessTokenAuthSource struct {
-	Token string
-}
-
-func (AccessTokenAuthSource) Init(context.Context, *Client) error {
-	return nil
-}
-
-func (s AccessTokenAuthSource) Header(_ context.Context) (string, string, error) {
-	return AccessTokenHeaderName, s.Token, nil
-}
-
-// PasswordCredentialsAuthSource implements the AuthSource interface for the OAuth 2.0
+// passwordTokenSource implements the AuthSource interface for the OAuth 2.0
 // resource owner password credentials flow.
-type PasswordCredentialsAuthSource struct {
-	Username string
-	Password string
+type passwordCredentialsAuthSource struct {
+	username string
+	password string
 
 	AuthSource
 }
 
-func (as *PasswordCredentialsAuthSource) Init(ctx context.Context, client *Client) error {
+func (as *passwordCredentialsAuthSource) Init(ctx context.Context, client *Client) error {
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, client.client.HTTPClient)
 
 	config := &oauth2.Config{
 		Endpoint: client.endpoint(),
 	}
 
-	pct, err := config.PasswordCredentialsToken(ctx, as.Username, as.Password)
+	pct, err := config.PasswordCredentialsToken(ctx, as.username, as.password)
 	if err != nil {
-		return fmt.Errorf("PasswordCredentialsToken(%q, ******): %w", as.Username, err)
+		return fmt.Errorf("PasswordCredentialsToken(%q, ******): %w", as.username, err)
 	}
 
 	as.AuthSource = OAuthTokenSource{

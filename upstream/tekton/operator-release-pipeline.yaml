@@ -8,9 +8,6 @@ spec:
   - name: package
     description: package to release
     default: github.com/tektoncd/operator
-  - name: repoName
-    description: repository name (e.g., pipeline, triggers, etc.)
-    default: operator
   - name: gitRevision
     description: the git revision to release
   - name: imageRegistry
@@ -21,7 +18,7 @@ spec:
     default: tekton-releases
   - name: imageRegistryRegions
     description: The target image registry regions
-    default: ""  # Empty for GHCR, "us eu asia" for GCR
+    default: "us eu asia"
   - name: imageRegistryUser
     description: The user for the image registry credentials
     default: _json_key
@@ -29,7 +26,7 @@ spec:
     description: The X.Y.Z version that the artifacts should be tagged with
   - name: releaseBucket
     description: bucket where the release is stored. The bucket must be project specific.
-    default: tekton-releases
+    default: gs://tekton-releases-nightly/operator
   - name: releaseAsLatest
     description: Whether to tag and publish this release as Operator's latest
     default: "true"
@@ -39,6 +36,8 @@ spec:
   - name: koExtraArgs
     description: Extra args to be passed to ko
     default: "--preserve-import-paths"
+  - name: serviceAccountPath
+    description: The path to the service account file within the release-secret workspace
   - name: serviceAccountImagesPath
     description: The path to the service account file or credentials within the release-images-secret workspace
   - name: runTests
@@ -76,32 +75,31 @@ spec:
   tasks:
   - name: git-clone
     taskRef:
-      resolver: bundles
+      resolver: hub
       params:
-        - name: bundle
-          value: ghcr.io/tektoncd/catalog/upstream/tasks/git-clone:0.7
         - name: name
           value: git-clone
-        - name: kind
-          value: task
+        - name: version
+          value: "0.7"
     workspaces:
       - name: output
         workspace: workarea
         subPath: git
     params:
-      - name: url
-        value: https://$(params.package)
-      - name: revision
-        value: $(params.gitRevision)
-
+    - name: url
+      value: https://$(params.package)
+    - name: revision
+      value: $(params.gitRevision)
   - name: precheck
     runAfter:
     - git-clone
     taskRef:
       resolver: git
       params:
-      - name: url
-        value: https://github.com/tektoncd/plumbing
+      - name: repo
+        value: plumbing
+      - name: org
+        value: tektoncd
       - name: revision
         value: aeed19e5a36f335ebfdc4b96fa78d1ce5bb4f7b8
       - name: pathInRepo
@@ -117,7 +115,6 @@ spec:
     - name: source-to-release
       workspace: workarea
       subPath: git
-
   - name: unit-tests
     runAfter:
     - precheck
@@ -141,15 +138,16 @@ spec:
     - name: source
       workspace: workarea
       subPath: git
-
   - name: fetch-component-releases
     runAfter:
     - unit-tests
     taskRef:
       resolver: git
       params:
-        - name: url
-          value: https://github.com/tektoncd/operator
+        - name: repo
+          value: operator
+        - name: org
+          value: tektoncd
         - name: revision
           value: $(params.gitRevision)
         - name: pathInRepo
@@ -163,7 +161,6 @@ spec:
       value: $(params.components)
     - name: TARGET_PLATFORMS
       value: $(params.kubeDistros)
-
   - name: build-test
     runAfter:
     - fetch-component-releases
@@ -187,15 +184,16 @@ spec:
     - name: source
       workspace: workarea
       subPath: git
-
   - name: publish-images-platform-kubernetes
     runAfter:
     - build-test
     taskRef:
       resolver: git
       params:
-        - name: url
-          value: https://github.com/tektoncd/operator
+        - name: repo
+          value: operator
+        - name: org
+          value: tektoncd
         - name: revision
           value: $(params.gitRevision)
         - name: pathInRepo
@@ -234,15 +232,16 @@ spec:
       subPath: bucket
     - name: release-secret
       workspace: release-images-secret
-
   - name: publish-images-platform-openshift
     runAfter:
     - build-test
     taskRef:
       resolver: git
       params:
-        - name: url
-          value: https://github.com/tektoncd/operator
+        - name: repo
+          value: operator
+        - name: org
+          value: tektoncd
         - name: revision
           value: $(params.gitRevision)
         - name: pathInRepo
@@ -281,7 +280,6 @@ spec:
       subPath: bucket
     - name: release-secret
       workspace: release-images-secret
-
   - name: publish-to-bucket
     runAfter:
     - publish-images-platform-kubernetes
@@ -290,9 +288,9 @@ spec:
       resolver: bundles
       params:
         - name: bundle
-          value: ghcr.io/tektoncd/catalog/upstream/tasks/oracle-cloud-storage-upload:0.1
+          value: ghcr.io/tektoncd/catalog/upstream/tasks/gcs-upload:0.3
         - name: name
-          value: oracle-cloud-storage-upload
+          value: gcs-upload
         - name: kind
           value: task
     workspaces:
@@ -302,17 +300,12 @@ spec:
       workspace: workarea
       subPath: bucket
     params:
+    - name: location
+      value: $(params.releaseBucket)/previous/$(params.versionTag)
     - name: path
       value: $(params.versionTag)
-    - name: bucketName
-      value: $(params.releaseBucket)
-    - name: objectPrefix
-      value: $(params.repoName)/previous/$(params.versionTag)/
-    - name: replaceExistingFiles
-      value: "true"
-    - name: recursive
-      value: "true"
-
+    - name: serviceAccountPath
+      value: $(params.serviceAccountPath)
   - name: publish-to-bucket-latest
     runAfter:
     - publish-images-platform-kubernetes
@@ -326,9 +319,9 @@ spec:
       resolver: bundles
       params:
         - name: bundle
-          value: ghcr.io/tektoncd/catalog/upstream/tasks/oracle-cloud-storage-upload:0.1
+          value: ghcr.io/tektoncd/catalog/upstream/tasks/gcs-upload:0.3
         - name: name
-          value: oracle-cloud-storage-upload
+          value: gcs-upload
         - name: kind
           value: task
     workspaces:
@@ -338,19 +331,12 @@ spec:
       workspace: workarea
       subPath: bucket
     params:
+    - name: location
+      value: $(params.releaseBucket)/latest
     - name: path
       value: $(params.versionTag)
-    - name: bucketName
-      value: $(params.releaseBucket)
-    - name: objectPrefix
-      value: $(params.repoName)/latest/
-    - name: replaceExistingFiles
-      value: "true"
-    - name: recursive
-      value: "true"
-    - name: deleteExtraFiles
-      value: "true"
-
+    - name: serviceAccountPath
+      value: $(params.serviceAccountPath)
   - name: report-bucket
     runAfter:
     - publish-to-bucket
@@ -359,13 +345,10 @@ spec:
       value: $(params.releaseBucket)
     - name: versionTag
       value: $(params.versionTag)
-    - name: repoName
-      value: $(params.repoName)
     taskSpec:
       params:
       - name: releaseBucket
       - name: versionTag
-      - name: repoName
       results:
       - name: release
         description: The full URL of the release file in the bucket
@@ -380,9 +363,8 @@ spec:
         image: docker.io/library/alpine:3.20.3@sha256:beefdbd8a1da6d2915566fde36db9db0b524eb737fc57cd1367effd16dc0d06d
         script: |
           BASE_URL=$(echo "$(params.releaseBucket)/previous/$(params.versionTag)")
-          # Oracle Cloud Storage: Construct public URL
-          # Format: https://infra.tekton.dev/<releaseBucket>/<repoName>/previous/<versionTag>
-          BASE_URL="https://infra.tekton.dev/${BASE_URL}"
+          # If the bucket is in the gs:// return the corresponding public https URL
+          BASE_URL=$(echo ${BASE_URL} | sed 's,gs://,https://storage.googleapis.com/,g')
           echo "${BASE_URL}/release.yaml" > $(results.release.path)
           echo "${BASE_URL}/release.notags.yaml" > $(results.release-no-tag.path)
           echo "${BASE_URL}/openshift-release.yaml" > $(results.openshift-release.path)

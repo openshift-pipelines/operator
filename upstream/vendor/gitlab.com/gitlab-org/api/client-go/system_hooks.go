@@ -42,7 +42,7 @@ type (
 
 var _ SystemHooksServiceInterface = (*SystemHooksService)(nil)
 
-// Hook represents a GitLab system hook.
+// Hook represents a GitLap system hook.
 //
 // GitLab API docs: https://docs.gitlab.com/api/system_hooks/
 type Hook struct {

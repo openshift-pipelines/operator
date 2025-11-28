@@ -35,8 +35,7 @@ func filterAndTransform(extension common.Extension) client.FilterAndTransform {
 		dashboard := comp.(*v1alpha1.TektonDashboard)
 		targetNamespace := dashboard.Spec.GetTargetNamespace()
 
-		imagesRaw := common.ToLowerCaseKeys(common.ImagesFromEnv(common.DashboardImagePrefix))
-		images := common.ImageRegistryDomainOverride(imagesRaw)
+		images := common.ToLowerCaseKeys(common.ImagesFromEnv(common.DashboardImagePrefix))
 
 		trns := extension.Transformers(dashboard)
 		extra := []mf.Transformer{
