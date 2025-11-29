@@ -1,3 +1,24 @@
+  function validate_bundles(){
+    BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    ROOT_DIR="$(dirname "$BASEDIR")"
+    LENGTH=$(yq e '.bundles | length' $ROOT_DIR/olm/config.yaml)
+    echo "Total Bundles : $LENGTH"
+    for i in $(seq 0 $((${LENGTH}-1))); do
+        version=$(yq e ".bundles.${i}.version" $ROOT_DIR/olm/config.yaml)
+        image=$(yq e ".bundles.${i}.image" $ROOT_DIR/olm/config.yaml)
+        BUNDLE_JSON=$(opm render $image)
+        BUNDLE_NAME=$(echo $BUNDLE_JSON | jq -r '.name')
+        BUNDLE_VERSION=$(echo $BUNDLE_NAME | awk -F 'v' '{ print $2 }')
+        echo -e "$image \n \t Bundle Version: $BUNDLE_VERSION\n\t Config Version: $version "
+
+        if [[ $version != $BUNDLE_VERSION ]] ; then
+          echo -e "❌ Bundle image  for $version is not correct in config \e[0m" >&2
+          exit 1
+        fi
+    done
+    echo "All Bundle Images are configured correctly"
+  }
+
   function update_bundle_image() {
     environment=${1:-"devel"}
     BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,8 +35,8 @@
     echo "BUNDLE_NAME : $BUNDLE_NAME"
     echo "Bundle Version : $BUNDLE_VERSION"
 
-    SOURCE_PATTEN="quay.io/.*/(.*)-rhel9(@sha256:.+)"
-    TARGET_PATTEN="$TARGET_REGISTRY/pipelines-\1\2"
+    SOURCE_PATTEN="quay.io/.*/(.*@sha256:.+)"
+    TARGET_PATTEN="$TARGET_REGISTRY/\1"
     BUNDLE_IMAGE=$(echo "${BUNDLE_IMAGE}" | sed -E "s|$SOURCE_PATTEN|$TARGET_PATTEN|g")
     echo "Updated bundle image: $BUNDLE_IMAGE" >&2
 
@@ -45,6 +66,7 @@ function target_registry() {
 
 #
 function render_catalog() {
+    validate_bundles
     VERSION=$1
     CATALOG_JSON=$2
     RENDERED_CATALOG_JSON=$3
