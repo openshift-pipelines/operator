@@ -66,6 +66,7 @@ function target_registry() {
 
 #
 function render_catalog() {
+    validate_bundles
     VERSION=$1
     CATALOG_JSON=$2
     RENDERED_CATALOG_JSON=$3
