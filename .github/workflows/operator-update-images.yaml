@@ -1,4 +1,4 @@
-name: operator-update-images
+name: update-csv
 
 on:
   push:
@@ -61,6 +61,8 @@ jobs:
             gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
           else
             echo "a PR already exists, editing..."
+            # Sleep before adding the label so that bot do not remove the label
+            sleep 30
             gh pr edit $(echo $pr_list | jq .[0].number) --add-label=lgtm  --add-label=approved 
           fi
         env:
