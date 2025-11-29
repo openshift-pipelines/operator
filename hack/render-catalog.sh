@@ -9,6 +9,8 @@ source $BASEDIR/olm-functions.sh
 ROOT_DIR="$(dirname "$BASEDIR")"
 OLM_DIR="$ROOT_DIR/.konflux/olm-catalog"
 
+validate_bundles
+
 if [ "$OCP_VERSIONS" == "ALL_VERSIONS" ]; then
   OCP_VERSIONS=()
   for d in "$OLM_DIR/index"/*/; do
