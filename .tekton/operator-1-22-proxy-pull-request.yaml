@@ -17,7 +17,7 @@ metadata:
       ".tekton/operator-1-22-proxy-pull-request.yaml".pathChanged())
   labels:
     appstudio.openshift.io/application: openshift-pipelines-operator-1-22
-    appstudio.openshift.io/component: operator-proxy-1-22
+    appstudio.openshift.io/component: operator-1-22-proxy
     pipelines.appstudio.openshift.io/type: build
   name: operator-1-22-proxy-on-pull-request
   namespace: tekton-ecosystem-tenant
@@ -25,6 +25,8 @@ spec:
   params:
   - name: git-url
     value: '{{source_url}}'
+  - name: upstream-git-url
+    value: 'https://github.com/tektoncd/operator'
   - name: revision
     value: '{{revision}}'
   - name: output-image
@@ -35,18 +37,17 @@ spec:
     value: .konflux/dockerfiles/proxy.Dockerfile
   - name: additional-tags
     value:
-      - "on-pr-1.22"
       - "on-pr-1.22.0"
   - name: build-platforms
     value:
-    - linux/x86_64
+     - linux/x86_64
   - name: prefetch-input
     value: |
       {"type": "rpm", "path": ".konflux/rpms"}
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-proxy-1-22
+    serviceAccountName: build-pipeline-operator-1-22-proxy
   workspaces:
   - name: git-auth
     secret:

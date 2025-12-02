@@ -17,7 +17,7 @@ metadata:
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: openshift-pipelines-operator-1-22
-    appstudio.openshift.io/component: operator-bundle-1-22
+    appstudio.openshift.io/component: operator-1-22-bundle
     pipelines.appstudio.openshift.io/type: build
   name: operator-1-22-bundle-on-push
   namespace: tekton-ecosystem-tenant
@@ -25,6 +25,8 @@ spec:
   params:
   - name: git-url
     value: '{{source_url}}'
+  - name: upstream-git-url
+    value: 'https://github.com/tektoncd/operator'
   - name: revision
     value: '{{revision}}'
   - name: output-image
@@ -33,11 +35,10 @@ spec:
     value: .konflux/olm-catalog/bundle/Dockerfile
   - name: additional-tags
     value:
-      - "1.22"
       - "1.22.0"
   - name: build-platforms
     value:
-      - linux/x86_64
+     - linux/x86_64
   - name: build-image-index
     value: false
   - name: prefetch-input
@@ -46,7 +47,7 @@ spec:
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-bundle-1-22
+    serviceAccountName: build-pipeline-operator-1-22-bundle
   workspaces:
   - name: git-auth
     secret:
