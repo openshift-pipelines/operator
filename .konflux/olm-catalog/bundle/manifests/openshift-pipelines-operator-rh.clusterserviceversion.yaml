@@ -18,7 +18,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.20.0 <5.0.5-749'
+    olm.skipRange: '>=1.20.0 <5.0.5-750'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
@@ -30,7 +30,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v5.0.5-749
+  name: openshift-pipelines-operator-rh.v5.0.5-750
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -356,13 +356,13 @@ spec:
 
     - Tekton Chains: v0.26.0
 
-    - Tekton Hub (tech-preview): v1.23.3
+    - Tekton Hub (tech-preview): v1.23.4
 
     - Tekton Results (tech-preview): v0.17.1
 
     - Manual Approval Gate (tech-preview): v0.7.0
 
-    - Tekton Pruner: v0.3.1
+    - Tekton Pruner: v0.3.3
 
 
     ## Getting Started
@@ -1212,7 +1212,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 5.0.5-749
+                        value: 5.0.5-750
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1328,9 +1328,9 @@ spec:
                       - name: IMAGE_MAG_MANUAL_APPROVAL
                         value: quay.io/openshift-pipeline/pipelines-manual-approval-gate-webhook-rhel9@sha256:1c4248443060d3e642acaa25c2a7c9b1178e933bd19dd2aaeae5c135d2d9ff6f
                       - name: IMAGE_PRUNER_CONTROLLER
-                        value: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:5cd70e7ec072525da4f40d7b2866d0401cb9a2e416c07e354bd628a826024477
+                        value: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:9518c4bc1cb0498caa496f72df3ffefd6d0320e38b66640268d44a78be019ed9
                       - name: IMAGE_PRUNER_WEBHOOK
-                        value: quay.io/openshift-pipeline/pipelines-pruner-webhook-rhel9@sha256:89883f7a5d116dece021017e19244160b945ceb5d5917e357ee39cf603e55f4b
+                        value: quay.io/openshift-pipeline/pipelines-pruner-webhook-rhel9@sha256:e640d0e01736af6519d4341ce4b0440991e35044fd45d0a048d72af097d239e7
                       - name: IMAGE_PAC_PAC_CONTROLLER
                         value: quay.io/openshift-pipeline/pipelines-pipelines-as-code-controller-rhel9@sha256:346ec0cb6f85540fbe3d189a5d3118ca6dc49a89f4daa0e5eb2af0897ea33636
                       - name: IMAGE_PAC_PAC_WEBHOOK
@@ -1596,9 +1596,9 @@ spec:
       name: IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER
     - image: quay.io/openshift-pipeline/pipelines-manual-approval-gate-webhook-rhel9@sha256:1c4248443060d3e642acaa25c2a7c9b1178e933bd19dd2aaeae5c135d2d9ff6f
       name: IMAGE_MAG_MANUAL_APPROVAL
-    - image: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:5cd70e7ec072525da4f40d7b2866d0401cb9a2e416c07e354bd628a826024477
+    - image: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:9518c4bc1cb0498caa496f72df3ffefd6d0320e38b66640268d44a78be019ed9
       name: IMAGE_PRUNER_CONTROLLER
-    - image: quay.io/openshift-pipeline/pipelines-pruner-webhook-rhel9@sha256:89883f7a5d116dece021017e19244160b945ceb5d5917e357ee39cf603e55f4b
+    - image: quay.io/openshift-pipeline/pipelines-pruner-webhook-rhel9@sha256:e640d0e01736af6519d4341ce4b0440991e35044fd45d0a048d72af097d239e7
       name: IMAGE_PRUNER_WEBHOOK
     - image: quay.io/openshift-pipeline/pipelines-pipelines-as-code-controller-rhel9@sha256:346ec0cb6f85540fbe3d189a5d3118ca6dc49a89f4daa0e5eb2af0897ea33636
       name: IMAGE_PAC_PAC_CONTROLLER
@@ -1620,5 +1620,5 @@ spec:
       name: IMAGE_ADDONS_MAVEN_GOALS
     - image: quay.io/openshift-pipeline/pipelines-console-plugin-rhel9@sha256:b90510e3bc8feb9cfd04cb24d4ccc15cb9039187e646298830f66ec73303603a
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
-  replaces: openshift-pipelines-operator-rh.v5.0.5-748
-  version: 5.0.5-749
+  replaces: openshift-pipelines-operator-rh.v5.0.5-749
+  version: 5.0.5-750
