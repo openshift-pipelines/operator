@@ -1,4 +1,4 @@
-# Generated for Konflux Application openshift-pipelines-operator-next by openshift-pipelines/hack. DO NOT EDIT
+# Generated for Konflux Application openshift-pipelines-operator by openshift-pipelines/hack. DO NOT EDIT
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
@@ -25,17 +25,20 @@ spec:
   params:
   - name: git-url
     value: '{{source_url}}'
-  - name: revision
-    value: '{{revision}}'
   - name: upstream-git-url
     value: 'https://github.com/tektoncd/operator'
+  - name: revision
+    value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/operator-bundle-rhel9:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-bundle:{{revision}}
   - name: dockerfile
     value: .konflux/olm-catalog/bundle/Dockerfile
+  - name: additional-tags
+    value:
+      - "next"
   - name: build-platforms
     value:
-      - linux/x86_64
+     - linux/x86_64
   - name: build-image-index
     value: false
   - name: prefetch-input
