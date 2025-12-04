@@ -1,4 +1,4 @@
-# Generated for Konflux Application openshift-pipelines-index-4.19-next by openshift-pipelines/hack. DO NOT EDIT
+# Generated for Konflux Application openshift-pipelines-index-4.19 by openshift-pipelines/hack. DO NOT EDIT
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
@@ -12,7 +12,7 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "next" &&
       (( ".konflux/olm-catalog/index/***".pathChanged()) ||
-      ".konflux/olm-catalog/index/v4.19/Dockerfile.catalog".pathChanged() ||
+      ".konflux/dockerfiles/index-4.19.Dockerfile".pathChanged() ||
       ".tekton/operator-next-index-4.19-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
@@ -25,12 +25,17 @@ spec:
   params:
   - name: git-url
     value: '{{source_url}}'
+  - name: upstream-git-url
+    value: 'https://github.com/'
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/index-4.19:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-index-4.19:{{revision}}
   - name: dockerfile
-    value: .konflux/olm-catalog/index/v4.19/Dockerfile.catalog
+    value: .konflux/dockerfiles/index-4.19.Dockerfile
+  - name: additional-tags
+    value:
+      - "next"
   pipelineRef:
     name: fbc-build
   taskRunTemplate:
