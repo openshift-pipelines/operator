@@ -1,4 +1,4 @@
-# Generated for Konflux Application openshift-pipelines-index-4.20 by openshift-pipelines/hack. DO NOT EDIT
+# Generated for Konflux Application openshift-pipelines-index-4.20-next by openshift-pipelines/hack. DO NOT EDIT
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
@@ -28,13 +28,9 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-index-4.20:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/index-4.20:{{revision}}
   - name: dockerfile
     value: .konflux/olm-catalog/index/v4.20/Dockerfile.catalog
-  - name: additional-tags
-    value:
-      - "next"
-      - "next"
   pipelineRef:
     name: fbc-build
   taskRunTemplate:
