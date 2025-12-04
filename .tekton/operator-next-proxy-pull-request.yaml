@@ -1,4 +1,4 @@
-# Generated for Konflux Application openshift-pipelines-operator by openshift-pipelines/hack. DO NOT EDIT
+# Generated for Konflux Application openshift-pipelines-operator-next by openshift-pipelines/hack. DO NOT EDIT
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
@@ -15,6 +15,7 @@ metadata:
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
       ".konflux/dockerfiles/proxy.Dockerfile".pathChanged() ||
       ".tekton/operator-next-proxy-pull-request.yaml".pathChanged())
+  creationTimestamp: null
   labels:
     appstudio.openshift.io/application: openshift-pipelines-operator-next
     appstudio.openshift.io/component: operator-next-proxy
@@ -30,14 +31,11 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-proxy-rhel9:on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/next/operator-proxy-rhel9:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: dockerfile
     value: .konflux/dockerfiles/proxy.Dockerfile
-  - name: additional-tags
-    value:
-      - "on-pr-next"
   - name: build-platforms
     value:
     - linux/x86_64
