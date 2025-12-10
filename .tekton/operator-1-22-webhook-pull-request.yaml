@@ -11,15 +11,15 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "next" &&
-      ((".konflux/patches/***".pathChanged() || ".konflux/olm-catalog/bundle/***".pathChanged()) ||
-      ".konflux/olm-catalog/bundle/Dockerfile".pathChanged() ||
-      ".tekton/operator-next-bundle-pull-request.yaml".pathChanged())
+      == "release-v1.22.x" &&
+      ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
+      ".konflux/dockerfiles/webhook.Dockerfile".pathChanged() ||
+      ".tekton/operator-1-22-webhook-pull-request.yaml".pathChanged())
   labels:
-    appstudio.openshift.io/application: openshift-pipelines-operator-next
-    appstudio.openshift.io/component: operator-next-bundle
+    appstudio.openshift.io/application: openshift-pipelines-operator-1-22
+    appstudio.openshift.io/component: operator-1-22-webhook
     pipelines.appstudio.openshift.io/type: build
-  name: operator-next-bundle-on-pull-request
+  name: operator-1-22-webhook-on-pull-request
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -30,27 +30,24 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-bundle:on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-webhook-rhel9:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: .konflux/olm-catalog/bundle/Dockerfile
+    value: .konflux/dockerfiles/webhook.Dockerfile
   - name: additional-tags
     value:
-      - "on-pr-next"
+      - "on-pr-1.22.0"
   - name: build-platforms
     value:
     - linux/x86_64
-  - name: build-image-index
-    value: false
-  
   - name: prefetch-input
     value: |
       {"type": "rpm", "path": ".konflux/rpms"}
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-next-bundle
+    serviceAccountName: build-pipeline-operator-1-22-webhook
   workspaces:
   - name: git-auth
     secret:
