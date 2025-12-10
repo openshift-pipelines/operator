@@ -10,16 +10,16 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "next" &&
-      ((".konflux/patches/***".pathChanged() || ".konflux/olm-catalog/bundle/***".pathChanged()) ||
-      ".konflux/olm-catalog/bundle/Dockerfile".pathChanged() ||
-      ".tekton/operator-next-bundle-push.yaml".pathChanged())
+      == "release-v1.22.x" &&
+      ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
+      ".konflux/dockerfiles/proxy.Dockerfile".pathChanged() ||
+      ".tekton/operator-1-22-proxy-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: openshift-pipelines-operator-next
-    appstudio.openshift.io/component: operator-next-bundle
+    appstudio.openshift.io/application: openshift-pipelines-operator-1-22
+    appstudio.openshift.io/component: operator-1-22-proxy
     pipelines.appstudio.openshift.io/type: build
-  name: operator-next-bundle-on-push
+  name: operator-1-22-proxy-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -30,24 +30,19 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-bundle:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-proxy-rhel9:{{revision}}
   - name: dockerfile
-    value: .konflux/olm-catalog/bundle/Dockerfile
+    value: .konflux/dockerfiles/proxy.Dockerfile
   - name: additional-tags
     value:
-      - "next"
-  - name: build-platforms
-    value:
-      - linux/x86_64
-  - name: build-image-index
-    value: false
+      - "1.22.0"
   - name: prefetch-input
     value: |
       {"type": "rpm", "path": ".konflux/rpms"}
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-next-bundle
+    serviceAccountName: build-pipeline-operator-1-22-proxy
   workspaces:
   - name: git-auth
     secret:
