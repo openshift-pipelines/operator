@@ -1,5 +1,5 @@
-# Generated for Konflux Application openshift-pipelines-operator-next by openshift-pipelines/hack. DO NOT EDIT
-name: auto-merge-upstream-next
+# Generated for Konflux Application openshift-pipelines-operator by openshift-pipelines/hack. DO NOT EDIT
+name: auto-merge-upstream-operator
 
 on:
   workflow_dispatch: {}
@@ -9,19 +9,18 @@ on:
 jobs:
   auto-approve:
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
     permissions:
       pull-requests: write
     steps:
     - name: Checkout the current repo
       uses: actions/checkout@v4
-    - name: auto-merge-upstream-next
+    - name: auto-merge-upstream-operator
       run: |
         gh auth status
         git config user.name openshift-pipelines-bot
         git config user.email pipelines-extcomm@redhat.com
         # Approve and merge pull-request with no reviews
-        for p in $(gh pr list --search "head:actions/update/sources-next" --json "number" | jq ".[].number"); do
+        for p in $(gh pr list --search "head:actions/update/sources-operator" --json "number" | jq ".[].number"); do
           gh pr merge --rebase --delete-branch --auto $p
         done
       env:
