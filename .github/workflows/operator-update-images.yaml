@@ -29,7 +29,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout the current repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: update-image-references
         run: |
@@ -62,6 +62,7 @@ jobs:
             gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
           else
             echo "a PR already exists, editing..."
+            sleep 10
             gh pr edit $(echo $pr_list | jq .[0].number) --add-label=lgtm  --add-label=approved 
           fi
         env:
