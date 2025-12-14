@@ -1,28 +1,45 @@
 # Generated for Konflux Application openshift-pipelines-operator by openshift-pipelines/hack. DO NOT EDIT
-name: auto-merge-upstream-operator
-
+name: auto-merge-upstream-tektoncd/operator
 on:
   workflow_dispatch: {}
   schedule:
-  - cron: "*/30 * * * *" # At every 30 minutes
+    - cron: "0,30 * * * *"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  auto-approve:
+  collect-branches:
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-    - name: Checkout the current repo
-      uses: actions/checkout@v4
-    - name: auto-merge-upstream-operator
-      run: |
-        gh auth status
-        git config user.name openshift-pipelines-bot
-        git config user.email pipelines-extcomm@redhat.com
-        # Approve and merge pull-request with no reviews
-        for p in $(gh pr list --search "head:actions/update/sources-operator" --json "number" | jq ".[].number"); do
-          gh pr merge --rebase --delete-branch --auto $p
-        done
-      env:
-        GH_TOKEN: ${{ secrets.OPENSHIFT_PIPELINES_ROBOT }}
-
+      - name: Get branches matching pattern
+        id: set-matrix
+        run: |
+          # List all branches and filter
+          branches=$(gh api repos/${{ github.repository }}/branches --paginate -q '.[] | .name' | grep -E '^(release-v.*\.x$|next$)')
+          echo "Found branches:"
+          echo "$branches"
+          # Convert to JSON array for matrix
+          json=$(jq -nc --argjson arr "$(printf '%s\n' "$branches" | jq -R . | jq -s .)" '{branch: $arr}')
+          echo "Matrix JSON: $json"
+          echo "matrix=$json" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  auto-merge-upstream-all:
+    needs: collect-branches
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.collect-branches.outputs.matrix) }}
+    steps:
+      - name: Trigger auto-merge-upstream for ${{ matrix.branch }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo Triggering workflow for branch: ${{ matrix.branch }}
+          
+          gh workflow run "auto-merge-upstream.yaml" \
+                                                                                                                                                                                                                                                                                                              --ref ${{ matrix.branch }} \
+                                                                                                                                                                                                                                                                                                              --repo ${{ github.repository }}
