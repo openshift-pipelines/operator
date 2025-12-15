@@ -58,7 +58,7 @@ type GetCurrentPlanLimitsOptions struct {
 	PlanName *string `url:"plan_name,omitempty" json:"plan_name,omitempty"`
 }
 
-// GetCurrentPlanLimits lists the current limits of a plan on the GitLab instance.
+// List the current limits of a plan on the GitLab instance.
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/plan_limits/#get-current-plan-limits

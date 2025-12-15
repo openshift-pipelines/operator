@@ -56,7 +56,7 @@ type ProjectSecuritySettings struct {
 	SecretPushProtectionEnabled         bool       `json:"secret_push_protection_enabled"`
 }
 
-// String gets a string representation of the ProjectSecuritySettings data.
+// Gets a string representation of the ProjectSecuritySettings data.
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/project_security_settings/
