@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync"
 
+	hubtypes "github.com/openshift-pipelines/pipelines-as-code/pkg/hub/vars"
 	pacSettings "github.com/openshift-pipelines/pipelines-as-code/pkg/params/settings"
 	"go.uber.org/zap"
 	"knative.dev/pkg/logging"
@@ -45,8 +46,7 @@ func (set *PACSettings) setPACDefaults(logger *zap.SugaredLogger) {
 	if set.Settings == nil {
 		set.Settings = map[string]string{}
 	}
-	defaultPacSettings := pacSettings.Settings{}
-
+	defaultPacSettings := pacSettings.DefaultSettings()
 	err := pacSettings.SyncConfig(logger, &defaultPacSettings, set.Settings, map[string]func(string) error{})
 	if err != nil {
 		logger.Error("error on applying default PAC settings", err)
@@ -54,6 +54,15 @@ func (set *PACSettings) setPACDefaults(logger *zap.SugaredLogger) {
 
 	// Remove tektonhub catalog to only keep artifacthub
 	defaultPacSettings.HubCatalogs.Delete("tektonhub")
+
+	// Override the default ArtifactHub URL to use https://artifacthub.io instead of https://artifacthub.io/api/v1
+	if defaultCatalog, ok := defaultPacSettings.HubCatalogs.Load("default"); ok {
+		catalog := defaultCatalog.(pacSettings.HubCatalog)
+		if catalog.Type == hubtypes.ArtifactHubType {
+			catalog.URL = "https://artifacthub.io"
+		}
+		defaultPacSettings.HubCatalogs.Store("default", catalog)
+	}
 
 	set.Settings = ConvertPacStructToConfigMap(&defaultPacSettings)
 	setAdditionalPACControllerDefault(set.AdditionalPACControllers)
