@@ -102,13 +102,8 @@ func (tc *TektonConfig) Validate(ctx context.Context) (errs *apis.FieldError) {
 		}
 	}
 
-	// validate pruner specifications (legacy job-based pruner)
+	// validate pruner specifications
 	errs = errs.Also(tc.Spec.Pruner.validate())
-
-	// validate TektonPruner (event-based) configuration using tektoncd/pruner webhook validation
-	// This ensures that the pruner config in TektonConfig is validated using the same
-	// comprehensive validation logic as the standalone TektonPruner resource
-	errs = errs.Also(tc.Spec.TektonPruner.validate("spec.tektonpruner"))
 
 	if !tc.Spec.Addon.IsEmpty() {
 		errs = errs.Also(validateAddonParams(tc.Spec.Addon.Params, "spec.addon.params"))

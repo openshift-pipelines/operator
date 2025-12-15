@@ -2,14 +2,15 @@ package workloadapi
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/spiffe/go-spiffe/v2/bundle/jwtbundle"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/jwtsvid"
+	"github.com/zeebo/errs"
 )
+
+var jwtsourceErr = errs.Class("jwtsource")
 
 // JWTSource is a source of JWT-SVID and JWT bundles maintained via the
 // Workload API.
@@ -120,11 +121,7 @@ func (s *JWTSource) checkClosed() error {
 	s.closeMtx.RLock()
 	defer s.closeMtx.RUnlock()
 	if s.closed {
-		return wrapJwtsourceErr(errors.New("source is closed"))
+		return jwtsourceErr.New("source is closed")
 	}
 	return nil
-}
-
-func wrapJwtsourceErr(err error) error {
-	return fmt.Errorf("jwtsource: %w", err)
 }
