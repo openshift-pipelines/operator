@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest as base 
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest as base
 FROM scratch
 
 COPY .konflux/olm-catalog/bundle/kodata /kodata
