@@ -1,7 +1,7 @@
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest as base 
 FROM scratch
 
-COPY .konflux/olm-catalog/bundle/kodata /kodata
+COPY .konflux/olm-catalog/bundle/kodata /kodata 
 COPY .konflux/olm-catalog/bundle/manifests /manifests
 COPY .konflux/olm-catalog/bundle/metadata/annotations.yaml /metadata/annotations.yaml
 
