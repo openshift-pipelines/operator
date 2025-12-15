@@ -36,7 +36,7 @@ type MarkdownUpload struct {
 	UploadedBy *User      `json:"uploaded_by"`
 }
 
-// String gets a string representation of a MarkdownUpload.
+// Gets a string representation of a MarkdownUpload.
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/project_markdown_uploads/
