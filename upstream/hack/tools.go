@@ -28,5 +28,4 @@ import (
 	_ "k8s.io/code-generator/cmd/lister-gen"
 
 	_ "knative.dev/pkg/codegen/cmd/injection-gen"
-	_ "knative.dev/pkg/hack"
 )
