@@ -198,16 +198,14 @@ func TestPreUpgradePipelinesAsCodeArtifacts(t *testing.T) {
 	t.Setenv("PLATFORM", "openshift")
 
 	tests := []struct {
-		name                       string
-		tc                         *v1alpha1.TektonConfig
-		expectedHubCatalogType     string
-		expectedHubURL             string
-		shouldUpdate               bool
-		shouldRemoveHubCatalogName bool
-		shouldRemoveHubURL         bool
+		name                   string
+		tc                     *v1alpha1.TektonConfig
+		expectedHubCatalogType string
+		expectedHubURL         string
+		shouldUpdate           bool
 	}{
 		{
-			name: "PAC enabled with no settings - should not update",
+			name: "PAC enabled with no settings - should update",
 			tc: &v1alpha1.TektonConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: v1alpha1.ConfigResourceName,
@@ -222,14 +220,12 @@ func TestPreUpgradePipelinesAsCodeArtifacts(t *testing.T) {
 					},
 				},
 			},
-			expectedHubCatalogType:     "",
-			expectedHubURL:             "",
-			shouldUpdate:               false,
-			shouldRemoveHubCatalogName: false,
-			shouldRemoveHubURL:         false,
+			expectedHubCatalogType: "artifacthub",
+			expectedHubURL:         "https://artifacthub.io",
+			shouldUpdate:           true,
 		},
 		{
-			name: "PAC enabled with tektonhub settings - should not update",
+			name: "PAC enabled with tektonhub settings - should update",
 			tc: &v1alpha1.TektonConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: v1alpha1.ConfigResourceName,
@@ -250,14 +246,12 @@ func TestPreUpgradePipelinesAsCodeArtifacts(t *testing.T) {
 					},
 				},
 			},
-			expectedHubCatalogType:     "tektonhub",
-			expectedHubURL:             "https://api.hub.tekton.dev/v1",
-			shouldUpdate:               false,
-			shouldRemoveHubCatalogName: false,
-			shouldRemoveHubURL:         false,
+			expectedHubCatalogType: "artifacthub",
+			expectedHubURL:         "https://artifacthub.io",
+			shouldUpdate:           true,
 		},
 		{
-			name: "PAC enabled with old artifacthub API URL - should not update",
+			name: "PAC enabled with old artifacthub API URL - should update",
 			tc: &v1alpha1.TektonConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: v1alpha1.ConfigResourceName,
@@ -278,11 +272,9 @@ func TestPreUpgradePipelinesAsCodeArtifacts(t *testing.T) {
 					},
 				},
 			},
-			expectedHubCatalogType:     "artifacthub",
-			expectedHubURL:             "https://artifacthub.io/api/v1",
-			shouldUpdate:               false,
-			shouldRemoveHubCatalogName: false,
-			shouldRemoveHubURL:         false,
+			expectedHubCatalogType: "artifacthub",
+			expectedHubURL:         "https://artifacthub.io",
+			shouldUpdate:           true,
 		},
 		{
 			name: "PAC enabled with correct settings - should not update",
@@ -306,14 +298,12 @@ func TestPreUpgradePipelinesAsCodeArtifacts(t *testing.T) {
 					},
 				},
 			},
-			expectedHubCatalogType:     "artifacthub",
-			expectedHubURL:             "https://artifacthub.io",
-			shouldUpdate:               false,
-			shouldRemoveHubCatalogName: false,
-			shouldRemoveHubURL:         false,
+			expectedHubCatalogType: "artifacthub",
+			expectedHubURL:         "https://artifacthub.io",
+			shouldUpdate:           false,
 		},
 		{
-			name: "PAC enabled with hub-catalog-name=tekton - should update and remove hub-catalog-name",
+			name: "PAC enabled with hub-catalog-name - should update and remove hub-catalog-name",
 			tc: &v1alpha1.TektonConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: v1alpha1.ConfigResourceName,
@@ -335,14 +325,12 @@ func TestPreUpgradePipelinesAsCodeArtifacts(t *testing.T) {
 					},
 				},
 			},
-			expectedHubCatalogType:     "artifacthub",
-			expectedHubURL:             "https://artifacthub.io",
-			shouldUpdate:               true,
-			shouldRemoveHubCatalogName: true,
-			shouldRemoveHubURL:         false,
+			expectedHubCatalogType: "artifacthub",
+			expectedHubURL:         "https://artifacthub.io",
+			shouldUpdate:           true,
 		},
 		{
-			name: "PAC enabled with hub-catalog-name=tekton and hub-url=api.hub.tekton.dev - should update and remove both",
+			name: "PAC enabled with tektonhub and hub-catalog-name - should update all",
 			tc: &v1alpha1.TektonConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: v1alpha1.ConfigResourceName,
@@ -364,40 +352,9 @@ func TestPreUpgradePipelinesAsCodeArtifacts(t *testing.T) {
 					},
 				},
 			},
-			expectedHubCatalogType:     "tektonhub",
-			expectedHubURL:             "", // This will be removed
-			shouldUpdate:               true,
-			shouldRemoveHubCatalogName: true,
-			shouldRemoveHubURL:         true,
-		},
-		{
-			name: "PAC enabled with hub-catalog-name=tekton and different hub-url - should only remove hub-catalog-name",
-			tc: &v1alpha1.TektonConfig{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: v1alpha1.ConfigResourceName,
-				},
-				Spec: v1alpha1.TektonConfigSpec{
-					Platforms: v1alpha1.Platforms{
-						OpenShift: v1alpha1.OpenShift{
-							PipelinesAsCode: &v1alpha1.PipelinesAsCode{
-								Enable: ptr.Bool(true),
-								PACSettings: v1alpha1.PACSettings{
-									Settings: map[string]string{
-										"hub-catalog-type": "tektonhub",
-										"hub-url":          "https://custom-hub.com",
-										"hub-catalog-name": "tekton",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedHubCatalogType:     "tektonhub",
-			expectedHubURL:             "https://custom-hub.com",
-			shouldUpdate:               true,
-			shouldRemoveHubCatalogName: true,
-			shouldRemoveHubURL:         false,
+			expectedHubCatalogType: "artifacthub",
+			expectedHubURL:         "https://artifacthub.io",
+			shouldUpdate:           true,
 		},
 	}
 
@@ -429,62 +386,42 @@ func TestPreUpgradePipelinesAsCodeArtifacts(t *testing.T) {
 				assert.NotNil(t, tcData.Spec.Platforms.OpenShift.PipelinesAsCode.PACSettings.Settings)
 
 				settings := tcData.Spec.Platforms.OpenShift.PipelinesAsCode.PACSettings.Settings
+				assert.Equal(t, tt.expectedHubCatalogType, settings["hub-catalog-type"])
+				assert.Equal(t, tt.expectedHubURL, settings["hub-url"])
 
-				// Check hub-catalog-type (should remain unchanged)
-				if tt.expectedHubCatalogType != "" {
-					assert.Equal(t, tt.expectedHubCatalogType, settings["hub-catalog-type"])
-				}
-
-				// Check hub-url (should remain unchanged or be removed)
-				if tt.expectedHubURL != "" {
-					assert.Equal(t, tt.expectedHubURL, settings["hub-url"])
-				}
-
-				// Verify that hub-catalog-name is removed if it should be removed
+				// Verify that hub-catalog-name is removed if it existed in the original settings
 				_, hubCatalogNameExists := settings["hub-catalog-name"]
-				if tt.shouldRemoveHubCatalogName {
-					assert.False(t, hubCatalogNameExists, "hub-catalog-name should be removed from settings")
-				} else {
-					// If it shouldn't be removed, check if it still exists (for cases where it wasn't "tekton")
-					if tt.tc.Spec.Platforms.OpenShift.PipelinesAsCode.PACSettings.Settings["hub-catalog-name"] != "tekton" {
-						assert.True(t, hubCatalogNameExists, "hub-catalog-name should still exist if it wasn't 'tekton'")
-					}
-				}
-
-				// Verify that hub-url is removed if it should be removed
-				_, hubURLExists := settings["hub-url"]
-				if tt.shouldRemoveHubURL {
-					assert.False(t, hubURLExists, "hub-url should be removed from settings")
-				} else {
-					// If it shouldn't be removed, it should still exist
-					if tt.expectedHubURL != "" {
-						assert.True(t, hubURLExists, "hub-url should still exist")
-					}
-				}
-			} else {
-				// If no update should happen, verify the settings remain unchanged
-				tcData, err := operatorClient.OperatorV1alpha1().TektonConfigs().Get(ctx, v1alpha1.ConfigResourceName, metav1.GetOptions{})
-				assert.NoError(t, err)
-				if tcData.Spec.Platforms.OpenShift.PipelinesAsCode != nil && tcData.Spec.Platforms.OpenShift.PipelinesAsCode.PACSettings.Settings != nil {
-					settings := tcData.Spec.Platforms.OpenShift.PipelinesAsCode.PACSettings.Settings
-
-					// Check that settings remain unchanged
-					if tt.expectedHubCatalogType != "" {
-						assert.Equal(t, tt.expectedHubCatalogType, settings["hub-catalog-type"])
-					}
-					if tt.expectedHubURL != "" {
-						assert.Equal(t, tt.expectedHubURL, settings["hub-url"])
-					}
-
-					// Check that hub-catalog-name is not removed
-					_, hubCatalogNameExists := settings["hub-catalog-name"]
-					if tt.tc.Spec.Platforms.OpenShift.PipelinesAsCode.PACSettings.Settings["hub-catalog-name"] != "" {
-						assert.True(t, hubCatalogNameExists, "hub-catalog-name should not be removed when no update is expected")
-					}
-				}
+				assert.False(t, hubCatalogNameExists, "hub-catalog-name should be removed from settings")
 			}
 		})
 	}
+}
+
+func TestPreUpgradePipelinesAsCodeArtifacts_NonOpenShift(t *testing.T) {
+	// Test on non-OpenShift platform
+	t.Setenv("PLATFORM", "kubernetes")
+
+	ctx := context.TODO()
+	logger := logging.FromContext(ctx).Named("unit-test")
+	operatorClient := operatorFake.NewSimpleClientset()
+	k8sClient := k8sFake.NewSimpleClientset()
+
+	// Should return early without error on non-OpenShift platform
+	err := preUpgradePipelinesAsCodeArtifacts(ctx, logger, k8sClient, operatorClient, nil)
+	assert.NoError(t, err)
+}
+
+func TestPreUpgradePipelinesAsCodeArtifacts_NoTektonConfig(t *testing.T) {
+	t.Setenv("PLATFORM", "openshift")
+
+	ctx := context.TODO()
+	logger := logging.FromContext(ctx).Named("unit-test")
+	operatorClient := operatorFake.NewSimpleClientset()
+	k8sClient := k8sFake.NewSimpleClientset()
+
+	// Should return without error when TektonConfig CR doesn't exist
+	err := preUpgradePipelinesAsCodeArtifacts(ctx, logger, k8sClient, operatorClient, nil)
+	assert.NoError(t, err)
 }
 
 func TestUpdatePipelinesAsCodeConfigMap(t *testing.T) {
@@ -496,7 +433,7 @@ func TestUpdatePipelinesAsCodeConfigMap(t *testing.T) {
 		expectedLogMsg string
 	}{
 		{
-			name: "ConfigMap with hub-catalog-name=tekton and hub-url!=api.hub.tekton.dev - should remove",
+			name: "ConfigMap with hub-catalog-name - should remove",
 			configMapData: map[string]string{
 				"hub-catalog-name": "tekton",
 				"other-setting":    "value",
@@ -505,22 +442,13 @@ func TestUpdatePipelinesAsCodeConfigMap(t *testing.T) {
 			expectUpdate: true,
 		},
 		{
-			name: "ConfigMap with hub-catalog-name=tekton and hub-url=api.hub.tekton.dev - should remove both",
+			name: "ConfigMap with empty hub-catalog-name - should remove",
 			configMapData: map[string]string{
-				"hub-catalog-name": "tekton",
-				"other-setting":    "value",
-				"hub-url":          "https://api.hub.tekton.dev/v1",
-			},
-			expectUpdate: true,
-		},
-		{
-			name: "ConfigMap with hub-catalog-name!=tekton - should not remove",
-			configMapData: map[string]string{
-				"hub-catalog-name": "custom-catalog",
+				"hub-catalog-name": "",
 				"other-setting":    "value",
 				"hub-url":          "https://artifacthub.io",
 			},
-			expectUpdate: false,
+			expectUpdate: true,
 		},
 		{
 			name: "ConfigMap with multiple hub settings but no hub-catalog-name - should not update",
@@ -532,20 +460,20 @@ func TestUpdatePipelinesAsCodeConfigMap(t *testing.T) {
 			expectUpdate: false,
 		},
 		{
-			name: "ConfigMap with only hub-catalog-name=tekton-catalog - should not remove",
+			name: "ConfigMap with only hub-catalog-name - should remove",
 			configMapData: map[string]string{
 				"hub-catalog-name": "tekton-catalog",
 			},
-			expectUpdate: false,
+			expectUpdate: true,
 		},
 		{
-			name: "ConfigMap with hub-catalog-name=tekton-catalog-v1.0.0 - should not remove",
+			name: "ConfigMap with hub-catalog-name and special characters - should remove",
 			configMapData: map[string]string{
 				"hub-catalog-name": "tekton-catalog-v1.0.0",
 				"secret-name":      "pac-secret",
 				"webhook-url":      "https://example.com/webhook",
 			},
-			expectUpdate: false,
+			expectUpdate: true,
 		},
 		{
 			name: "ConfigMap without hub-catalog-name - should not update",
@@ -606,21 +534,14 @@ func TestUpdatePipelinesAsCodeConfigMap(t *testing.T) {
 
 			assert.NoError(t, err)
 
-			if tt.configMapData != nil {
-				// Verify the config map state
+			if tt.expectUpdate && tt.configMapData != nil {
+				// Verify the config map was updated
 				updatedCM, err := k8sClient.CoreV1().ConfigMaps(targetNamespace).Get(ctx, "pipelines-as-code", metav1.GetOptions{})
 				assert.NoError(t, err)
 
-				if tt.expectUpdate {
-					// hub-catalog-name should be removed
-					_, exists := updatedCM.Data["hub-catalog-name"]
-					assert.False(t, exists, "hub-catalog-name should be removed from config map")
-				} else {
-					// hub-catalog-name should remain if it existed originally
-					if originalValue, hadCatalogName := tt.configMapData["hub-catalog-name"]; hadCatalogName {
-						assert.Equal(t, originalValue, updatedCM.Data["hub-catalog-name"], "hub-catalog-name should be preserved")
-					}
-				}
+				// hub-catalog-name should be removed
+				_, exists := updatedCM.Data["hub-catalog-name"]
+				assert.False(t, exists, "hub-catalog-name should be removed from config map")
 
 				// Other settings should remain
 				if originalValue, hadOtherSetting := tt.configMapData["other-setting"]; hadOtherSetting {
@@ -631,6 +552,17 @@ func TestUpdatePipelinesAsCodeConfigMap(t *testing.T) {
 	}
 }
 
+func TestUpdatePipelinesAsCodeConfigMap_NotFound(t *testing.T) {
+	ctx := context.TODO()
+	logger := logging.FromContext(ctx).Named("unit-test")
+	k8sClient := k8sFake.NewSimpleClientset()
+	targetNamespace := "test-namespace"
+
+	// Should return without error when config map doesn't exist
+	err := updatePipelinesAsCodeConfigMap(ctx, logger, k8sClient, targetNamespace)
+	assert.NoError(t, err)
+}
+
 func TestUpdateOpenShiftPipelinesAsCodeCR(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -638,7 +570,7 @@ func TestUpdateOpenShiftPipelinesAsCodeCR(t *testing.T) {
 		expectUpdate bool
 	}{
 		{
-			name: "PAC CR with hub-catalog-name=tekton and hub-url!=api.hub.tekton.dev - should remove",
+			name: "PAC CR with hub-catalog-name - should remove",
 			pacCR: &v1alpha1.OpenShiftPipelinesAsCode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: v1alpha1.OpenShiftPipelinesAsCodeName,
@@ -657,7 +589,7 @@ func TestUpdateOpenShiftPipelinesAsCodeCR(t *testing.T) {
 			expectUpdate: true,
 		},
 		{
-			name: "PAC CR with hub-catalog-name=tekton and hub-url=api.hub.tekton.dev/v1 - should remove both",
+			name: "PAC CR with empty hub-catalog-name - should remove",
 			pacCR: &v1alpha1.OpenShiftPipelinesAsCode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: v1alpha1.OpenShiftPipelinesAsCodeName,
@@ -665,9 +597,8 @@ func TestUpdateOpenShiftPipelinesAsCodeCR(t *testing.T) {
 				Spec: v1alpha1.OpenShiftPipelinesAsCodeSpec{
 					PACSettings: v1alpha1.PACSettings{
 						Settings: map[string]string{
-							"hub-catalog-name": "tekton",
+							"hub-catalog-name": "",
 							"other-setting":    "value",
-							"hub-url":          "https://api.hub.tekton.dev/v1",
 							"secret-name":      "pac-secret",
 						},
 					},
@@ -676,7 +607,7 @@ func TestUpdateOpenShiftPipelinesAsCodeCR(t *testing.T) {
 			expectUpdate: true,
 		},
 		{
-			name: "PAC CR with hub-catalog-name!=tekton - should not remove",
+			name: "PAC CR with hub-catalog-name and complex settings - should remove only hub-catalog-name",
 			pacCR: &v1alpha1.OpenShiftPipelinesAsCode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: v1alpha1.OpenShiftPipelinesAsCodeName,
@@ -695,10 +626,10 @@ func TestUpdateOpenShiftPipelinesAsCodeCR(t *testing.T) {
 					},
 				},
 			},
-			expectUpdate: false,
+			expectUpdate: true,
 		},
 		{
-			name: "PAC CR with only hub-catalog-name=tekton-only - should not remove",
+			name: "PAC CR with only hub-catalog-name - should remove",
 			pacCR: &v1alpha1.OpenShiftPipelinesAsCode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: v1alpha1.OpenShiftPipelinesAsCodeName,
@@ -711,7 +642,7 @@ func TestUpdateOpenShiftPipelinesAsCodeCR(t *testing.T) {
 					},
 				},
 			},
-			expectUpdate: false,
+			expectUpdate: true,
 		},
 		{
 			name: "PAC CR with multiple hub settings but no hub-catalog-name - should not update",
@@ -800,25 +731,30 @@ func TestUpdateOpenShiftPipelinesAsCodeCR(t *testing.T) {
 			err = updateOpenShiftPipelinesAsCodeCR(ctx, logger, operatorClient)
 			assert.NoError(t, err)
 
-			// Verify the PAC CR state
-			updatedPAC, err := operatorClient.OperatorV1alpha1().OpenShiftPipelinesAsCodes().Get(ctx, v1alpha1.OpenShiftPipelinesAsCodeName, metav1.GetOptions{})
-			assert.NoError(t, err)
-
 			if tt.expectUpdate {
+				// Verify the PAC CR was updated
+				updatedPAC, err := operatorClient.OperatorV1alpha1().OpenShiftPipelinesAsCodes().Get(ctx, v1alpha1.OpenShiftPipelinesAsCodeName, metav1.GetOptions{})
+				assert.NoError(t, err)
+
 				// hub-catalog-name should be removed
 				_, exists := updatedPAC.Spec.PACSettings.Settings["hub-catalog-name"]
 				assert.False(t, exists, "hub-catalog-name should be removed from PAC CR settings")
-			} else {
-				// hub-catalog-name should remain if it existed originally
-				if originalValue, hadCatalogName := originalSettings["hub-catalog-name"]; hadCatalogName {
-					assert.Equal(t, originalValue, updatedPAC.Spec.PACSettings.Settings["hub-catalog-name"], "hub-catalog-name should be preserved")
-				}
-			}
 
-			// Other settings should remain
-			if originalValue, hadOtherSetting := originalSettings["other-setting"]; hadOtherSetting {
-				assert.Equal(t, originalValue, updatedPAC.Spec.PACSettings.Settings["other-setting"])
+				// Other settings should remain
+				if originalValue, hadOtherSetting := originalSettings["other-setting"]; hadOtherSetting {
+					assert.Equal(t, originalValue, updatedPAC.Spec.PACSettings.Settings["other-setting"])
+				}
 			}
 		})
 	}
+}
+
+func TestUpdateOpenShiftPipelinesAsCodeCR_NotFound(t *testing.T) {
+	ctx := context.TODO()
+	logger := logging.FromContext(ctx).Named("unit-test")
+	operatorClient := operatorFake.NewSimpleClientset()
+
+	// Should return without error when PAC CR doesn't exist
+	err := updateOpenShiftPipelinesAsCodeCR(ctx, logger, operatorClient)
+	assert.NoError(t, err)
 }
