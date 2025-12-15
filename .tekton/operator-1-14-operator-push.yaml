@@ -1,4 +1,4 @@
-# Generated for Release 1.14 by openshift-pipelines/hack. DO NOT EDIT.
+# Generated for Konflux Application openshift-pipelines-operator by openshift-pipelines/hack. DO NOT EDIT
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
@@ -25,17 +25,24 @@ spec:
   params:
   - name: git-url
     value: '{{source_url}}'
+  - name: upstream-git-url
+    value: 'https://github.com/tektoncd/operator'
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/1-14/operator-operator-rhel8:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-rhel9-operator:{{revision}}
   - name: dockerfile
     value: .konflux/dockerfiles/operator.Dockerfile
+  - name: additional-tags
+    value:
+      - "1.14.0"
   - name: prefetch-input
     value: |
       {"type": "rpm", "path": ".konflux/rpms"}
   pipelineRef:
     name: docker-build-ta
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-operator-1-14-operator
   workspaces:
   - name: git-auth
     secret:
