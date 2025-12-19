@@ -12,7 +12,7 @@ require (
 	github.com/manifestival/client-go-client v0.6.0
 	github.com/manifestival/manifestival v0.7.2
 	github.com/markbates/inflect v1.0.4
-	github.com/openshift-pipelines/pipelines-as-code v0.39.2
+	github.com/openshift-pipelines/pipelines-as-code v0.39.3
 	github.com/openshift/api v0.0.0-20240521185306-0314f31e7774
 	github.com/openshift/apiserver-library-go v0.0.0-20230816171015-6bfafa975bfb
 	github.com/openshift/client-go v0.0.0-20240523113335-452272e0496d
@@ -27,7 +27,7 @@ require (
 	go.opencensus.io v0.24.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621
-	golang.org/x/mod v0.30.0
+	golang.org/x/mod v0.31.0
 	golang.org/x/sync v0.19.0
 	gomodules.xyz/jsonpatch/v2 v2.5.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -296,7 +296,7 @@ require (
 	golang.org/x/term v0.37.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/time v0.13.0 // indirect
-	golang.org/x/tools v0.38.0 // indirect
+	golang.org/x/tools v0.39.0 // indirect
 	google.golang.org/api v0.249.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250908214217-97024824d090 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250908214217-97024824d090 // indirect
