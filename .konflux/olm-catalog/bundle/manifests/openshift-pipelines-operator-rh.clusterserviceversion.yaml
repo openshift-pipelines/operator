@@ -18,7 +18,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.20.0 <5.0.5-764'
+    olm.skipRange: '>=1.20.0 <5.0.5-765'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
@@ -30,7 +30,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v5.0.5-764
+  name: openshift-pipelines-operator-rh.v5.0.5-765
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -348,7 +348,7 @@ spec:
     ### Components
 
 
-    - Tekton Pipelines: v1.6.0
+    - Tekton Pipelines: v1.7.0
 
     - Tekton Triggers: v0.34.0
 
@@ -356,9 +356,9 @@ spec:
 
     - Tekton Chains: v0.26.0
 
-    - Tekton Hub (tech-preview): v1.23.6
+    - Tekton Hub (tech-preview): v1.23.5
 
-    - Tekton Results: v0.17.1
+    - Tekton Results (tech-preview): v0.17.2
 
     - Manual Approval Gate (tech-preview): v0.7.0
 
@@ -1169,8 +1169,8 @@ spec:
           serviceAccountName: openshift-pipelines-operator
       deployments:
         - label:
-            operator.tekton.dev/release: v0.78.1
-            version: v0.78.1
+            operator.tekton.dev/release: devel
+            version: devel
           name: openshift-pipelines-operator
           spec:
             replicas: 1
@@ -1212,7 +1212,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 5.0.5-764
+                        value: 5.0.5-765
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1382,7 +1382,7 @@ spec:
                       - name: PROFILING_PORT
                         value: '9009'
                       - name: VERSION
-                        value: v0.78.1
+                        value: devel
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: CONFIG_LEADERELECTION_NAME
@@ -1405,8 +1405,8 @@ spec:
                     type: RuntimeDefault
                 serviceAccountName: openshift-pipelines-operator
         - label:
-            operator.tekton.dev/release: v0.78.1
-            version: v0.78.1
+            operator.tekton.dev/release: devel
+            version: devel
           name: tekton-operator-webhook
           spec:
             replicas: 1
@@ -1620,5 +1620,5 @@ spec:
       name: IMAGE_ADDONS_MAVEN_GOALS
     - image: quay.io/openshift-pipeline/pipelines-console-plugin-rhel9@sha256:bb058b3de08a97a38b1eb1c65df636dcb0632194c30c4d57569762097f9b6b86
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
-  replaces: openshift-pipelines-operator-rh.v5.0.5-763
-  version: 5.0.5-764
+  replaces: openshift-pipelines-operator-rh.v5.0.5-764
+  version: 5.0.5-765
