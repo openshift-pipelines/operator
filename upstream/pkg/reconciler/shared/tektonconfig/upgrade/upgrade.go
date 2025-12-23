@@ -37,8 +37,8 @@ var (
 		// Todo: Remove the deleteTektonResultsTLSSecret upgrade function in next operator release
 		deleteTektonResultsTLSSecret, // upgrade #5: deletes default tekton results tls certificate
 		// TODO: Remove the preUpgradeTektonPruner upgrade function in next operator release
-		preUpgradeTektonPruner,             // upgrade #5: pre upgrade tekton pruner
-		preUpgradePipelinesAsCodeArtifacts, // upgrade #6: update Pipelines as Code artifact hub settings
+		preUpgradeTektonPruner,                   // upgrade #5: pre upgrade tekton pruner
+		removeDeprecatedDisableAffinityAssistant, // upgrade #6: remove deprecated DisableAffinityAssistant field from pipeline config
 	}
 
 	// post upgrade functions

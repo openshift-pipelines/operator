@@ -9,7 +9,7 @@ FORCE_FETCH_RELEASE = false
 CR            = config/basic
 PLATFORM := $(if $(PLATFORM),--platform $(PLATFORM))
 
-GOLANGCI_VERSION  = v2.1.6
+GOLANGCI_VERSION  = $(shell yq '.jobs.linting.steps[] | select(.name == "golangci-lint") | .with.version' .github/workflows/ci.yaml)
 
 BIN      = $(CURDIR)/.bin
 
@@ -34,8 +34,7 @@ $(BIN)/%: | $(BIN) ; $(info $(M) building $(PACKAGE)…)
 	  	rm -rf $$tmp ; exit $$ret
 
 KO = $(or ${KO_BIN},${KO_BIN},$(BIN)/ko)
-KO_VERSION ?= v0.17.0
-$(BIN)/ko: PACKAGE=github.com/google/ko@$(KO_VERSION)
+$(BIN)/ko: PACKAGE=github.com/google/ko@latest
 
 KUSTOMIZE = $(or ${KUSTOMIZE_BIN},${KUSTOMIZE_BIN},$(BIN)/kustomize)
 $(BIN)/kustomize: | $(BIN) ; $(info $(M) getting kustomize)
@@ -59,7 +58,7 @@ clean-cluster: | $(KO) $(KUSTOMIZE) clean-cr; $(info $(M) clean $(TARGET)…) @ 
 		--recursive
 
 .PHONY: clean-manifest
-clean-manifest:
+clean-manifest: ## Cleanup manifest
 ifeq ($(TARGET), openshift)
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-pipeline
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-trigger
@@ -70,8 +69,8 @@ ifeq ($(TARGET), openshift)
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-pruner
 	rm -rf ./cmd/$(TARGET)/operator/kodata/pruner
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code
-	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/addons/06-ecosystem/tasks
-	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/addons/06-ecosystem/stepactions
+	find ./cmd/$(TARGET)/operator/kodata/tekton-addon/addons/06-ecosystem/tasks -type f ! -name "role.yaml" ! -name "rolebinding.yaml" -delete 
+	find ./cmd/$(TARGET)/operator/kodata/tekton-addon/addons/06-ecosystem/stepactions -type f ! -name "role.yaml" ! -name "rolebinding.yaml" -delete
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/go.yaml
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/java.yaml
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/nodejs.yaml
@@ -92,8 +91,6 @@ clean-bin:
 .PHONY: clean
 clean: clean-cluster clean-bin clean-manifest; $(info $(M) clean all) @ ## Cleanup everything
 
-.PHONY: clean-manifest
-clean-manifest: clean-manifest ## Cleanup manifest
 
 .PHONY: clean-cr
 clean-cr: | ; $(info $(M) clean CRs on $(TARGET)) @ ## Clean the CRs to the current cluster
