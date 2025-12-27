@@ -3,33 +3,33 @@ kind: CustomResourceDefinition
 metadata:
   creationTimestamp: null
   labels:
-    operator.tekton.dev/release: v0.78.0
-    version: v0.78.0
+    operator.tekton.dev/release: devel
+    version: devel
   name: tektonresults.operator.tekton.dev
 spec:
   group: operator.tekton.dev
   names:
     kind: TektonResult
     listKind: TektonResultList
-    plural: tektonresults
     singular: tektonresult
+    plural: tektonresults
+  preserveUnknownFields: false
   scope: Cluster
   versions:
-  - additionalPrinterColumns:
+    additionalPrinterColumns:
     - jsonPath: .status.version
       name: Version
       type: string
     - jsonPath: .status.conditions[?(@.type=="Ready")].status
       name: Ready
       type: string
-    - jsonPath: .status.conditions[?(@.type=="Ready")].message
+    - jsonPath: .status.conditions[?(@.type=="Ready")].reason
       name: Reason
       type: string
-    name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Schema for the TektonResults API
         type: object
+        description: Schema for the TektonResults API
         x-kubernetes-preserve-unknown-fields: true
     served: true
     storage: true
