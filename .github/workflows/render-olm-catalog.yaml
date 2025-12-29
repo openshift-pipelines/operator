@@ -1,4 +1,4 @@
-name: index-render-template
+name: render-olm-catalog
 
 on:
   push:
@@ -15,8 +15,6 @@ on:
         type: choice
         options:
           - devel
-  schedule:
-    - cron: "0 1 * * *" # At 1AM everyday
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -56,7 +54,12 @@ jobs:
           DOCKER_JSON: ${{ secrets.DOCKER_REGISTRY_SECRET }}
         run: |
           echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json
-      - name: Generate ${{matrix.version}} catalog
+      - name: Generate ${{matrix.version}} Bundles
+        run: |
+          ./hack/update-olm-bundle.sh ${{github.event.inputs.environment}}
+          ./hack/render-catalog.sh ${{matrix.version}} ${{github.event.inputs.environment}}
+
+      - name: Update ${{matrix.version}} catalog
         run: |
           curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
           chmod +x /usr/local/bin/opm
