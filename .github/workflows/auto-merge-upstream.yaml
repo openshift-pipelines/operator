@@ -10,9 +10,10 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-    - id: Checkout the current repo
+    - name: Checkout the current repo
       uses: actions/checkout@v5
-    - id: list-prs
+    - name: List PRs
+      id: list-prs
       run: |
         echo "Listing PRs"
         gh auth status
@@ -30,7 +31,7 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - id: add LGTM Label
+    - name: add LGTM Label
       run: |
         # Approve and merge pull-request with no reviews
         for p in $pr_list; do
@@ -40,7 +41,7 @@ jobs:
       env:
         pr_list: ${{ steps.list-prs.outputs.pr_list }} 
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - id: Merging PRs
+    - name: Merging PRs
       run: |
         # Approve and merge pull-request with no reviews
         for p in $pr_list; do
