@@ -3,12 +3,13 @@ name: render-olm-catalog
 on:
   push:
     branches:
+      - main
       - next
       - release-v*
     paths:
       - nightly-bundle.yaml
-      - olm/*
-      - .konflux/olm-catalog/index/*
+      - .github/workflows/all-generate-index-catalog.yaml
+      - .github/workflows/render-olm-catalog.yaml
   workflow_dispatch:
     inputs:
       environment:
@@ -18,105 +19,46 @@ on:
         type: choice
         options:
           - devel
+  schedule:
+    - cron: "0 1 * * *" # At 1AM everyday
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-matrix:
+  collect-branches:
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-      - id: set-matrix
-        run: |
-          pushd .konflux/olm-catalog/index
-          VERSIONS=$(ls -d v* | jq -R -s -c 'split("\n")[:-1]')
-          popd
-          echo "Versions: ${VERSIONS}"
-          echo "versions=${VERSIONS}" >> $GITHUB_OUTPUT
-      - id: update-bundle-image
-        run: |
-          ./hack/update-olm-config.sh ${{github.event.inputs.environment}}
-      - name: Save generated changes
-        uses: actions/upload-artifact@v4
-        with:
-          name: olm
-          path: olm/
-
     outputs:
-      versions: ${{ steps.set-matrix.outputs.versions }}
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Get branches matching pattern
+        id: set-matrix
+        run: |
+          # List all branches and filter
+          branches=$(gh api repos/${{ github.repository }}/branches --paginate -q '.[] | .name' | grep -E '^(release-v.*\.x$|next$|main$)')
 
-  generate-catalog:
-    needs:
-      - build-matrix
+          echo "Found branches:"
+          echo "$branches"
+          
+          # Convert to JSON array for matrix
+          json=$(jq -nc --argjson arr "$(printf '%s\n' "$branches" | jq -R . | jq -s .)" '{branch: $arr}')
+          echo "Matrix JSON: $json"
+          
+          echo "matrix=$json" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  build:
+    needs: collect-branches
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
-      matrix:
-        version: ${{ fromJSON(needs.build-matrix.outputs.versions) }}
-    permissions:
-      contents: write
-      pull-requests: write
+      matrix: ${{ fromJSON(needs.collect-branches.outputs.matrix) }}
     steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-      - name: Configure Docker authentication
+      - name: Trigger render-olm-catalog workflow for ${{ matrix.branch }}
         env:
-          DOCKER_CONFIG: /home/runner/.docker
-          DOCKER_JSON: ${{ secrets.DOCKER_REGISTRY_SECRET }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json
-      - name: Generate ${{matrix.version}} catalog
-        run: |
-          curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
-          chmod +x /usr/local/bin/opm
-          ./hack/render-catalog.sh ${{matrix.version}}
-      - name: Save generated changes
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.version }}
-          path: .konflux/olm-catalog/index/${{ matrix.version }}
-
-  final-commit:
-    needs: generate-catalog
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: downloaded-artifacts
-      - name: Apply downloaded changes
-        run: |
-          set -x
-          cp -rvf  downloaded-artifacts/olm/* olm/
-          rm -rf downloaded-artifacts/olm/*
-          cp -rvf  downloaded-artifacts/* .konflux/olm-catalog/index/
-      - name: Commit Changes and Generate PR
-        run: |
-          git config user.name openshift-pipelines-bot
-          git config user.email pipelines-extcomm@redhat.com
-          BASE_BRANCH=${GITHUB_REF#refs/heads/}
-          SOURCE_BRANCH=actions/update/olm-catalog-${BASE_BRANCH}
-          git checkout -b ${SOURCE_BRANCH}
+          echo "Triggering workflow for branch: ${{ matrix.branch }}"
           
-          git add .konflux/olm-catalog/index/ olm/
-          
-          if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
-            echo "No change, exiting"
-            exit 0
-          fi
-          
-          git commit -F- <<EOF
-          [bot:${BASE_BRANCH}] Update  catalog
-          EOF
-          
-          git push -f origin ${SOURCE_BRANCH}
-          if [ "$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json url --jq 'length')" = "0" ]; then
-            echo "creating PR..."
-            gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          gh workflow run "render-olm-catalog.yaml" \
+            --ref "${{ matrix.branch }}" \
+            --repo "${{ github.repository }}"
