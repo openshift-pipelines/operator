@@ -4,11 +4,7 @@ on:
   push:
     branches:
       - main
-      - next
-      - release-v*
     paths:
-      - nightly-bundle.yaml
-      - .github/workflows/all-generate-index-catalog.yaml
       - .github/workflows/render-olm-catalog.yaml
   workflow_dispatch:
     inputs:
@@ -22,8 +18,8 @@ on:
   schedule:
     - cron: "0 1 * * *" # At 1AM everyday
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: dispatch-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   collect-branches:
