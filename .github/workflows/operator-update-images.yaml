@@ -3,11 +3,11 @@ name: operator-update-images
 on:
   push:
     branches:
-    - next
-    - main
-    - release-v*
+      - next
+      - main
+      - release-v*
     paths:
-    - project.yaml
+      - project.yaml
   workflow_dispatch:
     inputs:
       environment:
@@ -19,6 +19,9 @@ on:
           - devel
           - staging
           - production
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   update-csv:
