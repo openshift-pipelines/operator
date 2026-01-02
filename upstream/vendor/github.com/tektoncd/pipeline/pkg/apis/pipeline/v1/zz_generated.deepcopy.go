@@ -637,11 +637,6 @@ func (in *PipelineRunSpec) DeepCopyInto(out *PipelineRunSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.ManagedBy != nil {
-		in, out := &in.ManagedBy, &out.ManagedBy
-		*out = new(string)
-		**out = **in
-	}
 	return
 }
 
@@ -1001,11 +996,6 @@ func (in *PipelineTaskRunSpec) DeepCopyInto(out *PipelineTaskRunSpec) {
 		in, out := &in.ComputeResources, &out.ComputeResources
 		*out = new(corev1.ResourceRequirements)
 		(*in).DeepCopyInto(*out)
-	}
-	if in.Timeout != nil {
-		in, out := &in.Timeout, &out.Timeout
-		*out = new(metav1.Duration)
-		**out = **in
 	}
 	return
 }
@@ -1951,11 +1941,6 @@ func (in *TaskRunSpec) DeepCopyInto(out *TaskRunSpec) {
 		in, out := &in.ComputeResources, &out.ComputeResources
 		*out = new(corev1.ResourceRequirements)
 		(*in).DeepCopyInto(*out)
-	}
-	if in.ManagedBy != nil {
-		in, out := &in.ManagedBy, &out.ManagedBy
-		*out = new(string)
-		**out = **in
 	}
 	return
 }

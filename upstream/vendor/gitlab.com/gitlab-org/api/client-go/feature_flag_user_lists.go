@@ -29,7 +29,7 @@ type (
 		DeleteFeatureFlagUserList(pid any, iid int, options ...RequestOptionFunc) (*Response, error)
 	}
 
-	// FeatureFlagUserListsService handles communication with the feature flag
+	// FeatureFlagUserListService handles communication with the feature flag
 	// user list related methods of the GitLab API.
 	//
 	// GitLab API docs: https://docs.gitlab.com/api/feature_flag_user_lists/
