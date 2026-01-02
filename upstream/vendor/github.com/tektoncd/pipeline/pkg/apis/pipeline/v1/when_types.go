@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/tektoncd/pipeline/pkg/substitution"
@@ -63,7 +62,7 @@ func (we *WhenExpression) isTrue() bool {
 }
 
 func (we *WhenExpression) applyReplacements(replacements map[string]string, arrayReplacements map[string][]string) WhenExpression {
-	replacedInput := applyReplacementsAsString(we.Input, replacements, arrayReplacements)
+	replacedInput := substitution.ApplyReplacements(we.Input, replacements)
 	replacedCEL := substitution.ApplyReplacements(we.CEL, replacements)
 
 	var replacedValues []string
@@ -82,26 +81,6 @@ func (we *WhenExpression) applyReplacements(replacements map[string]string, arra
 	}
 
 	return WhenExpression{Input: replacedInput, Operator: we.Operator, Values: replacedValues, CEL: replacedCEL}
-}
-
-func applyReplacementsAsString(s string, replacements map[string]string, arrayReplacements map[string][]string) string {
-	if _, ok := arrayReplacements[fmt.Sprintf("%s.%s", ParamsPrefix, ArrayReference(s))]; ok {
-		b, err := json.Marshal(substitution.ApplyArrayReplacements(s, replacements, arrayReplacements))
-		if err != nil {
-			return s
-		}
-		return string(b)
-	}
-
-	if _, ok := arrayReplacements[ResultsArrayReference(s)]; ok {
-		b, err := json.Marshal(substitution.ApplyArrayReplacements(s, replacements, arrayReplacements))
-		if err != nil {
-			return s
-		}
-		return string(b)
-	}
-
-	return substitution.ApplyReplacements(s, replacements)
 }
 
 // GetVarSubstitutionExpressions extracts all the values between "$(" and ")" in a When Expression

@@ -1,8 +1,7 @@
 name: Tekton Integration
 # Adapted from https://github.com/mattmoor/mink/blob/master/.github/workflows/minkind.yaml
 
-on:
-  - workflow_call
+on: [workflow_call]
 
 defaults:
   run:
@@ -16,24 +15,24 @@ jobs:
     name: e2e tests
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false  # Keep running if one leg fails.
+      fail-fast: false # Keep running if one leg fails.
       matrix:
         k8s-name:
         - k8s-oldest
-        - k8s-latest
+        - k8s-plus-one
 
         include:
         - k8s-name: k8s-oldest
           k8s-version: v1.28.x
-        - k8s-name: k8s-latest
-          k8s-version: v1.34.x
+        - k8s-name: k8s-plus-one
+          k8s-version: v1.29.x
     env:
       KO_DOCKER_REPO: registry.local:5000/tekton
       CLUSTER_DOMAIN: c${{ github.run_id }}.local
       ARTIFACTS: ${{ github.workspace }}/artifacts
 
     steps:
-    - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3  # v6.0.0
     - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c  # v6.1.0
       with:
         go-version-file: "go.mod"
@@ -63,7 +62,7 @@ jobs:
           --e2e-env ./test/e2e-tests-kind.env
 
     - name: Upload test results
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
       with:
         name: ${{ matrix.k8s-version }}-${{ matrix.feature-flags }}
         path: ${{ env.ARTIFACTS }}

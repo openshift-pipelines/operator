@@ -47,6 +47,7 @@ spec:
   pipeline:
     await-sidecar-readiness: true
     coschedule: workspaces
+    disable-affinity-assistant: false
     disable-creds-init: false
     disable-home-env-overwrite: true
     disable-working-directory-overwrite: true
@@ -69,10 +70,6 @@ spec:
     metrics.pipelinerun.level: pipeline
     metrics.taskrun.duration-type: histogram
     metrics.taskrun.level: task
-    # Tracing configuration (optional)
-    # traces.enabled: true
-    # traces.endpoint: "http://jaeger-collector.jaeger.svc.cluster.local:4318/v1/traces"
-    # traces.credentialsSecret: ""
     require-git-ssh-secret-known-hosts: false
     results-from: termination-message
     running-in-environment-with-injected-sidecars: true
@@ -151,12 +148,10 @@ platforms:
             ^(?P<filename>[^:]*):(?P<line>[0-9]+):(?P<column>[0-9]+):([
             ]*)?(?P<error>.*)
           error-log-snippet: "true"
-          error-log-snippet-number-of-lines: "3"
           enable-cancel-in-progress-on-pull-requests: "false"
           enable-cancel-in-progress-on-push: "false"
           hub-catalog-name: tekton
           hub-url: https://api.hub.tekton.dev/v1
-          require-ok-to-test-sha: "false"
           skip-push-event-for-pr-commits: "true"
           remote-tasks: "true"
           secret-auto-create: "true"
@@ -237,6 +232,7 @@ Example:
 
 ```yaml
 pipeline:
+  disable-affinity-assistant: false
   disable-creds-init: false
   disable-home-env-overwrite: true
   disable-working-directory-overwrite: true
@@ -246,9 +242,6 @@ pipeline:
   metrics.pipelinerun.level: pipelinerun
   metrics.taskrun.duration-type: histogram
   metrics.taskrun.level: taskrun
-  traces.enabled: true
-  traces.endpoint: "http://jaeger-collector.jaeger.svc.cluster.local:4318/v1/traces"
-  traces.credentialsSecret: "" # optional
   require-git-ssh-secret-known-hosts: false
   running-in-environment-with-injected-sidecars: true
   trusted-resources-verification-no-match-policy: ignore
@@ -558,178 +551,28 @@ platforms:
         enable-cancel-in-progress-on-push: "false"
         hub-catalog-name: tekton
         hub-url: https://api.hub.tekton.dev/v1
-        require-ok-to-test-sha: "false"
         remote-tasks: "true"
         secret-auto-create: "true"
         secret-github-app-token-scoped: "true"
 ```
 
-#### Remote Hub Catalogs
-
-Pipelines as Code supports configuring remote hub catalogs to fetch tasks and pipelines. You can configure custom catalogs using the `catalog-{INDEX}-*` settings pattern.
-
-Each custom catalog requires the following four fields:
-
-| Field | Description | Required |
-|-------|-------------|----------|
-| `catalog-{INDEX}-id` | Unique identifier for the catalog. Users reference tasks from this catalog using this ID as prefix (e.g., `custom://task-name`) | Yes |
-| `catalog-{INDEX}-name` | Name of the catalog within the hub | Yes |
-| `catalog-{INDEX}-url` | URL endpoint of the hub API | Yes |
-| `catalog-{INDEX}-type` | Type of hub: `artifacthub` (for Artifact Hub) or `tektonhub` (for Tekton Hub) | Yes |
-
-Where `{INDEX}` is a number that can be incremented to add multiple catalogs (e.g., `1`, `2`, `3`).
-
-##### Example: Configuring a Custom Hub Catalog
-
-```yaml
-platforms:
-  openshift:
-    pipelinesAsCode:
-      enable: true
-      settings:
-        catalog-1-id: "custom"
-        catalog-1-name: "tekton"
-        catalog-1-url: "https://api.custom.hub/v1"
-        catalog-1-type: "tektonhub"
-```
-
-##### Example: Configuring Multiple Hub Catalogs
-
-You can configure multiple hub catalogs by incrementing the `catalog-{INDEX}` number:
-
-```yaml
-platforms:
-  openshift:
-    pipelinesAsCode:
-      enable: true
-      settings:
-        catalog-1-id: "custom"
-        catalog-1-name: "tekton"
-        catalog-1-url: "https://api.custom.hub/v1"
-        catalog-1-type: "tektonhub"
-        catalog-2-id: "artifact"
-        catalog-2-name: "tekton-catalog-tasks"
-        catalog-2-url: "https://artifacthub.io"
-        catalog-2-type: "artifacthub"
-```
-
-##### Referencing Tasks from Custom Catalogs
-
-Once configured, users can reference tasks from custom catalogs by adding a prefix matching the catalog ID:
-
-```yaml
-pipelinesascode.tekton.dev/task: "custom://git-clone"
-pipelinesascode.tekton.dev/task: "artifact://buildah"
-```
-
-> **Note:** Pipelines-as-Code will not try to fallback to the default or another custom hub if the task referenced is not found (the Pull Request will be set as failed).
-
-For more details, see the [Pipelines-as-Code Remote Hub Catalogs documentation](https://pipelinesascode.com/docs/install/settings/#remote-hub-catalogs).
-
 **NOTE**: OpenShiftPipelinesAsCode is currently available for the OpenShift Platform only.
 
-### Event based pruner 
+### **Tech Preview** Event based pruner 
 
-The `tektonpruner` section in the TektonConfig spec allows you to manage the event-driven Tekton Pruner, which enables configuration-based cleanup of Tekton resources such as PipelineRuns and TaskRuns.
+The `tektonpruner` section in the TektonConfig spec allows  to manage the event-driven Tekton Pruner, which enables configuration-based cleanup of Tekton resources.
 
 > Important: This component is **disabled by default**. To enable the event-based pruner, the existing job-based pruner `pruner` **MUST** be disabled.
 
-#### Basic Configuration
-
 ```yaml
-  pruner:
-    disabled: true  # Must disable job-based pruner
   tektonpruner:
-    disabled: false  # Enable event-based pruner
-    global-config:
-      enforcedConfigLevel: global  # Options: global, namespace
-      ttlSecondsAfterFinished: 3600  # Delete runs older than 1 hour (optional)
-      historyLimit: 100              # Keep only 100 runs total (optional)
-      successfulHistoryLimit: 50     # Keep only 50 successful runs (optional)
-      failedHistoryLimit: 20         # Keep only 20 failed runs (optional)
+    disabled: true
     options: {}
 ```
+**Configuration Notes :**
+- In this Tech Preview, only enabled/disabled status is configurable via `tektonconfig` spec.
 
-#### Configuration Levels
-
-The `enforcedConfigLevel` determines the configuration hierarchy:
-
-- **`global`**: Cluster-wide defaults apply to all namespaces (no namespace overrides allowed)
-- **`namespace`**: Allows namespace-level overrides via ConfigMaps in individual namespaces
-
-#### Pruning Fields
-
-You can specify any combination of these fields. The pruner deletes runs when **any one** of the specified conditions is met:
-
-- **`ttlSecondsAfterFinished`**: Time in seconds to retain completed runs before pruning
-- **`historyLimit`**: Maximum number of runs to retain for each status (applies independently to both successful and failed runs)
-- **`successfulHistoryLimit`**: Maximum number of successful runs to retain
-- **`failedHistoryLimit`**: Maximum number of failed runs to retain
-
-**Note:** If `successfulHistoryLimit` or `failedHistoryLimit` is not specified, `historyLimit` value is used as fallback for that status type.
-
-#### Namespace-Level Configuration
-
-Configure different default pruning policies for specific namespaces in the global config:
-
-```yaml
-  tektonpruner:
-    disabled: false
-    global-config:
-      enforcedConfigLevel: namespace
-      historyLimit: 100  # Global default
-      namespaces:
-        dev-namespace:
-          historyLimit: 50
-          ttlSecondsAfterFinished: 1800  # 30 minutes for dev
-        prod-namespace:
-          successfulHistoryLimit: 200
-          failedHistoryLimit: 50
-          ttlSecondsAfterFinished: 86400  # 24 hours for prod
-```
-
-> **Note:** For advanced configurations including resource-level selectors and per-namespace overrides via ConfigMaps, refer to the [TektonPruner documentation](./TektonPruner.md).
-
-#### Complete Example
-
-```yaml
-apiVersion: operator.tekton.dev/v1alpha1
-kind: TektonConfig
-metadata:
-  name: config
-spec:
-  targetNamespace: tekton-pipelines
-  profile: all
-  pruner:
-    disabled: true  # Disable job-based pruner
-  tektonpruner:
-    disabled: false
-    global-config:
-      enforcedConfigLevel: namespace
-      historyLimit: 100
-      ttlSecondsAfterFinished: 7200  # 2 hours
-      namespaces:
-        tekton-pipelines:
-          historyLimit: 200
-          successfulHistoryLimit: 150
-          failedHistoryLimit: 50
-        dev:
-          ttlSecondsAfterFinished: 3600  # 1 hour
-          historyLimit: 50
-    options:
-      disabled: false
-      deployments:
-        tekton-pruner-controller:
-          spec:
-            replicas: 1
-```
-
-**Configuration Notes:**
-- Both pruners (job-based and event-based) cannot be enabled simultaneously
-- The event-based pruner responds to resource events in real-time, providing more efficient cleanup
-- When `enforcedConfigLevel` is set to `namespace`, individual namespaces can override these settings using ConfigMaps
-
-
+- For all other  [configurations](https://github.com/openshift-pipelines/tektoncd-pruner/blob/main/docs/tutorials/getting-started.md#basic-pruner-configuration)(e.g., TTLs, history limits), use the ConfigMap: `tekton-pruner-default-spec`
 
 ### Additional fields as `options`
 

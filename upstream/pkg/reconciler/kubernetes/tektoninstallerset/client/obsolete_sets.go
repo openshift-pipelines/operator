@@ -40,8 +40,6 @@ func (i *InstallerSetClient) RemoveObsoleteSets(ctx context.Context) error {
 		sets = []string{"ClusterTask", "CommunityClusterTask", "PipelinesTemplate", "TriggersResources", "ConsoleCLI", "MiscellaneousResources", "PipelinesAsCode"}
 	case v1alpha1.KindTektonDashboard:
 		sets = []string{"dashboard"}
-	case v1alpha1.KindTektonPruner:
-		sets = []string{"pruner-config"}
 	case v1alpha1.ManualApprovalGates:
 		sets = []string{"manualapprovalgate"}
 	}
