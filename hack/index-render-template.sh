@@ -5,7 +5,7 @@
 BUNDLE_NAME=openshift-pipelines-operator-rh.v1.17.2
 
 # Update images from project.yaml to "generated" files
-VERSION=${1:-"v4.18"}
+VERSION=${1:-"v4.20"}
 ENVIRONMENT=${2:-"devel"}
 
 CATALOG_JSON=".konflux/olm-catalog/index/${VERSION}/catalog-template.json"
