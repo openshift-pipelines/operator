@@ -4,7 +4,6 @@ kind: PipelineRun
 metadata:
   annotations:
     pipelinesascode.tekton.dev/cancel-in-progress: "true" # Cancel in-progress pipelines
-    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/main/.tekton/docker-build-ta.yaml"
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator.git?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
@@ -12,7 +11,7 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "next" &&
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
-      ".konflux/dockerfiles/webhook.Dockerfile".pathChanged() ||
+      ".konflux/dockerfiles/webhook.Dockerfile".pathChanged() || ".tekton/*build*.yaml".pathChanged() ||
       ".tekton/operator-next-webhook-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
