@@ -88,7 +88,6 @@ type Pipeline struct {
 
 // PipelineProperties defines customizable flags for Pipeline Component.
 type PipelineProperties struct {
-	DisableAffinityAssistant                 *bool  `json:"disable-affinity-assistant,omitempty"`
 	DisableCredsInit                         *bool  `json:"disable-creds-init,omitempty"`
 	AwaitSidecarReadiness                    *bool  `json:"await-sidecar-readiness,omitempty"`
 	RunningInEnvironmentWithInjectedSidecars *bool  `json:"running-in-environment-with-injected-sidecars,omitempty"`
@@ -114,6 +113,12 @@ type PipelineProperties struct {
 	// ScopeWhenExpressionsToTask is deprecated and never used.
 	ScopeWhenExpressionsToTask *bool `json:"scope-when-expressions-to-task,omitempty"`
 
+	// Deprecated: DisableAffinityAssistant is deprecated and no longer used.
+	// This field is removed from pipeline component.
+	// Keeping here to maintain API compatibility during upgrades.
+	// TODO: Remove this field in release-v0.80.x
+	DisableAffinityAssistant *bool `json:"disable-affinity-assistant,omitempty"`
+
 	EnforceNonfalsifiability  string `json:"enforce-nonfalsifiability,omitempty"`
 	EnableKeepPodOnCancel     *bool  `json:"keep-pod-on-cancel,omitempty"`
 	ResultExtractionMethod    string `json:"results-from,omitempty"`
@@ -126,6 +131,8 @@ type PipelineProperties struct {
 	DisableInlineSpec         string `json:"disable-inline-spec,omitempty"`
 
 	PipelineMetricsProperties `json:",inline"`
+	// +optional
+	TracingProperties `json:",inline"`
 	// +optional
 	OptionalPipelineProperties `json:",inline"`
 	// +optional
@@ -164,6 +171,19 @@ type PipelineMetricsProperties struct {
 	MetricsPipelinerunLevel        string `json:"metrics.pipelinerun.level,omitempty"`
 	MetricsPipelinerunDurationType string `json:"metrics.pipelinerun.duration-type,omitempty"`
 	CountWithReason                *bool  `json:"metrics.count.enable-reason,omitempty"`
+}
+
+// TracingProperties defines the fields which are configurable for tracing
+type TracingProperties struct {
+	// Enabled controls whether tracing is enabled or not
+	// +optional
+	Enabled *bool `json:"traces.enabled,omitempty"`
+	// Endpoint is the URL for the OpenTelemetry trace collector
+	// +optional
+	Endpoint string `json:"traces.endpoint,omitempty"`
+	// CredentialsSecret is the name of the secret containing credentials for the tracing endpoint
+	// +optional
+	CredentialsSecret string `json:"traces.credentialsSecret,omitempty"`
 }
 
 // Resolvers defines the fields to configure resolvers

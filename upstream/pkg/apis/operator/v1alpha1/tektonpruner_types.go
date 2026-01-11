@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/openshift-pipelines/tektoncd-pruner/pkg/config"
+	"github.com/tektoncd/pruner/pkg/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	duckv1 "knative.dev/pkg/apis/duck/v1"
 )
@@ -42,7 +42,7 @@ type TektonPruner struct {
 }
 
 type TektonPrunerConfig struct {
-	GlobalConfig config.GlobalConfig `json:"global-config"`
+	GlobalConfig *config.GlobalConfig `json:"global-config"`
 }
 
 type Pruner struct {
