@@ -114,8 +114,6 @@ var (
 	ErrUserRejectPrevented           = errors.New("cannot reject a user if not authenticated as administrator")
 	ErrUserTwoFactorNotEnabled       = errors.New("cannot disable two factor authentication if not enabled")
 	ErrUserUnblockPrevented          = errors.New("cannot unblock a user that is blocked by LDAP synchronization")
-
-	errUnexpectedResultCode = errors.New("received unexpected result code")
 )
 
 // BasicUser included in other service responses (such as merge requests, pipelines, etc).
@@ -171,7 +169,6 @@ type User struct {
 	AvatarURL                      string             `json:"avatar_url"`
 	CanCreateGroup                 bool               `json:"can_create_group"`
 	CanCreateProject               bool               `json:"can_create_project"`
-	CanCreateOrganization          bool               `json:"can_create_organization"`
 	ProjectsLimit                  int                `json:"projects_limit"`
 	CurrentSignInAt                *time.Time         `json:"current_sign_in_at"`
 	CurrentSignInIP                *net.IP            `json:"current_sign_in_ip"`
@@ -220,14 +217,13 @@ func (a *UserAvatar) MarshalJSON() ([]byte, error) {
 // GitLab API docs: https://docs.gitlab.com/api/users/#list-users
 type ListUsersOptions struct {
 	ListOptions
-	Active          *bool   `url:"active,omitempty" json:"active,omitempty"`
-	Blocked         *bool   `url:"blocked,omitempty" json:"blocked,omitempty"`
-	Humans          *bool   `url:"humans,omitempty" json:"humans,omitempty"`
-	ExcludeInternal *bool   `url:"exclude_internal,omitempty" json:"exclude_internal,omitempty"`
-	ExcludeActive   *bool   `url:"exclude_active,omitempty" json:"exclude_active,omitempty"`
-	ExcludeExternal *bool   `url:"exclude_external,omitempty" json:"exclude_external,omitempty"`
-	ExcludeHumans   *bool   `url:"exclude_humans,omitempty" json:"exclude_humans,omitempty"`
-	PublicEmail     *string `url:"public_email,omitempty" json:"public_email,omitempty"`
+	Active          *bool `url:"active,omitempty" json:"active,omitempty"`
+	Blocked         *bool `url:"blocked,omitempty" json:"blocked,omitempty"`
+	Humans          *bool `url:"humans,omitempty" json:"humans,omitempty"`
+	ExcludeInternal *bool `url:"exclude_internal,omitempty" json:"exclude_internal,omitempty"`
+	ExcludeActive   *bool `url:"exclude_active,omitempty" json:"exclude_active,omitempty"`
+	ExcludeExternal *bool `url:"exclude_external,omitempty" json:"exclude_external,omitempty"`
+	ExcludeHumans   *bool `url:"exclude_humans,omitempty" json:"exclude_humans,omitempty"`
 
 	// The options below are only available for admins.
 	Search               *string    `url:"search,omitempty" json:"search,omitempty"`
@@ -1115,7 +1111,7 @@ func (s *UsersService) BlockUser(user int, options ...RequestOptionFunc) error {
 	case 404:
 		return ErrUserNotFound
 	default:
-		return fmt.Errorf("%w: %d", errUnexpectedResultCode, resp.StatusCode)
+		return fmt.Errorf("received unexpected result code: %d", resp.StatusCode)
 	}
 }
 
@@ -1143,7 +1139,7 @@ func (s *UsersService) UnblockUser(user int, options ...RequestOptionFunc) error
 	case 404:
 		return ErrUserNotFound
 	default:
-		return fmt.Errorf("%w: %d", errUnexpectedResultCode, resp.StatusCode)
+		return fmt.Errorf("received unexpected result code: %d", resp.StatusCode)
 	}
 }
 
@@ -1169,7 +1165,7 @@ func (s *UsersService) BanUser(user int, options ...RequestOptionFunc) error {
 	case 404:
 		return ErrUserNotFound
 	default:
-		return fmt.Errorf("%w: %d", errUnexpectedResultCode, resp.StatusCode)
+		return fmt.Errorf("received unexpected result code: %d", resp.StatusCode)
 	}
 }
 
@@ -1195,7 +1191,7 @@ func (s *UsersService) UnbanUser(user int, options ...RequestOptionFunc) error {
 	case 404:
 		return ErrUserNotFound
 	default:
-		return fmt.Errorf("%w: %d", errUnexpectedResultCode, resp.StatusCode)
+		return fmt.Errorf("received unexpected result code: %d", resp.StatusCode)
 	}
 }
 
@@ -1223,7 +1219,7 @@ func (s *UsersService) DeactivateUser(user int, options ...RequestOptionFunc) er
 	case 404:
 		return ErrUserNotFound
 	default:
-		return fmt.Errorf("%w: %d", errUnexpectedResultCode, resp.StatusCode)
+		return fmt.Errorf("received unexpected result code: %d", resp.StatusCode)
 	}
 }
 
@@ -1251,7 +1247,7 @@ func (s *UsersService) ActivateUser(user int, options ...RequestOptionFunc) erro
 	case 404:
 		return ErrUserNotFound
 	default:
-		return fmt.Errorf("%w: %d", errUnexpectedResultCode, resp.StatusCode)
+		return fmt.Errorf("received unexpected result code: %d", resp.StatusCode)
 	}
 }
 
@@ -1279,7 +1275,7 @@ func (s *UsersService) ApproveUser(user int, options ...RequestOptionFunc) error
 	case 404:
 		return ErrUserNotFound
 	default:
-		return fmt.Errorf("%w: %d", errUnexpectedResultCode, resp.StatusCode)
+		return fmt.Errorf("received unexpected result code: %d", resp.StatusCode)
 	}
 }
 
@@ -1309,7 +1305,7 @@ func (s *UsersService) RejectUser(user int, options ...RequestOptionFunc) error 
 	case 409:
 		return ErrUserConflict
 	default:
-		return fmt.Errorf("%w: %d", errUnexpectedResultCode, resp.StatusCode)
+		return fmt.Errorf("received unexpected result code: %d", resp.StatusCode)
 	}
 }
 
@@ -1505,7 +1501,7 @@ type UserActivity struct {
 
 // GetUserActivitiesOptions represents the options for GetUserActivities
 //
-// GitLab API docs:
+// GitLap API docs:
 // https://docs.gitlab.com/api/users/#list-a-users-activity
 type GetUserActivitiesOptions struct {
 	ListOptions
@@ -1599,7 +1595,7 @@ func (s *UsersService) DisableTwoFactor(user int, options ...RequestOptionFunc) 
 	case 404:
 		return ErrUserNotFound
 	default:
-		return fmt.Errorf("%w: %d", errUnexpectedResultCode, resp.StatusCode)
+		return fmt.Errorf("received unexpected result code: %d", resp.StatusCode)
 	}
 }
 
