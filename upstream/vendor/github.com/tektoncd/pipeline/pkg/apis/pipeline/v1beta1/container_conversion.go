@@ -38,7 +38,6 @@ func (r *Ref) convertFrom(ctx context.Context, source v1.Ref) {
 
 func (s Step) convertTo(ctx context.Context, sink *v1.Step) {
 	sink.Name = s.Name
-	sink.DisplayName = s.DisplayName
 	sink.Image = s.Image
 	sink.Command = s.Command
 	sink.Args = s.Args
@@ -82,7 +81,6 @@ func (s Step) convertTo(ctx context.Context, sink *v1.Step) {
 
 func (s *Step) convertFrom(ctx context.Context, source v1.Step) {
 	s.Name = source.Name
-	s.DisplayName = source.DisplayName
 	s.Image = source.Image
 	s.Command = source.Command
 	s.Args = source.Args

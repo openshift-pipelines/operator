@@ -18,8 +18,6 @@ package v1alpha1
 
 import (
 	"context"
-
-	"github.com/tektoncd/pruner/pkg/config"
 )
 
 var DefaultPrunerDisabled = true
@@ -32,8 +30,5 @@ func (p *Pruner) SetDefaults() {
 	if p.Disabled == nil {
 		p.Disabled = &DefaultPrunerDisabled
 	}
-	if p.GlobalConfig == nil {
-		p.GlobalConfig = &config.GlobalConfig{}
-		p.GlobalConfig.SetDefaults()
-	}
+	p.GlobalConfig.SetDefaults()
 }

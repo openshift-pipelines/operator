@@ -50,7 +50,7 @@ type ProtectedTag struct {
 	CreateAccessLevels []*TagAccessDescription `json:"create_access_levels"`
 }
 
-// TagAccessDescription represents the access description for a protected tag.
+// TagAccessDescription reperesents the access decription for a protected tag.
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/protected_tags/

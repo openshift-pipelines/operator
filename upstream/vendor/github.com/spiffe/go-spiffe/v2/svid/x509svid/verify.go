@@ -2,14 +2,15 @@ package x509svid
 
 import (
 	"crypto/x509"
-	"errors"
-	"fmt"
 	"time"
 
 	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 	"github.com/spiffe/go-spiffe/v2/internal/x509util"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
+	"github.com/zeebo/errs"
 )
+
+var x509svidErr = errs.Class("x509svid")
 
 // VerifyOption is an option used when verifying X509-SVIDs.
 type VerifyOption interface {
@@ -35,29 +36,29 @@ func Verify(certs []*x509.Certificate, bundleSource x509bundle.Source, opts ...V
 
 	switch {
 	case len(certs) == 0:
-		return spiffeid.ID{}, nil, wrapX509svidErr(errors.New("empty certificates chain"))
+		return spiffeid.ID{}, nil, x509svidErr.New("empty certificates chain")
 	case bundleSource == nil:
-		return spiffeid.ID{}, nil, wrapX509svidErr(errors.New("bundleSource is required"))
+		return spiffeid.ID{}, nil, x509svidErr.New("bundleSource is required")
 	}
 
 	leaf := certs[0]
 	id, err := IDFromCert(leaf)
 	if err != nil {
-		return spiffeid.ID{}, nil, wrapX509svidErr(fmt.Errorf("could not get leaf SPIFFE ID: %w", err))
+		return spiffeid.ID{}, nil, x509svidErr.New("could not get leaf SPIFFE ID: %w", err)
 	}
 
 	switch {
 	case leaf.IsCA:
-		return id, nil, wrapX509svidErr(errors.New("leaf certificate with CA flag set to true"))
+		return id, nil, x509svidErr.New("leaf certificate with CA flag set to true")
 	case leaf.KeyUsage&x509.KeyUsageCertSign > 0:
-		return id, nil, wrapX509svidErr(errors.New("leaf certificate with KeyCertSign key usage"))
+		return id, nil, x509svidErr.New("leaf certificate with KeyCertSign key usage")
 	case leaf.KeyUsage&x509.KeyUsageCRLSign > 0:
-		return id, nil, wrapX509svidErr(errors.New("leaf certificate with KeyCrlSign key usage"))
+		return id, nil, x509svidErr.New("leaf certificate with KeyCrlSign key usage")
 	}
 
 	bundle, err := bundleSource.GetX509BundleForTrustDomain(id.TrustDomain())
 	if err != nil {
-		return id, nil, wrapX509svidErr(fmt.Errorf("could not get X509 bundle: %w", err))
+		return id, nil, x509svidErr.New("could not get X509 bundle: %w", err)
 	}
 
 	verifiedChains, err := leaf.Verify(x509.VerifyOptions{
@@ -67,7 +68,7 @@ func Verify(certs []*x509.Certificate, bundleSource x509bundle.Source, opts ...V
 		CurrentTime:   config.now,
 	})
 	if err != nil {
-		return id, nil, wrapX509svidErr(fmt.Errorf("could not verify leaf certificate: %w", err))
+		return id, nil, x509svidErr.New("could not verify leaf certificate: %w", err)
 	}
 
 	return id, verifiedChains, nil
@@ -81,7 +82,7 @@ func ParseAndVerify(rawCerts [][]byte, bundleSource x509bundle.Source, opts ...V
 	for _, rawCert := range rawCerts {
 		cert, err := x509.ParseCertificate(rawCert)
 		if err != nil {
-			return spiffeid.ID{}, nil, wrapX509svidErr(fmt.Errorf("unable to parse certificate: %w", err))
+			return spiffeid.ID{}, nil, x509svidErr.New("unable to parse certificate: %w", err)
 		}
 		certs = append(certs, cert)
 	}
@@ -94,9 +95,9 @@ func ParseAndVerify(rawCerts [][]byte, bundleSource x509bundle.Source, opts ...V
 func IDFromCert(cert *x509.Certificate) (spiffeid.ID, error) {
 	switch {
 	case len(cert.URIs) == 0:
-		return spiffeid.ID{}, errors.New("certificate contains no URI SAN")
+		return spiffeid.ID{}, errs.New("certificate contains no URI SAN")
 	case len(cert.URIs) > 1:
-		return spiffeid.ID{}, errors.New("certificate contains more than one URI SAN")
+		return spiffeid.ID{}, errs.New("certificate contains more than one URI SAN")
 	}
 	return spiffeid.FromURI(cert.URIs[0])
 }
@@ -109,8 +110,4 @@ type verifyOption func(config *verifyConfig)
 
 func (fn verifyOption) apply(config *verifyConfig) {
 	fn(config)
-}
-
-func wrapX509svidErr(err error) error {
-	return fmt.Errorf("x509svid: %w", err)
 }
