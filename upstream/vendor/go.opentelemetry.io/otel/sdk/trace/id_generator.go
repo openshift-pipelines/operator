@@ -5,8 +5,10 @@ package trace // import "go.opentelemetry.io/otel/sdk/trace"
 
 import (
 	"context"
+	crand "crypto/rand"
 	"encoding/binary"
-	"math/rand/v2"
+	"math/rand"
+	"sync"
 
 	"go.opentelemetry.io/otel/trace"
 )
@@ -27,43 +29,38 @@ type IDGenerator interface {
 	// must never be done outside of a new major release.
 }
 
-type randomIDGenerator struct{}
+type randomIDGenerator struct {
+	sync.Mutex
+	randSource *rand.Rand
+}
 
 var _ IDGenerator = &randomIDGenerator{}
 
 // NewSpanID returns a non-zero span ID from a randomly-chosen sequence.
-func (*randomIDGenerator) NewSpanID(context.Context, trace.TraceID) trace.SpanID {
+func (gen *randomIDGenerator) NewSpanID(ctx context.Context, traceID trace.TraceID) trace.SpanID {
+	gen.Lock()
+	defer gen.Unlock()
 	sid := trace.SpanID{}
-	for {
-		binary.NativeEndian.PutUint64(sid[:], rand.Uint64())
-		if sid.IsValid() {
-			break
-		}
-	}
+	_, _ = gen.randSource.Read(sid[:])
 	return sid
 }
 
 // NewIDs returns a non-zero trace ID and a non-zero span ID from a
 // randomly-chosen sequence.
-func (*randomIDGenerator) NewIDs(context.Context) (trace.TraceID, trace.SpanID) {
+func (gen *randomIDGenerator) NewIDs(ctx context.Context) (trace.TraceID, trace.SpanID) {
+	gen.Lock()
+	defer gen.Unlock()
 	tid := trace.TraceID{}
+	_, _ = gen.randSource.Read(tid[:])
 	sid := trace.SpanID{}
-	for {
-		binary.NativeEndian.PutUint64(tid[:8], rand.Uint64())
-		binary.NativeEndian.PutUint64(tid[8:], rand.Uint64())
-		if tid.IsValid() {
-			break
-		}
-	}
-	for {
-		binary.NativeEndian.PutUint64(sid[:], rand.Uint64())
-		if sid.IsValid() {
-			break
-		}
-	}
+	_, _ = gen.randSource.Read(sid[:])
 	return tid, sid
 }
 
 func defaultIDGenerator() IDGenerator {
-	return &randomIDGenerator{}
+	gen := &randomIDGenerator{}
+	var rngSeed int64
+	_ = binary.Read(crand.Reader, binary.LittleEndian, &rngSeed)
+	gen.randSource = rand.New(rand.NewSource(rngSeed))
+	return gen
 }

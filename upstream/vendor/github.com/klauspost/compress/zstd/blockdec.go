@@ -5,10 +5,14 @@
 package zstd
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"hash/crc32"
 	"io"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/klauspost/compress/huff0"
@@ -54,11 +58,11 @@ const (
 )
 
 var (
-	huffDecoderPool = sync.Pool{New: func() any {
+	huffDecoderPool = sync.Pool{New: func() interface{} {
 		return &huff0.Scratch{}
 	}}
 
-	fseDecoderPool = sync.Pool{New: func() any {
+	fseDecoderPool = sync.Pool{New: func() interface{} {
 		return &fseDecoder{}
 	}}
 )
@@ -550,10 +554,7 @@ func (b *blockDec) prepareSequences(in []byte, hist *history) (err error) {
 		if debugDecoder {
 			printf("Compression modes: 0b%b", compMode)
 		}
-		if compMode&3 != 0 {
-			return errors.New("corrupt block: reserved bits not zero")
-		}
-		for i := range uint(3) {
+		for i := uint(0); i < 3; i++ {
 			mode := seqCompMode((compMode >> (6 - i*2)) & 3)
 			if debugDecoder {
 				println("Table", tableIndex(i), "is", mode)
@@ -594,9 +595,7 @@ func (b *blockDec) prepareSequences(in []byte, hist *history) (err error) {
 					printf("RLE set to 0x%x, code: %v", symb, v)
 				}
 			case compModeFSE:
-				if debugDecoder {
-					println("Reading table for", tableIndex(i))
-				}
+				println("Reading table for", tableIndex(i))
 				if seq.fse == nil || seq.fse.preDefined {
 					seq.fse = fseDecoderPool.Get().(*fseDecoder)
 				}
@@ -643,6 +642,21 @@ func (b *blockDec) prepareSequences(in []byte, hist *history) (err error) {
 	if err := seqs.initialize(br, hist, b.dst); err != nil {
 		println("initializing sequences:", err)
 		return err
+	}
+	// Extract blocks...
+	if false && hist.dict == nil {
+		fatalErr := func(err error) {
+			if err != nil {
+				panic(err)
+			}
+		}
+		fn := fmt.Sprintf("n-%d-lits-%d-prev-%d-%d-%d-win-%d.blk", hist.decoders.nSeqs, len(hist.decoders.literals), hist.recentOffsets[0], hist.recentOffsets[1], hist.recentOffsets[2], hist.windowSize)
+		var buf bytes.Buffer
+		fatalErr(binary.Write(&buf, binary.LittleEndian, hist.decoders.litLengths.fse))
+		fatalErr(binary.Write(&buf, binary.LittleEndian, hist.decoders.matchLengths.fse))
+		fatalErr(binary.Write(&buf, binary.LittleEndian, hist.decoders.offsets.fse))
+		buf.Write(in)
+		os.WriteFile(filepath.Join("testdata", "seqs", fn), buf.Bytes(), os.ModePerm)
 	}
 
 	return nil

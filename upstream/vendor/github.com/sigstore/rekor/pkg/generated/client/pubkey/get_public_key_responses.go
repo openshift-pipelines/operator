@@ -22,8 +22,6 @@ package pubkey
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
-	"encoding/json"
-	stderrors "errors"
 	"fmt"
 	"io"
 
@@ -39,7 +37,7 @@ type GetPublicKeyReader struct {
 }
 
 // ReadResponse reads a server response into the received o.
-func (o *GetPublicKeyReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (any, error) {
+func (o *GetPublicKeyReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
 	case 200:
 		result := NewGetPublicKeyOK()
@@ -104,13 +102,11 @@ func (o *GetPublicKeyOK) Code() int {
 }
 
 func (o *GetPublicKeyOK) Error() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/publicKey][%d] getPublicKeyOK %s", 200, payload)
+	return fmt.Sprintf("[GET /api/v1/log/publicKey][%d] getPublicKeyOK  %+v", 200, o.Payload)
 }
 
 func (o *GetPublicKeyOK) String() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/publicKey][%d] getPublicKeyOK %s", 200, payload)
+	return fmt.Sprintf("[GET /api/v1/log/publicKey][%d] getPublicKeyOK  %+v", 200, o.Payload)
 }
 
 func (o *GetPublicKeyOK) GetPayload() string {
@@ -120,7 +116,7 @@ func (o *GetPublicKeyOK) GetPayload() string {
 func (o *GetPublicKeyOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
 
 	// response payload
-	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && !stderrors.Is(err, io.EOF) {
+	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 
@@ -176,13 +172,11 @@ func (o *GetPublicKeyDefault) Code() int {
 }
 
 func (o *GetPublicKeyDefault) Error() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/publicKey][%d] getPublicKey default %s", o._statusCode, payload)
+	return fmt.Sprintf("[GET /api/v1/log/publicKey][%d] getPublicKey default  %+v", o._statusCode, o.Payload)
 }
 
 func (o *GetPublicKeyDefault) String() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/publicKey][%d] getPublicKey default %s", o._statusCode, payload)
+	return fmt.Sprintf("[GET /api/v1/log/publicKey][%d] getPublicKey default  %+v", o._statusCode, o.Payload)
 }
 
 func (o *GetPublicKeyDefault) GetPayload() *models.Error {
@@ -194,7 +188,7 @@ func (o *GetPublicKeyDefault) readResponse(response runtime.ClientResponse, cons
 	o.Payload = new(models.Error)
 
 	// response payload
-	if err := consumer.Consume(response.Body(), o.Payload); err != nil && !stderrors.Is(err, io.EOF) {
+	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 

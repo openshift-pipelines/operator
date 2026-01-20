@@ -85,8 +85,7 @@ type DeserializeStep struct {
 // initialization added to it.
 func NewDeserializeStep() *DeserializeStep {
 	return &DeserializeStep{
-		// downstream SDK typically has larger Deserialize step
-		ids: newOrderedIDs(baseOrderedItems * 2),
+		ids: newOrderedIDs(),
 	}
 }
 

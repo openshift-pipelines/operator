@@ -1,8 +1,6 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Package env provides types and functionality for environment variable support
-// in the OpenTelemetry SDK.
 package env // import "go.opentelemetry.io/otel/sdk/internal/env"
 
 import (
@@ -24,7 +22,7 @@ const (
 	BatchSpanProcessorMaxQueueSizeKey = "OTEL_BSP_MAX_QUEUE_SIZE"
 	// BatchSpanProcessorMaxExportBatchSizeKey is the maximum batch size (i.e.
 	// 512). Note: it must be less than or equal to
-	// BatchSpanProcessorMaxQueueSize.
+	// EnvBatchSpanProcessorMaxQueueSize.
 	BatchSpanProcessorMaxExportBatchSizeKey = "OTEL_BSP_MAX_EXPORT_BATCH_SIZE"
 
 	// AttributeValueLengthKey is the maximum allowed attribute value size.

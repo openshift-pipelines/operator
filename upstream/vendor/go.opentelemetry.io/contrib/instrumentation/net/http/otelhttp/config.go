@@ -1,5 +1,16 @@
 // Copyright The OpenTelemetry Authors
-// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package otelhttp // import "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
@@ -9,7 +20,6 @@ import (
 	"net/http/httptrace"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -34,9 +44,8 @@ type config struct {
 	SpanNameFormatter func(string, *http.Request) string
 	ClientTrace       func(context.Context) *httptrace.ClientTrace
 
-	TracerProvider     trace.TracerProvider
-	MeterProvider      metric.MeterProvider
-	MetricAttributesFn func(*http.Request) []attribute.KeyValue
+	TracerProvider trace.TracerProvider
+	MeterProvider  metric.MeterProvider
 }
 
 // Option interface used for setting optional config properties.
@@ -102,7 +111,7 @@ func WithPublicEndpoint() Option {
 	})
 }
 
-// WithPublicEndpointFn runs with every request, and allows conditionally
+// WithPublicEndpointFn runs with every request, and allows conditionnally
 // configuring the Handler to link the span with an incoming span context. If
 // this option is not provided or returns false, then the association is a
 // child association instead of a link.
@@ -175,10 +184,6 @@ func WithMessageEvents(events ...event) Option {
 
 // WithSpanNameFormatter takes a function that will be called on every
 // request and the returned string will become the Span Name.
-//
-// When using [http.ServeMux] (or any middleware that sets the Pattern of [http.Request]),
-// the span name formatter will run twice. Once when the span is created, and
-// second time after the middleware, so the pattern can be used.
 func WithSpanNameFormatter(f func(operation string, r *http.Request) string) Option {
 	return optionFunc(func(c *config) {
 		c.SpanNameFormatter = f
@@ -198,13 +203,5 @@ func WithClientTrace(f func(context.Context) *httptrace.ClientTrace) Option {
 func WithServerName(server string) Option {
 	return optionFunc(func(c *config) {
 		c.ServerName = server
-	})
-}
-
-// WithMetricAttributesFn returns an Option to set a function that maps an HTTP request to a slice of attribute.KeyValue.
-// These attributes will be included in metrics for every request.
-func WithMetricAttributesFn(metricAttributesFn func(r *http.Request) []attribute.KeyValue) Option {
-	return optionFunc(func(c *config) {
-		c.MetricAttributesFn = metricAttributesFn
 	})
 }

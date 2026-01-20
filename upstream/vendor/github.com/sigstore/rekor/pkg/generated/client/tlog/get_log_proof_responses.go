@@ -22,8 +22,6 @@ package tlog
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
-	"encoding/json"
-	stderrors "errors"
 	"fmt"
 	"io"
 
@@ -39,7 +37,7 @@ type GetLogProofReader struct {
 }
 
 // ReadResponse reads a server response into the received o.
-func (o *GetLogProofReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (any, error) {
+func (o *GetLogProofReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
 	case 200:
 		result := NewGetLogProofOK()
@@ -110,13 +108,11 @@ func (o *GetLogProofOK) Code() int {
 }
 
 func (o *GetLogProofOK) Error() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/proof][%d] getLogProofOK %s", 200, payload)
+	return fmt.Sprintf("[GET /api/v1/log/proof][%d] getLogProofOK  %+v", 200, o.Payload)
 }
 
 func (o *GetLogProofOK) String() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/proof][%d] getLogProofOK %s", 200, payload)
+	return fmt.Sprintf("[GET /api/v1/log/proof][%d] getLogProofOK  %+v", 200, o.Payload)
 }
 
 func (o *GetLogProofOK) GetPayload() *models.ConsistencyProof {
@@ -128,7 +124,7 @@ func (o *GetLogProofOK) readResponse(response runtime.ClientResponse, consumer r
 	o.Payload = new(models.ConsistencyProof)
 
 	// response payload
-	if err := consumer.Consume(response.Body(), o.Payload); err != nil && !stderrors.Is(err, io.EOF) {
+	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 
@@ -180,13 +176,11 @@ func (o *GetLogProofBadRequest) Code() int {
 }
 
 func (o *GetLogProofBadRequest) Error() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/proof][%d] getLogProofBadRequest %s", 400, payload)
+	return fmt.Sprintf("[GET /api/v1/log/proof][%d] getLogProofBadRequest  %+v", 400, o.Payload)
 }
 
 func (o *GetLogProofBadRequest) String() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/proof][%d] getLogProofBadRequest %s", 400, payload)
+	return fmt.Sprintf("[GET /api/v1/log/proof][%d] getLogProofBadRequest  %+v", 400, o.Payload)
 }
 
 func (o *GetLogProofBadRequest) GetPayload() *models.Error {
@@ -198,7 +192,7 @@ func (o *GetLogProofBadRequest) readResponse(response runtime.ClientResponse, co
 	o.Payload = new(models.Error)
 
 	// response payload
-	if err := consumer.Consume(response.Body(), o.Payload); err != nil && !stderrors.Is(err, io.EOF) {
+	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 
@@ -254,13 +248,11 @@ func (o *GetLogProofDefault) Code() int {
 }
 
 func (o *GetLogProofDefault) Error() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/proof][%d] getLogProof default %s", o._statusCode, payload)
+	return fmt.Sprintf("[GET /api/v1/log/proof][%d] getLogProof default  %+v", o._statusCode, o.Payload)
 }
 
 func (o *GetLogProofDefault) String() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[GET /api/v1/log/proof][%d] getLogProof default %s", o._statusCode, payload)
+	return fmt.Sprintf("[GET /api/v1/log/proof][%d] getLogProof default  %+v", o._statusCode, o.Payload)
 }
 
 func (o *GetLogProofDefault) GetPayload() *models.Error {
@@ -272,7 +264,7 @@ func (o *GetLogProofDefault) readResponse(response runtime.ClientResponse, consu
 	o.Payload = new(models.Error)
 
 	// response payload
-	if err := consumer.Consume(response.Body(), o.Payload); err != nil && !stderrors.Is(err, io.EOF) {
+	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 

@@ -154,65 +154,40 @@ var supportedAlgorithms = map[string]bool{
 	EdDSA: true,
 }
 
-// ProviderConfig allows direct creation of a [Provider] from metadata
-// configuration. This is intended for interop with providers that don't support
-// discovery, or host the JSON discovery document at an off-spec path.
-//
-// The ProviderConfig struct specifies JSON struct tags to support document
-// parsing.
-//
-//	// Directly fetch the metadata document.
-//	resp, err := http.Get("https://login.example.com/custom-metadata-path")
-//	if err != nil {
-//		// ...
-//	}
-//	defer resp.Body.Close()
-//
-//	// Parse config from JSON metadata.
-//	config := &oidc.ProviderConfig{}
-//	if err := json.NewDecoder(resp.Body).Decode(config); err != nil {
-//		// ...
-//	}
-//	p := config.NewProvider(context.Background())
-//
-// For providers that implement discovery, use [NewProvider] instead.
-//
-// See: https://openid.net/specs/openid-connect-discovery-1_0.html
+// ProviderConfig allows creating providers when discovery isn't supported. It's
+// generally easier to use NewProvider directly.
 type ProviderConfig struct {
 	// IssuerURL is the identity of the provider, and the string it uses to sign
 	// ID tokens with. For example "https://accounts.google.com". This value MUST
 	// match ID tokens exactly.
-	IssuerURL string `json:"issuer"`
+	IssuerURL string
 	// AuthURL is the endpoint used by the provider to support the OAuth 2.0
 	// authorization endpoint.
-	AuthURL string `json:"authorization_endpoint"`
+	AuthURL string
 	// TokenURL is the endpoint used by the provider to support the OAuth 2.0
 	// token endpoint.
-	TokenURL string `json:"token_endpoint"`
+	TokenURL string
 	// DeviceAuthURL is the endpoint used by the provider to support the OAuth 2.0
 	// device authorization endpoint.
-	DeviceAuthURL string `json:"device_authorization_endpoint"`
+	DeviceAuthURL string
 	// UserInfoURL is the endpoint used by the provider to support the OpenID
 	// Connect UserInfo flow.
 	//
 	// https://openid.net/specs/openid-connect-core-1_0.html#UserInfo
-	UserInfoURL string `json:"userinfo_endpoint"`
+	UserInfoURL string
 	// JWKSURL is the endpoint used by the provider to advertise public keys to
 	// verify issued ID tokens. This endpoint is polled as new keys are made
 	// available.
-	JWKSURL string `json:"jwks_uri"`
+	JWKSURL string
 
 	// Algorithms, if provided, indicate a list of JWT algorithms allowed to sign
 	// ID tokens. If not provided, this defaults to the algorithms advertised by
 	// the JWK endpoint, then the set of algorithms supported by this package.
-	Algorithms []string `json:"id_token_signing_alg_values_supported"`
+	Algorithms []string
 }
 
 // NewProvider initializes a provider from a set of endpoints, rather than
 // through discovery.
-//
-// The provided context is only used for [http.Client] configuration through
-// [ClientContext], not cancelation.
 func (p *ProviderConfig) NewProvider(ctx context.Context) *Provider {
 	return &Provider{
 		issuer:        p.IssuerURL,
@@ -227,14 +202,9 @@ func (p *ProviderConfig) NewProvider(ctx context.Context) *Provider {
 }
 
 // NewProvider uses the OpenID Connect discovery mechanism to construct a Provider.
+//
 // The issuer is the URL identifier for the service. For example: "https://accounts.google.com"
 // or "https://login.salesforce.com".
-//
-// OpenID Connect providers that don't implement discovery or host the discovery
-// document at a non-spec complaint path (such as requiring a URL parameter),
-// should use [ProviderConfig] instead.
-//
-// See: https://openid.net/specs/openid-connect-discovery-1_0.html
 func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 	wellKnown := strings.TrimSuffix(issuer, "/") + "/.well-known/openid-configuration"
 	req, err := http.NewRequest("GET", wellKnown, nil)
@@ -267,7 +237,7 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 		issuerURL = issuer
 	}
 	if p.Issuer != issuerURL && !skipIssuerValidation {
-		return nil, fmt.Errorf("oidc: issuer URL provided to client (%q) did not match the issuer URL returned by provider (%q)", issuer, p.Issuer)
+		return nil, fmt.Errorf("oidc: issuer did not match the issuer returned by provider, expected %q got %q", issuer, p.Issuer)
 	}
 	var algs []string
 	for _, a := range p.Algorithms {

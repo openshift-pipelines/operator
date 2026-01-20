@@ -7,9 +7,9 @@
 TEXT ·sequenceDecs_decode_amd64(SB), $8-32
 	MOVQ    br+8(FP), CX
 	MOVQ    24(CX), DX
-	MOVBQZX 40(CX), BX
+	MOVBQZX 32(CX), BX
 	MOVQ    (CX), AX
-	MOVQ    32(CX), SI
+	MOVQ    8(CX), SI
 	ADDQ    SI, AX
 	MOVQ    AX, (SP)
 	MOVQ    ctx+16(FP), AX
@@ -157,7 +157,8 @@ sequenceDecs_decode_amd64_ll_update_zero:
 
 	// Update Literal Length State
 	MOVBQZX DI, R14
-	SHRL    $0x10, DI
+	SHRQ    $0x10, DI
+	MOVWQZX DI, DI
 	LEAQ    (BX)(R14*1), CX
 	MOVQ    DX, R15
 	MOVQ    CX, BX
@@ -176,7 +177,8 @@ sequenceDecs_decode_amd64_ll_update_zero:
 
 	// Update Match Length State
 	MOVBQZX R8, R14
-	SHRL    $0x10, R8
+	SHRQ    $0x10, R8
+	MOVWQZX R8, R8
 	LEAQ    (BX)(R14*1), CX
 	MOVQ    DX, R15
 	MOVQ    CX, BX
@@ -195,7 +197,8 @@ sequenceDecs_decode_amd64_ll_update_zero:
 
 	// Update Offset State
 	MOVBQZX R9, R14
-	SHRL    $0x10, R9
+	SHRQ    $0x10, R9
+	MOVWQZX R9, R9
 	LEAQ    (BX)(R14*1), CX
 	MOVQ    DX, R15
 	MOVQ    CX, BX
@@ -299,8 +302,8 @@ sequenceDecs_decode_amd64_match_len_ofs_ok:
 	MOVQ R13, 160(AX)
 	MOVQ br+8(FP), AX
 	MOVQ DX, 24(AX)
-	MOVB BL, 40(AX)
-	MOVQ SI, 32(AX)
+	MOVB BL, 32(AX)
+	MOVQ SI, 8(AX)
 
 	// Return success
 	MOVQ $0x00000000, ret+24(FP)
@@ -335,9 +338,9 @@ error_overread:
 TEXT ·sequenceDecs_decode_56_amd64(SB), $8-32
 	MOVQ    br+8(FP), CX
 	MOVQ    24(CX), DX
-	MOVBQZX 40(CX), BX
+	MOVBQZX 32(CX), BX
 	MOVQ    (CX), AX
-	MOVQ    32(CX), SI
+	MOVQ    8(CX), SI
 	ADDQ    SI, AX
 	MOVQ    AX, (SP)
 	MOVQ    ctx+16(FP), AX
@@ -456,7 +459,8 @@ sequenceDecs_decode_56_amd64_ll_update_zero:
 
 	// Update Literal Length State
 	MOVBQZX DI, R14
-	SHRL    $0x10, DI
+	SHRQ    $0x10, DI
+	MOVWQZX DI, DI
 	LEAQ    (BX)(R14*1), CX
 	MOVQ    DX, R15
 	MOVQ    CX, BX
@@ -475,7 +479,8 @@ sequenceDecs_decode_56_amd64_ll_update_zero:
 
 	// Update Match Length State
 	MOVBQZX R8, R14
-	SHRL    $0x10, R8
+	SHRQ    $0x10, R8
+	MOVWQZX R8, R8
 	LEAQ    (BX)(R14*1), CX
 	MOVQ    DX, R15
 	MOVQ    CX, BX
@@ -494,7 +499,8 @@ sequenceDecs_decode_56_amd64_ll_update_zero:
 
 	// Update Offset State
 	MOVBQZX R9, R14
-	SHRL    $0x10, R9
+	SHRQ    $0x10, R9
+	MOVWQZX R9, R9
 	LEAQ    (BX)(R14*1), CX
 	MOVQ    DX, R15
 	MOVQ    CX, BX
@@ -598,8 +604,8 @@ sequenceDecs_decode_56_amd64_match_len_ofs_ok:
 	MOVQ R13, 160(AX)
 	MOVQ br+8(FP), AX
 	MOVQ DX, 24(AX)
-	MOVB BL, 40(AX)
-	MOVQ SI, 32(AX)
+	MOVB BL, 32(AX)
+	MOVQ SI, 8(AX)
 
 	// Return success
 	MOVQ $0x00000000, ret+24(FP)
@@ -634,9 +640,9 @@ error_overread:
 TEXT ·sequenceDecs_decode_bmi2(SB), $8-32
 	MOVQ    br+8(FP), BX
 	MOVQ    24(BX), AX
-	MOVBQZX 40(BX), DX
+	MOVBQZX 32(BX), DX
 	MOVQ    (BX), CX
-	MOVQ    32(BX), BX
+	MOVQ    8(BX), BX
 	ADDQ    BX, CX
 	MOVQ    CX, (SP)
 	MOVQ    ctx+16(FP), CX
@@ -766,10 +772,11 @@ sequenceDecs_decode_bmi2_fill_2_end:
 	BZHIQ   R14, R15, R15
 
 	// Update Offset State
-	BZHIQ R8, R15, CX
-	SHRXQ R8, R15, R15
-	SHRL  $0x10, R8
-	ADDQ  CX, R8
+	BZHIQ  R8, R15, CX
+	SHRXQ  R8, R15, R15
+	MOVQ   $0x00001010, R14
+	BEXTRQ R14, R8, R8
+	ADDQ   CX, R8
 
 	// Load ctx.ofTable
 	MOVQ ctx+16(FP), CX
@@ -777,10 +784,11 @@ sequenceDecs_decode_bmi2_fill_2_end:
 	MOVQ (CX)(R8*8), R8
 
 	// Update Match Length State
-	BZHIQ DI, R15, CX
-	SHRXQ DI, R15, R15
-	SHRL  $0x10, DI
-	ADDQ  CX, DI
+	BZHIQ  DI, R15, CX
+	SHRXQ  DI, R15, R15
+	MOVQ   $0x00001010, R14
+	BEXTRQ R14, DI, DI
+	ADDQ   CX, DI
 
 	// Load ctx.mlTable
 	MOVQ ctx+16(FP), CX
@@ -788,9 +796,10 @@ sequenceDecs_decode_bmi2_fill_2_end:
 	MOVQ (CX)(DI*8), DI
 
 	// Update Literal Length State
-	BZHIQ SI, R15, CX
-	SHRL  $0x10, SI
-	ADDQ  CX, SI
+	BZHIQ  SI, R15, CX
+	MOVQ   $0x00001010, R14
+	BEXTRQ R14, SI, SI
+	ADDQ   CX, SI
 
 	// Load ctx.llTable
 	MOVQ ctx+16(FP), CX
@@ -884,8 +893,8 @@ sequenceDecs_decode_bmi2_match_len_ofs_ok:
 	MOVQ R12, 160(CX)
 	MOVQ br+8(FP), CX
 	MOVQ AX, 24(CX)
-	MOVB DL, 40(CX)
-	MOVQ BX, 32(CX)
+	MOVB DL, 32(CX)
+	MOVQ BX, 8(CX)
 
 	// Return success
 	MOVQ $0x00000000, ret+24(FP)
@@ -920,9 +929,9 @@ error_overread:
 TEXT ·sequenceDecs_decode_56_bmi2(SB), $8-32
 	MOVQ    br+8(FP), BX
 	MOVQ    24(BX), AX
-	MOVBQZX 40(BX), DX
+	MOVBQZX 32(BX), DX
 	MOVQ    (BX), CX
-	MOVQ    32(BX), BX
+	MOVQ    8(BX), BX
 	ADDQ    BX, CX
 	MOVQ    CX, (SP)
 	MOVQ    ctx+16(FP), CX
@@ -1023,10 +1032,11 @@ sequenceDecs_decode_56_bmi2_fill_end:
 	BZHIQ   R14, R15, R15
 
 	// Update Offset State
-	BZHIQ R8, R15, CX
-	SHRXQ R8, R15, R15
-	SHRL  $0x10, R8
-	ADDQ  CX, R8
+	BZHIQ  R8, R15, CX
+	SHRXQ  R8, R15, R15
+	MOVQ   $0x00001010, R14
+	BEXTRQ R14, R8, R8
+	ADDQ   CX, R8
 
 	// Load ctx.ofTable
 	MOVQ ctx+16(FP), CX
@@ -1034,10 +1044,11 @@ sequenceDecs_decode_56_bmi2_fill_end:
 	MOVQ (CX)(R8*8), R8
 
 	// Update Match Length State
-	BZHIQ DI, R15, CX
-	SHRXQ DI, R15, R15
-	SHRL  $0x10, DI
-	ADDQ  CX, DI
+	BZHIQ  DI, R15, CX
+	SHRXQ  DI, R15, R15
+	MOVQ   $0x00001010, R14
+	BEXTRQ R14, DI, DI
+	ADDQ   CX, DI
 
 	// Load ctx.mlTable
 	MOVQ ctx+16(FP), CX
@@ -1045,9 +1056,10 @@ sequenceDecs_decode_56_bmi2_fill_end:
 	MOVQ (CX)(DI*8), DI
 
 	// Update Literal Length State
-	BZHIQ SI, R15, CX
-	SHRL  $0x10, SI
-	ADDQ  CX, SI
+	BZHIQ  SI, R15, CX
+	MOVQ   $0x00001010, R14
+	BEXTRQ R14, SI, SI
+	ADDQ   CX, SI
 
 	// Load ctx.llTable
 	MOVQ ctx+16(FP), CX
@@ -1141,8 +1153,8 @@ sequenceDecs_decode_56_bmi2_match_len_ofs_ok:
 	MOVQ R12, 160(CX)
 	MOVQ br+8(FP), CX
 	MOVQ AX, 24(CX)
-	MOVB DL, 40(CX)
-	MOVQ BX, 32(CX)
+	MOVB DL, 32(CX)
+	MOVQ BX, 8(CX)
 
 	// Return success
 	MOVQ $0x00000000, ret+24(FP)
@@ -1787,9 +1799,9 @@ empty_seqs:
 TEXT ·sequenceDecs_decodeSync_amd64(SB), $64-32
 	MOVQ    br+8(FP), CX
 	MOVQ    24(CX), DX
-	MOVBQZX 40(CX), BX
+	MOVBQZX 32(CX), BX
 	MOVQ    (CX), AX
-	MOVQ    32(CX), SI
+	MOVQ    8(CX), SI
 	ADDQ    SI, AX
 	MOVQ    AX, (SP)
 	MOVQ    ctx+16(FP), AX
@@ -1814,7 +1826,7 @@ TEXT ·sequenceDecs_decodeSync_amd64(SB), $64-32
 	MOVQ    40(SP), AX
 	ADDQ    AX, 48(SP)
 
-	// Calculate pointer to s.out[cap(s.out)] (a past-end pointer)
+	// Calculate poiter to s.out[cap(s.out)] (a past-end pointer)
 	ADDQ R10, 32(SP)
 
 	// outBase += outPosition
@@ -1955,7 +1967,8 @@ sequenceDecs_decodeSync_amd64_ll_update_zero:
 
 	// Update Literal Length State
 	MOVBQZX DI, R13
-	SHRL    $0x10, DI
+	SHRQ    $0x10, DI
+	MOVWQZX DI, DI
 	LEAQ    (BX)(R13*1), CX
 	MOVQ    DX, R14
 	MOVQ    CX, BX
@@ -1974,7 +1987,8 @@ sequenceDecs_decodeSync_amd64_ll_update_zero:
 
 	// Update Match Length State
 	MOVBQZX R8, R13
-	SHRL    $0x10, R8
+	SHRQ    $0x10, R8
+	MOVWQZX R8, R8
 	LEAQ    (BX)(R13*1), CX
 	MOVQ    DX, R14
 	MOVQ    CX, BX
@@ -1993,7 +2007,8 @@ sequenceDecs_decodeSync_amd64_ll_update_zero:
 
 	// Update Offset State
 	MOVBQZX R9, R13
-	SHRL    $0x10, R9
+	SHRQ    $0x10, R9
+	MOVWQZX R9, R9
 	LEAQ    (BX)(R13*1), CX
 	MOVQ    DX, R14
 	MOVQ    CX, BX
@@ -2281,8 +2296,8 @@ handle_loop:
 loop_finished:
 	MOVQ br+8(FP), AX
 	MOVQ DX, 24(AX)
-	MOVB BL, 40(AX)
-	MOVQ SI, 32(AX)
+	MOVB BL, 32(AX)
+	MOVQ SI, 8(AX)
 
 	// Update the context
 	MOVQ ctx+16(FP), AX
@@ -2349,9 +2364,9 @@ error_not_enough_space:
 TEXT ·sequenceDecs_decodeSync_bmi2(SB), $64-32
 	MOVQ    br+8(FP), BX
 	MOVQ    24(BX), AX
-	MOVBQZX 40(BX), DX
+	MOVBQZX 32(BX), DX
 	MOVQ    (BX), CX
-	MOVQ    32(BX), BX
+	MOVQ    8(BX), BX
 	ADDQ    BX, CX
 	MOVQ    CX, (SP)
 	MOVQ    ctx+16(FP), CX
@@ -2376,7 +2391,7 @@ TEXT ·sequenceDecs_decodeSync_bmi2(SB), $64-32
 	MOVQ    40(SP), CX
 	ADDQ    CX, 48(SP)
 
-	// Calculate pointer to s.out[cap(s.out)] (a past-end pointer)
+	// Calculate poiter to s.out[cap(s.out)] (a past-end pointer)
 	ADDQ R9, 32(SP)
 
 	// outBase += outPosition
@@ -2499,10 +2514,11 @@ sequenceDecs_decodeSync_bmi2_fill_2_end:
 	BZHIQ   R13, R14, R14
 
 	// Update Offset State
-	BZHIQ R8, R14, CX
-	SHRXQ R8, R14, R14
-	SHRL  $0x10, R8
-	ADDQ  CX, R8
+	BZHIQ  R8, R14, CX
+	SHRXQ  R8, R14, R14
+	MOVQ   $0x00001010, R13
+	BEXTRQ R13, R8, R8
+	ADDQ   CX, R8
 
 	// Load ctx.ofTable
 	MOVQ ctx+16(FP), CX
@@ -2510,10 +2526,11 @@ sequenceDecs_decodeSync_bmi2_fill_2_end:
 	MOVQ (CX)(R8*8), R8
 
 	// Update Match Length State
-	BZHIQ DI, R14, CX
-	SHRXQ DI, R14, R14
-	SHRL  $0x10, DI
-	ADDQ  CX, DI
+	BZHIQ  DI, R14, CX
+	SHRXQ  DI, R14, R14
+	MOVQ   $0x00001010, R13
+	BEXTRQ R13, DI, DI
+	ADDQ   CX, DI
 
 	// Load ctx.mlTable
 	MOVQ ctx+16(FP), CX
@@ -2521,9 +2538,10 @@ sequenceDecs_decodeSync_bmi2_fill_2_end:
 	MOVQ (CX)(DI*8), DI
 
 	// Update Literal Length State
-	BZHIQ SI, R14, CX
-	SHRL  $0x10, SI
-	ADDQ  CX, SI
+	BZHIQ  SI, R14, CX
+	MOVQ   $0x00001010, R13
+	BEXTRQ R13, SI, SI
+	ADDQ   CX, SI
 
 	// Load ctx.llTable
 	MOVQ ctx+16(FP), CX
@@ -2801,8 +2819,8 @@ handle_loop:
 loop_finished:
 	MOVQ br+8(FP), CX
 	MOVQ AX, 24(CX)
-	MOVB DL, 40(CX)
-	MOVQ BX, 32(CX)
+	MOVB DL, 32(CX)
+	MOVQ BX, 8(CX)
 
 	// Update the context
 	MOVQ ctx+16(FP), AX
@@ -2869,9 +2887,9 @@ error_not_enough_space:
 TEXT ·sequenceDecs_decodeSync_safe_amd64(SB), $64-32
 	MOVQ    br+8(FP), CX
 	MOVQ    24(CX), DX
-	MOVBQZX 40(CX), BX
+	MOVBQZX 32(CX), BX
 	MOVQ    (CX), AX
-	MOVQ    32(CX), SI
+	MOVQ    8(CX), SI
 	ADDQ    SI, AX
 	MOVQ    AX, (SP)
 	MOVQ    ctx+16(FP), AX
@@ -2896,7 +2914,7 @@ TEXT ·sequenceDecs_decodeSync_safe_amd64(SB), $64-32
 	MOVQ    40(SP), AX
 	ADDQ    AX, 48(SP)
 
-	// Calculate pointer to s.out[cap(s.out)] (a past-end pointer)
+	// Calculate poiter to s.out[cap(s.out)] (a past-end pointer)
 	ADDQ R10, 32(SP)
 
 	// outBase += outPosition
@@ -3037,7 +3055,8 @@ sequenceDecs_decodeSync_safe_amd64_ll_update_zero:
 
 	// Update Literal Length State
 	MOVBQZX DI, R13
-	SHRL    $0x10, DI
+	SHRQ    $0x10, DI
+	MOVWQZX DI, DI
 	LEAQ    (BX)(R13*1), CX
 	MOVQ    DX, R14
 	MOVQ    CX, BX
@@ -3056,7 +3075,8 @@ sequenceDecs_decodeSync_safe_amd64_ll_update_zero:
 
 	// Update Match Length State
 	MOVBQZX R8, R13
-	SHRL    $0x10, R8
+	SHRQ    $0x10, R8
+	MOVWQZX R8, R8
 	LEAQ    (BX)(R13*1), CX
 	MOVQ    DX, R14
 	MOVQ    CX, BX
@@ -3075,7 +3095,8 @@ sequenceDecs_decodeSync_safe_amd64_ll_update_zero:
 
 	// Update Offset State
 	MOVBQZX R9, R13
-	SHRL    $0x10, R9
+	SHRQ    $0x10, R9
+	MOVWQZX R9, R9
 	LEAQ    (BX)(R13*1), CX
 	MOVQ    DX, R14
 	MOVQ    CX, BX
@@ -3465,8 +3486,8 @@ handle_loop:
 loop_finished:
 	MOVQ br+8(FP), AX
 	MOVQ DX, 24(AX)
-	MOVB BL, 40(AX)
-	MOVQ SI, 32(AX)
+	MOVB BL, 32(AX)
+	MOVQ SI, 8(AX)
 
 	// Update the context
 	MOVQ ctx+16(FP), AX
@@ -3533,9 +3554,9 @@ error_not_enough_space:
 TEXT ·sequenceDecs_decodeSync_safe_bmi2(SB), $64-32
 	MOVQ    br+8(FP), BX
 	MOVQ    24(BX), AX
-	MOVBQZX 40(BX), DX
+	MOVBQZX 32(BX), DX
 	MOVQ    (BX), CX
-	MOVQ    32(BX), BX
+	MOVQ    8(BX), BX
 	ADDQ    BX, CX
 	MOVQ    CX, (SP)
 	MOVQ    ctx+16(FP), CX
@@ -3560,7 +3581,7 @@ TEXT ·sequenceDecs_decodeSync_safe_bmi2(SB), $64-32
 	MOVQ    40(SP), CX
 	ADDQ    CX, 48(SP)
 
-	// Calculate pointer to s.out[cap(s.out)] (a past-end pointer)
+	// Calculate poiter to s.out[cap(s.out)] (a past-end pointer)
 	ADDQ R9, 32(SP)
 
 	// outBase += outPosition
@@ -3683,10 +3704,11 @@ sequenceDecs_decodeSync_safe_bmi2_fill_2_end:
 	BZHIQ   R13, R14, R14
 
 	// Update Offset State
-	BZHIQ R8, R14, CX
-	SHRXQ R8, R14, R14
-	SHRL  $0x10, R8
-	ADDQ  CX, R8
+	BZHIQ  R8, R14, CX
+	SHRXQ  R8, R14, R14
+	MOVQ   $0x00001010, R13
+	BEXTRQ R13, R8, R8
+	ADDQ   CX, R8
 
 	// Load ctx.ofTable
 	MOVQ ctx+16(FP), CX
@@ -3694,10 +3716,11 @@ sequenceDecs_decodeSync_safe_bmi2_fill_2_end:
 	MOVQ (CX)(R8*8), R8
 
 	// Update Match Length State
-	BZHIQ DI, R14, CX
-	SHRXQ DI, R14, R14
-	SHRL  $0x10, DI
-	ADDQ  CX, DI
+	BZHIQ  DI, R14, CX
+	SHRXQ  DI, R14, R14
+	MOVQ   $0x00001010, R13
+	BEXTRQ R13, DI, DI
+	ADDQ   CX, DI
 
 	// Load ctx.mlTable
 	MOVQ ctx+16(FP), CX
@@ -3705,9 +3728,10 @@ sequenceDecs_decodeSync_safe_bmi2_fill_2_end:
 	MOVQ (CX)(DI*8), DI
 
 	// Update Literal Length State
-	BZHIQ SI, R14, CX
-	SHRL  $0x10, SI
-	ADDQ  CX, SI
+	BZHIQ  SI, R14, CX
+	MOVQ   $0x00001010, R13
+	BEXTRQ R13, SI, SI
+	ADDQ   CX, SI
 
 	// Load ctx.llTable
 	MOVQ ctx+16(FP), CX
@@ -4087,8 +4111,8 @@ handle_loop:
 loop_finished:
 	MOVQ br+8(FP), CX
 	MOVQ AX, 24(CX)
-	MOVB DL, 40(CX)
-	MOVQ BX, 32(CX)
+	MOVB DL, 32(CX)
+	MOVQ BX, 8(CX)
 
 	// Update the context
 	MOVQ ctx+16(FP), AX

@@ -286,10 +286,6 @@ func makeJWERecipient(alg KeyAlgorithm, encryptionKey interface{}) (recipientKey
 		return newSymmetricRecipient(alg, encryptionKey)
 	case string:
 		return newSymmetricRecipient(alg, []byte(encryptionKey))
-	case JSONWebKey:
-		recipient, err := makeJWERecipient(alg, encryptionKey.Key)
-		recipient.keyID = encryptionKey.KeyID
-		return recipient, err
 	case *JSONWebKey:
 		recipient, err := makeJWERecipient(alg, encryptionKey.Key)
 		recipient.keyID = encryptionKey.KeyID
@@ -454,15 +450,16 @@ func (obj JSONWebEncryption) Decrypt(decryptionKey interface{}) ([]byte, error) 
 		return nil, errors.New("go-jose/go-jose: too many recipients in payload; expecting only one")
 	}
 
-	err := headers.checkNoCritical()
+	critical, err := headers.getCritical()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("go-jose/go-jose: invalid crit header")
 	}
 
-	key, err := tryJWKS(decryptionKey, obj.Header)
-	if err != nil {
-		return nil, err
+	if len(critical) > 0 {
+		return nil, fmt.Errorf("go-jose/go-jose: unsupported crit header")
 	}
+
+	key := tryJWKS(decryptionKey, obj.Header)
 	decrypter, err := newDecrypter(key)
 	if err != nil {
 		return nil, err
@@ -523,15 +520,16 @@ func (obj JSONWebEncryption) Decrypt(decryptionKey interface{}) ([]byte, error) 
 func (obj JSONWebEncryption) DecryptMulti(decryptionKey interface{}) (int, Header, []byte, error) {
 	globalHeaders := obj.mergedHeaders(nil)
 
-	err := globalHeaders.checkNoCritical()
+	critical, err := globalHeaders.getCritical()
 	if err != nil {
-		return -1, Header{}, nil, err
+		return -1, Header{}, nil, fmt.Errorf("go-jose/go-jose: invalid crit header")
 	}
 
-	key, err := tryJWKS(decryptionKey, obj.Header)
-	if err != nil {
-		return -1, Header{}, nil, err
+	if len(critical) > 0 {
+		return -1, Header{}, nil, fmt.Errorf("go-jose/go-jose: unsupported crit header")
 	}
+
+	key := tryJWKS(decryptionKey, obj.Header)
 	decrypter, err := newDecrypter(key)
 	if err != nil {
 		return -1, Header{}, nil, err

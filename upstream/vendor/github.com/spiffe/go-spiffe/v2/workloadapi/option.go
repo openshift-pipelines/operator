@@ -2,7 +2,6 @@ package workloadapi
 
 import (
 	"github.com/spiffe/go-spiffe/v2/logger"
-	"github.com/spiffe/go-spiffe/v2/svid/jwtsvid"
 	"github.com/spiffe/go-spiffe/v2/svid/x509svid"
 	"google.golang.org/grpc"
 )
@@ -36,14 +35,6 @@ func WithLogger(logger logger.Logger) ClientOption {
 	})
 }
 
-// WithBackoff provides a custom backoff strategy that replaces the
-// default backoff strategy (linear backoff).
-func WithBackoffStrategy(backoffStrategy BackoffStrategy) ClientOption {
-	return clientOption(func(c *clientConfig) {
-		c.backoffStrategy = backoffStrategy
-	})
-}
-
 // SourceOption are options that are shared among all option types.
 type SourceOption interface {
 	configureX509Source(*x509SourceConfig)
@@ -69,26 +60,18 @@ type X509SourceOption interface {
 	configureX509Source(*x509SourceConfig)
 }
 
-// WithDefaultJWTSVIDPicker provides a function that is used to determine the
-// default JWT-SVID when more than one is provided by the Workload API. By
-// default, the first JWT-SVID in the list returned by the Workload API is
-// used.
-func WithDefaultJWTSVIDPicker(picker func([]*jwtsvid.SVID) *jwtsvid.SVID) JWTSourceOption {
-	return withDefaultJWTSVIDPicker{picker: picker}
-}
-
-// JWTSourceOption is an option for the JWTSource. A SourceOption is also a
-// JWTSourceOption.
-type JWTSourceOption interface {
-	configureJWTSource(*jwtSourceConfig)
-}
-
 // WithDefaultX509SVIDPicker provides a function that is used to determine the
 // default X509-SVID when more than one is provided by the Workload API. By
 // default, the first X509-SVID in the list returned by the Workload API is
 // used.
 func WithDefaultX509SVIDPicker(picker func([]*x509svid.SVID) *x509svid.SVID) X509SourceOption {
 	return withDefaultX509SVIDPicker{picker: picker}
+}
+
+// JWTSourceOption is an option for the JWTSource. A SourceOption is also a
+// JWTSourceOption.
+type JWTSourceOption interface {
+	configureJWTSource(*jwtSourceConfig)
 }
 
 // BundleSourceOption is an option for the BundleSource. A SourceOption is also
@@ -98,11 +81,10 @@ type BundleSourceOption interface {
 }
 
 type clientConfig struct {
-	address         string
-	namedPipeName   string
-	dialOptions     []grpc.DialOption
-	log             logger.Logger
-	backoffStrategy BackoffStrategy
+	address       string
+	namedPipeName string
+	dialOptions   []grpc.DialOption
+	log           logger.Logger
 }
 
 type clientOption func(*clientConfig)
@@ -118,7 +100,6 @@ type x509SourceConfig struct {
 
 type jwtSourceConfig struct {
 	watcher watcherConfig
-	picker  func([]*jwtsvid.SVID) *jwtsvid.SVID
 }
 
 type bundleSourceConfig struct {
@@ -162,13 +143,5 @@ type withDefaultX509SVIDPicker struct {
 }
 
 func (o withDefaultX509SVIDPicker) configureX509Source(config *x509SourceConfig) {
-	config.picker = o.picker
-}
-
-type withDefaultJWTSVIDPicker struct {
-	picker func([]*jwtsvid.SVID) *jwtsvid.SVID
-}
-
-func (o withDefaultJWTSVIDPicker) configureJWTSource(config *jwtSourceConfig) {
 	config.picker = o.picker
 }

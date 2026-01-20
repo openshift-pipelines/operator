@@ -22,8 +22,8 @@ package observer
 
 import "go.uber.org/zap/zapcore"
 
-// A LoggedEntry is an encoding-agnostic representation of a log message.
-// Field availability is context dependent.
+// An LoggedEntry is an encoding-agnostic representation of a log message.
+// Field availability is context dependant.
 type LoggedEntry struct {
 	zapcore.Entry
 	Context []zapcore.Field

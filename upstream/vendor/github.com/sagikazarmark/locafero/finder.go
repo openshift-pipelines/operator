@@ -1,4 +1,4 @@
-// Package locafero looks for files and directories in an {fs.Fs} filesystem.
+// Package finder looks for files and directories in an {fs.Fs} filesystem.
 package locafero
 
 import (
@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sourcegraph/conc/pool"
+	"github.com/sourcegraph/conc/iter"
 	"github.com/spf13/afero"
 )
 
@@ -27,7 +27,7 @@ type Finder struct {
 	// It provides the capability to search for entries with depth,
 	// meaning it can target deeper locations within the directory structure.
 	//
-	// It also supports glob syntax (as defined by [filepath.Match]), offering greater flexibility in search patterns.
+	// It also supports glob syntax (as defined by [filepat.Match]), offering greater flexibility in search patterns.
 	//
 	// Examples:
 	//   - config.yaml
@@ -44,66 +44,65 @@ type Finder struct {
 // Find looks for files and directories in an [afero.Fs] filesystem.
 func (f Finder) Find(fsys afero.Fs) ([]string, error) {
 	// Arbitrary go routine limit (TODO: make this a parameter)
-	p := pool.NewWithResults[[]searchResult]().WithMaxGoroutines(5).WithErrors().WithFirstError()
+	// pool := pool.NewWithResults[[]string]().WithMaxGoroutines(5).WithErrors().WithFirstError()
+
+	type searchItem struct {
+		path string
+		name string
+	}
+
+	var searchItems []searchItem
 
 	for _, searchPath := range f.Paths {
-		for _, searchName := range f.Names {
-			p.Go(func() ([]searchResult, error) {
-				// If the name contains any glob character, perform a glob match
-				if strings.ContainsAny(searchName, globMatch) {
-					return globWalkSearch(fsys, searchPath, searchName, f.Type)
-				}
+		searchPath := searchPath
 
-				return statSearch(fsys, searchPath, searchName, f.Type)
-			})
+		for _, searchName := range f.Names {
+			searchName := searchName
+
+			searchItems = append(searchItems, searchItem{searchPath, searchName})
+
+			// pool.Go(func() ([]string, error) {
+			// 	// If the name contains any glob character, perform a glob match
+			// 	if strings.ContainsAny(searchName, "*?[]\\^") {
+			// 		return globWalkSearch(fsys, searchPath, searchName, f.Type)
+			// 	}
+			//
+			// 	return statSearch(fsys, searchPath, searchName, f.Type)
+			// })
 		}
 	}
 
-	searchResults, err := flatten(p.Wait())
+	// allResults, err := pool.Wait()
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	allResults, err := iter.MapErr(searchItems, func(item *searchItem) ([]string, error) {
+		// If the name contains any glob character, perform a glob match
+		if strings.ContainsAny(item.name, "*?[]\\^") {
+			return globWalkSearch(fsys, item.path, item.name, f.Type)
+		}
+
+		return statSearch(fsys, item.path, item.name, f.Type)
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	// Return early if no results were found
-	if len(searchResults) == 0 {
-		return nil, nil
+	var results []string
+
+	for _, r := range allResults {
+		results = append(results, r...)
 	}
 
-	results := make([]string, 0, len(searchResults))
-
-	for _, searchResult := range searchResults {
-		results = append(results, searchResult.path)
-	}
+	// Sort results in alphabetical order for now
+	// sort.Strings(results)
 
 	return results, nil
 }
 
-type searchResult struct {
-	path string
-	info fs.FileInfo
-}
-
-func flatten[T any](results [][]T, err error) ([]T, error) {
-	if err != nil {
-		return nil, err
-	}
-
-	var flattened []T
-
-	for _, r := range results {
-		flattened = append(flattened, r...)
-	}
-
-	return flattened, nil
-}
-
-func globWalkSearch(
-	fsys afero.Fs,
-	searchPath string,
-	searchName string,
-	searchType FileType,
-) ([]searchResult, error) {
-	var results []searchResult
+func globWalkSearch(fsys afero.Fs, searchPath string, searchName string, searchType FileType) ([]string, error) {
+	var results []string
 
 	err := afero.Walk(fsys, searchPath, func(p string, fileInfo fs.FileInfo, err error) error {
 		if err != nil {
@@ -124,7 +123,7 @@ func globWalkSearch(
 		}
 
 		// Skip unmatching type
-		if !searchType.match(fileInfo) {
+		if !searchType.matchFileInfo(fileInfo) {
 			return result
 		}
 
@@ -134,7 +133,7 @@ func globWalkSearch(
 		}
 
 		if match {
-			results = append(results, searchResult{p, fileInfo})
+			results = append(results, p)
 		}
 
 		return result
@@ -146,12 +145,7 @@ func globWalkSearch(
 	return results, nil
 }
 
-func statSearch(
-	fsys afero.Fs,
-	searchPath string,
-	searchName string,
-	searchType FileType,
-) ([]searchResult, error) {
+func statSearch(fsys afero.Fs, searchPath string, searchName string, searchType FileType) ([]string, error) {
 	filePath := filepath.Join(searchPath, searchName)
 
 	fileInfo, err := fsys.Stat(filePath)
@@ -163,9 +157,9 @@ func statSearch(
 	}
 
 	// Skip unmatching type
-	if !searchType.match(fileInfo) {
+	if !searchType.matchFileInfo(fileInfo) {
 		return nil, nil
 	}
 
-	return []searchResult{{filePath, fileInfo}}, nil
+	return []string{filePath}, nil
 }

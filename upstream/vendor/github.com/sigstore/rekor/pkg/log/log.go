@@ -20,8 +20,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/go-chi/chi/v5/middleware"
-	internallog "github.com/sigstore/rekor/pkg/internal/log"
+	"github.com/go-chi/chi/middleware"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -55,7 +54,6 @@ func ConfigureLogger(logType, traceStrPrefix string) {
 		log.Fatalln("createLogger", err)
 	}
 	Logger = logger.Sugar()
-	internallog.Logger = Logger
 
 	if traceStrPrefix != "" {
 		traceStringPrefix = traceStrPrefix

@@ -16,7 +16,6 @@ type InstrumentOption interface {
 	Int64CounterOption
 	Int64UpDownCounterOption
 	Int64HistogramOption
-	Int64GaugeOption
 	Int64ObservableCounterOption
 	Int64ObservableUpDownCounterOption
 	Int64ObservableGaugeOption
@@ -24,7 +23,6 @@ type InstrumentOption interface {
 	Float64CounterOption
 	Float64UpDownCounterOption
 	Float64HistogramOption
-	Float64GaugeOption
 	Float64ObservableCounterOption
 	Float64ObservableUpDownCounterOption
 	Float64ObservableGaugeOption
@@ -53,19 +51,12 @@ func (o descOpt) applyFloat64Histogram(c Float64HistogramConfig) Float64Histogra
 	return c
 }
 
-func (o descOpt) applyFloat64Gauge(c Float64GaugeConfig) Float64GaugeConfig {
-	c.description = string(o)
-	return c
-}
-
 func (o descOpt) applyFloat64ObservableCounter(c Float64ObservableCounterConfig) Float64ObservableCounterConfig {
 	c.description = string(o)
 	return c
 }
 
-func (o descOpt) applyFloat64ObservableUpDownCounter(
-	c Float64ObservableUpDownCounterConfig,
-) Float64ObservableUpDownCounterConfig {
+func (o descOpt) applyFloat64ObservableUpDownCounter(c Float64ObservableUpDownCounterConfig) Float64ObservableUpDownCounterConfig {
 	c.description = string(o)
 	return c
 }
@@ -90,19 +81,12 @@ func (o descOpt) applyInt64Histogram(c Int64HistogramConfig) Int64HistogramConfi
 	return c
 }
 
-func (o descOpt) applyInt64Gauge(c Int64GaugeConfig) Int64GaugeConfig {
-	c.description = string(o)
-	return c
-}
-
 func (o descOpt) applyInt64ObservableCounter(c Int64ObservableCounterConfig) Int64ObservableCounterConfig {
 	c.description = string(o)
 	return c
 }
 
-func (o descOpt) applyInt64ObservableUpDownCounter(
-	c Int64ObservableUpDownCounterConfig,
-) Int64ObservableUpDownCounterConfig {
+func (o descOpt) applyInt64ObservableUpDownCounter(c Int64ObservableUpDownCounterConfig) Int64ObservableUpDownCounterConfig {
 	c.description = string(o)
 	return c
 }
@@ -132,19 +116,12 @@ func (o unitOpt) applyFloat64Histogram(c Float64HistogramConfig) Float64Histogra
 	return c
 }
 
-func (o unitOpt) applyFloat64Gauge(c Float64GaugeConfig) Float64GaugeConfig {
-	c.unit = string(o)
-	return c
-}
-
 func (o unitOpt) applyFloat64ObservableCounter(c Float64ObservableCounterConfig) Float64ObservableCounterConfig {
 	c.unit = string(o)
 	return c
 }
 
-func (o unitOpt) applyFloat64ObservableUpDownCounter(
-	c Float64ObservableUpDownCounterConfig,
-) Float64ObservableUpDownCounterConfig {
+func (o unitOpt) applyFloat64ObservableUpDownCounter(c Float64ObservableUpDownCounterConfig) Float64ObservableUpDownCounterConfig {
 	c.unit = string(o)
 	return c
 }
@@ -169,19 +146,12 @@ func (o unitOpt) applyInt64Histogram(c Int64HistogramConfig) Int64HistogramConfi
 	return c
 }
 
-func (o unitOpt) applyInt64Gauge(c Int64GaugeConfig) Int64GaugeConfig {
-	c.unit = string(o)
-	return c
-}
-
 func (o unitOpt) applyInt64ObservableCounter(c Int64ObservableCounterConfig) Int64ObservableCounterConfig {
 	c.unit = string(o)
 	return c
 }
 
-func (o unitOpt) applyInt64ObservableUpDownCounter(
-	c Int64ObservableUpDownCounterConfig,
-) Int64ObservableUpDownCounterConfig {
+func (o unitOpt) applyInt64ObservableUpDownCounter(c Int64ObservableUpDownCounterConfig) Int64ObservableUpDownCounterConfig {
 	c.unit = string(o)
 	return c
 }
@@ -359,7 +329,7 @@ func WithAttributeSet(attributes attribute.Set) MeasurementOption {
 //
 //	cp := make([]attribute.KeyValue, len(attributes))
 //	copy(cp, attributes)
-//	WithAttributeSet(attribute.NewSet(cp...))
+//	WithAttributes(attribute.NewSet(cp...))
 //
 // [attribute.NewSet] may modify the passed attributes so this will make a copy
 // of attributes before creating a set in order to ensure this function is

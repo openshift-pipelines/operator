@@ -1,7 +1,7 @@
 package jose
 
 import (
-	fileutils "go.step.sm/crypto/internal/utils/file"
+	"go.step.sm/crypto/internal/utils"
 )
 
 type context struct {
@@ -97,7 +97,7 @@ func WithPassword(pass []byte) Option {
 // WithPasswordFile is a method that adds the password in a file to the context.
 func WithPasswordFile(filename string) Option {
 	return func(ctx *context) error {
-		b, err := fileutils.ReadPasswordFromFile(filename)
+		b, err := utils.ReadPasswordFromFile(filename)
 		if err != nil {
 			return err
 		}

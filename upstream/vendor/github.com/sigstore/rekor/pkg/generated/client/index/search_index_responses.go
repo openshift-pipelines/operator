@@ -22,8 +22,6 @@ package index
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
-	"encoding/json"
-	stderrors "errors"
 	"fmt"
 	"io"
 
@@ -39,7 +37,7 @@ type SearchIndexReader struct {
 }
 
 // ReadResponse reads a server response into the received o.
-func (o *SearchIndexReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (any, error) {
+func (o *SearchIndexReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
 	case 200:
 		result := NewSearchIndexOK()
@@ -110,13 +108,11 @@ func (o *SearchIndexOK) Code() int {
 }
 
 func (o *SearchIndexOK) Error() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[POST /api/v1/index/retrieve][%d] searchIndexOK %s", 200, payload)
+	return fmt.Sprintf("[POST /api/v1/index/retrieve][%d] searchIndexOK  %+v", 200, o.Payload)
 }
 
 func (o *SearchIndexOK) String() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[POST /api/v1/index/retrieve][%d] searchIndexOK %s", 200, payload)
+	return fmt.Sprintf("[POST /api/v1/index/retrieve][%d] searchIndexOK  %+v", 200, o.Payload)
 }
 
 func (o *SearchIndexOK) GetPayload() []string {
@@ -126,7 +122,7 @@ func (o *SearchIndexOK) GetPayload() []string {
 func (o *SearchIndexOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
 
 	// response payload
-	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && !stderrors.Is(err, io.EOF) {
+	if err := consumer.Consume(response.Body(), &o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 
@@ -178,13 +174,11 @@ func (o *SearchIndexBadRequest) Code() int {
 }
 
 func (o *SearchIndexBadRequest) Error() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[POST /api/v1/index/retrieve][%d] searchIndexBadRequest %s", 400, payload)
+	return fmt.Sprintf("[POST /api/v1/index/retrieve][%d] searchIndexBadRequest  %+v", 400, o.Payload)
 }
 
 func (o *SearchIndexBadRequest) String() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[POST /api/v1/index/retrieve][%d] searchIndexBadRequest %s", 400, payload)
+	return fmt.Sprintf("[POST /api/v1/index/retrieve][%d] searchIndexBadRequest  %+v", 400, o.Payload)
 }
 
 func (o *SearchIndexBadRequest) GetPayload() *models.Error {
@@ -196,7 +190,7 @@ func (o *SearchIndexBadRequest) readResponse(response runtime.ClientResponse, co
 	o.Payload = new(models.Error)
 
 	// response payload
-	if err := consumer.Consume(response.Body(), o.Payload); err != nil && !stderrors.Is(err, io.EOF) {
+	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 
@@ -252,13 +246,11 @@ func (o *SearchIndexDefault) Code() int {
 }
 
 func (o *SearchIndexDefault) Error() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[POST /api/v1/index/retrieve][%d] searchIndex default %s", o._statusCode, payload)
+	return fmt.Sprintf("[POST /api/v1/index/retrieve][%d] searchIndex default  %+v", o._statusCode, o.Payload)
 }
 
 func (o *SearchIndexDefault) String() string {
-	payload, _ := json.Marshal(o.Payload)
-	return fmt.Sprintf("[POST /api/v1/index/retrieve][%d] searchIndex default %s", o._statusCode, payload)
+	return fmt.Sprintf("[POST /api/v1/index/retrieve][%d] searchIndex default  %+v", o._statusCode, o.Payload)
 }
 
 func (o *SearchIndexDefault) GetPayload() *models.Error {
@@ -270,7 +262,7 @@ func (o *SearchIndexDefault) readResponse(response runtime.ClientResponse, consu
 	o.Payload = new(models.Error)
 
 	// response payload
-	if err := consumer.Consume(response.Body(), o.Payload); err != nil && !stderrors.Is(err, io.EOF) {
+	if err := consumer.Consume(response.Body(), o.Payload); err != nil && err != io.EOF {
 		return err
 	}
 

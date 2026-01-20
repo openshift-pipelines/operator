@@ -31,7 +31,7 @@ import (
 const cloudPlatformScope = "https://www.googleapis.com/auth/cloud-platform"
 
 // GetGcloudCmd is exposed so we can test this.
-var GetGcloudCmd = func(ctx context.Context) *exec.Cmd {
+var GetGcloudCmd = func() *exec.Cmd {
 	// This is odd, but basically what docker-credential-gcr does.
 	//
 	// config-helper is undocumented, but it's purportedly the only supported way
@@ -39,15 +39,15 @@ var GetGcloudCmd = func(ctx context.Context) *exec.Cmd {
 	//
 	// --force-auth-refresh means we are getting a token that is valid for about
 	// an hour (we reuse it until it's expired).
-	return exec.CommandContext(ctx, "gcloud", "config", "config-helper", "--force-auth-refresh", "--format=json(credential)")
+	return exec.Command("gcloud", "config", "config-helper", "--force-auth-refresh", "--format=json(credential)")
 }
 
 // NewEnvAuthenticator returns an authn.Authenticator that generates access
 // tokens from the environment we're running in.
 //
 // See: https://godoc.org/golang.org/x/oauth2/google#FindDefaultCredentials
-func NewEnvAuthenticator(ctx context.Context) (authn.Authenticator, error) {
-	ts, err := googauth.DefaultTokenSource(ctx, cloudPlatformScope)
+func NewEnvAuthenticator() (authn.Authenticator, error) {
+	ts, err := googauth.DefaultTokenSource(context.Background(), cloudPlatformScope)
 	if err != nil {
 		return nil, err
 	}
@@ -62,14 +62,14 @@ func NewEnvAuthenticator(ctx context.Context) (authn.Authenticator, error) {
 
 // NewGcloudAuthenticator returns an oauth2.TokenSource that generates access
 // tokens by shelling out to the gcloud sdk.
-func NewGcloudAuthenticator(ctx context.Context) (authn.Authenticator, error) {
+func NewGcloudAuthenticator() (authn.Authenticator, error) {
 	if _, err := exec.LookPath("gcloud"); err != nil {
 		// gcloud is not available, fall back to anonymous
 		logs.Warn.Println("gcloud binary not found")
 		return authn.Anonymous, nil
 	}
 
-	ts := gcloudSource{ctx, GetGcloudCmd}
+	ts := gcloudSource{GetGcloudCmd}
 
 	// Attempt to fetch a token to ensure gcloud is installed and we can run it.
 	token, err := ts.Token()
@@ -143,15 +143,13 @@ type gcloudOutput struct {
 }
 
 type gcloudSource struct {
-	ctx context.Context
-
 	// This is passed in so that we mock out gcloud and test Token.
-	exec func(ctx context.Context) *exec.Cmd
+	exec func() *exec.Cmd
 }
 
 // Token implements oauath2.TokenSource.
 func (gs gcloudSource) Token() (*oauth2.Token, error) {
-	cmd := gs.exec(gs.ctx)
+	cmd := gs.exec()
 	var out bytes.Buffer
 	cmd.Stdout = &out
 

@@ -11,7 +11,6 @@ import (
 	"go/ast"
 	"go/token"
 	"log"
-	"slices"
 	"sort"
 	"strconv"
 )
@@ -19,7 +18,7 @@ import (
 // sortImports sorts runs of consecutive import lines in import blocks in f.
 // It also removes duplicate imports when it is possible to do so without data loss.
 //
-// It may mutate the token.File and the ast.File.
+// It may mutate the token.File.
 func sortImports(localPrefix string, tokFile *token.File, f *ast.File) {
 	for i, d := range f.Decls {
 		d, ok := d.(*ast.GenDecl)
@@ -31,7 +30,7 @@ func sortImports(localPrefix string, tokFile *token.File, f *ast.File) {
 
 		if len(d.Specs) == 0 {
 			// Empty import block, remove it.
-			f.Decls = slices.Delete(f.Decls, i, i+1)
+			f.Decls = append(f.Decls[:i], f.Decls[i+1:]...)
 		}
 
 		if !d.Lparen.IsValid() {
@@ -92,7 +91,7 @@ func mergeImports(f *ast.File) {
 			spec.(*ast.ImportSpec).Path.ValuePos = first.Pos()
 			first.Specs = append(first.Specs, spec)
 		}
-		f.Decls = slices.Delete(f.Decls, i, i+1)
+		f.Decls = append(f.Decls[:i], f.Decls[i+1:]...)
 		i--
 	}
 }

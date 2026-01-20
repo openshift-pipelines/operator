@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/spiffe/go-spiffe/v2/bundle/jwtbundle"
@@ -119,7 +120,7 @@ func (c *Client) FetchX509Bundles(ctx context.Context) (*x509bundle.Set, error) 
 // WatchX509Bundles watches for changes to the X.509 bundles. The watcher receives
 // the updated X.509 bundles.
 func (c *Client) WatchX509Bundles(ctx context.Context, watcher X509BundleWatcher) error {
-	backoff := c.config.backoffStrategy.NewBackoff()
+	backoff := newBackoff()
 	for {
 		err := c.watchX509Bundles(ctx, watcher, backoff)
 		watcher.OnX509BundlesWatchError(err)
@@ -152,7 +153,7 @@ func (c *Client) FetchX509Context(ctx context.Context) (*X509Context, error) {
 // WatchX509Context watches for updates to the X.509 context. The watcher
 // receives the updated X.509 context.
 func (c *Client) WatchX509Context(ctx context.Context, watcher X509ContextWatcher) error {
-	backoff := c.config.backoffStrategy.NewBackoff()
+	backoff := newBackoff()
 	for {
 		err := c.watchX509Context(ctx, watcher, backoff)
 		watcher.OnX509ContextWatchError(err)
@@ -224,7 +225,7 @@ func (c *Client) FetchJWTBundles(ctx context.Context) (*jwtbundle.Set, error) {
 // WatchJWTBundles watches for changes to the JWT bundles. The watcher receives
 // the updated JWT bundles.
 func (c *Client) WatchJWTBundles(ctx context.Context, watcher JWTBundleWatcher) error {
-	backoff := c.config.backoffStrategy.NewBackoff()
+	backoff := newBackoff()
 	for {
 		err := c.watchJWTBundles(ctx, watcher, backoff)
 		watcher.OnJWTBundlesWatchError(err)
@@ -255,10 +256,10 @@ func (c *Client) ValidateJWTSVID(ctx context.Context, token, audience string) (*
 func (c *Client) newConn(ctx context.Context) (*grpc.ClientConn, error) {
 	c.config.dialOptions = append(c.config.dialOptions, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	c.appendDialOptionsOS()
-	return grpc.DialContext(ctx, c.config.address, c.config.dialOptions...) //nolint:staticcheck // preserve backcompat with WithDialOptions option
+	return grpc.DialContext(ctx, c.config.address, c.config.dialOptions...)
 }
 
-func (c *Client) handleWatchError(ctx context.Context, err error, backoff Backoff) error {
+func (c *Client) handleWatchError(ctx context.Context, err error, backoff *backoff) error {
 	code := status.Code(err)
 	if code == codes.Canceled {
 		return err
@@ -270,7 +271,7 @@ func (c *Client) handleWatchError(ctx context.Context, err error, backoff Backof
 	}
 
 	c.config.log.Errorf("Failed to watch the Workload API: %v", err)
-	retryAfter := backoff.Next()
+	retryAfter := backoff.Duration()
 	c.config.log.Debugf("Retrying watch in %s", retryAfter)
 	select {
 	case <-time.After(retryAfter):
@@ -281,7 +282,7 @@ func (c *Client) handleWatchError(ctx context.Context, err error, backoff Backof
 	}
 }
 
-func (c *Client) watchX509Context(ctx context.Context, watcher X509ContextWatcher, backoff Backoff) error {
+func (c *Client) watchX509Context(ctx context.Context, watcher X509ContextWatcher, backoff *backoff) error {
 	ctx, cancel := context.WithCancel(withHeader(ctx))
 	defer cancel()
 
@@ -308,7 +309,7 @@ func (c *Client) watchX509Context(ctx context.Context, watcher X509ContextWatche
 	}
 }
 
-func (c *Client) watchJWTBundles(ctx context.Context, watcher JWTBundleWatcher, backoff Backoff) error {
+func (c *Client) watchJWTBundles(ctx context.Context, watcher JWTBundleWatcher, backoff *backoff) error {
 	ctx, cancel := context.WithCancel(withHeader(ctx))
 	defer cancel()
 
@@ -335,7 +336,7 @@ func (c *Client) watchJWTBundles(ctx context.Context, watcher JWTBundleWatcher, 
 	}
 }
 
-func (c *Client) watchX509Bundles(ctx context.Context, watcher X509BundleWatcher, backoff Backoff) error {
+func (c *Client) watchX509Bundles(ctx context.Context, watcher X509BundleWatcher, backoff *backoff) error {
 	ctx, cancel := context.WithCancel(withHeader(ctx))
 	defer cancel()
 
@@ -402,8 +403,7 @@ func withHeader(ctx context.Context) context.Context {
 
 func defaultClientConfig() clientConfig {
 	return clientConfig{
-		log:             logger.Null,
-		backoffStrategy: defaultBackoffStrategy{},
+		log: logger.Null,
 	}
 }
 
@@ -488,6 +488,9 @@ func parseX509Bundle(spiffeID string, bundle []byte) (*x509bundle.Bundle, error)
 	certs, err := x509.ParseCertificates(bundle)
 	if err != nil {
 		return nil, err
+	}
+	if len(certs) == 0 {
+		return nil, fmt.Errorf("empty X.509 bundle for trust domain %q", td)
 	}
 	return x509bundle.FromX509Authorities(td, certs), nil
 }
