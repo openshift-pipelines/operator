@@ -2,7 +2,7 @@
 
 # Update BUNDLE_NAME for each release according to the corresponding 'name' value specified in the catalog-template.json file.
 # ex: for 1.19 it will be openshift-pipelines-operator-rh.v1.19.0, for 1.17.2 it will be openshift-pipelines-operator-rh.v1.17.2
-BUNDLE_NAME=openshift-pipelines-operator-rh.v1.15.3
+BUNDLE_NAME=openshift-pipelines-operator-rh.v1.15.4
 
 # Update images from project.yaml to "generated" files
 VERSION=${1:-"v4.18"}
