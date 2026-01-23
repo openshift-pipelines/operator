@@ -1,0 +1,26 @@
+---
+apiVersion: appstudio.redhat.com/v1beta2
+kind: IntegrationTestScenario
+metadata:
+  name: operator-1-15-enterprise-contract-index-4-19
+spec:
+  application: operator-1-15-index-4-19-application
+  contexts:
+    - description: Application testing
+      name: component_operator-1-15-index-4-19
+  params:
+    - name: POLICY_CONFIGURATION
+      value: tekton-ecosystem-tenant/tekton-ecosystem-tenant-indexes
+    - name: TIMEOUT
+      value: "15m0s"
+    - name: SINGLE_COMPONENT
+      value: "true"
+  resolverRef:
+    params:
+      - name: url
+        value: "https://github.com/konflux-ci/build-definitions"
+      - name: revision
+        value: main
+      - name: pathInRepo
+        value: pipelines/enterprise-contract.yaml
+    resolver: git
