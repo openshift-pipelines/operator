@@ -1,4 +1,4 @@
-# Generated for Konflux Application openshift-pipelines-operator by openshift-pipelines/hack. DO NOT EDIT
+# Generated for Konflux Application openshift-pipelines-multicluster by openshift-pipelines/hack. DO NOT EDIT
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
@@ -15,7 +15,7 @@ metadata:
       ".tekton/operator-next-webhook-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: openshift-pipelines-operator-next
+    appstudio.openshift.io/application: openshift-pipelines-multicluster-next
     appstudio.openshift.io/component: operator-next-webhook
     pipelines.appstudio.openshift.io/type: build
   name: operator-next-webhook-on-push
@@ -25,11 +25,11 @@ spec:
   - name: git-url
     value: '{{source_url}}'
   - name: upstream-git-url
-    value: 'https://github.com/tektoncd/operator'
+    value: 'https://github.com/openshift-pipelines/operator-multicluster'
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-webhook-rhel9:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-multicluster-webhook-rhel9:{{revision}}
   - name: dockerfile
     value: .konflux/dockerfiles/webhook.Dockerfile
   - name: additional-tags

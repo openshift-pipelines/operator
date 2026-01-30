@@ -1,4 +1,4 @@
-# Generated for Konflux Application openshift-pipelines-operator by openshift-pipelines/hack. DO NOT EDIT
+# Generated for Konflux Application openshift-pipelines-multicluster by openshift-pipelines/hack. DO NOT EDIT
 name: update-sources
 on:
   workflow_dispatch: {}
@@ -15,10 +15,10 @@ jobs:
       with:
         ref: next
 
-    - name: Clone tektoncd/operator
+    - name: Clone openshift-pipelines/operator-multicluster
       run: |
         rm -fR upstream
-        git clone https://github.com/tektoncd/operator upstream
+        git clone https://github.com/openshift-pipelines/operator-multicluster upstream
         pushd upstream
         git checkout -B release-v0.78.x origin/release-v0.78.x
         popd
@@ -81,12 +81,12 @@ jobs:
         fi
 
         git commit -F- <<EOF
-        [bot] Update next from tektoncd/operator to ${NEW_COMMIT}
+        [bot] Update next from openshift-pipelines/operator-multicluster to ${NEW_COMMIT}
 
             $ git diff --stat ${NEW_COMMIT}..${OLD_COMMIT}
         $(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)
         
-        https://github.com/tektoncd/operator/compare/${NEW_COMMIT}..${OLD_COMMIT}
+        https://github.com/openshift-pipelines/operator-multicluster/compare/${NEW_COMMIT}..${OLD_COMMIT}
         EOF
         
         git push -f origin actions/update/sources-next
@@ -96,7 +96,7 @@ jobs:
           gh pr create -B next -H actions/update/sources-next --label=automated --label=upstream --fill
         else
           echo "a PR already exists, editing..."
-          gh pr edit --title "[bot] Update next from tektoncd/operator to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)"
+          gh pr edit --title "[bot] Update next from openshift-pipelines/operator-multicluster to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)"
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
