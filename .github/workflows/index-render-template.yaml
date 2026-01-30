@@ -50,18 +50,18 @@ jobs:
           BASE_BRANCH=${GITHUB_REF#refs/heads/}
           SOURCE_BRANCH=actions/update/olm-catalog-${BASE_BRANCH}
           git checkout -b ${SOURCE_BRANCH}
-          
+
           git add .konflux/olm-catalog/index/ olm/
-          
+
           if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
             echo "No change, exiting"
             exit 0
           fi
-          
+
           git commit -F- <<EOF
           [bot:${BASE_BRANCH}] Render OLM catalog
           EOF
-          
+
           git push -f origin ${SOURCE_BRANCH}
           if [ "$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json url --jq 'length')" = "0" ]; then
             echo "creating PR..."
