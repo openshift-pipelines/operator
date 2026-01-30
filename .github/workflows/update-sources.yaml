@@ -13,14 +13,14 @@ jobs:
     - name: Checkout the current repo
       uses: actions/checkout@v4
       with:
-        ref: next
+        ref: multicluster
 
-    - name: Clone tektoncd/operator
+    - name: Clone openshift-pipelines/operator-multicluster
       run: |
         rm -fR upstream
-        git clone https://github.com/tektoncd/operator upstream
+        git clone https://github.com/openshift-pipelines/operator-multicluster upstream
         pushd upstream
-        git checkout -B release-v0.78.x origin/release-v0.78.x
+        git checkout -B main origin/main
         popd
     - name: fetch-payload
       run: |
@@ -59,7 +59,7 @@ jobs:
         
         git config user.name openshift-pipelines-bot
         git config user.email pipelines-extcomm@redhat.com
-        git checkout -b actions/update/sources-next
+        git checkout -b actions/update/sources-multicluster
         touch head
         pushd upstream
         OLD_COMMIT=$(cat ../head)
@@ -81,22 +81,22 @@ jobs:
         fi
 
         git commit -F- <<EOF
-        [bot] Update next from tektoncd/operator to ${NEW_COMMIT}
+        [bot] Update multicluster from openshift-pipelines/operator-multicluster to ${NEW_COMMIT}
 
             $ git diff --stat ${NEW_COMMIT}..${OLD_COMMIT}
         $(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)
         
-        https://github.com/tektoncd/operator/compare/${NEW_COMMIT}..${OLD_COMMIT}
+        https://github.com/openshift-pipelines/operator-multicluster/compare/${NEW_COMMIT}..${OLD_COMMIT}
         EOF
         
-        git push -f origin actions/update/sources-next
+        git push -f origin actions/update/sources-multicluster
 
-        if [ "$(gh pr list --base next --head actions/update/sources-next --json url --jq 'length')" = "0" ]; then
+        if [ "$(gh pr list --base multicluster --head actions/update/sources-multicluster --json url --jq 'length')" = "0" ]; then
           echo "creating PR..."
-          gh pr create -B next -H actions/update/sources-next --label=automated --label=upstream --fill
+          gh pr create -B multicluster -H actions/update/sources-multicluster --label=automated --label=upstream --fill
         else
           echo "a PR already exists, editing..."
-          gh pr edit --title "[bot] Update next from tektoncd/operator to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)"
+          gh pr edit --title "[bot] Update multicluster from openshift-pipelines/operator-multicluster to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)"
         fi
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

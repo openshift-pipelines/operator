@@ -4,39 +4,40 @@ kind: PipelineRun
 metadata:
   annotations:
     pipelinesascode.tekton.dev/cancel-in-progress: "true" # Cancel in-progress pipelines
+    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/next/.tekton/docker-build-ta.yaml"
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator.git?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "next" &&
+      == "multicluster" &&
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
       ".konflux/dockerfiles/webhook.Dockerfile".pathChanged() ||
-      ".tekton/operator-next-webhook-pull-request.yaml".pathChanged())
+      ".tekton/operator-multicluster-webhook-pull-request.yaml".pathChanged())
   labels:
-    appstudio.openshift.io/application: openshift-pipelines-operator-next
-    appstudio.openshift.io/component: operator-next-webhook
+    appstudio.openshift.io/application: openshift-pipelines-operator-multicluster
+    appstudio.openshift.io/component: operator-multicluster-webhook
     pipelines.appstudio.openshift.io/type: build
-  name: operator-next-webhook-on-pull-request
+  name: operator-multicluster-webhook-on-pull-request
   namespace: tekton-ecosystem-tenant
 spec:
   params:
   - name: git-url
     value: '{{source_url}}'
   - name: upstream-git-url
-    value: 'https://github.com/tektoncd/operator'
+    value: 'https://github.com/openshift-pipelines/operator-multicluster'
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-webhook-rhel9:on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-multicluster-webhook-rhel9:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: dockerfile
     value: .konflux/dockerfiles/webhook.Dockerfile
   - name: additional-tags
     value:
-      - "on-pr-next"
+      - "on-pr-multicluster"
   - name: build-platforms
     value:
     - linux/x86_64
@@ -46,7 +47,7 @@ spec:
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-next-webhook
+    serviceAccountName: build-pipeline-operator-multicluster-webhook
   workspaces:
   - name: git-auth
     secret:
