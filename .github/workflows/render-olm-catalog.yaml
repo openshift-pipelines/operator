@@ -13,15 +13,33 @@ on:
         type: choice
         options:
           - devel
-  schedule:
-    - cron: "0 3 * * *" # At 3AM everyday
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: render-${{ github.ref }}-${{ github.run_id }}
+  cancel-in-progress: false
 
 jobs:
-  render-catalog:
+  build-matrix:
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+      - id: set-matrix
+        run: |
+          pushd .konflux/olm-catalog/index
+          VERSIONS=$(ls -d v* | jq -R -s -c 'split("\n")[:-1]')
+          popd
+          echo "Versions: ${VERSIONS}"
+          echo "versions=${VERSIONS}" >> $GITHUB_OUTPUT
+    outputs:
+      versions: ${{ steps.set-matrix.outputs.versions }}
+  generate-catalog:
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.build-matrix.outputs.versions) }}
     permissions:
       contents: write
       pull-requests: write
@@ -34,31 +52,56 @@ jobs:
           DOCKER_JSON: ${{ secrets.DOCKER_REGISTRY_SECRET }}
         run: |
           echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json
-      - name: Render OLM catalog
+      - name: Generate ${{matrix.version}} Bundles
         run: |
           curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
           chmod +x /usr/local/bin/opm
           ./hack/update-olm-bundle.sh ${{github.event.inputs.environment}}
-          ./hack/render-catalog.sh
+          ./hack/render-catalog.sh ${{matrix.version}} ${{github.event.inputs.environment}}
+
+      - name: Update ${{matrix.version}} catalog
+        run: |
+          curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
+          chmod +x /usr/local/bin/opm
+          ./hack/render-catalog.sh ${{matrix.version}} ${{github.event.inputs.environment}}
+      - name: Save generated changes
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.version }}
+          path: .konflux/olm-catalog/index/${{ matrix.version }}
+
+  final-commit:
+    needs: generate-catalog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded-artifacts
+      - name: Apply downloaded changes
+        run: |
+          set -x
+          cp -rvf  downloaded-artifacts/* .konflux/olm-catalog/index/
       - name: Commit Changes and Generate PR
         run: |
           git config user.name openshift-pipelines-bot
           git config user.email pipelines-extcomm@redhat.com
           BASE_BRANCH=${GITHUB_REF#refs/heads/}
-          SOURCE_BRANCH=actions/update/olm-catalog-${BASE_BRANCH}
+          SOURCE_BRANCH=actions/update/operator-update-catalog-${BASE_BRANCH}
           git checkout -b ${SOURCE_BRANCH}
-
-          git add .konflux/olm-catalog/index/ olm/
-
+          
+          git add .konflux/olm-catalog/index/
+          
           if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
             echo "No change, exiting"
             exit 0
           fi
-
+          
           git commit -F- <<EOF
-          [bot:${BASE_BRANCH}] Render OLM catalog
+          [bot:${BASE_BRANCH}] Update  catalog
           EOF
-
+          
           git push -f origin ${SOURCE_BRANCH}
           if [ "$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json url --jq 'length')" = "0" ]; then
             echo "creating PR..."
