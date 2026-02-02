@@ -10,12 +10,12 @@ LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
 LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
 LABEL operators.operatorframework.io.bundle.package.v1=serverless-operator
 LABEL operators.operatorframework.io.bundle.channel.default.v1="latest"
-LABEL operators.operatorframework.io.bundle.channels.v1="latest,pipelines-5.0"
+LABEL operators.operatorframework.io.bundle.channels.v1="latest,pipelines-1.22"
 
 LABEL \
       com.redhat.component="openshift-pipelines-operator-bundle-container" \
       name="openshift-pipelines/pipelines-operator-bundle-container" \
-      version="5.0.5-770" \
+      version="1.22.0" \
       summary="Red Hat OpenShift Pipelines Operator Bundle" \
       maintainer="pipelines-extcomm@redhat.com" \
       description="Red Hat OpenShift Pipelines Operator Bundle" \
