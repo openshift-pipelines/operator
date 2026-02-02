@@ -61,8 +61,6 @@ jobs:
 
       - name: Update ${{matrix.version}} catalog
         run: |
-          curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
-          chmod +x /usr/local/bin/opm
           ./hack/render-catalog.sh ${{matrix.version}} ${{github.event.inputs.environment}}
       - name: Save generated changes
         uses: actions/upload-artifact@v4
@@ -82,7 +80,7 @@ jobs:
       - name: Apply downloaded changes
         run: |
           set -x
-          cp -rvf  downloaded-artifacts/* .konflux/olm-catalog/index/
+          cp -rvf  downloaded-artifacts/v* .konflux/olm-catalog/index/
       - name: Commit Changes and Generate PR
         run: |
           git config user.name openshift-pipelines-bot
@@ -91,7 +89,7 @@ jobs:
           SOURCE_BRANCH=actions/update/operator-update-catalog-${BASE_BRANCH}
           git checkout -b ${SOURCE_BRANCH}
           
-          git add .konflux/olm-catalog/index/
+          git add .konflux/olm-catalog/index/ olm/
           
           if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
             echo "No change, exiting"
