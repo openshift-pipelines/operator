@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"cloud.google.com/go/auth"
-	"cloud.google.com/go/auth/credentials"
 	"cloud.google.com/go/auth/credentials/impersonate"
 	intimpersonate "cloud.google.com/go/auth/credentials/internal/impersonate"
 	"cloud.google.com/go/auth/internal"
@@ -40,8 +39,8 @@ func credsFromDefault(creds *auth.Credentials, opts *Options) (*auth.Credentials
 	if err != nil {
 		return nil, err
 	}
-	switch credentials.CredType(t) {
-	case credentials.ServiceAccount:
+	switch t {
+	case credsfile.ServiceAccountKey:
 		f, err := credsfile.ParseServiceAccount(b)
 		if err != nil {
 			return nil, err
@@ -72,7 +71,7 @@ func credsFromDefault(creds *auth.Credentials, opts *Options) (*auth.Credentials
 			ProjectIDProvider:      auth.CredentialsPropertyFunc(creds.ProjectID),
 			UniverseDomainProvider: auth.CredentialsPropertyFunc(creds.UniverseDomain),
 		}), nil
-	case credentials.ImpersonatedServiceAccount, credentials.ExternalAccount:
+	case credsfile.ImpersonatedServiceAccountKey, credsfile.ExternalAccountKey:
 		type url struct {
 			ServiceAccountImpersonationURL string `json:"service_account_impersonation_url"`
 		}

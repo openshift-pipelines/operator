@@ -39,7 +39,7 @@ func Resolve(ctx *OpContext, c Conjunct) *Vertex {
 		v = x
 
 	case Resolver:
-		r, err := ctx.resolveState(c, x, Flags{
+		r, err := ctx.resolveState(c, x, combinedFlags{
 			status:    finalized,
 			condition: allKnown,
 			mode:      attemptOnly,
@@ -112,14 +112,14 @@ type Evaluator interface {
 
 	// evaluate evaluates the underlying expression. If the expression
 	// is incomplete, it may record the error in ctx and return nil.
-	evaluate(ctx *OpContext, state Flags) Value
+	evaluate(ctx *OpContext, state combinedFlags) Value
 }
 
 // A Resolver represents a reference somewhere else within a tree that resolves
 // a value.
 type Resolver interface {
 	Node
-	resolve(ctx *OpContext, state Flags) *Vertex
+	resolve(ctx *OpContext, state combinedFlags) *Vertex
 }
 
 type YieldFunc func(env *Environment)
@@ -232,7 +232,6 @@ func (*SliceExpr) expr()     {}
 func (*Interpolation) expr() {}
 func (*UnaryExpr) expr()     {}
 func (*BinaryExpr) expr()    {}
-func (*OpenExpr) expr()      {}
 func (*CallExpr) expr()      {}
 
 // Decl and Expr (so allow attaching original source in Conjunct)
@@ -330,8 +329,6 @@ func (*UnaryExpr) declNode()        {}
 func (*UnaryExpr) elemNode()        {}
 func (*BinaryExpr) declNode()       {}
 func (*BinaryExpr) elemNode()       {}
-func (*OpenExpr) declNode()         {}
-func (*OpenExpr) elemNode()         {}
 func (*CallExpr) declNode()         {}
 func (*CallExpr) elemNode()         {}
 func (*Builtin) declNode()          {}
@@ -348,7 +345,6 @@ func (*Comprehension) elemNode() {}
 
 func (*Vertex) node()            {}
 func (*Conjunction) node()       {}
-func (*OpenExpr) node()          {}
 func (*ConjunctGroup) node()     {}
 func (*Disjunction) node()       {}
 func (*BoundValue) node()        {}

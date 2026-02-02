@@ -43,8 +43,11 @@ var matchNBuiltin = &adt.Builtin{
 		}
 
 		var errs []*adt.Bottom
+
+		constraints := c.Elems(args[2])
+
 		var count, possibleCount int64
-		for check := range c.Elems(args[2]) {
+		for _, check := range constraints {
 			v := adt.Unify(c, self, check)
 			if err := adt.Validate(c, v, finalCfg); err == nil {
 				// TODO: is it always true that the lack of an error signifies
@@ -119,8 +122,7 @@ var matchIfBuiltin = &adt.Builtin{
 	},
 }
 
-// Explicitly disallow incomplete errors.
-var finalCfg = &adt.ValidateConfig{ReportIncomplete: true, Final: true}
+var finalCfg = &adt.ValidateConfig{Final: true}
 
 // finalizeSelf ensures a value is fully evaluated and then strips it of any
 // of its validators or default values.

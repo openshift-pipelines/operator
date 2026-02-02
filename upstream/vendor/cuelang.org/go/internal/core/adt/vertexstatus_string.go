@@ -12,17 +12,17 @@ func _() {
 	_ = x[evaluating-1]
 	_ = x[partial-2]
 	_ = x[conjuncts-3]
-	_ = x[finalized-4]
+	_ = x[evaluatingArcs-4]
+	_ = x[finalized-5]
 }
 
-const _vertexStatus_name = "unprocessedevaluatingpartialconjunctsfinalized"
+const _vertexStatus_name = "unprocessedevaluatingpartialconjunctsevaluatingArcsfinalized"
 
-var _vertexStatus_index = [...]uint8{0, 11, 21, 28, 37, 46}
+var _vertexStatus_index = [...]uint8{0, 11, 21, 28, 37, 51, 60}
 
 func (i vertexStatus) String() string {
-	idx := int(i) - 0
-	if i < 0 || idx >= len(_vertexStatus_index)-1 {
+	if i < 0 || i >= vertexStatus(len(_vertexStatus_index)-1) {
 		return "vertexStatus(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _vertexStatus_name[_vertexStatus_index[idx]:_vertexStatus_index[idx+1]]
+	return _vertexStatus_name[_vertexStatus_index[i]:_vertexStatus_index[i+1]]
 }

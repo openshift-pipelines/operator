@@ -17,7 +17,6 @@ package export
 import (
 	"cmp"
 	"fmt"
-	"maps"
 	"slices"
 
 	"cuelang.org/go/cue/ast"
@@ -81,12 +80,13 @@ func (e *exporter) expr(env *adt.Environment, v adt.Elem) (result ast.Expr) {
 		} // Should this be the arcs label?
 
 		a := []conjunct{}
-		for c := range x.LeafConjuncts() {
+		x.VisitLeafConjuncts(func(c adt.Conjunct) bool {
 			if c, ok := c.Elem().(*adt.Comprehension); ok && !c.DidResolve() {
-				continue
+				return true
 			}
 			a = append(a, conjunct{c, 0})
-		}
+			return true
+		})
 
 		return e.mergeValues(adt.InvalidLabel, x, a, x.Conjuncts...)
 
@@ -177,7 +177,10 @@ func (x *exporter) mergeValues(label adt.Feature, src *adt.Vertex, a []conjunct,
 
 	// Collect and order set of fields.
 
-	fields := slices.Collect(maps.Keys(e.fields))
+	fields := []adt.Feature{}
+	for f := range e.fields {
+		fields = append(fields, f)
+	}
 
 	// Sort fields in case features lists are missing to ensure
 	// predictability. Also sort in reverse order, so that bugs
@@ -294,8 +297,15 @@ func (x *exporter) mergeValues(label adt.Feature, src *adt.Vertex, a []conjunct,
 }
 
 func (e *conjuncts) wrapCloseIfNecessary(s *ast.StructLit, v *adt.Vertex) ast.Expr {
-	if !e.hasEllipsis && v != nil && v.ClosedNonRecursive {
-		return ast.NewCall(ast.NewIdent("close"), s)
+	if !e.hasEllipsis && v != nil {
+		if v.ClosedNonRecursive {
+			// Eval V3 logic
+			return ast.NewCall(ast.NewIdent("close"), s)
+		}
+		if st, ok := v.BaseValue.(*adt.StructMarker); ok && st.NeedClose {
+			// Eval V2 logic
+			return ast.NewCall(ast.NewIdent("close"), s)
+		}
 	}
 	return s
 }
@@ -423,9 +433,10 @@ func (e *conjuncts) addExpr(env *adt.Environment, src *adt.Vertex, x adt.Elem, i
 
 			switch {
 			default:
-				for c := range v.LeafConjuncts() {
+				v.VisitLeafConjuncts(func(c adt.Conjunct) bool {
 					e.addExpr(c.Env, v, c.Elem(), false)
-				}
+					return true
+				})
 
 			case v.IsData():
 				e.structs = append(e.structs, v.Structs...)
