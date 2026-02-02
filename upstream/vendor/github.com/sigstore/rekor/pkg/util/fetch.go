@@ -21,18 +21,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 )
 
-// FileOrURLReadCloser reads content either from a URL or a byte slice
-// Note: Caller is responsible for closing the returned ReadCloser
-// Note: This must never be called from any server codepath to prevent SSRF
+// FileOrURLReadCloser Note: caller is responsible for closing ReadCloser returned from method!
 func FileOrURLReadCloser(ctx context.Context, url string, content []byte) (io.ReadCloser, error) {
 	var dataReader io.ReadCloser
 	if url != "" {
-		client := &http.Client{
-			Timeout: 30 * time.Second,
-		}
+		//TODO: set timeout here, SSL settings?
+		client := &http.Client{}
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			return nil, err

@@ -24,11 +24,7 @@ import (
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
-// TrustedMetadata struct for storing trusted metadata.
-//
-// Thread Safety: TrustedMetadata is NOT safe for concurrent use. If multiple
-// goroutines need to access a TrustedMetadata instance concurrently, external
-// synchronization is required (e.g., a sync.Mutex).
+// TrustedMetadata struct for storing trusted metadata
 type TrustedMetadata struct {
 	Root      *metadata.Metadata[metadata.RootType]
 	Snapshot  *metadata.Metadata[metadata.SnapshotType]

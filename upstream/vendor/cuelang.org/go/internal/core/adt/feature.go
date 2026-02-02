@@ -23,6 +23,7 @@ import (
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/cue/token"
+	"cuelang.org/go/internal"
 )
 
 // A Feature is an encoded form of a label which comprises a compact
@@ -75,14 +76,14 @@ func (f Feature) SelectorString(index StringIndexer) string {
 		}
 		return strconv.Itoa(int(x))
 	case StringLabel:
+		s := index.IndexToString(x)
+		if ast.IsValidIdent(s) && !internal.IsDefOrHidden(s) {
+			return s
+		}
 		if f == AnyString {
 			return "_"
 		}
-		s := index.IndexToString(x)
-		if ast.StringLabelNeedsQuoting(s) {
-			return literal.Label.Quote(s)
-		}
-		return s
+		return literal.Label.Quote(s)
 	default:
 		return f.IdentString(index)
 	}
@@ -388,3 +389,6 @@ func (f Feature) safeIndex() int64 {
 	}
 	return int64(x)
 }
+
+// TODO: should let declarations be implemented as fields?
+// func (f Feature) isLet() bool  { return f.typ() == letLabel }

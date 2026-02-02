@@ -17,7 +17,6 @@ package export
 import (
 	"fmt"
 	"math/rand/v2"
-	"slices"
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/ast/astutil"
@@ -72,10 +71,6 @@ type Profile struct {
 
 	// InlineImports expands references to non-builtin packages.
 	InlineImports bool
-
-	// ExpandReferences causes all references to be expanded inline. This
-	// disables the ability to prevent billion laughs attacks, so use with care.
-	ExpandReferences bool
 }
 
 var Simplified = &Profile{
@@ -197,10 +192,10 @@ func (e *exporter) toFile(v *adt.Vertex, x ast.Expr) *ast.File {
 			// prevent the file comment from attaching to pkg when there is no pkg comment
 			PackagePos: token.NoPos.WithRel(token.NewSection),
 		}
-		for c := range v.LeafConjuncts() {
+		v.VisitLeafConjuncts(func(c adt.Conjunct) bool {
 			f, _ := c.Source().(*ast.File)
 			if f == nil {
-				continue
+				return true
 			}
 
 			if name := f.PackageName(); name != "" {
@@ -219,17 +214,18 @@ func (e *exporter) toFile(v *adt.Vertex, x ast.Expr) *ast.File {
 					ast.AddComment(fout, c)
 				}
 			}
-		}
+			return true
+		})
 
 		if pkgName != "" {
 			pkg.Name = ast.NewIdent(pkgName)
 			fout.Decls = append(fout.Decls, pkg)
-			ast.SetComments(pkg, mergeDocs(pkg.Comments()))
+			ast.SetComments(pkg, internal.MergeDocs(pkg.Comments()))
 		} else {
 			for _, c := range fout.Comments() {
 				ast.AddComment(pkg, c)
 			}
-			ast.SetComments(fout, mergeDocs(pkg.Comments()))
+			ast.SetComments(fout, internal.MergeDocs(pkg.Comments()))
 		}
 	}
 
@@ -245,39 +241,6 @@ func (e *exporter) toFile(v *adt.Vertex, x ast.Expr) *ast.File {
 	}
 
 	return fout
-}
-
-// mergeDocs merges multiple doc comments into one single doc comment.
-func mergeDocs(comments []*ast.CommentGroup) []*ast.CommentGroup {
-	if len(comments) <= 1 || !hasDocComment(comments) {
-		return comments
-	}
-
-	comments1 := make([]*ast.CommentGroup, 0, len(comments))
-	comments1 = append(comments1, nil)
-	var docComment *ast.CommentGroup
-	for _, c := range comments {
-		switch {
-		case !c.Doc:
-			comments1 = append(comments1, c)
-		case docComment == nil:
-			docComment = c
-		default:
-			docComment.List = append(slices.Clip(docComment.List), &ast.Comment{Text: "//"})
-			docComment.List = append(docComment.List, c.List...)
-		}
-	}
-	comments1[0] = docComment
-	return comments1
-}
-
-func hasDocComment(comments []*ast.CommentGroup) bool {
-	for _, c := range comments {
-		if c.Doc {
-			return true
-		}
-	}
-	return false
 }
 
 // Vertex exports evaluated values (data mode).
@@ -420,7 +383,7 @@ func (e *exporter) initPivot(n *adt.Vertex) {
 	switch {
 	case e.cfg.SelfContained, e.cfg.InlineImports:
 		// Explicitly enabled.
-	case n.Parent == nil, e.cfg.Fragment, e.cfg.ExpandReferences:
+	case n.Parent == nil, e.cfg.Fragment:
 		return
 	}
 	e.initPivotter(n)
@@ -449,9 +412,10 @@ func (e *exporter) markUsedFeatures(x adt.Expr) {
 		switch x := n.(type) {
 		case *adt.Vertex:
 			if !x.IsData() {
-				for c := range x.LeafConjuncts() {
+				x.VisitLeafConjuncts(func(c adt.Conjunct) bool {
 					w.Elem(c.Elem())
-				}
+					return true
+				})
 			}
 
 		case *adt.DynamicReference:

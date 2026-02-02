@@ -30,8 +30,6 @@ type (
 
 var _ TerraformStatesServiceInterface = (*TerraformStatesService)(nil)
 
-// TerraformState represents a Terraform state.
-//
 // GitLab API docs: https://docs.gitlab.com/api/graphql/reference/#terraformstate
 type TerraformState struct {
 	Name          string                `json:"name"`
@@ -42,8 +40,6 @@ type TerraformState struct {
 	LockedAt      time.Time             `json:"lockedAt"`
 }
 
-// TerraformStateVersion represents a Terraform state version.
-//
 // GitLab API docs: https://docs.gitlab.com/api/graphql/reference/#terraformstateversion
 type TerraformStateVersion struct {
 	Serial       uint64    `json:"serial"`

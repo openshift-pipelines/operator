@@ -397,7 +397,7 @@ func (ap *oauth2ClientCredentialsAuthPlugin) createAuthJWT(ctx context.Context, 
 		}
 
 		// Parse headers
-		var headers map[string]any
+		var headers map[string]interface{}
 		if err := json.Unmarshal(header, &headers); err != nil {
 			return nil, err
 		}

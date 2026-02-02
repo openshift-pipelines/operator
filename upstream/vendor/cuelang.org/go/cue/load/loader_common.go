@@ -311,7 +311,7 @@ func (fp *fileProcessor) add(root string, file *build.File, mode importMode) {
 	isTest := strings.HasSuffix(base, "_test"+cueSuffix)
 	isTool := strings.HasSuffix(base, "_tool"+cueSuffix)
 
-	for spec := range pf.ImportSpecs() {
+	for _, spec := range pf.Imports {
 		quoted := spec.Path.Value
 		path, err := strconv.Unquote(quoted)
 		if err != nil {

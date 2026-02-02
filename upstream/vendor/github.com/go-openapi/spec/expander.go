@@ -545,9 +545,6 @@ func expandParameterOrResponse(input any, resolver *schemaLoader, basePath strin
 		}
 
 		ref, sch, _ = getRefAndSchema(input)
-		if ref == nil {
-			ref = &Ref{} // empty ref
-		}
 	}
 
 	if ref.String() != "" {

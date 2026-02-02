@@ -38,7 +38,7 @@ type Signature struct {
 }
 
 /*
-PAE implements the DSSE Pre-Authentic Encoding
+PAE implementes the DSSE Pre-Authentic Encoding
 https://github.com/secure-systems-lab/dsse/blob/master/protocol.md#signature-definition
 */
 func PAE(payloadType string, payload []byte) []byte {

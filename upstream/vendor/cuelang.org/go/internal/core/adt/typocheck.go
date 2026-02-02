@@ -166,6 +166,7 @@ package adt
 // type.
 //
 import (
+	"math"
 	"slices"
 
 	"cuelang.org/go/cue/ast"
@@ -173,33 +174,41 @@ import (
 
 type defID uint32
 
-//go:generate go tool stringer -type=defIDType -linecomment
-
 type defIDType int8
 
 const (
 	// defIDTypeUnknown indicates that the ID is not a definition.
-	defIDTypeUnknown defIDType = iota // *
+	defIDTypeUnknown defIDType = iota
 
-	defEmbedding // E
-	defReference // D
-	defStruct    // S
+	defEmbedding
+	defReference
+	defStruct
 )
 
-type containment struct {
-	id defID
-	n  Node
+func (d defIDType) String() string {
+	switch d {
+	case defEmbedding:
+		return "E"
+	case defReference:
+		return "D"
+	case defStruct:
+		return "S"
+	default:
+		return "*"
+	}
 }
 
-func (c *OpContext) getNextDefID(n Node) defID {
+const deleteID defID = math.MaxUint32
+
+func (c *OpContext) getNextDefID() defID {
 	c.stats.NumCloseIDs++
 	c.nextDefID++
 
 	if len(c.containments) == 0 {
 		// Our ID starts at 1. Create an extra element for the zero value.
-		c.containments = make([]containment, 1, 16)
+		c.containments = make([]defID, 1, 16)
 	}
-	c.containments = append(c.containments, containment{id: 0, n: n})
+	c.containments = append(c.containments, 0)
 
 	return c.nextDefID
 }
@@ -266,8 +275,8 @@ func (n *nodeContext) addReplacement(x replaceID) {
 		return
 	}
 
-	if x.from < x.to && n.ctx.containments[x.to].id == 0 {
-		n.ctx.containments[x.to].id = x.from
+	if x.from < x.to && n.ctx.containments[x.to] == 0 {
+		n.ctx.containments[x.to] = x.from
 		return
 	}
 
@@ -311,7 +320,7 @@ func (n *nodeContext) updateConjunctInfo(k Kind, id CloseInfo, flags conjunctFla
 // multiple times to a single node. As we only want to insert each conjunct
 // once, we need to ensure that within all contexts a single ID assigned to such
 // a resolver is tracked.
-func (n *nodeContext) addResolver(p Node, v *Vertex, id CloseInfo, forceIgnore bool) CloseInfo {
+func (n *nodeContext) addResolver(v *Vertex, id CloseInfo, forceIgnore bool) CloseInfo {
 	if n.ctx.OpenDef {
 		return id
 	}
@@ -320,8 +329,7 @@ func (n *nodeContext) addResolver(p Node, v *Vertex, id CloseInfo, forceIgnore b
 		return id
 	}
 
-	// This can only be true when not using the @experiment(explicitopen).
-	closeOuter := id.FromDef && id.FromEmbed && !id.Opened
+	closeOuter := (id.FromDef && id.FromEmbed) || v.ClosedNonRecursive
 
 	if closeOuter && !forceIgnore {
 		// Walk up the parent chain of the outer structs to "activate" them.
@@ -340,7 +348,7 @@ func (n *nodeContext) addResolver(p Node, v *Vertex, id CloseInfo, forceIgnore b
 
 	var ignore bool
 	switch {
-	case forceIgnore, id.Opened:
+	case forceIgnore:
 		// Special mode to always ignore the outer enclosing group.
 		// This is the case, for instance, if a resolver resolves to a
 		// non-definition.
@@ -358,7 +366,7 @@ func (n *nodeContext) addResolver(p Node, v *Vertex, id CloseInfo, forceIgnore b
 		// 			// the embedding.
 		// 			#A & #B
 		// 		}
-		isClosed := id.FromDef || v.ClosedNonRecursive || v.ClosedRecursive
+		isClosed := id.FromDef || v.ClosedNonRecursive
 		ignore = !isClosed
 	default:
 		// In the default case we can disable typo checking this type if it is
@@ -367,21 +375,15 @@ func (n *nodeContext) addResolver(p Node, v *Vertex, id CloseInfo, forceIgnore b
 	}
 
 	dstID := defID(0)
-	for i, x := range n.reqDefIDs {
+	for _, x := range n.reqDefIDs {
 		if x.v == v {
 			dstID = x.id
-			if x.ignore && !ignore {
-				// Override settings of a vertex added by #A...
-				n.reqDefIDs[i].ignore = false
-				n.reqDefIDs[i].parent = id.outerID
-				n.reqDefIDs[i].embed = id.enclosingEmbed
-			}
 			break
 		}
 	}
 
 	if dstID == 0 || id.enclosingEmbed != 0 {
-		next := n.ctx.getNextDefID(p)
+		next := n.ctx.getNextDefID()
 		if dstID != 0 {
 			// If we need to activate an enclosing embed group, and the added
 			// resolver was already before, we need to allocate a new ID and
@@ -416,10 +418,6 @@ func (c *OpContext) subField(ci CloseInfo) CloseInfo {
 	// as, at this point, it seems to be only used for debugging. We may
 	// want to consider having a separate field for this, though.
 	ci.FromEmbed = false
-
-	// The priority should be cleared for sub fields: we take default struct
-	// in its entirety, but not piecemeal.
-	ci.Priority = 0
 	return ci
 }
 
@@ -433,12 +431,12 @@ func (id CloseInfo) clearCloseCheck() CloseInfo {
 	return id
 }
 
-func (n *nodeContext) newReq(p Node, id CloseInfo, kind defIDType) CloseInfo {
+func (n *nodeContext) newReq(id CloseInfo, kind defIDType) CloseInfo {
 	if id.defID != 0 && id.opID != n.ctx.opID {
 		return id.clearCloseCheck()
 	}
 
-	dstID := n.ctx.getNextDefID(p)
+	dstID := n.ctx.getNextDefID()
 	n.addReplacement(replaceID{from: id.defID, to: dstID})
 
 	parent := id.defID
@@ -498,10 +496,6 @@ func (v *Vertex) AddOpenConjunct(ctx *OpContext, w *Vertex) {
 // We can then say that requirement 3 (node A) holds if all fields contain
 // either label 3, or any field within 1 that is not 2.
 func (n *nodeContext) injectEmbedNode(x Decl, id CloseInfo) CloseInfo {
-	if pos(x).Experiment().ExplicitOpen {
-		return id
-	}
-
 	id.FromEmbed = true
 
 	// Filter cases where we do not need to track the definition.
@@ -512,7 +506,7 @@ func (n *nodeContext) injectEmbedNode(x Decl, id CloseInfo) CloseInfo {
 		}
 	}
 
-	return n.newReq(x, id, defEmbedding)
+	return n.newReq(id, defEmbedding)
 }
 
 // splitStruct is used to mark the outer struct of a field in which embeddings
@@ -526,7 +520,7 @@ func (n *nodeContext) injectEmbedNode(x Decl, id CloseInfo) CloseInfo {
 // definition is embedded within a struct. It can be removed if we implement
 // the #A vs #A... semantics.
 func (n *nodeContext) splitStruct(s *StructLit, id CloseInfo) CloseInfo {
-	if pos(s).Experiment().ExplicitOpen || n.ctx.OpenDef {
+	if n.ctx.OpenDef {
 		return id
 	}
 
@@ -552,11 +546,11 @@ func (n *nodeContext) splitStruct(s *StructLit, id CloseInfo) CloseInfo {
 		return id
 	}
 
-	return n.splitScope(s, id)
+	return n.splitScope(id)
 }
 
-func (n *nodeContext) splitScope(p Node, id CloseInfo) CloseInfo {
-	return n.newReq(p, id, defStruct)
+func (n *nodeContext) splitScope(id CloseInfo) CloseInfo {
+	return n.newReq(id, defStruct)
 }
 
 func (n *nodeContext) checkTypos() {
@@ -629,9 +623,7 @@ func (n *nodeContext) checkTypos() {
 
 		// TODO: do not descend on optional?
 
-		if OpenGraphs {
-			openDebugGraph(ctx, a, "NOT ALLOWED") // Uncomment for debugging.
-		}
+		// openDebugGraph(ctx, a, "NOT ALLOWED") // Uncomment for debugging.
 
 		if b := ctx.notAllowedError(a); b != nil && a.ArcType <= ArcRequired {
 			err = CombineErrors(nil, err, b)
@@ -676,11 +668,16 @@ func (n *nodeContext) hasEvidenceForOne(all reqSets, i uint32, conjuncts []conju
 	}
 
 	embedScope, ok := all.lookupSet(a.embed)
+
 	if !ok {
 		return false
 	}
 
 	outerScope, ok := all.lookupSet(a.parent)
+
+	if ok && outerScope.removed {
+		return true
+	}
 
 outer:
 	for _, c := range conjuncts {
@@ -690,9 +687,6 @@ outer:
 		}
 
 		if !ok || a.parent == 0 {
-			return true
-		}
-		if outerScope.removed {
 			return true
 		}
 
@@ -707,15 +701,10 @@ outer:
 }
 
 func (n *nodeContext) containsDefID(node, child defID) bool {
+	// TODO(perf): cache result
 	// TODO(perf): we could keep track of the minimum defID that could map so
 	// that we can use this to bail out early.
 	c := n.ctx
-
-	key := [2]defID{node, child}
-	if result, ok := n.containsDefIDCache[key]; ok {
-		return result
-	}
-
 	c.redirectsBuf = c.redirectsBuf[:0]
 	for p := n; p != nil; p = p.node.Parent.state {
 		if p.opID != n.opID {
@@ -731,19 +720,7 @@ func (n *nodeContext) containsDefID(node, child defID) bool {
 		c.stats.MaxRedirect = int64(len(c.redirectsBuf))
 	}
 
-	result := n.containsDefIDRec(node, child, child)
-
-	// Caching in [nodeContext.containsDefIDCache] adds overhead;
-	// only do it if we estimate that [nodeContext.containsDefIDRec]
-	// is doing significant work by looking at the number of replaceIDs.
-	if len(c.redirectsBuf) > 15 {
-		if n.containsDefIDCache == nil {
-			n.containsDefIDCache = make(map[[2]defID]bool)
-		}
-		n.containsDefIDCache[key] = result
-	}
-
-	return result
+	return n.containsDefIDRec(node, child, child)
 }
 
 func (n *nodeContext) containsDefIDRec(node, child, start defID) bool {
@@ -767,7 +744,7 @@ func (n *nodeContext) containsDefIDRec(node, child, start defID) bool {
 			}
 		}
 
-		p = c.containments[p].id
+		p = c.containments[p]
 		if p == start {
 			// We won't match node we haven't already after one cycle.
 			return false
@@ -828,7 +805,7 @@ func mergeCloseInfo(nv, nw *nodeContext) {
 	if w == nil {
 		return
 	}
-	// Merge missing conjunct infos
+	// Merge missing closeInfos
 outer:
 	for _, wci := range nw.conjunctInfo {
 		for _, vci := range nv.conjunctInfo {
@@ -875,7 +852,7 @@ func getReqSets(n *nodeContext) reqSets {
 		return n.reqSets
 	}
 
-	a := n.reqSets[:0]
+	a := n.reqSets
 	v := n.node
 
 	if p := v.Parent; p != nil && !n.dropParentRequirements {

@@ -675,7 +675,7 @@ const gqlCacheName = "graphql"
 
 func init() {
 
-	var defaultCacheEntries = 10
+	var defaultCacheEntries int = 10
 	var graphqlCacheConfig = cache.NamedValueCacheConfig{
 		MaxNumEntries: &defaultCacheEntries,
 	}

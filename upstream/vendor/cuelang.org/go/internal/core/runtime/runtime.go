@@ -81,13 +81,15 @@ func NewWithSettings(v internal.EvaluatorVersion, flags cuedebug.Config) *Runtim
 // before first use.
 func (r *Runtime) SetVersion(v internal.EvaluatorVersion) {
 	switch v {
-	case internal.EvalV3:
+	case internal.EvalV2, internal.EvalV3:
 		r.version = v
 	case internal.EvalVersionUnset, internal.DefaultVersion:
-		// TODO(evalv4): read from cueexperiment.
-		// cueexperiment.Init()
-		// if cueexperiment.Flags.EvalV3 {
-		r.version = internal.EvalV3
+		cueexperiment.Init()
+		if cueexperiment.Flags.EvalV3 {
+			r.version = internal.EvalV3
+		} else {
+			r.version = internal.EvalV2
+		}
 	}
 }
 

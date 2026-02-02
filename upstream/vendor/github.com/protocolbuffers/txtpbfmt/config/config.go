@@ -24,15 +24,6 @@ type Config struct {
 	// Sort fields by field name.
 	SortFieldsByFieldName bool
 
-	// Sort fields by field number from proto definition.
-	SortFieldsByFieldNumber bool
-
-	// Path to protobuf descriptor file (.desc).
-	ProtoDescriptor string
-
-	// Full message type name for field number lookup (required, e.g. google.protobuf.Any).
-	MessageFullName string
-
 	// Sort adjacent scalar fields of the same field name by their contents.
 	SortRepeatedFieldsByContent bool
 
@@ -43,11 +34,6 @@ type Config struct {
 
 	// Sort the Sort* fields by descending order instead of ascending order.
 	ReverseSort bool
-
-	// Sort content fields in a way that's suitable for DNS names. It splits the
-	// value around '.' characters, reverses the substrings, and concatenates to
-	// generate the sort key.
-	DNSSortOrder bool
 
 	// Map from Node.Name to the order of all fields within that node. See AddFieldSortOrder().
 	FieldSortOrder map[string][]string

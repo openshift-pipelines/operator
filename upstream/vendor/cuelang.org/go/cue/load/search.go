@@ -144,9 +144,6 @@ func (l *loader) matchPackagesInFS(pattern, pkgName string) *match {
 	// Could be smarter but this one optimization
 	// is enough for now, since ... is usually at the
 	// end of a path.
-	//
-	// TODO this logic entirely ignores the pattern that's
-	// after the "...". See cuelang.org/issue/3212
 	i := strings.Index(pattern, "...")
 	dir, _ := path.Split(pattern[:i])
 
@@ -246,13 +243,15 @@ func (l *loader) importPathsQuiet(patterns []string) []*match {
 
 		orig := a
 		pkgName := l.cfg.Package
-		ip := ast.ParseImportPath(a)
-		if ip.ExplicitQualifier {
-			pkgName = ip.Qualifier
+		switch p := strings.IndexByte(a, ':'); {
+		case p < 0:
+		case p == 0:
+			pkgName = a[1:]
+			a = "."
+		default:
+			pkgName = a[p+1:]
+			a = a[:p]
 		}
-		ip.Qualifier = ""
-		ip.ExplicitQualifier = false
-		a = ip.String()
 		if pkgName == "*" {
 			pkgName = ""
 		}
@@ -487,23 +486,15 @@ func appendExpandedUnqualifiedPackagePath(pkgPaths []resolvedPackageArg, origp s
 // Note:
 // * We know that pattern contains "..."
 // * We know that pattern is relative to the module root
-//
-// Note: this logic matches the logic in [loader.loadImportPathsQuiet].
-// TODO de-duplicate the logic so wildcards are expanded exactly once using a single piece of logic.
 func appendExpandedWildcardPackagePath(pkgPaths []resolvedPackageArg, pattern ast.ImportPath, pkgQual string, mainModRoot module.SourceLoc, mainModPath string, tg *tagger) ([]resolvedPackageArg, error) {
 	modIpath := ast.ParseImportPath(mainModPath)
 	// Find directory to begin the scan.
 	// Could be smarter but this one optimization is enough for now,
 	// since ... is usually at the end of a path.
-	//
-	// TODO this logic entirely ignores the pattern that's
-	// after the "...". See cuelang.org/issue/3212
+	// TODO: strip package qualifier.
 	i := strings.Index(pattern.Path, "...")
 	dir, _ := path.Split(pattern.Path[:i])
 	dir = path.Join(mainModRoot.Dir, dir)
-	if pattern.ExplicitQualifier {
-		pkgQual = pattern.Qualifier
-	}
 	var isSelected func(string) bool
 	switch pkgQual {
 	case "_":
