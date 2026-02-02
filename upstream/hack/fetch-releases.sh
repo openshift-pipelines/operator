@@ -2,9 +2,6 @@
 
 set -u -e
 
-# Ensure GOTOOLCHAIN is set to auto to allow Go 1.25+ to be downloaded
-export GOTOOLCHAIN="${GOTOOLCHAIN:-auto}"
-
 declare -r SCRIPT_DIR=$(cd $(dirname "$0")/.. && pwd)
 TARGET=""
 FORCE_FETCH_RELEASE=""
@@ -162,7 +159,7 @@ release_yaml_github() {
   echo "URL to download Release YAML is : $url"
 
     ko_data=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata
-    comp_dir=${ko_data}/${component}
+    comp_dir=${ko_data}/tekton-${component}
     dirPath=${comp_dir}/${dirVersion}
 
     # destination file
@@ -181,6 +178,9 @@ release_yaml_github() {
       fi
     fi
 
+    #Cleanup the Directory
+    rm -rf $comp_dir || true
+    
     # create a directory
     mkdir -p ${dirPath} || true
 
@@ -421,6 +421,9 @@ main() {
   copy_pruner_yaml
   pruner_version=$(go run ./cmd/tool component-version ${CONFIG} pruner)
   release_yaml pruner release 00-pruner ${pruner_version}
+
+  # Tekton Scheduler
+  release_yaml_github scheduler
 
   echo updated payload tree
   find cmd/${TARGET}/operator/kodata
