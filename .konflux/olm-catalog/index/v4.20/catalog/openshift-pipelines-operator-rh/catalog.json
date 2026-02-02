@@ -138,9 +138,19 @@
             "skipRange": ">=1.19.0 <1.20.2"
         },
         {
-            "name": "openshift-pipelines-operator-rh.v5.0.5-771",
+            "name": "openshift-pipelines-operator-rh.v1.21.0",
             "replaces": "openshift-pipelines-operator-rh.v1.20.2",
-            "skipRange": ">=1.20.0 <5.0.5-771"
+            "skipRange": ">=1.20.0 <1.21.0"
+        },
+        {
+            "name": "openshift-pipelines-operator-rh.v1.22.0",
+            "replaces": "openshift-pipelines-operator-rh.v1.21.0",
+            "skipRange": ">=1.21.0 <1.22.0"
+        },
+        {
+            "name": "openshift-pipelines-operator-rh.v5.0.5-770",
+            "replaces": "openshift-pipelines-operator-rh.v1.22.0",
+            "skipRange": ">=1.22.0 <5.0.5-770"
         }
     ]
 }
@@ -320,13 +330,37 @@
 }
 {
     "schema": "olm.channel",
+    "name": "pipelines-1.21",
+    "package": "openshift-pipelines-operator-rh",
+    "entries": [
+        {
+            "name": "openshift-pipelines-operator-rh.v1.21.0",
+            "replaces": "openshift-pipelines-operator-rh.v1.20.2",
+            "skipRange": ">=1.20.0 <1.21.0"
+        }
+    ]
+}
+{
+    "schema": "olm.channel",
+    "name": "pipelines-1.22",
+    "package": "openshift-pipelines-operator-rh",
+    "entries": [
+        {
+            "name": "openshift-pipelines-operator-rh.v1.22.0",
+            "replaces": "openshift-pipelines-operator-rh.v1.21.0",
+            "skipRange": ">=1.21.0 <1.22.0"
+        }
+    ]
+}
+{
+    "schema": "olm.channel",
     "name": "pipelines-5.0",
     "package": "openshift-pipelines-operator-rh",
     "entries": [
         {
-            "name": "openshift-pipelines-operator-rh.v5.0.5-771",
-            "replaces": "openshift-pipelines-operator-rh.v1.20.2",
-            "skipRange": ">=1.20.0 <5.0.5-771"
+            "name": "openshift-pipelines-operator-rh.v5.0.5-770",
+            "replaces": "openshift-pipelines-operator-rh.v1.22.0",
+            "skipRange": ">=1.22.0 <5.0.5-770"
         }
     ]
 }
@@ -20845,9 +20879,9 @@
 }
 {
     "schema": "olm.bundle",
-    "name": "openshift-pipelines-operator-rh.v5.0.5-771",
+    "name": "openshift-pipelines-operator-rh.v1.21.0",
     "package": "openshift-pipelines-operator-rh",
-    "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:e8681eb78954ffe87f226a4a3a111784659ac1259de0ed21961f9d18862300b9",
+    "image": "registry.redhat.io/openshift-pipelines/pipelines-operator-bundle:v1.21.0",
     "properties": [
         {
             "type": "olm.gvk",
@@ -20941,7 +20975,7 @@
             "type": "olm.package",
             "value": {
                 "packageName": "openshift-pipelines-operator-rh",
-                "version": "5.0.5-771"
+                "version": "1.21.0"
             }
         },
         {
@@ -20964,7 +20998,905 @@
                     "features.operators.openshift.io/token-auth-aws": "false",
                     "features.operators.openshift.io/token-auth-azure": "false",
                     "features.operators.openshift.io/token-auth-gcp": "false",
-                    "olm.skipRange": ">=1.20.0 <5.0.5-771",
+                    "olm.skipRange": ">=1.20.0 <1.21.0",
+                    "operators.openshift.io/valid-subscription": "[\"OpenShift Container Platform\", \"OpenShift Platform Plus\"]",
+                    "operators.operatorframework.io/builder": "operator-sdk-v1.37.0",
+                    "operators.operatorframework.io/internal-objects": "[\"tektoninstallersets.operator.tekton.dev\", \"tektonconfigs.operator.tekton.dev\",\"tektonpipelines.operator.tekton.dev\",\"tektontriggers.operator.tekton.dev\",\"tektonaddons.operator.tekton.dev\", \"tektonhubs.operator.tekton.dev\", \"tektonresults.operator.tekton.dev\", \"tektonchains.operator.tekton.dev\", \"openshiftpipelinesascodes.operator.tekton.dev\", \"manualapprovalgates.operator.tekton.dev\",\"tektonpruners.operator.tekton.dev\"]",
+                    "operators.operatorframework.io/project_layout": "unknown",
+                    "repository": "https://github.com/tektoncd/operator",
+                    "support": "Red Hat"
+                },
+                "apiServiceDefinitions": {},
+                "crdDescriptions": {
+                    "owned": [
+                        {
+                            "name": "manualapprovalgates.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "ManualApprovalGate",
+                            "displayName": "Manual Approval Gate",
+                            "description": "Represents an installation of latest version of Manual Approval Gate",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Manual Approval Gate installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Manual Approval Gate installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "openshiftpipelinesascodes.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "OpenShiftPipelinesAsCode",
+                            "displayName": "OpenShift Pipelines As Code",
+                            "description": "Represents an installation of latest version of OpenShift Pipelines As Code",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Pipelines As Code installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Pipelines As Code installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonaddons.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonAddon",
+                            "displayName": "Tekton Addons",
+                            "description": "Represents an installation of latest version of Addons (exclusively Tasks, StepActions, consoleyamlsamples, consoleclidownloads and consolequickstarts)",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonchains.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonChain",
+                            "displayName": "Tekton Chains",
+                            "description": "Represents an installation of latest version of Chains",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonconfigs.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonConfig",
+                            "displayName": "Tekton Configuration",
+                            "description": "Represents an installation of latest version of Tekton components, TektonPipeline, TektonTrigger and TektonAddon",
+                            "resources": [
+                                {
+                                    "name": "pipeline",
+                                    "kind": "tektonpipelines",
+                                    "version": "v1alpha1"
+                                },
+                                {
+                                    "name": "trigger",
+                                    "kind": "tektontriggers",
+                                    "version": "v1alpha1"
+                                },
+                                {
+                                    "name": "addon",
+                                    "kind": "tektonaddons",
+                                    "version": "v1alpha1"
+                                },
+                                {
+                                    "name": "pipelinesascode",
+                                    "kind": "openshiftpipelinesascodes",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Operator installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Tekton components are installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                },
+                                {
+                                    "path": "profile",
+                                    "displayName": "Profile",
+                                    "description": "Installation Profile (specifies which of the Tekton components are installed)",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonhubs.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonHub",
+                            "displayName": "Tekton Hub",
+                            "description": "Represents an installation of latest version of Hub",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektoninstallersets.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonInstallerSet",
+                            "displayName": "Tekton Installer Set",
+                            "description": "This CustomResourceDefinition (CRD) is used internally by the other OpenShift Pipelines CRDs to maintain the lifecycle of OpenShift Pipelines Components",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "clusterroles",
+                                    "version": "v1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "customresourcedefinitions",
+                                    "version": "v1beta1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "deployments",
+                                    "version": "v1beta1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "clusterrolebindings",
+                                    "version": "v1beta1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "services",
+                                    "version": "v1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "pods",
+                                    "version": "v1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "configmaps",
+                                    "version": "v1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "config",
+                                    "version": "v1alpha1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "namespaces",
+                                    "version": "v1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "serviceaccounts",
+                                    "version": "v1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "observedGeneration",
+                                    "displayName": "ObservedGeneration",
+                                    "description": "The version of Operator installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "manifests",
+                                    "displayName": "Manifests",
+                                    "description": "List of OpenShift API resources managed by this InstallerSet",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonpipelines.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonPipeline",
+                            "displayName": "Tekton Pipelines",
+                            "description": "Represents an installation of latest version of Tekton Pipelines",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Tekton Pipelines installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Tekton Pipelines installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonpruners.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonPruner",
+                            "displayName": "Tekton Pruner",
+                            "description": "Represents an installation of latest version of Tekton Pruner",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Tekton Pruner installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Tekton Pruner installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonresults.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonResult",
+                            "displayName": "Tekton Results",
+                            "description": "Represents an installation of latest version of Tekton Results",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektontriggers.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonTrigger",
+                            "displayName": "Tekton Triggers",
+                            "description": "Represents an installation of latest version of Tekton Triggers",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Tekton Triggers installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Tekton Triggers installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "description": "Red Hat OpenShift Pipelines is a cloud-native continuous integration and delivery\n(CI/CD) solution for building pipelines using [Tekton](https://tekton.dev).\nTekton is a flexible Kubernetes-native open-source CI/CD framework, which\nenables automating deployments across multiple platforms (Kubernetes,\nserverless, VMs, etc) by abstracting away the underlying details.\n\n## Features\n\n* Standard CI/CD pipelines definition\n* Build images with Kubernetes tools such as S2I, Buildah, Buildpacks, Kaniko, etc\n* Deploy applications to multiple platforms such as Kubernetes, serverless and VMs\n* Easy to extend and integrate with existing tools\n* Scale pipelines on-demand\n* Portable across any Kubernetes platform\n* Designed for microservices and decentralized team\n* Integrated with OpenShift Developer Console\n\n## Installation\n\n_Red Hat OpenShift Pipelines Operator_ gets installed into a single namespace (openshift-operators) which would then install _Red Hat OpenShift Pipelines_ into the openshift-pipelines namespace. _Red Hat OpenShift Pipelines_ is however cluster-wide and can run pipelines created in any namespace.\n\n### Components\n\n- Tekton Pipelines: v1.6.0\n- Tekton Triggers: v0.34.0\n- Pipelines as Code: v0.39.3\n- Tekton Chains: v0.26.0\n- Tekton Hub (tech-preview): v1.23.6\n- Tekton Results: v0.17.2\n- Manual Approval Gate (tech-preview): v0.7.0\n- Tekton Pruner: v0.3.5\n\n## Getting Started\n\nIn order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/pipelines/1.21/create/creating-applications-with-cicd-pipelines.html).\n\n## CLI (tkn)\n\nTekton Pipelines cli project provides a CLI (tkn) for interacting with OpenShift Pipelines.\n\n[Download tkn](/command-line-tools) (links will be available on `command line tools` page after this operator is installed).\n",
+                "displayName": "Red Hat OpenShift Pipelines",
+                "installModes": [
+                    {
+                        "type": "OwnNamespace",
+                        "supported": false
+                    },
+                    {
+                        "type": "SingleNamespace",
+                        "supported": false
+                    },
+                    {
+                        "type": "MultiNamespace",
+                        "supported": false
+                    },
+                    {
+                        "type": "AllNamespaces",
+                        "supported": true
+                    }
+                ],
+                "keywords": [
+                    "tektoncd",
+                    "openshift",
+                    "build",
+                    "pipeline"
+                ],
+                "labels": {
+                    "operatorframework.io/arch.amd64": "supported",
+                    "operatorframework.io/arch.arm64": "supported",
+                    "operatorframework.io/arch.ppc64le": "supported",
+                    "operatorframework.io/arch.s390x": "supported"
+                },
+                "links": [
+                    {
+                        "name": "Tekton Pipeline GitHub Repository",
+                        "url": "https://github.com/tektoncd/pipeline"
+                    },
+                    {
+                        "name": "Tekton Operator GitHub Repository",
+                        "url": "https://github.com/tektoncd/operator"
+                    }
+                ],
+                "maintainers": [
+                    {
+                        "name": "Red Hat",
+                        "email": "pipelines-extcomm@redhat.com"
+                    }
+                ],
+                "maturity": "alpha",
+                "provider": {
+                    "name": "Red Hat"
+                }
+            }
+        }
+    ],
+    "relatedImages": [
+        {
+            "name": "IMAGE_ADDONS_CACHE_UPLOAD",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-cache-rhel9@sha256:ce548401247c025aa5dee6ed641ede514a8ce19cbfb6fbe41edeabcdb1d493f2"
+        },
+        {
+            "name": "IMAGE_ADDONS_CACHE_FETCH",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-cache-rhel9@sha256:ce548401247c025aa5dee6ed641ede514a8ce19cbfb6fbe41edeabcdb1d493f2"
+        },
+        {
+            "name": "IMAGE_CHAINS_TEKTON_CHAINS_CONTROLLER",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-chains-controller-rhel9@sha256:66cd9f353839c9acc70fc82697ddaab47fc69b6b8e7a2a2d53956450b9677cc6"
+        },
+        {
+            "name": "IMAGE_ADDONS_PARAM_TKN_IMAGE",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-cli-tkn-rhel9@sha256:c59eb850cf59615b2d54247101e146a7d8818b1c6e95279863a512a3e0f93ae4"
+        },
+        {
+            "name": "IMAGE_JOB_PRUNER_TKN",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-cli-tkn-rhel9@sha256:c59eb850cf59615b2d54247101e146a7d8818b1c6e95279863a512a3e0f93ae4"
+        },
+        {
+            "name": "IMAGE_ADDONS_TKN",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-cli-tkn-rhel9@sha256:c59eb850cf59615b2d54247101e146a7d8818b1c6e95279863a512a3e0f93ae4"
+        },
+        {
+            "name": "IMAGE_PIPELINES_CONSOLE_PLUGIN",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-console-plugin-rhel9@sha256:9bd9cd6f769b17095f9adaa370358d83b64d735dd811bb6dc6aea1936bb290e7"
+        },
+        {
+            "name": "IMAGE_PIPELINES_TEKTON_PIPELINES_CONTROLLER",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-controller-rhel9@sha256:17b972e84ee15b9768a8c1ced8815a41cf04a6cdd58502c52f6455896926808e"
+        },
+        {
+            "name": "IMAGE_PIPELINES_ARG__SHELL_IMAGE",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-entrypoint-rhel9@sha256:e28570a59545fa9d0dcb2cf05cb8d0f4ebf1565cedc6609267a81dae539e2902"
+        },
+        {
+            "name": "IMAGE_PIPELINES_ARG__ENTRYPOINT_IMAGE",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-entrypoint-rhel9@sha256:e28570a59545fa9d0dcb2cf05cb8d0f4ebf1565cedc6609267a81dae539e2902"
+        },
+        {
+            "name": "IMAGE_PIPELINES_TEKTON_EVENTS_CONTROLLER",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-events-rhel9@sha256:ee2fcbc670a57f1f0de140d12d13ef73f2d1ddded83db8893c7c9a47c43719b2"
+        },
+        {
+            "name": "IMAGE_ADDONS_GIT_RUN",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:665dae0d8a843f89e5bff8ae7e56f27829b2218242085a09ac0cc1659e2acf85"
+        },
+        {
+            "name": "IMAGE_ADDONS_GIT_CLONE",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:665dae0d8a843f89e5bff8ae7e56f27829b2218242085a09ac0cc1659e2acf85"
+        },
+        {
+            "name": "IMAGE_ADDONS_PREPARE_AND_RUN",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:665dae0d8a843f89e5bff8ae7e56f27829b2218242085a09ac0cc1659e2acf85"
+        },
+        {
+            "name": "IMAGE_ADDONS_REPORT",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:665dae0d8a843f89e5bff8ae7e56f27829b2218242085a09ac0cc1659e2acf85"
+        },
+        {
+            "name": "IMAGE_ADDONS_PARAM_GITINITIMAGE",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:665dae0d8a843f89e5bff8ae7e56f27829b2218242085a09ac0cc1659e2acf85"
+        },
+        {
+            "name": "IMAGE_PIPELINES_ARG__GIT_IMAGE",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:665dae0d8a843f89e5bff8ae7e56f27829b2218242085a09ac0cc1659e2acf85"
+        },
+        {
+            "name": "IMAGE_HUB_TEKTON_HUB_API",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-hub-api-rhel9@sha256:644ed40be346caee0575f334633f02b6227f2a5e12438bf4feee51ebdb90273c"
+        },
+        {
+            "name": "IMAGE_HUB_TEKTON_HUB_DB_MIGRATION",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-hub-db-migration-rhel9@sha256:92a9f8b3b56bf95d2f12ec7cde961db0c973f9a6d5149f549314d10e37c5d50d"
+        },
+        {
+            "name": "IMAGE_HUB_TEKTON_HUB_UI",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-hub-ui-rhel9@sha256:fb4da575eda3083fd4af7377de5f4774a787190be46cb39f8c360e72192d6b09"
+        },
+        {
+            "name": "IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-manual-approval-gate-controller-rhel9@sha256:8e3594e397e4b4023534456c0dc452a8dfc0d0d315d4c567854fe29a22be2825"
+        },
+        {
+            "name": "IMAGE_MAG_MANUAL_APPROVAL",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-manual-approval-gate-webhook-rhel9@sha256:396ce34a6470d077782d2508891e98eedd93df4f20426bb494cc7cb87ff8eaa7"
+        },
+        {
+            "name": "IMAGE_PIPELINES_ARG__NOP_IMAGE",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-nop-rhel9@sha256:27e117c36f59523ad20770179c254ad59975536363707af887723a1734ad11f6"
+        },
+        {
+            "name": "IMAGE_ADDONS_OPC",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-opc-rhel9@sha256:d7e2ee83dec6f23ad9cfc0d173aaf9930c2e458cee7e464a1c8437dd3525612f"
+        },
+        {
+            "name": "",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-operator-bundle:v1.21.0"
+        },
+        {
+            "name": "IMAGE_PIPELINES_PROXY",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-operator-proxy-rhel9@sha256:78428f7884abb1249fce9ec4602b81593c58ff0d84b64fda2c03ed3c9558ea78"
+        },
+        {
+            "name": "TEKTON_OPERATOR_WEBHOOK",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-operator-webhook-rhel9@sha256:cc9124d155fd82e77c5c1b30a169cae037c8269ceed83b85d154a8b7ba2a1a41"
+        },
+        {
+            "name": "IMAGE_PAC_PAC_CLI",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-cli-rhel9@sha256:ecec031c16d3e7189849e59efa4dd8d9439980747d6d410b5da6ba66fc72ead5"
+        },
+        {
+            "name": "IMAGE_PAC_PAC_CONTROLLER",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-controller-rhel9@sha256:21115568507c9b5cf5d7ec755dae34cdda0489f6e45749b3d0edf899e5ce9467"
+        },
+        {
+            "name": "IMAGE_PAC_PAC_WATCHER",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-watcher-rhel9@sha256:1d3751f8b8b4e38017ea26965038fd01223f90c362787e84cd66aa0a99bb948d"
+        },
+        {
+            "name": "IMAGE_PAC_PAC_WEBHOOK",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-webhook-rhel9@sha256:81052ab4ed1027b719f27e3f9ed2fea92cc53a6c6f09c8cdff841fb201f2b793"
+        },
+        {
+            "name": "IMAGE_PRUNER_CONTROLLER",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-pruner-controller-rhel9@sha256:f5d24a923cf6a3051bccc6f37adefb8fe34e108330f558f29c06f8ae454fb32e"
+        },
+        {
+            "name": "IMAGE_PRUNER_WEBHOOK",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-pruner-webhook-rhel9@sha256:30d850de2064a8207a2429ecd61c2e34230b597daae08dc787e140e6d684cdcf"
+        },
+        {
+            "name": "IMAGE_PIPELINES_CONTROLLER",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-resolvers-rhel9@sha256:ea635cd3bea729b910aef2379d25fec2dcabc13c16dbdbb34cf03053637eb13d"
+        },
+        {
+            "name": "IMAGE_RESULTS_API",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-results-api-rhel9@sha256:43b2f1c0bbebe2062ba9d74adbaf653769514672aacdcf7849f45c3553dead7a"
+        },
+        {
+            "name": "IMAGE_RESULTS_RETENTION_POLICY_AGENT",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-results-retention-policy-agent-rhel9@sha256:9816cb86c44759148fca608f5ea8f10da0bc82f26cbe655254992b52febbe11e"
+        },
+        {
+            "name": "IMAGE_RESULTS_WATCHER",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-results-watcher-rhel9@sha256:baf5c05a730e9a19bedf783b6070e7bc3f32417d5e02ae684e440521f7c1f964"
+        },
+        {
+            "name": "OPENSHIFT_PIPELINES_OPERATOR_LIFECYCLE",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-rhel9-operator@sha256:bdbdbea0fc04f708dd70aec72dd364d41cb03b56102b4b05d0e33688c14e1e8c"
+        },
+        {
+            "name": "OPENSHIFT_PIPELINES_OPERATOR_CLUSTER_OPERATIONS",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-rhel9-operator@sha256:bdbdbea0fc04f708dd70aec72dd364d41cb03b56102b4b05d0e33688c14e1e8c"
+        },
+        {
+            "name": "IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel9@sha256:86d4d2d86f3fa1b103c260d6ef7e861d4c3ca1edbe952803d0b524c6f7935eaa"
+        },
+        {
+            "name": "IMAGE_ADDONS_TKN_CLI_SERVE",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel9@sha256:86d4d2d86f3fa1b103c260d6ef7e861d4c3ca1edbe952803d0b524c6f7935eaa"
+        },
+        {
+            "name": "IMAGE_PIPELINES_ARG__SIDECARLOGRESULTS_IMAGE",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-sidecarlogresults-rhel9@sha256:2a0fba34de9d6d4051a1474df20d76b4f4b042d8483abe079b9d5de8e7bbf687"
+        },
+        {
+            "name": "IMAGE_TRIGGERS_TEKTON_TRIGGERS_CONTROLLER",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-triggers-controller-rhel9@sha256:a20a3ddd60b0bdb701da737cb4bf96091f4695ad256eafec63b5b5e8a171304f"
+        },
+        {
+            "name": "IMAGE_TRIGGERS_TEKTON_TRIGGERS_CORE_INTERCEPTORS",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-triggers-core-interceptors-rhel9@sha256:e4a5c7a00b4c4f921f4389e969764020155f6ebbeb1cb4a08ecfd118088bb0c6"
+        },
+        {
+            "name": "IMAGE_TRIGGERS_ARG__EL_IMAGE",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-triggers-eventlistenersink-rhel9@sha256:7fbf2fdaa98bf1cfbdd6412a6cdfb7063a4f174f8d71f0d7bdc73fdbfba88820"
+        },
+        {
+            "name": "IMAGE_TRIGGERS_WEBHOOK",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-triggers-webhook-rhel9@sha256:dd28b69e663f500f0ef71ea05216a580f48258521b0609f4d947ddd8ca025da5"
+        },
+        {
+            "name": "IMAGE_PIPELINES_WEBHOOK",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-webhook-rhel9@sha256:bdfe579e12bc084eb1ed3b4a42ddb9db0755bad78752ee33283d3af45bc5b530"
+        },
+        {
+            "name": "IMAGE_PIPELINES_ARG__WORKINGDIRINIT_IMAGE",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-workingdirinit-rhel9@sha256:1d95083c002216163eff3d6bb94ad5a956ba9ebe0641c6bdc795f06bac102898"
+        },
+        {
+            "name": "IMAGE_ADDONS_KN",
+            "image": "registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:e213fd263772c5286aa560132cd8c043cf2946f04f96eedf18cd240859bd8a48"
+        },
+        {
+            "name": "IMAGE_ADDONS_PARAM_KN_IMAGE",
+            "image": "registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:e213fd263772c5286aa560132cd8c043cf2946f04f96eedf18cd240859bd8a48"
+        },
+        {
+            "name": "IMAGE_ADDONS_S2I_BUILD",
+            "image": "registry.redhat.io/rhel9/buildah@sha256:4e604d18fc609d25b2fc99814281944acaac78e8cd5e47b8359709b8b505db86"
+        },
+        {
+            "name": "IMAGE_ADDONS_BUILD",
+            "image": "registry.redhat.io/rhel9/buildah@sha256:4e604d18fc609d25b2fc99814281944acaac78e8cd5e47b8359709b8b505db86"
+        },
+        {
+            "name": "IMAGE_ADDONS_PARAM_BUILDER_IMAGE",
+            "image": "registry.redhat.io/rhel9/buildah@sha256:4e604d18fc609d25b2fc99814281944acaac78e8cd5e47b8359709b8b505db86"
+        },
+        {
+            "name": "IMAGE_HUB_TEKTON_HUB_DB",
+            "image": "registry.redhat.io/rhel9/postgresql-15@sha256:90ec347a35ab8a5d530c8d09f5347b13cc71df04f3b994bfa8b1a409b1171d59"
+        },
+        {
+            "name": "IMAGE_RESULTS_POSTGRES",
+            "image": "registry.redhat.io/rhel9/postgresql-15@sha256:90ec347a35ab8a5d530c8d09f5347b13cc71df04f3b994bfa8b1a409b1171d59"
+        },
+        {
+            "name": "IMAGE_ADDONS_SKOPEO_RESULTS",
+            "image": "registry.redhat.io/rhel9/skopeo@sha256:3c1d54513adc2998955731da23ec354a15942fa7dd2e37dc818f85a947f400d4"
+        },
+        {
+            "name": "IMAGE_ADDONS_SKOPEO_COPY",
+            "image": "registry.redhat.io/rhel9/skopeo@sha256:3c1d54513adc2998955731da23ec354a15942fa7dd2e37dc818f85a947f400d4"
+        },
+        {
+            "name": "IMAGE_ADDONS_GENERATE",
+            "image": "registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:bc10e7d6122ede5cf4f2882c200447683255465a1080e826761e90bfb983506e"
+        },
+        {
+            "name": "IMAGE_ADDONS_GEN_ENV_FILE",
+            "image": "registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:bc10e7d6122ede5cf4f2882c200447683255465a1080e826761e90bfb983506e"
+        },
+        {
+            "name": "IMAGE_ADDONS_S2I_GENERATE",
+            "image": "registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:bc10e7d6122ede5cf4f2882c200447683255465a1080e826761e90bfb983506e"
+        },
+        {
+            "name": "IMAGE_ADDONS_PARAM_MAVEN_IMAGE",
+            "image": "registry.redhat.io/ubi9/openjdk-17@sha256:d334d3c36867a1eef7daa598af10b5f620394ca0234b12e71b8b7e99bda9224e"
+        },
+        {
+            "name": "IMAGE_ADDONS_MAVEN_GOALS",
+            "image": "registry.redhat.io/ubi9/openjdk-17@sha256:d334d3c36867a1eef7daa598af10b5f620394ca0234b12e71b8b7e99bda9224e"
+        },
+        {
+            "name": "IMAGE_ADDONS_PREPARE",
+            "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:61d5ad475048c2e655cd46d0a55dfeaec182cc3faa6348cb85989a7c9e196483"
+        },
+        {
+            "name": "IMAGE_ADDONS_MVN_SETTINGS",
+            "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:61d5ad475048c2e655cd46d0a55dfeaec182cc3faa6348cb85989a7c9e196483"
+        },
+        {
+            "name": "IMAGE_ADDONS_LOAD_SCRIPTS",
+            "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:61d5ad475048c2e655cd46d0a55dfeaec182cc3faa6348cb85989a7c9e196483"
+        },
+        {
+            "name": "IMAGE_ADDONS_MAVEN_GENERATE",
+            "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:61d5ad475048c2e655cd46d0a55dfeaec182cc3faa6348cb85989a7c9e196483"
+        }
+    ]
+}
+{
+    "schema": "olm.bundle",
+    "name": "openshift-pipelines-operator-rh.v5.0.5-770",
+    "package": "openshift-pipelines-operator-rh",
+    "image": "quay.io/openshift-pipeline/pipelines-operator-bundle:v1.22.0",
+    "properties": [
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "ManualApprovalGate",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "OpenShiftPipelinesAsCode",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonAddon",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonChain",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonConfig",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonHub",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonInstallerSet",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonPipeline",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonPruner",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonResult",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonTrigger",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.package",
+            "value": {
+                "packageName": "openshift-pipelines-operator-rh",
+                "version": "5.0.5-770"
+            }
+        },
+        {
+            "type": "olm.csv.metadata",
+            "value": {
+                "annotations": {
+                    "alm-examples": "[\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"ManualApprovalGate\",\n    \"metadata\": {\n      \"name\": \"manual-approval-gate\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"OpenShiftPipelinesAsCode\",\n    \"metadata\": {\n      \"name\": \"pipelines-as-code\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonAddon\",\n    \"metadata\": {\n      \"name\": \"addon\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonChain\",\n    \"metadata\": {\n      \"name\": \"chain\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonConfig\",\n    \"metadata\": {\n      \"name\": \"config\"\n    },\n    \"spec\": {\n      \"addon\": {\n        \"params\": [\n          {\n            \"name\": \"pipelineTemplates\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverTasks\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverStepActions\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"communityResolverTasks\",\n            \"value\": \"true\"\n          }\n        ]\n      },\n      \"params\": [\n        {\n          \"name\": \"createRbacResource\",\n          \"value\": \"true\"\n        },\n        {\n          \"name\": \"legacyPipelineRbac\",\n          \"value\": \"true\"\n        },\n        {\n          \"name\": \"createCABundleConfigMaps\",\n          \"value\": \"true\"\n        }\n      ],\n      \"profile\": \"all\",\n      \"pruner\": {\n        \"keep\": 100,\n        \"resources\": [\n          \"pipelinerun\",\n          \"taskrun\"\n        ],\n        \"schedule\": \"0 8 * * *\"\n      },\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonHub\",\n    \"metadata\": {\n      \"name\": \"hub\"\n    },\n    \"spec\": {\n      \"api\": {\n        \"catalogRefreshInterval\": \"30m\"\n      },\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonInstallerSet\",\n    \"metadata\": {\n      \"name\": \"foo\"\n    },\n    \"spec\": {\n      \"manifests\": []\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonPipeline\",\n    \"metadata\": {\n      \"name\": \"pipeline\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonPruner\",\n    \"metadata\": {\n      \"name\": \"pruner\"\n    },\n    \"spec\": {\n      \"disabled\": true,\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonResult\",\n    \"metadata\": {\n      \"name\": \"result\"\n    },\n    \"spec\": {\n      \"auth_disable\": true,\n      \"db_enable_auto_migration\": true,\n      \"db_host\": \"tekton-results-postgres-service.openshift-pipelines.svc.cluster.local\",\n      \"db_port\": 5432,\n      \"log_level\": \"debug\",\n      \"logging_pvc_name\": \"tekton-logs\",\n      \"logs_api\": true,\n      \"logs_buffer_size\": 32768,\n      \"logs_path\": \"/logs\",\n      \"logs_type\": \"File\",\n      \"prometheus_port\": 9090,\n      \"server_port\": 8080,\n      \"targetNamespace\": \"openshift-pipelines\",\n      \"tls_hostname_override\": \"tekton-results-api-service.openshift-pipelines.svc.cluster.local\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonTrigger\",\n    \"metadata\": {\n      \"name\": \"trigger\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  }\n]",
+                    "capabilities": "Full Lifecycle",
+                    "categories": "Developer Tools, Integration & Delivery",
+                    "certified": "false",
+                    "console.openshift.io/plugins": "[\"pipelines-console-plugin\"]",
+                    "description": "Red Hat OpenShift Pipelines is a cloud-native CI/CD solution for building pipelines using Tekton concepts which run natively on OpenShift and Kubernetes.",
+                    "features.operators.openshift.io/cnf": "false",
+                    "features.operators.openshift.io/cni": "false",
+                    "features.operators.openshift.io/csi": "false",
+                    "features.operators.openshift.io/disconnected": "true",
+                    "features.operators.openshift.io/fips-compliant": "true",
+                    "features.operators.openshift.io/proxy-aware": "true",
+                    "features.operators.openshift.io/tls-profiles": "false",
+                    "features.operators.openshift.io/token-auth-aws": "false",
+                    "features.operators.openshift.io/token-auth-azure": "false",
+                    "features.operators.openshift.io/token-auth-gcp": "false",
+                    "olm.skipRange": ">=1.20.0 <5.0.5-770",
                     "operators.openshift.io/valid-subscription": "[\"OpenShift Container Platform\", \"OpenShift Platform Plus\"]",
                     "operators.operatorframework.io/builder": "operator-sdk-v1.37.0",
                     "operators.operatorframework.io/internal-objects": "[\"tektoninstallersets.operator.tekton.dev\", \"tektonconfigs.operator.tekton.dev\",\"tektonpipelines.operator.tekton.dev\",\"tektontriggers.operator.tekton.dev\",\"tektonaddons.operator.tekton.dev\", \"tektonhubs.operator.tekton.dev\", \"tektonresults.operator.tekton.dev\", \"tektonchains.operator.tekton.dev\", \"openshiftpipelinesascodes.operator.tekton.dev\", \"manualapprovalgates.operator.tekton.dev\",\"tektonpruners.operator.tekton.dev\"]",
@@ -21477,27 +22409,27 @@
     "relatedImages": [
         {
             "name": "IMAGE_ADDONS_CACHE_UPLOAD",
-            "image": "quay.io/openshift-pipeline/pipelines-cache-rhel9@sha256:cd9d1726d80e2b53cb586178af97baaf8f87d8472c545920fc79b78bec14b890"
+            "image": "quay.io/openshift-pipeline/pipelines-cache-rhel9@sha256:52687d928cc24b3c8b4d414225db342f4ac4a8c88d2a379a66ca87131bf15b6b"
         },
         {
             "name": "IMAGE_ADDONS_CACHE_FETCH",
-            "image": "quay.io/openshift-pipeline/pipelines-cache-rhel9@sha256:cd9d1726d80e2b53cb586178af97baaf8f87d8472c545920fc79b78bec14b890"
+            "image": "quay.io/openshift-pipeline/pipelines-cache-rhel9@sha256:52687d928cc24b3c8b4d414225db342f4ac4a8c88d2a379a66ca87131bf15b6b"
         },
         {
             "name": "IMAGE_CHAINS_TEKTON_CHAINS_CONTROLLER",
-            "image": "quay.io/openshift-pipeline/pipelines-chains-controller-rhel9@sha256:7d38eb585ba29e6629651df747133e549e7ac3648214930d87afc65114b53418"
+            "image": "quay.io/openshift-pipeline/pipelines-chains-controller-rhel9@sha256:58f89ac15f8c801a67c7649dc95c888720416e152e8a4ab3d16c6001004d2a3b"
         },
         {
             "name": "IMAGE_ADDONS_PARAM_TKN_IMAGE",
-            "image": "quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:ebd8ff96ec1c0667eaec198eae0ef601a2596e87923f41c7c5b06c4cf2eb275f"
+            "image": "quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:2871101262adbe8c590340734a39578d95ac462983f8157383a13b51e10078ab"
         },
         {
             "name": "IMAGE_JOB_PRUNER_TKN",
-            "image": "quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:ebd8ff96ec1c0667eaec198eae0ef601a2596e87923f41c7c5b06c4cf2eb275f"
+            "image": "quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:2871101262adbe8c590340734a39578d95ac462983f8157383a13b51e10078ab"
         },
         {
             "name": "IMAGE_ADDONS_TKN",
-            "image": "quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:ebd8ff96ec1c0667eaec198eae0ef601a2596e87923f41c7c5b06c4cf2eb275f"
+            "image": "quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:2871101262adbe8c590340734a39578d95ac462983f8157383a13b51e10078ab"
         },
         {
             "name": "IMAGE_PIPELINES_CONSOLE_PLUGIN",
@@ -21505,19 +22437,19 @@
         },
         {
             "name": "IMAGE_PIPELINES_TEKTON_PIPELINES_CONTROLLER",
-            "image": "quay.io/openshift-pipeline/pipelines-controller-rhel9@sha256:6e2804923b53c4c91ad962f226692fa07196f747ad637688efcfe2b200dfe37f"
+            "image": "quay.io/openshift-pipeline/pipelines-controller-rhel9@sha256:d74b68ffbd2cec8062a4def44e5ae41978a5f59237c3e203878e80b704a3e270"
         },
         {
             "name": "IMAGE_PIPELINES_ARG__SHELL_IMAGE",
-            "image": "quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:1d6ab62cdbd85d861cfe226e5a8e9eaccff8a926d9028a363d8eade324c15398"
+            "image": "quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:b683d1297531301092caa83d7dbb59869a5e5a0ffe8a20951d5b4515881d8cc1"
         },
         {
             "name": "IMAGE_PIPELINES_ARG__ENTRYPOINT_IMAGE",
-            "image": "quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:1d6ab62cdbd85d861cfe226e5a8e9eaccff8a926d9028a363d8eade324c15398"
+            "image": "quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:b683d1297531301092caa83d7dbb59869a5e5a0ffe8a20951d5b4515881d8cc1"
         },
         {
             "name": "IMAGE_PIPELINES_TEKTON_EVENTS_CONTROLLER",
-            "image": "quay.io/openshift-pipeline/pipelines-events-rhel9@sha256:2536695f809b01d24dc74fc51f3bab0153804a215d3153da04c4b2d76c65b4de"
+            "image": "quay.io/openshift-pipeline/pipelines-events-rhel9@sha256:c62f8521024d49792c023a7de84a2b8d71d6a2d88bce5dab2ee0a48c6359e1fb"
         },
         {
             "name": "IMAGE_ADDONS_GIT_RUN",
@@ -21553,55 +22485,55 @@
         },
         {
             "name": "IMAGE_HUB_TEKTON_HUB_UI",
-            "image": "quay.io/openshift-pipeline/pipelines-hub-ui-rhel9@sha256:3e7428f2d1d8c1a8a9f695414b0583628a496cc65ba575b72460afcfbde8530a"
+            "image": "quay.io/openshift-pipeline/pipelines-hub-ui-rhel9@sha256:0cb8d1f1552e15245afa1935576130093063e664ed2a9ba13e9d4c91afe17a5c"
         },
         {
             "name": "IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER",
-            "image": "quay.io/openshift-pipeline/pipelines-manual-approval-gate-controller-rhel9@sha256:edcdfec7ec6c0f3b5e929ea67145ef71d92273775ed38c8801deb3f9fefe0641"
+            "image": "quay.io/openshift-pipeline/pipelines-manual-approval-gate-controller-rhel9@sha256:9228d5164a5a32951733869153cf827308f53694f5c246df6294d8ba3ad1edd3"
         },
         {
             "name": "IMAGE_MAG_MANUAL_APPROVAL",
-            "image": "quay.io/openshift-pipeline/pipelines-manual-approval-gate-webhook-rhel9@sha256:246e104dd190887b4d284e3c47cecc6cd302e78a8c3a038a9eda297807c40f11"
+            "image": "quay.io/openshift-pipeline/pipelines-manual-approval-gate-webhook-rhel9@sha256:ff472c514aa6f7c998b7bbf4c6a065e9b1c27d341714d42ae405cb3360482fb1"
         },
         {
             "name": "IMAGE_PIPELINES_ARG__NOP_IMAGE",
-            "image": "quay.io/openshift-pipeline/pipelines-nop-rhel9@sha256:0e8b247aa768a9c8822013427e62ea7a9c16b1f0ff95d7fb63fcfae55dfdbce3"
+            "image": "quay.io/openshift-pipeline/pipelines-nop-rhel9@sha256:b1769e60d85ee314541ec07d1689b11179dfa0380c979b61a42791acdad9e4a6"
         },
         {
             "name": "IMAGE_ADDONS_OPC",
-            "image": "quay.io/openshift-pipeline/pipelines-opc-rhel9@sha256:0b44c1703254c37c4e3a631e89e6ccb842a7f5b6b80f1be8d5cdf43a9842b9f1"
+            "image": "quay.io/openshift-pipeline/pipelines-opc-rhel9@sha256:0f4fb86deb1f34cf4a422835f2c5add41532c24858bc974211932f14c57f7346"
         },
         {
             "name": "",
-            "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:e8681eb78954ffe87f226a4a3a111784659ac1259de0ed21961f9d18862300b9"
+            "image": "quay.io/openshift-pipeline/pipelines-operator-bundle:v1.22.0"
         },
         {
             "name": "IMAGE_PIPELINES_PROXY",
-            "image": "quay.io/openshift-pipeline/pipelines-operator-proxy-rhel9@sha256:31848358c42141d5f3fae498043d62e8aa0b29a35a4fbfb9ddca337657f7a6a1"
+            "image": "quay.io/openshift-pipeline/pipelines-operator-proxy-rhel9@sha256:e0c41e50942f694436f5036762e2ac5afac7a12cb209a40d7c2bcaf9771bc796"
         },
         {
             "name": "TEKTON_OPERATOR_WEBHOOK",
-            "image": "quay.io/openshift-pipeline/pipelines-operator-webhook-rhel9@sha256:e861eea0ecaf1075dc45490f05205e24fe9b5e4c2343af5dd2b8e619bf273051"
+            "image": "quay.io/openshift-pipeline/pipelines-operator-webhook-rhel9@sha256:962db05ca62d916d85bfc909c352f146646385bda4922f584694181be9b5b3c6"
         },
         {
             "name": "IMAGE_PAC_PAC_CLI",
-            "image": "quay.io/openshift-pipeline/pipelines-pipelines-as-code-cli-rhel9@sha256:2910a2713c988935099173474aae24544635788f0136727a22bc8ed97f7447c7"
+            "image": "quay.io/openshift-pipeline/pipelines-pipelines-as-code-cli-rhel9@sha256:2a5dc3ddb65c50a8e165da467d3a022c25a84b5c9b7716453d6174b31b74fb19"
         },
         {
             "name": "IMAGE_PAC_PAC_CONTROLLER",
-            "image": "quay.io/openshift-pipeline/pipelines-pipelines-as-code-controller-rhel9@sha256:b6e668c49b32a042bc84716f2726295d34ab7b016739c95d26e48b6aef360d9e"
+            "image": "quay.io/openshift-pipeline/pipelines-pipelines-as-code-controller-rhel9@sha256:88cd960389917ea9efa7237b4fe2965bb75e539d15204c34cae47d4e7bed7a25"
         },
         {
             "name": "IMAGE_PAC_PAC_WATCHER",
-            "image": "quay.io/openshift-pipeline/pipelines-pipelines-as-code-watcher-rhel9@sha256:f94029e49bbb4ac0cd8e81b876f0f26963c588eda4bbd8317c84acadd63c1b94"
+            "image": "quay.io/openshift-pipeline/pipelines-pipelines-as-code-watcher-rhel9@sha256:67bddcf7488ca76945e19a31d44c97a4b26e0c2756da7217f3eb5285c197460a"
         },
         {
             "name": "IMAGE_PAC_PAC_WEBHOOK",
-            "image": "quay.io/openshift-pipeline/pipelines-pipelines-as-code-webhook-rhel9@sha256:fa3e75e01a894f48646277a43f4236d6b04d8b2abd8bb47c6ee71d881f25ff2d"
+            "image": "quay.io/openshift-pipeline/pipelines-pipelines-as-code-webhook-rhel9@sha256:83bd69a36728fc2bf57e5e46344e90b5252b41853755508d28ca39afdad3a6b2"
         },
         {
             "name": "IMAGE_PRUNER_CONTROLLER",
-            "image": "quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:0c5f2c84476619c6dadd4d7938508d1d122e1d323a7b239a7384eadeeeda8533"
+            "image": "quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:1bda4d788bf47e82f8d2df5c6cbfe5d294e15112d22b920625634832a8fdc810"
         },
         {
             "name": "IMAGE_PRUNER_WEBHOOK",
@@ -21613,59 +22545,957 @@
         },
         {
             "name": "IMAGE_RESULTS_API",
-            "image": "quay.io/openshift-pipeline/pipelines-results-api-rhel9@sha256:19552df9c3be521a7c44f4f4e1eae0060b5d95e314707d26d51429c186ec2266"
+            "image": "quay.io/openshift-pipeline/pipelines-results-api-rhel9@sha256:88b73c578908061cc0d6cd872945a2076e7067749f35942b6c0fafc91586765c"
         },
         {
             "name": "IMAGE_RESULTS_RETENTION_POLICY_AGENT",
-            "image": "quay.io/openshift-pipeline/pipelines-results-retention-policy-agent-rhel9@sha256:5b88e8d016987cb0f12792fbbe82fffdc619e06ec69d9c725d9c6b205c6041f8"
+            "image": "quay.io/openshift-pipeline/pipelines-results-retention-policy-agent-rhel9@sha256:00984f30f91a4ccea0838260af78a6c61f04653ea65f87d6604a4c68629ff275"
         },
         {
             "name": "IMAGE_RESULTS_WATCHER",
-            "image": "quay.io/openshift-pipeline/pipelines-results-watcher-rhel9@sha256:68d5e2666ed74c642a8176f873d2ae58293d64ca36553c6bc85c031b4275218a"
+            "image": "quay.io/openshift-pipeline/pipelines-results-watcher-rhel9@sha256:4579a76d5475222960fc98e964e0d56e9133107ecfce45b6235275ad4f8f0cd9"
         },
         {
             "name": "OPENSHIFT_PIPELINES_OPERATOR_LIFECYCLE",
-            "image": "quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:6dd17668d606eab3f245edb853a4654332c0c3978de0fe6d873efdc707f8e658"
+            "image": "quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:be18ec851ae55dcceedacfeb2314ecfe91dbe539fb18154b844826f8d46dedd5"
         },
         {
             "name": "OPENSHIFT_PIPELINES_OPERATOR_CLUSTER_OPERATIONS",
-            "image": "quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:6dd17668d606eab3f245edb853a4654332c0c3978de0fe6d873efdc707f8e658"
+            "image": "quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:be18ec851ae55dcceedacfeb2314ecfe91dbe539fb18154b844826f8d46dedd5"
         },
         {
             "name": "IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG",
-            "image": "quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:f28c197c0b1264d8da07ac7d04c94ef16678ac9b698cc02e8d0949311eb6488c"
+            "image": "quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:83479f3be12ec9bf542600f6efe06fc7e3a36e351f7befef6d1d114396e468d5"
         },
         {
             "name": "IMAGE_ADDONS_TKN_CLI_SERVE",
-            "image": "quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:f28c197c0b1264d8da07ac7d04c94ef16678ac9b698cc02e8d0949311eb6488c"
+            "image": "quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:83479f3be12ec9bf542600f6efe06fc7e3a36e351f7befef6d1d114396e468d5"
         },
         {
             "name": "IMAGE_PIPELINES_ARG__SIDECARLOGRESULTS_IMAGE",
-            "image": "quay.io/openshift-pipeline/pipelines-sidecarlogresults-rhel9@sha256:efcad22066eb852bc6bf246a220c116860807c3c4cdb852c8fdab81836e50c5a"
+            "image": "quay.io/openshift-pipeline/pipelines-sidecarlogresults-rhel9@sha256:b967c3556794c1cb44e62e4f13f2be16e96ad76297366a3323a0e758ba882944"
         },
         {
             "name": "IMAGE_TRIGGERS_TEKTON_TRIGGERS_CONTROLLER",
-            "image": "quay.io/openshift-pipeline/pipelines-triggers-controller-rhel9@sha256:8c667d78c99618255fd94f02c8f679bd494320c9ed7c6950b0d9dc4d10efcf2c"
+            "image": "quay.io/openshift-pipeline/pipelines-triggers-controller-rhel9@sha256:01873f0bb1ee9eb4237e1cb6fa4054f5ad6e92a50aaae6b72b253d8e0b5be941"
         },
         {
             "name": "IMAGE_TRIGGERS_TEKTON_TRIGGERS_CORE_INTERCEPTORS",
-            "image": "quay.io/openshift-pipeline/pipelines-triggers-core-interceptors-rhel9@sha256:27e3ba657113ea5ea44b0551ecc779d0be5d5ab902f6edba0ea2d7f87db4fad6"
+            "image": "quay.io/openshift-pipeline/pipelines-triggers-core-interceptors-rhel9@sha256:41cd4980262e0e8c78f7ee41ab4047e667a5481ed980f8f01cfd84d23851a05a"
         },
         {
             "name": "IMAGE_TRIGGERS_ARG__EL_IMAGE",
-            "image": "quay.io/openshift-pipeline/pipelines-triggers-eventlistenersink-rhel9@sha256:df9aa0b0c2b974fc7eb4e69df6f3af50d2b5e80f4fad0cc5eeab375541011b09"
+            "image": "quay.io/openshift-pipeline/pipelines-triggers-eventlistenersink-rhel9@sha256:a0380cf9ca6d6e67f80caa8e69c65ec1d6784180794c233fe5c241103b8ec037"
         },
         {
             "name": "IMAGE_TRIGGERS_WEBHOOK",
-            "image": "quay.io/openshift-pipeline/pipelines-triggers-webhook-rhel9@sha256:c3279773ea6c6a78f5511cc0c19ec0174fcd29d2ba93cefceaad30b9df698b33"
+            "image": "quay.io/openshift-pipeline/pipelines-triggers-webhook-rhel9@sha256:6e7204475640d590208ae0d26b39fd9a4abad2f0008386a1f229695dc8be05df"
         },
         {
             "name": "IMAGE_PIPELINES_WEBHOOK",
-            "image": "quay.io/openshift-pipeline/pipelines-webhook-rhel9@sha256:c71aab10420ba9a70d131c838006a53fd77365da320e25acff4515ba57f08f9f"
+            "image": "quay.io/openshift-pipeline/pipelines-webhook-rhel9@sha256:44dd107821f85fb47e832a499b7a982c2ef0ba3b3579ec620dd62027902a507f"
         },
         {
             "name": "IMAGE_PIPELINES_ARG__WORKINGDIRINIT_IMAGE",
-            "image": "quay.io/openshift-pipeline/pipelines-workingdirinit-rhel9@sha256:5546b645efb72f5fac00ae2fd08bfda5a1de54e043ac9903290066bc3e9b135c"
+            "image": "quay.io/openshift-pipeline/pipelines-workingdirinit-rhel9@sha256:323f761c7bea2978055042389c530e95476be8a851ce0f6a9b4057c4e3959a90"
+        },
+        {
+            "name": "IMAGE_ADDONS_KN",
+            "image": "registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:e213fd263772c5286aa560132cd8c043cf2946f04f96eedf18cd240859bd8a48"
+        },
+        {
+            "name": "IMAGE_ADDONS_PARAM_KN_IMAGE",
+            "image": "registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:e213fd263772c5286aa560132cd8c043cf2946f04f96eedf18cd240859bd8a48"
+        },
+        {
+            "name": "IMAGE_ADDONS_S2I_BUILD",
+            "image": "registry.redhat.io/rhel9/buildah@sha256:4e604d18fc609d25b2fc99814281944acaac78e8cd5e47b8359709b8b505db86"
+        },
+        {
+            "name": "IMAGE_ADDONS_BUILD",
+            "image": "registry.redhat.io/rhel9/buildah@sha256:4e604d18fc609d25b2fc99814281944acaac78e8cd5e47b8359709b8b505db86"
+        },
+        {
+            "name": "IMAGE_ADDONS_PARAM_BUILDER_IMAGE",
+            "image": "registry.redhat.io/rhel9/buildah@sha256:4e604d18fc609d25b2fc99814281944acaac78e8cd5e47b8359709b8b505db86"
+        },
+        {
+            "name": "IMAGE_HUB_TEKTON_HUB_DB",
+            "image": "registry.redhat.io/rhel9/postgresql-15@sha256:90ec347a35ab8a5d530c8d09f5347b13cc71df04f3b994bfa8b1a409b1171d59"
+        },
+        {
+            "name": "IMAGE_RESULTS_POSTGRES",
+            "image": "registry.redhat.io/rhel9/postgresql-15@sha256:90ec347a35ab8a5d530c8d09f5347b13cc71df04f3b994bfa8b1a409b1171d59"
+        },
+        {
+            "name": "IMAGE_ADDONS_SKOPEO_RESULTS",
+            "image": "registry.redhat.io/rhel9/skopeo@sha256:3c1d54513adc2998955731da23ec354a15942fa7dd2e37dc818f85a947f400d4"
+        },
+        {
+            "name": "IMAGE_ADDONS_SKOPEO_COPY",
+            "image": "registry.redhat.io/rhel9/skopeo@sha256:3c1d54513adc2998955731da23ec354a15942fa7dd2e37dc818f85a947f400d4"
+        },
+        {
+            "name": "IMAGE_ADDONS_GENERATE",
+            "image": "registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:bc10e7d6122ede5cf4f2882c200447683255465a1080e826761e90bfb983506e"
+        },
+        {
+            "name": "IMAGE_ADDONS_GEN_ENV_FILE",
+            "image": "registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:bc10e7d6122ede5cf4f2882c200447683255465a1080e826761e90bfb983506e"
+        },
+        {
+            "name": "IMAGE_ADDONS_S2I_GENERATE",
+            "image": "registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:bc10e7d6122ede5cf4f2882c200447683255465a1080e826761e90bfb983506e"
+        },
+        {
+            "name": "IMAGE_ADDONS_PARAM_MAVEN_IMAGE",
+            "image": "registry.redhat.io/ubi9/openjdk-17@sha256:d334d3c36867a1eef7daa598af10b5f620394ca0234b12e71b8b7e99bda9224e"
+        },
+        {
+            "name": "IMAGE_ADDONS_MAVEN_GOALS",
+            "image": "registry.redhat.io/ubi9/openjdk-17@sha256:d334d3c36867a1eef7daa598af10b5f620394ca0234b12e71b8b7e99bda9224e"
+        },
+        {
+            "name": "IMAGE_ADDONS_PREPARE",
+            "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:61d5ad475048c2e655cd46d0a55dfeaec182cc3faa6348cb85989a7c9e196483"
+        },
+        {
+            "name": "IMAGE_ADDONS_MVN_SETTINGS",
+            "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:61d5ad475048c2e655cd46d0a55dfeaec182cc3faa6348cb85989a7c9e196483"
+        },
+        {
+            "name": "IMAGE_ADDONS_LOAD_SCRIPTS",
+            "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:61d5ad475048c2e655cd46d0a55dfeaec182cc3faa6348cb85989a7c9e196483"
+        },
+        {
+            "name": "IMAGE_ADDONS_MAVEN_GENERATE",
+            "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:61d5ad475048c2e655cd46d0a55dfeaec182cc3faa6348cb85989a7c9e196483"
+        }
+    ]
+}
+{
+    "schema": "olm.bundle",
+    "name": "openshift-pipelines-operator-rh.v5.0.5-770",
+    "package": "openshift-pipelines-operator-rh",
+    "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:fd5ae2f68fe55fd87ea5036014fdc688c644128cd8b018ea1c06aa07f73de207",
+    "properties": [
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "ManualApprovalGate",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "OpenShiftPipelinesAsCode",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonAddon",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonChain",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonConfig",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonHub",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonInstallerSet",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonPipeline",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonPruner",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonResult",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonTrigger",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.package",
+            "value": {
+                "packageName": "openshift-pipelines-operator-rh",
+                "version": "5.0.5-770"
+            }
+        },
+        {
+            "type": "olm.csv.metadata",
+            "value": {
+                "annotations": {
+                    "alm-examples": "[\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"ManualApprovalGate\",\n    \"metadata\": {\n      \"name\": \"manual-approval-gate\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"OpenShiftPipelinesAsCode\",\n    \"metadata\": {\n      \"name\": \"pipelines-as-code\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonAddon\",\n    \"metadata\": {\n      \"name\": \"addon\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonChain\",\n    \"metadata\": {\n      \"name\": \"chain\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonConfig\",\n    \"metadata\": {\n      \"name\": \"config\"\n    },\n    \"spec\": {\n      \"addon\": {\n        \"params\": [\n          {\n            \"name\": \"pipelineTemplates\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverTasks\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"resolverStepActions\",\n            \"value\": \"true\"\n          },\n          {\n            \"name\": \"communityResolverTasks\",\n            \"value\": \"true\"\n          }\n        ]\n      },\n      \"params\": [\n        {\n          \"name\": \"createRbacResource\",\n          \"value\": \"true\"\n        },\n        {\n          \"name\": \"legacyPipelineRbac\",\n          \"value\": \"true\"\n        },\n        {\n          \"name\": \"createCABundleConfigMaps\",\n          \"value\": \"true\"\n        }\n      ],\n      \"profile\": \"all\",\n      \"pruner\": {\n        \"keep\": 100,\n        \"resources\": [\n          \"pipelinerun\",\n          \"taskrun\"\n        ],\n        \"schedule\": \"0 8 * * *\"\n      },\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonHub\",\n    \"metadata\": {\n      \"name\": \"hub\"\n    },\n    \"spec\": {\n      \"api\": {\n        \"catalogRefreshInterval\": \"30m\"\n      },\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonInstallerSet\",\n    \"metadata\": {\n      \"name\": \"foo\"\n    },\n    \"spec\": {\n      \"manifests\": []\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonPipeline\",\n    \"metadata\": {\n      \"name\": \"pipeline\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonPruner\",\n    \"metadata\": {\n      \"name\": \"pruner\"\n    },\n    \"spec\": {\n      \"disabled\": true,\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonResult\",\n    \"metadata\": {\n      \"name\": \"result\"\n    },\n    \"spec\": {\n      \"auth_disable\": true,\n      \"db_enable_auto_migration\": true,\n      \"db_host\": \"tekton-results-postgres-service.openshift-pipelines.svc.cluster.local\",\n      \"db_port\": 5432,\n      \"log_level\": \"debug\",\n      \"logging_pvc_name\": \"tekton-logs\",\n      \"logs_api\": true,\n      \"logs_buffer_size\": 32768,\n      \"logs_path\": \"/logs\",\n      \"logs_type\": \"File\",\n      \"prometheus_port\": 9090,\n      \"server_port\": 8080,\n      \"targetNamespace\": \"openshift-pipelines\",\n      \"tls_hostname_override\": \"tekton-results-api-service.openshift-pipelines.svc.cluster.local\"\n    }\n  },\n  {\n    \"apiVersion\": \"operator.tekton.dev/v1alpha1\",\n    \"kind\": \"TektonTrigger\",\n    \"metadata\": {\n      \"name\": \"trigger\"\n    },\n    \"spec\": {\n      \"targetNamespace\": \"openshift-pipelines\"\n    }\n  }\n]",
+                    "capabilities": "Full Lifecycle",
+                    "categories": "Developer Tools, Integration & Delivery",
+                    "certified": "false",
+                    "console.openshift.io/plugins": "[\"pipelines-console-plugin\"]",
+                    "description": "Red Hat OpenShift Pipelines is a cloud-native CI/CD solution for building pipelines using Tekton concepts which run natively on OpenShift and Kubernetes.",
+                    "features.operators.openshift.io/cnf": "false",
+                    "features.operators.openshift.io/cni": "false",
+                    "features.operators.openshift.io/csi": "false",
+                    "features.operators.openshift.io/disconnected": "true",
+                    "features.operators.openshift.io/fips-compliant": "true",
+                    "features.operators.openshift.io/proxy-aware": "true",
+                    "features.operators.openshift.io/tls-profiles": "false",
+                    "features.operators.openshift.io/token-auth-aws": "false",
+                    "features.operators.openshift.io/token-auth-azure": "false",
+                    "features.operators.openshift.io/token-auth-gcp": "false",
+                    "olm.skipRange": ">=1.20.0 <5.0.5-770",
+                    "operators.openshift.io/valid-subscription": "[\"OpenShift Container Platform\", \"OpenShift Platform Plus\"]",
+                    "operators.operatorframework.io/builder": "operator-sdk-v1.37.0",
+                    "operators.operatorframework.io/internal-objects": "[\"tektoninstallersets.operator.tekton.dev\", \"tektonconfigs.operator.tekton.dev\",\"tektonpipelines.operator.tekton.dev\",\"tektontriggers.operator.tekton.dev\",\"tektonaddons.operator.tekton.dev\", \"tektonhubs.operator.tekton.dev\", \"tektonresults.operator.tekton.dev\", \"tektonchains.operator.tekton.dev\", \"openshiftpipelinesascodes.operator.tekton.dev\", \"manualapprovalgates.operator.tekton.dev\",\"tektonpruners.operator.tekton.dev\"]",
+                    "operators.operatorframework.io/project_layout": "unknown",
+                    "repository": "https://github.com/tektoncd/operator",
+                    "support": "Red Hat"
+                },
+                "apiServiceDefinitions": {},
+                "crdDescriptions": {
+                    "owned": [
+                        {
+                            "name": "manualapprovalgates.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "ManualApprovalGate",
+                            "displayName": "Manual Approval Gate",
+                            "description": "Represents an installation of latest version of Manual Approval Gate",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Manual Approval Gate installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Manual Approval Gate installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "openshiftpipelinesascodes.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "OpenShiftPipelinesAsCode",
+                            "displayName": "OpenShift Pipelines As Code",
+                            "description": "Represents an installation of latest version of OpenShift Pipelines As Code",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Pipelines As Code installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Pipelines As Code installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonaddons.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonAddon",
+                            "displayName": "Tekton Addons",
+                            "description": "Represents an installation of latest version of Addons (exclusively Tasks, StepActions, consoleyamlsamples, consoleclidownloads and consolequickstarts)",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonchains.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonChain",
+                            "displayName": "Tekton Chains",
+                            "description": "Represents an installation of latest version of Chains",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonconfigs.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonConfig",
+                            "displayName": "Tekton Configuration",
+                            "description": "Represents an installation of latest version of Tekton components, TektonPipeline, TektonTrigger and TektonAddon",
+                            "resources": [
+                                {
+                                    "name": "pipeline",
+                                    "kind": "tektonpipelines",
+                                    "version": "v1alpha1"
+                                },
+                                {
+                                    "name": "trigger",
+                                    "kind": "tektontriggers",
+                                    "version": "v1alpha1"
+                                },
+                                {
+                                    "name": "addon",
+                                    "kind": "tektonaddons",
+                                    "version": "v1alpha1"
+                                },
+                                {
+                                    "name": "pipelinesascode",
+                                    "kind": "openshiftpipelinesascodes",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Operator installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Tekton components are installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                },
+                                {
+                                    "path": "profile",
+                                    "displayName": "Profile",
+                                    "description": "Installation Profile (specifies which of the Tekton components are installed)",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonhubs.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonHub",
+                            "displayName": "Tekton Hub",
+                            "description": "Represents an installation of latest version of Hub",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektoninstallersets.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonInstallerSet",
+                            "displayName": "Tekton Installer Set",
+                            "description": "This CustomResourceDefinition (CRD) is used internally by the other OpenShift Pipelines CRDs to maintain the lifecycle of OpenShift Pipelines Components",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "clusterroles",
+                                    "version": "v1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "customresourcedefinitions",
+                                    "version": "v1beta1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "deployments",
+                                    "version": "v1beta1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "clusterrolebindings",
+                                    "version": "v1beta1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "services",
+                                    "version": "v1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "pods",
+                                    "version": "v1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "configmaps",
+                                    "version": "v1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "config",
+                                    "version": "v1alpha1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "namespaces",
+                                    "version": "v1"
+                                },
+                                {
+                                    "name": "",
+                                    "kind": "serviceaccounts",
+                                    "version": "v1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "observedGeneration",
+                                    "displayName": "ObservedGeneration",
+                                    "description": "The version of Operator installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "manifests",
+                                    "displayName": "Manifests",
+                                    "description": "List of OpenShift API resources managed by this InstallerSet",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonpipelines.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonPipeline",
+                            "displayName": "Tekton Pipelines",
+                            "description": "Represents an installation of latest version of Tekton Pipelines",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Tekton Pipelines installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Tekton Pipelines installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonpruners.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonPruner",
+                            "displayName": "Tekton Pruner",
+                            "description": "Represents an installation of latest version of Tekton Pruner",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Tekton Pruner installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Tekton Pruner installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektonresults.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonResult",
+                            "displayName": "Tekton Results",
+                            "description": "Represents an installation of latest version of Tekton Results",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Addons installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "tektontriggers.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonTrigger",
+                            "displayName": "Tekton Triggers",
+                            "description": "Represents an installation of latest version of Tekton Triggers",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Tekton Triggers installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Tekton Triggers installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "description": "Red Hat OpenShift Pipelines is a cloud-native continuous integration and delivery\n(CI/CD) solution for building pipelines using [Tekton](https://tekton.dev).\nTekton is a flexible Kubernetes-native open-source CI/CD framework, which\nenables automating deployments across multiple platforms (Kubernetes,\nserverless, VMs, etc) by abstracting away the underlying details.\n\n## Features\n\n* Standard CI/CD pipelines definition\n* Build images with Kubernetes tools such as S2I, Buildah, Buildpacks, Kaniko, etc\n* Deploy applications to multiple platforms such as Kubernetes, serverless and VMs\n* Easy to extend and integrate with existing tools\n* Scale pipelines on-demand\n* Portable across any Kubernetes platform\n* Designed for microservices and decentralized team\n* Integrated with OpenShift Developer Console\n\n## Installation\n\n_Red Hat OpenShift Pipelines Operator_ gets installed into a single namespace (openshift-operators) which would then install _Red Hat OpenShift Pipelines_ into the openshift-pipelines namespace. _Red Hat OpenShift Pipelines_ is however cluster-wide and can run pipelines created in any namespace.\n\n### Components\n\n- Tekton Pipelines: v1.6.0\n- Tekton Triggers: v0.34.0\n- Pipelines as Code: v0.39.3\n- Tekton Chains: v0.26.0\n- Tekton Hub (tech-preview): v1.23.6\n- Tekton Results: v0.17.2\n- Manual Approval Gate (tech-preview): v0.7.0\n- Tekton Pruner: v0.3.5\n\n## Getting Started\n\nIn order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/pipelines/5.0/create/creating-applications-with-cicd-pipelines.html).\n\n## CLI (tkn)\n\nTekton Pipelines cli project provides a CLI (tkn) for interacting with OpenShift Pipelines.\n\n[Download tkn](/command-line-tools) (links will be available on `command line tools` page after this operator is installed).\n",
+                "displayName": "Red Hat OpenShift Pipelines",
+                "installModes": [
+                    {
+                        "type": "OwnNamespace",
+                        "supported": false
+                    },
+                    {
+                        "type": "SingleNamespace",
+                        "supported": false
+                    },
+                    {
+                        "type": "MultiNamespace",
+                        "supported": false
+                    },
+                    {
+                        "type": "AllNamespaces",
+                        "supported": true
+                    }
+                ],
+                "keywords": [
+                    "tektoncd",
+                    "openshift",
+                    "build",
+                    "pipeline"
+                ],
+                "labels": {
+                    "operatorframework.io/arch.amd64": "supported",
+                    "operatorframework.io/arch.arm64": "supported",
+                    "operatorframework.io/arch.ppc64le": "supported",
+                    "operatorframework.io/arch.s390x": "supported"
+                },
+                "links": [
+                    {
+                        "name": "Tekton Pipeline GitHub Repository",
+                        "url": "https://github.com/tektoncd/pipeline"
+                    },
+                    {
+                        "name": "Tekton Operator GitHub Repository",
+                        "url": "https://github.com/tektoncd/operator"
+                    }
+                ],
+                "maintainers": [
+                    {
+                        "name": "Red Hat",
+                        "email": "pipelines-extcomm@redhat.com"
+                    }
+                ],
+                "maturity": "alpha",
+                "provider": {
+                    "name": "Red Hat"
+                }
+            }
+        }
+    ],
+    "relatedImages": [
+        {
+            "name": "IMAGE_ADDONS_CACHE_UPLOAD",
+            "image": "quay.io/openshift-pipeline/pipelines-cache-rhel9@sha256:52687d928cc24b3c8b4d414225db342f4ac4a8c88d2a379a66ca87131bf15b6b"
+        },
+        {
+            "name": "IMAGE_ADDONS_CACHE_FETCH",
+            "image": "quay.io/openshift-pipeline/pipelines-cache-rhel9@sha256:52687d928cc24b3c8b4d414225db342f4ac4a8c88d2a379a66ca87131bf15b6b"
+        },
+        {
+            "name": "IMAGE_CHAINS_TEKTON_CHAINS_CONTROLLER",
+            "image": "quay.io/openshift-pipeline/pipelines-chains-controller-rhel9@sha256:58f89ac15f8c801a67c7649dc95c888720416e152e8a4ab3d16c6001004d2a3b"
+        },
+        {
+            "name": "IMAGE_ADDONS_PARAM_TKN_IMAGE",
+            "image": "quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:2871101262adbe8c590340734a39578d95ac462983f8157383a13b51e10078ab"
+        },
+        {
+            "name": "IMAGE_JOB_PRUNER_TKN",
+            "image": "quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:2871101262adbe8c590340734a39578d95ac462983f8157383a13b51e10078ab"
+        },
+        {
+            "name": "IMAGE_ADDONS_TKN",
+            "image": "quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:2871101262adbe8c590340734a39578d95ac462983f8157383a13b51e10078ab"
+        },
+        {
+            "name": "IMAGE_PIPELINES_CONSOLE_PLUGIN",
+            "image": "quay.io/openshift-pipeline/pipelines-console-plugin-rhel9@sha256:bb058b3de08a97a38b1eb1c65df636dcb0632194c30c4d57569762097f9b6b86"
+        },
+        {
+            "name": "IMAGE_PIPELINES_TEKTON_PIPELINES_CONTROLLER",
+            "image": "quay.io/openshift-pipeline/pipelines-controller-rhel9@sha256:d74b68ffbd2cec8062a4def44e5ae41978a5f59237c3e203878e80b704a3e270"
+        },
+        {
+            "name": "IMAGE_PIPELINES_ARG__SHELL_IMAGE",
+            "image": "quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:b683d1297531301092caa83d7dbb59869a5e5a0ffe8a20951d5b4515881d8cc1"
+        },
+        {
+            "name": "IMAGE_PIPELINES_ARG__ENTRYPOINT_IMAGE",
+            "image": "quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:b683d1297531301092caa83d7dbb59869a5e5a0ffe8a20951d5b4515881d8cc1"
+        },
+        {
+            "name": "IMAGE_PIPELINES_TEKTON_EVENTS_CONTROLLER",
+            "image": "quay.io/openshift-pipeline/pipelines-events-rhel9@sha256:c62f8521024d49792c023a7de84a2b8d71d6a2d88bce5dab2ee0a48c6359e1fb"
+        },
+        {
+            "name": "IMAGE_ADDONS_GIT_RUN",
+            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:7eb44962e318f67d26fca82bcd6ad6c0c31b76eca6370782c8459dbfe96ad9a7"
+        },
+        {
+            "name": "IMAGE_ADDONS_GIT_CLONE",
+            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:7eb44962e318f67d26fca82bcd6ad6c0c31b76eca6370782c8459dbfe96ad9a7"
+        },
+        {
+            "name": "IMAGE_ADDONS_PREPARE_AND_RUN",
+            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:7eb44962e318f67d26fca82bcd6ad6c0c31b76eca6370782c8459dbfe96ad9a7"
+        },
+        {
+            "name": "IMAGE_ADDONS_REPORT",
+            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:7eb44962e318f67d26fca82bcd6ad6c0c31b76eca6370782c8459dbfe96ad9a7"
+        },
+        {
+            "name": "IMAGE_ADDONS_PARAM_GITINITIMAGE",
+            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:7eb44962e318f67d26fca82bcd6ad6c0c31b76eca6370782c8459dbfe96ad9a7"
+        },
+        {
+            "name": "IMAGE_PIPELINES_ARG__GIT_IMAGE",
+            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:7eb44962e318f67d26fca82bcd6ad6c0c31b76eca6370782c8459dbfe96ad9a7"
+        },
+        {
+            "name": "IMAGE_HUB_TEKTON_HUB_API",
+            "image": "quay.io/openshift-pipeline/pipelines-hub-api-rhel9@sha256:c8443833598d8eb74859f07e92a6f3e4a20d574180d51d17527e1740c2c7a67c"
+        },
+        {
+            "name": "IMAGE_HUB_TEKTON_HUB_DB_MIGRATION",
+            "image": "quay.io/openshift-pipeline/pipelines-hub-db-migration-rhel9@sha256:84b0435aac4e93f42a81c64ae8d8fc8dc819b65deb80c1ddd64a405ee2c72273"
+        },
+        {
+            "name": "IMAGE_HUB_TEKTON_HUB_UI",
+            "image": "quay.io/openshift-pipeline/pipelines-hub-ui-rhel9@sha256:0cb8d1f1552e15245afa1935576130093063e664ed2a9ba13e9d4c91afe17a5c"
+        },
+        {
+            "name": "IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER",
+            "image": "quay.io/openshift-pipeline/pipelines-manual-approval-gate-controller-rhel9@sha256:9228d5164a5a32951733869153cf827308f53694f5c246df6294d8ba3ad1edd3"
+        },
+        {
+            "name": "IMAGE_MAG_MANUAL_APPROVAL",
+            "image": "quay.io/openshift-pipeline/pipelines-manual-approval-gate-webhook-rhel9@sha256:ff472c514aa6f7c998b7bbf4c6a065e9b1c27d341714d42ae405cb3360482fb1"
+        },
+        {
+            "name": "IMAGE_PIPELINES_ARG__NOP_IMAGE",
+            "image": "quay.io/openshift-pipeline/pipelines-nop-rhel9@sha256:b1769e60d85ee314541ec07d1689b11179dfa0380c979b61a42791acdad9e4a6"
+        },
+        {
+            "name": "IMAGE_ADDONS_OPC",
+            "image": "quay.io/openshift-pipeline/pipelines-opc-rhel9@sha256:0f4fb86deb1f34cf4a422835f2c5add41532c24858bc974211932f14c57f7346"
+        },
+        {
+            "name": "",
+            "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:fd5ae2f68fe55fd87ea5036014fdc688c644128cd8b018ea1c06aa07f73de207"
+        },
+        {
+            "name": "IMAGE_PIPELINES_PROXY",
+            "image": "quay.io/openshift-pipeline/pipelines-operator-proxy-rhel9@sha256:e0c41e50942f694436f5036762e2ac5afac7a12cb209a40d7c2bcaf9771bc796"
+        },
+        {
+            "name": "TEKTON_OPERATOR_WEBHOOK",
+            "image": "quay.io/openshift-pipeline/pipelines-operator-webhook-rhel9@sha256:962db05ca62d916d85bfc909c352f146646385bda4922f584694181be9b5b3c6"
+        },
+        {
+            "name": "IMAGE_PAC_PAC_CLI",
+            "image": "quay.io/openshift-pipeline/pipelines-pipelines-as-code-cli-rhel9@sha256:2a5dc3ddb65c50a8e165da467d3a022c25a84b5c9b7716453d6174b31b74fb19"
+        },
+        {
+            "name": "IMAGE_PAC_PAC_CONTROLLER",
+            "image": "quay.io/openshift-pipeline/pipelines-pipelines-as-code-controller-rhel9@sha256:88cd960389917ea9efa7237b4fe2965bb75e539d15204c34cae47d4e7bed7a25"
+        },
+        {
+            "name": "IMAGE_PAC_PAC_WATCHER",
+            "image": "quay.io/openshift-pipeline/pipelines-pipelines-as-code-watcher-rhel9@sha256:67bddcf7488ca76945e19a31d44c97a4b26e0c2756da7217f3eb5285c197460a"
+        },
+        {
+            "name": "IMAGE_PAC_PAC_WEBHOOK",
+            "image": "quay.io/openshift-pipeline/pipelines-pipelines-as-code-webhook-rhel9@sha256:83bd69a36728fc2bf57e5e46344e90b5252b41853755508d28ca39afdad3a6b2"
+        },
+        {
+            "name": "IMAGE_PRUNER_CONTROLLER",
+            "image": "quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:1bda4d788bf47e82f8d2df5c6cbfe5d294e15112d22b920625634832a8fdc810"
+        },
+        {
+            "name": "IMAGE_PRUNER_WEBHOOK",
+            "image": "quay.io/openshift-pipeline/pipelines-pruner-webhook-rhel9@sha256:e640d0e01736af6519d4341ce4b0440991e35044fd45d0a048d72af097d239e7"
+        },
+        {
+            "name": "IMAGE_PIPELINES_CONTROLLER",
+            "image": "quay.io/openshift-pipeline/pipelines-resolvers-rhel9@sha256:6a0977a2c1bff6eccccb6c0f43346e94c15e5a8f4efa04c86c07b16b034cadbe"
+        },
+        {
+            "name": "IMAGE_RESULTS_API",
+            "image": "quay.io/openshift-pipeline/pipelines-results-api-rhel9@sha256:88b73c578908061cc0d6cd872945a2076e7067749f35942b6c0fafc91586765c"
+        },
+        {
+            "name": "IMAGE_RESULTS_RETENTION_POLICY_AGENT",
+            "image": "quay.io/openshift-pipeline/pipelines-results-retention-policy-agent-rhel9@sha256:00984f30f91a4ccea0838260af78a6c61f04653ea65f87d6604a4c68629ff275"
+        },
+        {
+            "name": "IMAGE_RESULTS_WATCHER",
+            "image": "quay.io/openshift-pipeline/pipelines-results-watcher-rhel9@sha256:4579a76d5475222960fc98e964e0d56e9133107ecfce45b6235275ad4f8f0cd9"
+        },
+        {
+            "name": "OPENSHIFT_PIPELINES_OPERATOR_LIFECYCLE",
+            "image": "quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:be18ec851ae55dcceedacfeb2314ecfe91dbe539fb18154b844826f8d46dedd5"
+        },
+        {
+            "name": "OPENSHIFT_PIPELINES_OPERATOR_CLUSTER_OPERATIONS",
+            "image": "quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:be18ec851ae55dcceedacfeb2314ecfe91dbe539fb18154b844826f8d46dedd5"
+        },
+        {
+            "name": "IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG",
+            "image": "quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:83479f3be12ec9bf542600f6efe06fc7e3a36e351f7befef6d1d114396e468d5"
+        },
+        {
+            "name": "IMAGE_ADDONS_TKN_CLI_SERVE",
+            "image": "quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:83479f3be12ec9bf542600f6efe06fc7e3a36e351f7befef6d1d114396e468d5"
+        },
+        {
+            "name": "IMAGE_PIPELINES_ARG__SIDECARLOGRESULTS_IMAGE",
+            "image": "quay.io/openshift-pipeline/pipelines-sidecarlogresults-rhel9@sha256:b967c3556794c1cb44e62e4f13f2be16e96ad76297366a3323a0e758ba882944"
+        },
+        {
+            "name": "IMAGE_TRIGGERS_TEKTON_TRIGGERS_CONTROLLER",
+            "image": "quay.io/openshift-pipeline/pipelines-triggers-controller-rhel9@sha256:01873f0bb1ee9eb4237e1cb6fa4054f5ad6e92a50aaae6b72b253d8e0b5be941"
+        },
+        {
+            "name": "IMAGE_TRIGGERS_TEKTON_TRIGGERS_CORE_INTERCEPTORS",
+            "image": "quay.io/openshift-pipeline/pipelines-triggers-core-interceptors-rhel9@sha256:41cd4980262e0e8c78f7ee41ab4047e667a5481ed980f8f01cfd84d23851a05a"
+        },
+        {
+            "name": "IMAGE_TRIGGERS_ARG__EL_IMAGE",
+            "image": "quay.io/openshift-pipeline/pipelines-triggers-eventlistenersink-rhel9@sha256:a0380cf9ca6d6e67f80caa8e69c65ec1d6784180794c233fe5c241103b8ec037"
+        },
+        {
+            "name": "IMAGE_TRIGGERS_WEBHOOK",
+            "image": "quay.io/openshift-pipeline/pipelines-triggers-webhook-rhel9@sha256:6e7204475640d590208ae0d26b39fd9a4abad2f0008386a1f229695dc8be05df"
+        },
+        {
+            "name": "IMAGE_PIPELINES_WEBHOOK",
+            "image": "quay.io/openshift-pipeline/pipelines-webhook-rhel9@sha256:44dd107821f85fb47e832a499b7a982c2ef0ba3b3579ec620dd62027902a507f"
+        },
+        {
+            "name": "IMAGE_PIPELINES_ARG__WORKINGDIRINIT_IMAGE",
+            "image": "quay.io/openshift-pipeline/pipelines-workingdirinit-rhel9@sha256:323f761c7bea2978055042389c530e95476be8a851ce0f6a9b4057c4e3959a90"
         },
         {
             "name": "IMAGE_ADDONS_KN",
