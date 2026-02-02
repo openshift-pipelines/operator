@@ -2,16 +2,23 @@
 
 set -ex
 current_version=$(yq e '.versions.current' project.yaml)
-echo $current_version
-current_version_number=${current_version##*-}
-echo $current_version_number
-new_version_number=$(( current_version_number + 1 ))
-echo $new_version_number
-new_version1=(${current_version//-/ })
-new_version2=$new_version1-$new_version_number
-echo "$new_version2"
-yq -i e ".versions.current = \"$new_version2\"" project.yaml
-yq -i e ".versions.previous = \"$current_version\"" project.yaml
+echo "Current version: $current_version"
 
+new_version="$current_version"
+# Only bump if version ends with -<number>
+if [[ "$current_version" =~ ^(.+)-([0-9]+)$ ]]; then
+  base="${BASH_REMATCH[1]}"
+  suffix="${BASH_REMATCH[2]}"
+  new_version="${base}-$((suffix + 1))"
+fi
+echo "New version: $new_version"
+
+# Update YAML only if version changed
+if [[ "$new_version" != "$current_version" ]]; then
+  yq -i e ".versions.previous = \"$current_version\"" project.yaml
+  yq -i e ".versions.current  = \"$new_version\"" project.yaml
+else
+  echo "No numeric suffix found; version not updated in project.yaml"
+fi
 # update version and previous_version in operator-fetch-payload
-sed -i."" "s%version=.*\\\%version=\"$new_version2\" \\\%g" .konflux/dockerfiles/bundle.Dockerfile
+sed -i."" "s%version=.*\\\%version=\"$new_version\" \\\%g" .konflux/dockerfiles/bundle.Dockerfile
