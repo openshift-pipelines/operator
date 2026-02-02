@@ -21,8 +21,9 @@
 
     #Update the bundle image and version in the olm config.yaml file only for 5.0.x versions
     export BUNDLE_IMAGE BUNDLE_VERSION
-    yq -i e '(.bundles[] | select(.version | test("^5\\.0\\..*"))).image = env(BUNDLE_IMAGE)' $ROOT_DIR/olm/config.yaml
     yq -i e '(.bundles[] | select(.version | test("^5\\.0\\..*"))).version = env(BUNDLE_VERSION)' $ROOT_DIR/olm/config.yaml
+    yq -i e '(.bundles[] | select(.version == env(BUNDLE_VERSION))).image = env(BUNDLE_IMAGE)' $ROOT_DIR/olm/config.yaml
+
 }
 
 function target_registry() {
