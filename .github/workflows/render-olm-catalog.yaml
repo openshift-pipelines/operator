@@ -5,6 +5,7 @@ on:
     paths:
       - nightly-bundle.yaml
       - olm/
+      - .github/workflows/render-olm-catalog.yaml
   workflow_dispatch:
     inputs:
       environment:
@@ -19,28 +20,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-matrix:
-    runs-on: ubuntu-latest
-    if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-      - id: set-matrix
-        run: |
-          pushd .konflux/olm-catalog/index
-          VERSIONS=$(ls -d v* | jq -R -s -c 'split("\n")[:-1]')
-          popd
-          echo "Versions: ${VERSIONS}"
-          echo "versions=${VERSIONS}" >> $GITHUB_OUTPUT
-    outputs:
-      versions: ${{ steps.set-matrix.outputs.versions }}
   generate-catalog:
-    needs: build-matrix
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        version: ${{ fromJSON(needs.build-matrix.outputs.versions) }}
     permissions:
       contents: write
       pull-requests: write
@@ -53,35 +34,15 @@ jobs:
           DOCKER_JSON: ${{ secrets.DOCKER_REGISTRY_SECRET }}
         run: |
           echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json
-      - name: Generate ${{matrix.version}} Bundles
+      - name: Generate OLM Bundles
         run: |
           curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
           chmod +x /usr/local/bin/opm
           ./hack/update-olm-bundle.sh ${{github.event.inputs.environment}}
-          ./hack/render-catalog.sh ${{matrix.version}} ${{github.event.inputs.environment}}
 
-      - name: Update ${{matrix.version}} catalog
+      - name: Update OLM catalog
         run: |
-          ./hack/render-catalog.sh ${{matrix.version}} ${{github.event.inputs.environment}}
-      - name: Save generated changes
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.version }}
-          path: .konflux/olm-catalog/index/${{ matrix.version }}
-
-  final-commit:
-    needs: generate-catalog
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: downloaded-artifacts
-      - name: Apply downloaded changes
-        run: |
-          set -x
-          cp -rvf  downloaded-artifacts/v* .konflux/olm-catalog/index/
+          ./hack/render-catalog.sh
       - name: Commit Changes and Generate PR
         run: |
           git config user.name openshift-pipelines-bot

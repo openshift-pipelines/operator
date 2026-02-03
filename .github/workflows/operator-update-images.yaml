@@ -36,12 +36,6 @@ jobs:
           # Update operator's payload and stuff
           make ENVIRONMENT=${{github.event.inputs.environment}} update-reference  
 
-      - name: Generate OLM Bundles
-        run: |
-          curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
-          chmod +x /usr/local/bin/opm
-          ./hack/update-olm-bundle.sh ${{github.event.inputs.environment}}
-
       - name: Commit new changes
         run: |
           BASE_BRANCH=${GITHUB_REF#refs/heads/}
