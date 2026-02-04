@@ -287,8 +287,26 @@ spec:
             x-descriptors:
               - urn:alm:descriptor:com.tectonic.ui:label
         version: v1alpha1
-      - kind: TektonScheduler
+      - description: Represents an installation of latest version of Tekton Scheduler
+        displayName: Tekton Scheduler
+        kind: TektonScheduler
         name: tektonschedulers.operator.tekton.dev
+        resources:
+          - kind: tektoninstallersets
+            name: ''
+            version: v1alpha1
+        specDescriptors:
+          - description: Namespace where Tekton Scheduler installed
+            displayName: Target Namespace
+            path: targetNamespace
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:label
+        statusDescriptors:
+          - description: The version of Tekton Scheduler installed
+            displayName: Version
+            path: version
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:label
         version: v1alpha1
       - description: Represents an installation of latest version of Tekton Triggers
         displayName: Tekton Triggers
@@ -351,11 +369,11 @@ spec:
     ### Components
 
 
-    - Tekton Pipelines: v1.7.0
+    - Tekton Pipelines: v1.9.0
 
     - Tekton Triggers: v0.34.0
 
-    - Pipelines as Code: v0.41.0
+    - Pipelines as Code: v0.41.1
 
     - Tekton Chains: v0.26.0
 
@@ -366,6 +384,8 @@ spec:
     - Manual Approval Gate (tech-preview): v0.7.0
 
     - Tekton Pruner: v0.3.5
+
+    - Tekton Scheduler (tech-preview): v0.3.0
 
 
     ## Getting Started

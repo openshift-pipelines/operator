@@ -52,13 +52,9 @@ type Scheduler struct {
 }
 
 type SchedulerConfig struct {
-	// enable or disable TektonScheduler Component
-	Disabled *bool `json:"disabled"`
 	// This hold the config data from tekton-kueue. ConfigMap in tekton kueue is loaded as config.yaml so we need to
 	//match the key here
 	config.Config `json:"config.yaml"`
-	// options holds additions fields and these fields will be updated on the manifests
-	Options AdditionalOptions `json:"options"`
 }
 
 // MultiClusterConfig Configuration to enable/disable MultiCluster Configuration

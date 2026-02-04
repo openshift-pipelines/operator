@@ -85,8 +85,13 @@ func (r *Reconciler) ensureConfigInstallerSet(ctx context.Context, tektonSchedul
 
 	} else {
 		// If exists, then fetch the Tekton Scheduler Config InstallerSet
-		installedConfigTIS, _ := r.operatorClientSet.OperatorV1alpha1().TektonInstallerSets().
+		installedConfigTIS, err := r.operatorClientSet.OperatorV1alpha1().TektonInstallerSets().
 			Get(ctx, existingConfigInstallerSet, metav1.GetOptions{})
+		if err != nil {
+			logger.Errorw("Failed to get Config InstallerSet", err)
+			return err
+
+		}
 
 		configInstallerSetTargetNamespace := installedConfigTIS.Annotations[v1alpha1.TargetNamespaceKey]
 		configInstallerSetReleaseVersion := installedConfigTIS.Labels[v1alpha1.ReleaseVersionKey]
