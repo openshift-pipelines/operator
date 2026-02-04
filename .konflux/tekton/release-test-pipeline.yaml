@@ -60,35 +60,20 @@ spec:
     - name: provision-cluster
       runAfter:
         - provision-eaas-space
+      params:
+        - name: applicationName
+          value: "$(tasks.parse-metadata.results.application-name)"
       taskSpec:
+        params:
+          - name: applicationName
+            type: string
         results:
           - name: clusterName
             value: "$(steps.create-cluster.results.clusterName)"
           - name: ocpVersion
             description: The OCP version extracted from application name
+            type: string
         steps:
-          - name: extract-ocp-version
-            image: mirror.gcr.io/alpine
-            script: |
-              #!/bin/sh
-              set -e
-              
-              APPLICATION_NAME="$(tasks.parse-metadata.results.application-name)"
-              
-              echo "Application Name: $APPLICATION_NAME"
-              
-              # Extract version pattern (e.g., "4-19" from "openshift-pipelines-index-4-19-1-22")
-              VERSION_PATTERN=$(echo "$APPLICATION_NAME" | grep -oE '[0-9]+-[0-9]+' | head -1)
-              
-              if [ -z "$VERSION_PATTERN" ]; then
-                echo "Warning: Could not extract version from application name, will use default"
-                echo "4.20" | tee $(results.ocpVersion.path)
-              else
-                # Convert "4-19" to "4.19"
-                OCP_VERSION=$(echo "$VERSION_PATTERN" | tr '-' '.')
-                echo "Extracted OCP Version: $OCP_VERSION"
-                echo "$OCP_VERSION" | tee $(results.ocpVersion.path)
-              fi
           - name: get-supported-versions
             ref:
               resolver: git
@@ -102,19 +87,47 @@ spec:
             params:
               - name: eaasSpaceSecretRef
                 value: $(tasks.provision-eaas-space.results.secretRef)
-          - name: pick-version
-            ref:
-              resolver: git
-              params:
-                - name: url
-                  value: https://github.com/konflux-ci/build-definitions.git
-                - name: revision
-                  value: main
-                - name: pathInRepo
-                  value: stepactions/eaas-get-latest-openshift-version-by-prefix/0.1/eaas-get-latest-openshift-version-by-prefix.yaml
-            params:
-              - name: prefix
-                value: "$(steps.extract-ocp-version.results.ocpVersion)."
+          - name: extract-and-pick-version
+            image: quay.io/openshift-pipeline/ci:latest
+            env:
+              - name: APPLICATION_NAME
+                value: "$(params.applicationName)"
+            script: |
+              #!/usr/bin/env bash
+              set -e
+              
+              # Extract OCP version from APPLICATION_NAME
+              # Expected format: openshift-pipelines-index-4-19-1-22 -> 4.19
+              echo "Application Name: $APPLICATION_NAME"
+              
+              # Extract version pattern (e.g., "4-19" from "openshift-pipelines-index-4-19-1-22")
+              VERSION_PATTERN=$(echo "$APPLICATION_NAME" | grep -oE '[0-9]+-[0-9]+' | head -1)
+              
+              if [ -z "$VERSION_PATTERN" ]; then
+                echo "Warning: Could not extract version from application name, will use default"
+                OCP_VERSION="4.20"
+              else
+                # Convert "4-19" to "4.19"
+                OCP_VERSION=$(echo "$VERSION_PATTERN" | tr '-' '.')
+                echo "Extracted OCP Version: $OCP_VERSION"
+              fi
+              
+              echo -n "$OCP_VERSION" | tee /tekton/results/ocpVersion
+              
+              # Fetch the latest patch version for this OCP version
+              echo "Fetching latest patch version for ${OCP_VERSION}..."
+              RELEASE_URL="https://multi.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable-multi/latest?prefix=${OCP_VERSION}."
+              echo "GET $RELEASE_URL"
+              
+              RELEASE_INFO=$(curl -s "$RELEASE_URL")
+              echo "$RELEASE_INFO"
+              
+              VERSION=$(echo "$RELEASE_INFO" | jq -r '.name')
+              echo "Selected version: $VERSION"
+              
+              # Write result for create-cluster step
+              mkdir -p /tekton/steps/step-extract-and-pick-version/results
+              echo -n "$VERSION" | tee /tekton/steps/step-extract-and-pick-version/results/version
           - name: create-cluster
             ref:
               resolver: git
@@ -129,7 +142,7 @@ spec:
               - name: eaasSpaceSecretRef
                 value: $(tasks.provision-eaas-space.results.secretRef)
               - name: version
-                value: "$(steps.pick-version.results.version)"
+                value: "$(steps.extract-and-pick-version.results.version)"
               - name: instanceType
                 value: m5.2xlarge
     - name: deploy-operator
