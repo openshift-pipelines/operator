@@ -64,7 +64,31 @@ spec:
         results:
           - name: clusterName
             value: "$(steps.create-cluster.results.clusterName)"
+          - name: ocpVersion
+            description: The OCP version extracted from application name
         steps:
+          - name: extract-ocp-version
+            image: mirror.gcr.io/alpine
+            script: |
+              #!/bin/sh
+              set -e
+              
+              APPLICATION_NAME="$(tasks.parse-metadata.results.application-name)"
+              
+              echo "Application Name: $APPLICATION_NAME"
+              
+              # Extract version pattern (e.g., "4-19" from "openshift-pipelines-index-4-19-1-22")
+              VERSION_PATTERN=$(echo "$APPLICATION_NAME" | grep -oE '[0-9]+-[0-9]+' | head -1)
+              
+              if [ -z "$VERSION_PATTERN" ]; then
+                echo "Warning: Could not extract version from application name, will use default"
+                echo "4.20" | tee $(results.ocpVersion.path)
+              else
+                # Convert "4-19" to "4.19"
+                OCP_VERSION=$(echo "$VERSION_PATTERN" | tr '-' '.')
+                echo "Extracted OCP Version: $OCP_VERSION"
+                echo "$OCP_VERSION" | tee $(results.ocpVersion.path)
+              fi
           - name: get-supported-versions
             ref:
               resolver: git
@@ -90,7 +114,7 @@ spec:
                   value: stepactions/eaas-get-latest-openshift-version-by-prefix/0.1/eaas-get-latest-openshift-version-by-prefix.yaml
             params:
               - name: prefix
-                value: "$(steps.get-supported-versions.results.versions[0])."
+                value: "$(steps.extract-ocp-version.results.ocpVersion)."
           - name: create-cluster
             ref:
               resolver: git
