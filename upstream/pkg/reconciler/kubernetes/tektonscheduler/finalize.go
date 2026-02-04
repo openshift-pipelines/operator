@@ -28,7 +28,7 @@ import (
 
 var _ tektonscheduler.Finalizer = (*Reconciler)(nil)
 
-// FinalizeKind removes all resources after deletion of a TektonPruner CR.
+// FinalizeKind removes all resources after deletion of a TektonScheduler CR.
 func (r *Reconciler) FinalizeKind(ctx context.Context, original *v1alpha1.TektonScheduler) pkgreconciler.Event {
 	logger := logging.FromContext(ctx)
 
@@ -36,7 +36,7 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, original *v1alpha1.Tekton
 	//of CRDs which has finalizer set will get deleted before we remove
 	//the controller;s deployment for it
 	if err := r.manifest.Filter(mf.CRDs).Delete(); err != nil {
-		logger.Error("Failed to deleted CRDs for TektonPruner")
+		logger.Error("Failed to deleted CRDs for TektonScheduler")
 		return err
 	}
 
