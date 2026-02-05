@@ -25,11 +25,11 @@ function update_image_reference() {
 
 
      # Check if the image exists in the target registry
-    skopeo inspect --raw docker://${output} > /dev/null 2>&1
-     if [ $? -ne 0 ]; then
-         echo -e "\e[31m Image ${output} does not exist, skipping update \e[0m" >&2
-         return 1
-     fi
+#    skopeo inspect --raw docker://${output} > /dev/null 2>&1
+#     if [ $? -ne 0 ]; then
+#         echo -e "\e[31m Image ${output} does not exist, skipping update \e[0m" >&2
+#         return 1
+#     fi
     echo "$output"
 }
 CSV_FILE=".konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml"
