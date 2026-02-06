@@ -14,12 +14,12 @@ metadata:
       == "release-v1.22.x" &&
       ((".konflux/olm-catalog/bundle/***".pathChanged()) ||
       ".konflux/dockerfiles/bundle.Dockerfile".pathChanged() ||
-      ".tekton/operator-1-22-bundle-pull-request.yaml".pathChanged())
+      ".tekton/tektoncd-operator-1-22-bundle-pull-request.yaml".pathChanged())
   labels:
     appstudio.openshift.io/application: openshift-pipelines-core-1-22
-    appstudio.openshift.io/component: operator-1-22-bundle
+    appstudio.openshift.io/component: tektoncd-operator-1-22-bundle
     pipelines.appstudio.openshift.io/type: build
-  name: operator-1-22-bundle-on-pull-request
+  name: tektoncd-operator-1-22-bundle-on-pull-request
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -50,7 +50,7 @@ spec:
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-1-22-bundle
+    serviceAccountName: build-pipeline-tektoncd-operator-1-22-bundle
   workspaces:
   - name: git-auth
     secret:

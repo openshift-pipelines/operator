@@ -12,14 +12,14 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "release-v1.22.x" &&
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
-      ".konflux/dockerfiles/operator.Dockerfile".pathChanged() ||
-      ".tekton/operator-1-22-operator-push.yaml".pathChanged())
+      ".konflux/dockerfiles/webhook.Dockerfile".pathChanged() ||
+      ".tekton/tektoncd-operator-1-22-webhook-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: openshift-pipelines-core-1-22
-    appstudio.openshift.io/component: operator-1-22-operator
+    appstudio.openshift.io/component: tektoncd-operator-1-22-webhook
     pipelines.appstudio.openshift.io/type: build
-  name: operator-1-22-operator-on-push
+  name: tektoncd-operator-1-22-webhook-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -30,9 +30,9 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-rhel9-operator:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-webhook-rhel9:{{revision}}
   - name: dockerfile
-    value: .konflux/dockerfiles/operator.Dockerfile
+    value: .konflux/dockerfiles/webhook.Dockerfile
   - name: additional-tags
     value:
       - "v1.22.0"
@@ -42,7 +42,7 @@ spec:
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-1-22-operator
+    serviceAccountName: build-pipeline-tektoncd-operator-1-22-webhook
   workspaces:
   - name: git-auth
     secret:

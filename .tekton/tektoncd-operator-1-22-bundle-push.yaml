@@ -7,19 +7,19 @@ metadata:
     pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/next/.tekton/docker-build-ta.yaml"
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator.git?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
-    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "release-v1.22.x" &&
-      ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
-      ".konflux/dockerfiles/operator.Dockerfile".pathChanged() ||
-      ".tekton/operator-1-22-operator-pull-request.yaml".pathChanged())
+      ((".konflux/olm-catalog/bundle/***".pathChanged()) ||
+      ".konflux/dockerfiles/bundle.Dockerfile".pathChanged() ||
+      ".tekton/tektoncd-operator-1-22-bundle-push.yaml".pathChanged())
+  creationTimestamp: null
   labels:
     appstudio.openshift.io/application: openshift-pipelines-core-1-22
-    appstudio.openshift.io/component: operator-1-22-operator
+    appstudio.openshift.io/component: tektoncd-operator-1-22-bundle
     pipelines.appstudio.openshift.io/type: build
-  name: operator-1-22-operator-on-pull-request
+  name: tektoncd-operator-1-22-bundle-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -30,24 +30,24 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-rhel9-operator:on-pr-{{revision}}
-  - name: image-expires-after
-    value: 5d
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-bundle:{{revision}}
   - name: dockerfile
-    value: .konflux/dockerfiles/operator.Dockerfile
+    value: .konflux/dockerfiles/bundle.Dockerfile
   - name: additional-tags
     value:
-      - "on-pr-v1.22.0"
+      - "v1.22.0"
   - name: build-platforms
     value:
-    - linux/x86_64
+      - linux/x86_64
+  - name: build-image-index
+    value: false
   - name: prefetch-input
     value: |
       {"type": "rpm", "path": ".konflux/rpms"}
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-1-22-operator
+    serviceAccountName: build-pipeline-tektoncd-operator-1-22-bundle
   workspaces:
   - name: git-auth
     secret:

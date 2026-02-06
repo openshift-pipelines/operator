@@ -13,13 +13,13 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
       == "release-v1.22.x" &&
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
-      ".konflux/dockerfiles/webhook.Dockerfile".pathChanged() ||
-      ".tekton/operator-1-22-webhook-pull-request.yaml".pathChanged())
+      ".konflux/dockerfiles/proxy.Dockerfile".pathChanged() ||
+      ".tekton/tektoncd-operator-1-22-proxy-pull-request.yaml".pathChanged())
   labels:
     appstudio.openshift.io/application: openshift-pipelines-core-1-22
-    appstudio.openshift.io/component: operator-1-22-webhook
+    appstudio.openshift.io/component: tektoncd-operator-1-22-proxy
     pipelines.appstudio.openshift.io/type: build
-  name: operator-1-22-webhook-on-pull-request
+  name: tektoncd-operator-1-22-proxy-on-pull-request
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -30,11 +30,11 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-webhook-rhel9:on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-proxy-rhel9:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: .konflux/dockerfiles/webhook.Dockerfile
+    value: .konflux/dockerfiles/proxy.Dockerfile
   - name: additional-tags
     value:
       - "on-pr-v1.22.0"
@@ -47,7 +47,7 @@ spec:
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-1-22-webhook
+    serviceAccountName: build-pipeline-tektoncd-operator-1-22-proxy
   workspaces:
   - name: git-auth
     secret:
