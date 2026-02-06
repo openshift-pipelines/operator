@@ -13,13 +13,13 @@ metadata:
       == "release-v1.22.x" &&
       (( ".konflux/olm-catalog/index/***".pathChanged()) ||
       ".konflux/dockerfiles/index-4.20.Dockerfile".pathChanged() ||
-      ".tekton/operator-1-22-index-4.20-push.yaml".pathChanged())
+      ".tekton/operator-index-4-20-1-22-index-4.20-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: openshift-pipelines-index-4-20-1-22
-    appstudio.openshift.io/component: operator-1-22-index-4-20
+    appstudio.openshift.io/component: operator-index-4-20-1-22-index-4-20
     pipelines.appstudio.openshift.io/type: build
-  name: operator-1-22-index-4.20-on-push
+  name: operator-index-4-20-1-22-index-4.20-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -30,7 +30,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator/pipelines-index-4.20:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-index-4.20/pipelines-index-4.20:{{revision}}
   - name: dockerfile
     value: .konflux/dockerfiles/index-4.20.Dockerfile
   - name: additional-tags
@@ -39,7 +39,7 @@ spec:
   pipelineRef:
     name: fbc-build
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-1-22-index-4-20
+    serviceAccountName: build-pipeline-operator-index-4-20-1-22-index-4-20
   workspaces:
   - name: git-auth
     secret:
