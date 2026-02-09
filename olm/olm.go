@@ -11,18 +11,21 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/name"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"gopkg.in/yaml.v3"
 )
 
 func main() {
-
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run generator.go config.yaml")
+		fmt.Println("Usage: go run olm.go config.yaml")
 		return
 	}
 
 	// Read YAML
-	raw, err := ioutil.ReadFile(os.Args[1])
+	var filePath = os.Args[1]
+	raw, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		panic(err)
 	}
@@ -39,6 +42,7 @@ func main() {
 	var bundles []BundleVersion
 	var channels []string
 	for _, b := range cfg.Bundles {
+		updateBundleImage(&b)
 		bundleVersion := BundleVersion{parseVersion(b.Version), b.Image}
 		channel := channelName(bundleVersion)
 		if !slices.Contains(channels, channel) {
@@ -257,4 +261,29 @@ func buildChannel(pkg, name string, allEntries map[string][]ChannelEntry) Channe
 	})
 	channel.Entries = channelEntries
 	return channel
+}
+
+func updateBundleImage(b *BundleConfig) {
+	if !strings.Contains(b.Image, "@sha256") {
+		inputImage := "registry.redhat.io/openshift-pipelines/pipelines-operator-bundle:v" + b.Version
+		ref, err := name.ParseReference(inputImage)
+		if err != nil {
+			log.Fatalf("failed to parse image name: %v", err)
+		}
+
+		// 2. Fetch the descriptor from the remote registry
+		// This uses your local docker/podman credentials automatically
+		desc, err := remote.Get(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+		if err != nil {
+			log.Fatalf("failed to fetch image descriptor: %v", err)
+		}
+
+		// 3. Construct the new string using the digest
+		// desc.Digest contains the sha256 hash
+		digestImage := fmt.Sprintf("%s@%s", ref.Context().Name(), desc.Digest.String())
+
+		fmt.Printf("Original: %s\n", inputImage)
+		fmt.Printf("Resolved: %s\n", digestImage)
+		b.Image = digestImage
+	}
 }
