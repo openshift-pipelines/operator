@@ -71,21 +71,36 @@ need a checkout of the operator repo, a terminal window and a text editor.
 
 2. `cd` to root of Operator git checkout.
 
-3. set commit SHA from TEKTON_RELEASE_BRANCH
+3. Create a `release.env` file with environment variables for bash scripts in later steps, and source it:
+
+    ```bash
+    cat <<EOF > release.env
+    TEKTON_RELEASE_VERSION= # Example: v0.69.0
+    TEKTON_OLD_VERSION= # Example: v0.68.0
+    TEKTON_RELEASE_NAME="Oriental Longhair Omnibot" # Name of the release (should be a bird name) 
+    TEKTON_PACKAGE=tektoncd/operator
+    TEKTON_REPO_NAME=operator
+    EOF
+    . ./release.env
+    ```
+
+
+4. Set commit SHA from TEKTON_RELEASE_BRANCH:
    ```bash
    TEKTON_RELEASE_GIT_SHA=$(git rev-parse upstream/${TEKTON_RELEASE_BRANCH})
    ```
 
-4. Confirm commit SHA matches what you want to release.
+5. Confirm commit SHA matches what you want to release.
 
     ```bash
     git show $TEKTON_RELEASE_GIT_SHA
     ```
 
-5. Create a workspace template file:
+6. Create a workspace template file:
 
    ```bash
-   cat <<EOF > workspace-template.yaml
+   WORKSPACE_TEMPLATE=$(mktemp /tmp/workspace-template.XXXXXX.yaml)
+   cat <<'EOF' > $WORKSPACE_TEMPLATE
    spec:
      accessModes:
      - ReadWriteOnce
@@ -95,14 +110,16 @@ need a checkout of the operator repo, a terminal window and a text editor.
    EOF
    ```
 
-6. Execute the release pipeline.
+7. Execute the release pipeline (takes ~45 mins).
+    
+    **The minimum required tkn version is v0.30.0 or later**
 
+    **If you are back-porting include this flag: `--param=releaseAsLatest="false"`**
     ```bash
     tkn --context dogfooding pipeline start operator-release \
         --filename=tekton/operator-release-pipeline.yaml \
-        --serviceaccount=release-right-meow \
         --param package=github.com/tektoncd/operator \
-        --param repoName=pruner \
+        --param repoName="${TEKTON_REPO_NAME}" \
         --param components=components.yaml \
         --param gitRevision="${TEKTON_RELEASE_GIT_SHA}" \
         --param imageRegistry=ghcr.io \
@@ -118,7 +135,7 @@ need a checkout of the operator repo, a terminal window and a text editor.
         --param kubeDistros="kubernetes openshift" \
         --workspace name=release-secret,secret=oci-release-secret \
         --workspace name=release-images-secret,secret=ghcr-creds \
-        --workspace name=workarea,volumeClaimTemplateFile=workspace-template.yaml \
+        --workspace name=workarea,volumeClaimTemplateFile="${WORKSPACE_TEMPLATE}" \
         --pipeline-timeout 2h0m0s
     ```
 
@@ -145,42 +162,58 @@ need a checkout of the operator repo, a terminal window and a text editor.
 
 ## Creating Github Release
 
-1. The YAMLs are now uploaded to publically accesible gcs bucket! Anyone installing Tekton Pipelines will now get the
-   new version. Time to create a new GitHub release announcement:
+1. The YAMLs are now released. Anyone installing Tekton Operator will now get the new version. Time to create a new GitHub release announcement:
 
-    1. Create additional environment variables
+    1. Find the Rekor UUID for the release:
 
-    ```bash
-    TEKTON_OLD_VERSION=# Example: v0.11.1
-    TEKTON_RELEASE_NAME=# The release name you just chose, e.g.: "Ragdoll Norby"
-    ```
+        ```bash
+        RELEASE_FILE=https://infra.tekton.dev/tekton-releases/operator/previous/${TEKTON_RELEASE_VERSION}/release.yaml
+        OPERATOR_IMAGE_SHA=$(curl -L $RELEASE_FILE | sed -n 's/"//g;s/.*ghcr\.io\/tektoncd\/operator\/operator-[^@]*@//p;' | head -1)
+        REKOR_UUID=$(rekor-cli search --sha $OPERATOR_IMAGE_SHA | grep -v Found | head -1)
+        echo -e "OPERATOR_IMAGE_SHA: ${OPERATOR_IMAGE_SHA}\nREKOR_UUID: ${REKOR_UUID}"
+        ```
 
-    1. Execute the Draft Release Pipeline.
+    2. Execute the Draft Release Pipeline.
 
-    ```bash
-    tkn --context dogfooding pipeline start \
-      --workspace name=shared,volumeClaimTemplateFile=workspace-template.yaml \
-      --workspace name=credentials,secret=oci-release-secret \
-      -p package="tektoncd/operator" \
-      -p git-revision="$TEKTON_RELEASE_GIT_SHA" \
-      -p release-tag="${TEKTON_RELEASE_VERSION}" \
-      -p previous-release-tag="${TEKTON_OLD_VERSION}" \
-      -p release-name="${TEKTON_RELEASE_NAME}" \
-      -p bucket="tekton-releases/operator/" \
-      -p rekor-uuid="" \
-      release-draft-oci
-    ```
+        Create a pod template file:
 
-    1. Watch logs of create-draft-release
+        ```shell
+        POD_TEMPLATE=$(mktemp /tmp/pod-template.XXXXXX.yaml)
+        cat <<'EOF' > $POD_TEMPLATE
+        securityContext:
+          fsGroup: 65532
+          runAsUser: 65532
+          runAsNonRoot: true
+        EOF
+        ```
 
-    1. On successful completion, a 👉 URL will be logged. Visit that URL and look through the release notes. 1. Manually
-       add upgrade and deprecation notices based on the generated release notes 1. Double-check that the list of commits
-       here matches your expectations for the release. You might need to remove incorrect commits or copy/paste commits
-       from the release branch. Refer to previous releases to confirm the expected format.
+        ```bash
+        tkn --context dogfooding pipeline start \
+          --workspace name=shared,volumeClaimTemplateFile="${WORKSPACE_TEMPLATE}" \
+          --workspace name=credentials,secret=oci-release-secret \
+          --pod-template "${POD_TEMPLATE}" \
+          -p package="${TEKTON_PACKAGE}" \
+          -p git-revision="${TEKTON_RELEASE_GIT_SHA}" \
+          -p release-tag="${TEKTON_RELEASE_VERSION}" \
+          -p previous-release-tag="${TEKTON_OLD_VERSION}" \
+          -p release-name="${TEKTON_RELEASE_NAME}" \
+          -p repo-name="${TEKTON_REPO_NAME}" \
+          -p bucket="tekton-releases" \
+          -p rekor-uuid="${REKOR_UUID}" \
+          release-draft-oci
+        ```
 
-    1. Un-check the "This is a pre-release" checkbox since you're making a legit for-reals release!
+    3. Watch logs of create-draft-release
 
-    1. Publish the GitHub release once all notes are correct and in order.
+    4. On successful completion, a 👉 URL will be logged. Visit that URL and look through the release notes.
+
+    5. Manually add upgrade and deprecation notices based on the generated release notes.
+
+    6. Double-check that the list of commits here matches your expectations for the release. You might need to remove incorrect commits or copy/paste commits from the release branch. Refer to previous releases to confirm the expected format.
+
+    7. Un-check the "This is a pre-release" checkbox since you're making a legit for-reals release!
+
+    8. Publish the GitHub release once all notes are correct and in order.
 
 2. Edit `README.md` on `master` branch, add entry to docs table with latest release links.
    In README.md, update the supported versions and end-of-life sections:
@@ -212,26 +245,29 @@ Congratulations, you're done!
     oci ce cluster create-kubeconfig --cluster-id <CLUSTER-OCID> --file $HOME/.kube/config --region <CLUSTER-REGION> --token-version 2.0.0  --kube-endpoint PUBLIC_ENDPOINT
     ```
 
-1. Give [the context](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)
+2. Give [the context](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)
    a short memorable name such as `dogfooding`:
 
    ```bash
    kubectl config rename-context <REPLACE-WITH-NAME-FROM-CONFIG-CONTEXT> dogfooding
    ```
 
-1. **Important: Switch `kubectl` back to your own cluster by default.**
+3. **Important: Switch `kubectl` back to your own cluster by default.**
 
     ```bash
     kubectl config use-context my-dev-cluster
     ```
 
 ## Ensure documentation is updated
-   In the https://github.com/tektoncd/website.git repository, under sync/config/operator.yaml,
-   ensure that you add a section for the new ${TEKTON_RELEASE_VERSION} version.
+
+In the https://github.com/tektoncd/website.git repository, under sync/config/operator.yaml,
+ensure that you add a section for the new ${TEKTON_RELEASE_VERSION} version.
 
 ## Add operator to operatorhub
-   This process is typically done for minor releases, but not for patch releases.
-   1. Under the https://github.com/k8s-operatorhub/community-operators.git repository, follow these instructions:
-   2. Walk through the file /operatorhub/kubernetes/README.md to generate the bundle.
-   3. Copy the bundle generated to your local community-operators repository.
-   4. After completing the steps to generate and copy the bundle, create a pull request against the community-operators repository
+
+This process is typically done for minor releases, but not for patch releases.
+
+1. Under the https://github.com/k8s-operatorhub/community-operators.git repository, follow these instructions:
+2. Walk through the file /operatorhub/kubernetes/README.md to generate the bundle.
+3. Copy the bundle generated to your local community-operators repository.
+4. After completing the steps to generate and copy the bundle, create a pull request against the community-operators repository
