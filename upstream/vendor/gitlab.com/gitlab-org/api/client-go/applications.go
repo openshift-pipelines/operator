@@ -17,34 +17,21 @@
 package gitlab
 
 import (
+	"fmt"
 	"net/http"
 )
 
 type (
 	ApplicationsServiceInterface interface {
-		// CreateApplication creates a new application owned by the authenticated user.
-		//
-		// GitLab API docs:
-		// https://docs.gitlab.com/api/applications/#create-an-application
 		CreateApplication(opt *CreateApplicationOptions, options ...RequestOptionFunc) (*Application, *Response, error)
-
-		// ListApplications get a list of administrables applications by the authenticated user
-		//
-		// GitLab API docs:
-		// https://docs.gitlab.com/api/applications/#list-all-applications
 		ListApplications(opt *ListApplicationsOptions, options ...RequestOptionFunc) ([]*Application, *Response, error)
-
-		// DeleteApplication removes a specific application.
-		//
-		// GitLab API docs:
-		// https://docs.gitlab.com/api/applications/#delete-an-application
-		DeleteApplication(application int64, options ...RequestOptionFunc) (*Response, error)
+		DeleteApplication(application int, options ...RequestOptionFunc) (*Response, error)
 	}
 
 	// ApplicationsService handles communication with administrables applications
-	// of the GitLab API.
+	// of the Gitlab API.
 	//
-	// GitLab API docs: https://docs.gitlab.com/api/applications/
+	// Gitlab API docs: https://docs.gitlab.com/api/applications/
 	ApplicationsService struct {
 		client *Client
 	}
@@ -54,7 +41,7 @@ var _ ApplicationsServiceInterface = (*ApplicationsService)(nil)
 
 // Application represents a GitLab application
 type Application struct {
-	ID              int64  `json:"id"`
+	ID              int    `json:"id"`
 	ApplicationID   string `json:"application_id"`
 	ApplicationName string `json:"application_name"`
 	Secret          string `json:"secret"`
@@ -73,35 +60,57 @@ type CreateApplicationOptions struct {
 	Confidential *bool   `url:"confidential,omitempty" json:"confidential,omitempty"`
 }
 
+// CreateApplication creates a new application owned by the authenticated user.
+//
+// Gitlab API docs: https://docs.gitlab.com/api/applications/#create-an-application
 func (s *ApplicationsService) CreateApplication(opt *CreateApplicationOptions, options ...RequestOptionFunc) (*Application, *Response, error) {
-	return do[*Application](s.client,
-		withMethod(http.MethodPost),
-		withPath("applications"),
-		withAPIOpts(opt),
-		withRequestOpts(options...),
-	)
+	req, err := s.client.NewRequest(http.MethodPost, "applications", opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	a := new(Application)
+	resp, err := s.client.Do(req, a)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return a, resp, nil
 }
 
 // ListApplicationsOptions represents the available
 // ListApplications() options.
-type ListApplicationsOptions struct {
-	ListOptions
-}
+type ListApplicationsOptions ListOptions
 
+// ListApplications get a list of administrables applications by the authenticated user
+//
+// Gitlab API docs : https://docs.gitlab.com/api/applications/#list-all-applications
 func (s *ApplicationsService) ListApplications(opt *ListApplicationsOptions, options ...RequestOptionFunc) ([]*Application, *Response, error) {
-	return do[[]*Application](s.client,
-		withMethod(http.MethodGet),
-		withPath("applications"),
-		withAPIOpts(opt),
-		withRequestOpts(options...),
-	)
+	req, err := s.client.NewRequest(http.MethodGet, "applications", opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var as []*Application
+	resp, err := s.client.Do(req, &as)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return as, resp, nil
 }
 
-func (s *ApplicationsService) DeleteApplication(application int64, options ...RequestOptionFunc) (*Response, error) {
-	_, resp, err := do[none](s.client,
-		withMethod(http.MethodDelete),
-		withPath("applications/%d", application),
-		withRequestOpts(options...),
-	)
-	return resp, err
+// DeleteApplication removes a specific application.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/api/applications/#delete-an-application
+func (s *ApplicationsService) DeleteApplication(application int, options ...RequestOptionFunc) (*Response, error) {
+	u := fmt.Sprintf("applications/%d", application)
+
+	req, err := s.client.NewRequest(http.MethodDelete, u, nil, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.client.Do(req, nil)
 }

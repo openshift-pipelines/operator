@@ -8,40 +8,40 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/open-policy-agent/opa/v1/ast"
 )
 
-// RootPath refers to the root document in storage.
-var RootPath = Path{}
-
 // Path refers to a document in storage.
 type Path []string
 
 // ParsePath returns a new path for the given str.
 func ParsePath(str string) (path Path, ok bool) {
-	if len(str) == 0 || str[0] != '/' {
+	if len(str) == 0 {
+		return nil, false
+	}
+	if str[0] != '/' {
 		return nil, false
 	}
 	if len(str) == 1 {
 		return Path{}, true
 	}
-
-	return strings.Split(str[1:], "/"), true
+	parts := strings.Split(str[1:], "/")
+	return parts, true
 }
 
 // ParsePathEscaped returns a new path for the given escaped str.
 func ParsePathEscaped(str string) (path Path, ok bool) {
-	if path, ok = ParsePath(str); ok {
-		for i := range path {
-			if segment, err := url.PathUnescape(path[i]); err == nil {
-				path[i] = segment
-			} else {
-				return nil, false
-			}
+	path, ok = ParsePath(str)
+	if !ok {
+		return
+	}
+	for i := range path {
+		segment, err := url.PathUnescape(path[i])
+		if err == nil {
+			path[i] = segment
 		}
 	}
 	return
@@ -49,6 +49,7 @@ func ParsePathEscaped(str string) (path Path, ok bool) {
 
 // NewPathForRef returns a new path for the given ref.
 func NewPathForRef(ref ast.Ref) (path Path, err error) {
+
 	if len(ref) == 0 {
 		return nil, errors.New("empty reference (indicates error in caller)")
 	}
@@ -84,17 +85,36 @@ func NewPathForRef(ref ast.Ref) (path Path, err error) {
 // is less than other, 0 if p is equal to other, or 1 if p is greater than
 // other.
 func (p Path) Compare(other Path) (cmp int) {
-	return slices.Compare(p, other)
+	for i := range min(len(p), len(other)) {
+		if cmp := strings.Compare(p[i], other[i]); cmp != 0 {
+			return cmp
+		}
+	}
+	if len(p) < len(other) {
+		return -1
+	}
+	if len(p) == len(other) {
+		return 0
+	}
+	return 1
 }
 
 // Equal returns true if p is the same as other.
 func (p Path) Equal(other Path) bool {
-	return slices.Equal(p, other)
+	return p.Compare(other) == 0
 }
 
 // HasPrefix returns true if p starts with other.
 func (p Path) HasPrefix(other Path) bool {
-	return len(other) <= len(p) && p[:len(other)].Equal(other)
+	if len(other) > len(p) {
+		return false
+	}
+	for i := range other {
+		if p[i] != other[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // Ref returns a ref that represents p rooted at head.

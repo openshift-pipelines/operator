@@ -27,7 +27,7 @@ import (
 // GitLab API docs:
 // https://docs.gitlab.com/api/group_webhooks/
 type GroupHook struct {
-	ID                        int64               `json:"id"`
+	ID                        int                 `json:"id"`
 	URL                       string              `json:"url"`
 	Name                      string              `json:"name"`
 	Description               string              `json:"description"`
@@ -42,7 +42,7 @@ type GroupHook struct {
 	BranchFilterStrategy      string              `json:"branch_filter_strategy"`
 	CustomWebhookTemplate     string              `json:"custom_webhook_template"`
 	CustomHeaders             []*HookCustomHeader `url:"custom_headers,omitempty" json:"custom_headers,omitempty"`
-	GroupID                   int64               `json:"group_id"`
+	GroupID                   int                 `json:"group_id"`
 	IssuesEvents              bool                `json:"issues_events"`
 	ConfidentialIssuesEvents  bool                `json:"confidential_issues_events"`
 	NoteEvents                bool                `json:"note_events"`
@@ -57,18 +57,13 @@ type GroupHook struct {
 	EmojiEvents               bool                `json:"emoji_events"`
 	ResourceAccessTokenEvents bool                `json:"resource_access_token_events"`
 	MemberEvents              bool                `json:"member_events"`
-	ProjectEvents             bool                `json:"project_events"`
-	MilestoneEvents           bool                `json:"milestone_events"`
-	VulnerabilityEvents       bool                `json:"vulnerability_events"`
 }
 
 // ListGroupHooksOptions represents the available ListGroupHooks() options.
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/group_webhooks/#list-group-hooks
-type ListGroupHooksOptions struct {
-	ListOptions
-}
+type ListGroupHooksOptions ListOptions
 
 // ListGroupHooks gets a list of group hooks.
 //
@@ -98,7 +93,7 @@ func (s *GroupsService) ListGroupHooks(gid any, opt *ListGroupHooksOptions, opti
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/group_webhooks/#get-a-group-hook
-func (s *GroupsService) GetGroupHook(gid any, hook int64, options ...RequestOptionFunc) (*GroupHook, *Response, error) {
+func (s *GroupsService) GetGroupHook(gid any, hook int, options ...RequestOptionFunc) (*GroupHook, *Response, error) {
 	group, err := parseID(gid)
 	if err != nil {
 		return nil, nil, err
@@ -123,7 +118,7 @@ func (s *GroupsService) GetGroupHook(gid any, hook int64, options ...RequestOpti
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/group_webhooks/#resend-group-hook-event
-func (s *GroupsService) ResendGroupHookEvent(gid any, hook int64, hookEventID int64, options ...RequestOptionFunc) (*Response, error) {
+func (s *GroupsService) ResendGroupHookEvent(gid any, hook int, hookEventID int, options ...RequestOptionFunc) (*Response, error) {
 	group, err := parseID(gid)
 	if err != nil {
 		return nil, err
@@ -157,16 +152,13 @@ type AddGroupHookOptions struct {
 	ConfidentialNoteEvents    *bool                `url:"confidential_note_events,omitempty"  json:"confidential_note_events,omitempty"`
 	JobEvents                 *bool                `url:"job_events,omitempty"  json:"job_events,omitempty"`
 	PipelineEvents            *bool                `url:"pipeline_events,omitempty"  json:"pipeline_events,omitempty"`
-	ProjectEvents             *bool                `url:"project_events,omitempty"  json:"project_events,omitempty"`
 	WikiPageEvents            *bool                `url:"wiki_page_events,omitempty"  json:"wiki_page_events,omitempty"`
 	DeploymentEvents          *bool                `url:"deployment_events,omitempty" json:"deployment_events,omitempty"`
 	FeatureFlagEvents         *bool                `url:"feature_flag_events,omitempty" json:"feature_flag_events,omitempty"`
 	ReleasesEvents            *bool                `url:"releases_events,omitempty" json:"releases_events,omitempty"`
-	MilestoneEvents           *bool                `url:"milestone_events,omitempty" json:"milestone_events,omitempty"`
 	SubGroupEvents            *bool                `url:"subgroup_events,omitempty" json:"subgroup_events,omitempty"`
 	EmojiEvents               *bool                `url:"emoji_events,omitempty" json:"emoji_events,omitempty"`
 	MemberEvents              *bool                `url:"member_events,omitempty" json:"member_events,omitempty"`
-	VulnerabilityEvents       *bool                `url:"vulnerability_events,omitempty" json:"vulnerability_events,omitempty"`
 	EnableSSLVerification     *bool                `url:"enable_ssl_verification,omitempty"  json:"enable_ssl_verification,omitempty"`
 	Token                     *string              `url:"token,omitempty" json:"token,omitempty"`
 	ResourceAccessTokenEvents *bool                `url:"resource_access_token_events,omitempty" json:"resource_access_token_events,omitempty"`
@@ -218,16 +210,13 @@ type EditGroupHookOptions struct {
 	ConfidentialNoteEvents                *bool                `url:"confidential_note_events,omitempty" json:"confidential_note_events,omitempty"`
 	JobEvents                             *bool                `url:"job_events,omitempty" json:"job_events,omitempty"`
 	PipelineEvents                        *bool                `url:"pipeline_events,omitempty" json:"pipeline_events,omitempty"`
-	ProjectEvents                         *bool                `url:"project_events,omitempty" json:"project_events,omitempty"`
 	WikiPageEvents                        *bool                `url:"wiki_page_events,omitempty" json:"wiki_page_events,omitempty"`
 	DeploymentEvents                      *bool                `url:"deployment_events,omitempty" json:"deployment_events,omitempty"`
 	FeatureFlagEvents                     *bool                `url:"feature_flag_events,omitempty" json:"feature_flag_events,omitempty"`
 	ReleasesEvents                        *bool                `url:"releases_events,omitempty" json:"releases_events,omitempty"`
-	MilestoneEvents                       *bool                `url:"milestone_events,omitempty" json:"milestone_events,omitempty"`
 	SubGroupEvents                        *bool                `url:"subgroup_events,omitempty" json:"subgroup_events,omitempty"`
 	EmojiEvents                           *bool                `url:"emoji_events,omitempty" json:"emoji_events,omitempty"`
 	MemberEvents                          *bool                `url:"member_events,omitempty" json:"member_events,omitempty"`
-	VulnerabilityEvents                   *bool                `url:"vulnerability_events,omitempty" json:"vulnerability_events,omitempty"`
 	EnableSSLVerification                 *bool                `url:"enable_ssl_verification,omitempty" json:"enable_ssl_verification,omitempty"`
 	ServiceAccessTokensExpirationEnforced *bool                `url:"service_access_tokens_expiration_enforced,omitempty" json:"service_access_tokens_expiration_enforced,omitempty"`
 	Token                                 *string              `url:"token,omitempty" json:"token,omitempty"`
@@ -238,9 +227,9 @@ type EditGroupHookOptions struct {
 
 // EditGroupHook edits a hook for a specified group.
 //
-// GitLab API docs:
+// Gitlab API docs:
 // https://docs.gitlab.com/api/group_webhooks/#edit-group-hook
-func (s *GroupsService) EditGroupHook(gid any, hook int64, opt *EditGroupHookOptions, options ...RequestOptionFunc) (*GroupHook, *Response, error) {
+func (s *GroupsService) EditGroupHook(gid any, hook int, opt *EditGroupHookOptions, options ...RequestOptionFunc) (*GroupHook, *Response, error) {
 	group, err := parseID(gid)
 	if err != nil {
 		return nil, nil, err
@@ -266,7 +255,7 @@ func (s *GroupsService) EditGroupHook(gid any, hook int64, opt *EditGroupHookOpt
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/group_webhooks/#delete-a-group-hook
-func (s *GroupsService) DeleteGroupHook(gid any, hook int64, options ...RequestOptionFunc) (*Response, error) {
+func (s *GroupsService) DeleteGroupHook(gid any, hook int, options ...RequestOptionFunc) (*Response, error) {
 	group, err := parseID(gid)
 	if err != nil {
 		return nil, err
@@ -285,7 +274,7 @@ func (s *GroupsService) DeleteGroupHook(gid any, hook int64, options ...RequestO
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/group_webhooks/#trigger-a-test-group-hook
-func (s *GroupsService) TriggerTestGroupHook(pid any, hook int64, trigger GroupHookTrigger, options ...RequestOptionFunc) (*Response, error) {
+func (s *GroupsService) TriggerTestGroupHook(pid any, hook int, trigger GroupHookTrigger, options ...RequestOptionFunc) (*Response, error) {
 	group, err := parseID(pid)
 	if err != nil {
 		return nil, err
@@ -304,7 +293,7 @@ func (s *GroupsService) TriggerTestGroupHook(pid any, hook int64, trigger GroupH
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/group_webhooks/#set-a-custom-header
-func (s *GroupsService) SetGroupCustomHeader(gid any, hook int64, key string, opt *SetHookCustomHeaderOptions, options ...RequestOptionFunc) (*Response, error) {
+func (s *GroupsService) SetGroupCustomHeader(gid any, hook int, key string, opt *SetHookCustomHeaderOptions, options ...RequestOptionFunc) (*Response, error) {
 	group, err := parseID(gid)
 	if err != nil {
 		return nil, err
@@ -323,7 +312,7 @@ func (s *GroupsService) SetGroupCustomHeader(gid any, hook int64, key string, op
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/group_webhooks/#delete-a-custom-header
-func (s *GroupsService) DeleteGroupCustomHeader(gid any, hook int64, key string, options ...RequestOptionFunc) (*Response, error) {
+func (s *GroupsService) DeleteGroupCustomHeader(gid any, hook int, key string, options ...RequestOptionFunc) (*Response, error) {
 	group, err := parseID(gid)
 	if err != nil {
 		return nil, err
@@ -351,7 +340,7 @@ type SetHookURLVariableOptions struct {
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/group_webhooks/#set-a-url-variable
-func (s *GroupsService) SetGroupHookURLVariable(gid any, hook int64, key string, opt *SetHookURLVariableOptions, options ...RequestOptionFunc) (*Response, error) {
+func (s *GroupsService) SetGroupHookURLVariable(gid any, hook int, key string, opt *SetHookURLVariableOptions, options ...RequestOptionFunc) (*Response, error) {
 	group, err := parseID(gid)
 	if err != nil {
 		return nil, err
@@ -370,7 +359,7 @@ func (s *GroupsService) SetGroupHookURLVariable(gid any, hook int64, key string,
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/group_webhooks/#delete-a-url-variable
-func (s *GroupsService) DeleteGroupHookURLVariable(gid any, hook int64, key string, options ...RequestOptionFunc) (*Response, error) {
+func (s *GroupsService) DeleteGroupHookURLVariable(gid any, hook int, key string, options ...RequestOptionFunc) (*Response, error) {
 	group, err := parseID(gid)
 	if err != nil {
 		return nil, err

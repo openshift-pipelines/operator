@@ -22,9 +22,9 @@ import (
 type (
 	MergeRequestApprovalSettingsServiceInterface interface {
 		GetGroupMergeRequestApprovalSettings(gid any, options ...RequestOptionFunc) (*MergeRequestApprovalSettings, *Response, error)
-		UpdateGroupMergeRequestApprovalSettings(gid any, opt *UpdateGroupMergeRequestApprovalSettingsOptions, options ...RequestOptionFunc) (*MergeRequestApprovalSettings, *Response, error)
+		UpdateGroupMergeRequestApprovalSettings(gid any, opt *UpdateMergeRequestApprovalSettingsOptions, options ...RequestOptionFunc) (*MergeRequestApprovalSettings, *Response, error)
 		GetProjectMergeRequestApprovalSettings(pid any, options ...RequestOptionFunc) (*MergeRequestApprovalSettings, *Response, error)
-		UpdateProjectMergeRequestApprovalSettings(pid any, opt *UpdateProjectMergeRequestApprovalSettingsOptions, options ...RequestOptionFunc) (*MergeRequestApprovalSettings, *Response, error)
+		UpdateProjectMergeRequestApprovalSettings(pid any, opt *UpdateMergeRequestApprovalSettingsOptions, options ...RequestOptionFunc) (*MergeRequestApprovalSettings, *Response, error)
 	}
 
 	// MergeRequestApprovalSettingsService handles communication with the merge
@@ -90,32 +90,19 @@ func (s *MergeRequestApprovalSettingsService) GetGroupMergeRequestApprovalSettin
 	return settings, resp, nil
 }
 
-// UpdateProjectMergeRequestApprovalSettingsOptions represents the available
-// UpdateProjectMergeRequestApprovalSettings()
-// options.
-//
-// GitLab API docs:
-// https://docs.gitlab.com/api/merge_request_approval_settings/#update-project-mr-approval-settings
-type UpdateProjectMergeRequestApprovalSettingsOptions struct {
-	AllowAuthorApproval                         *bool `url:"allow_author_approval,omitempty" json:"allow_author_approval,omitempty"`
-	AllowCommitterApproval                      *bool `url:"allow_committer_approval,omitempty" json:"allow_committer_approval,omitempty"`
-	AllowOverridesToApproverListPerMergeRequest *bool `url:"allow_overrides_to_approver_list_per_merge_request,omitempty" json:"allow_overrides_to_approver_list_per_merge_request,omitempty"`
-	RetainApprovalsOnPush                       *bool `url:"retain_approvals_on_push,omitempty" json:"retain_approvals_on_push,omitempty"`
-	RequireReauthenticationToApprove            *bool `url:"require_reauthentication_to_approve,omitempty" json:"require_reauthentication_to_approve,omitempty"`
-	SelectiveCodeOwnerRemovals                  *bool `url:"selective_code_owner_removals,omitempty" json:"selective_code_owner_removals,omitempty"`
-}
-
-// UpdateGroupMergeRequestApprovalSettingsOptions represents the available
-// UpdateGroupRequestApprovalSettings()
+// UpdateMergeRequestApprovalSettingsOptions represents the available
+// UpdateGroupMergeRequestApprovalSettings() and UpdateProjectMergeRequestApprovalSettings()
 // options.
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/merge_request_approval_settings/#update-group-mr-approval-settings
-type UpdateGroupMergeRequestApprovalSettingsOptions struct {
+// https://docs.gitlab.com/api/merge_request_approval_settings/#update-project-mr-approval-settings
+type UpdateMergeRequestApprovalSettingsOptions struct {
 	AllowAuthorApproval                         *bool `url:"allow_author_approval,omitempty" json:"allow_author_approval,omitempty"`
 	AllowCommitterApproval                      *bool `url:"allow_committer_approval,omitempty" json:"allow_committer_approval,omitempty"`
 	AllowOverridesToApproverListPerMergeRequest *bool `url:"allow_overrides_to_approver_list_per_merge_request,omitempty" json:"allow_overrides_to_approver_list_per_merge_request,omitempty"`
 	RetainApprovalsOnPush                       *bool `url:"retain_approvals_on_push,omitempty" json:"retain_approvals_on_push,omitempty"`
+	SelectiveCodeOwnerRemovals                  *bool `url:"selective_code_owner_removals,omitempty" json:"selective_code_owner_removals,omitempty"`
 	RequireReauthenticationToApprove            *bool `url:"require_reauthentication_to_approve,omitempty" json:"require_reauthentication_to_approve,omitempty"`
 }
 
@@ -124,7 +111,7 @@ type UpdateGroupMergeRequestApprovalSettingsOptions struct {
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/merge_request_approval_settings/#update-group-mr-approval-settings
-func (s *MergeRequestApprovalSettingsService) UpdateGroupMergeRequestApprovalSettings(gid any, opt *UpdateGroupMergeRequestApprovalSettingsOptions, options ...RequestOptionFunc) (*MergeRequestApprovalSettings, *Response, error) {
+func (s *MergeRequestApprovalSettingsService) UpdateGroupMergeRequestApprovalSettings(gid any, opt *UpdateMergeRequestApprovalSettingsOptions, options ...RequestOptionFunc) (*MergeRequestApprovalSettings, *Response, error) {
 	group, err := parseID(gid)
 	if err != nil {
 		return nil, nil, err
@@ -176,7 +163,7 @@ func (s *MergeRequestApprovalSettingsService) GetProjectMergeRequestApprovalSett
 //
 // GitLab API docs:
 // https://docs.gitlab.com/api/merge_request_approval_settings/#update-project-mr-approval-settings
-func (s *MergeRequestApprovalSettingsService) UpdateProjectMergeRequestApprovalSettings(pid any, opt *UpdateProjectMergeRequestApprovalSettingsOptions, options ...RequestOptionFunc) (*MergeRequestApprovalSettings, *Response, error) {
+func (s *MergeRequestApprovalSettingsService) UpdateProjectMergeRequestApprovalSettings(pid any, opt *UpdateMergeRequestApprovalSettingsOptions, options ...RequestOptionFunc) (*MergeRequestApprovalSettings, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err

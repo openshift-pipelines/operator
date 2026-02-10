@@ -103,7 +103,7 @@ type ApproverIDsValue struct {
 // ApproverIDs is a helper routine that creates a new ApproverIDsValue.
 func ApproverIDs(v any) *ApproverIDsValue {
 	switch v.(type) {
-	case UserIDValue, []int64:
+	case UserIDValue, []int:
 		return &ApproverIDsValue{value: v}
 	default:
 		panic("Unsupported value passed as approver ID")
@@ -115,11 +115,11 @@ func (a *ApproverIDsValue) EncodeValues(key string, v *url.Values) error {
 	switch value := a.value.(type) {
 	case UserIDValue:
 		v.Set(key, string(value))
-	case []int64:
+	case []int:
 		v.Del(key)
 		v.Del(key + "[]")
 		for _, id := range value {
-			v.Add(key+"[]", strconv.FormatInt(id, 10))
+			v.Add(key+"[]", strconv.Itoa(id))
 		}
 	}
 	return nil
@@ -143,7 +143,7 @@ type AssigneeIDValue struct {
 // AssigneeID is a helper routine that creates a new AssigneeIDValue.
 func AssigneeID(v any) *AssigneeIDValue {
 	switch v.(type) {
-	case UserIDValue, int, int64:
+	case UserIDValue, int:
 		return &AssigneeIDValue{value: v}
 	default:
 		panic("Unsupported value passed as assignee ID")
@@ -157,8 +157,6 @@ func (a *AssigneeIDValue) EncodeValues(key string, v *url.Values) error {
 		v.Set(key, string(value))
 	case int:
 		v.Set(key, strconv.Itoa(value))
-	case int64:
-		v.Set(key, strconv.FormatInt(value, 10))
 	}
 	return nil
 }
@@ -181,7 +179,7 @@ type ReviewerIDValue struct {
 // ReviewerID is a helper routine that creates a new ReviewerIDValue.
 func ReviewerID(v any) *ReviewerIDValue {
 	switch v.(type) {
-	case UserIDValue, int, int64:
+	case UserIDValue, int:
 		return &ReviewerIDValue{value: v}
 	default:
 		panic("Unsupported value passed as reviewer ID")
@@ -195,8 +193,6 @@ func (a *ReviewerIDValue) EncodeValues(key string, v *url.Values) error {
 		v.Set(key, string(value))
 	case int:
 		v.Set(key, strconv.Itoa(value))
-	case int64:
-		v.Set(key, strconv.FormatInt(value, 10))
 	}
 	return nil
 }
@@ -303,7 +299,7 @@ const (
 	ProtectionRuleAccessLevelAdmin      ProtectionRuleAccessLevel = "admin"
 )
 
-// DeploymentApprovalStatus represents a GitLab deployment approval status.
+// DeploymentApprovalStatus represents a Gitlab deployment approval status.
 type DeploymentApprovalStatus string
 
 // These constants represent all valid deployment approval statuses.
@@ -312,7 +308,7 @@ const (
 	DeploymentApprovalStatusRejected DeploymentApprovalStatus = "rejected"
 )
 
-// DeploymentStatusValue represents a GitLab deployment status.
+// DeploymentStatusValue represents a Gitlab deployment status.
 type DeploymentStatusValue string
 
 // These constants represent all valid deployment statuses.
@@ -481,18 +477,10 @@ func (t *ISOTime) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	// Try parsing as datetime first (ISO 8601 with time)
-	isotime, err := time.Parse(`"`+time.RFC3339+`"`, string(data))
-	if err != nil {
-		// If that fails, try parsing as date-only
-		isotime, err = time.Parse(`"`+iso8601+`"`, string(data))
-		if err != nil {
-			return err
-		}
-	}
-
+	isotime, err := time.Parse(`"`+iso8601+`"`, string(data))
 	*t = ISOTime(isotime)
-	return nil
+
+	return err
 }
 
 // EncodeValues implements the query.Encoder interface.
@@ -730,10 +718,9 @@ type ResourceGroupProcessMode string
 // GitLab API docs:
 // https://docs.gitlab.com/ci/resource_groups/#process-modes
 const (
-	Unordered        ResourceGroupProcessMode = "unordered"
-	OldestFirst      ResourceGroupProcessMode = "oldest_first"
-	NewestFirst      ResourceGroupProcessMode = "newest_first"
-	NewestReadyFirst ResourceGroupProcessMode = "newest_ready_first"
+	Unordered   ResourceGroupProcessMode = "unordered"
+	OldestFirst ResourceGroupProcessMode = "oldest_first"
+	NewestFirst ResourceGroupProcessMode = "newest_first"
 )
 
 // SharedRunnersSettingValue determines whether shared runners are enabled for a
@@ -787,8 +774,8 @@ const (
 
 // TasksCompletionStatus represents tasks of the issue/merge request.
 type TasksCompletionStatus struct {
-	Count          int64 `json:"count"`
-	CompletedCount int64 `json:"completed_count"`
+	Count          int `json:"count"`
+	CompletedCount int `json:"completed_count"`
 }
 
 // TodoAction represents the available actions that can be performed on a todo.

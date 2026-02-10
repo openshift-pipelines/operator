@@ -23,6 +23,7 @@ import (
 
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/token"
+	"cuelang.org/go/internal"
 )
 
 // AppendDebug writes a multi-line Go-like representation of a syntax tree node,
@@ -195,7 +196,7 @@ func (d *debugPrinter) sliceElems(v reflect.Value, elemType reflect.Type) (anyEl
 
 func (d *debugPrinter) structFields(v reflect.Value) (anyElems bool) {
 	t := v.Type()
-	for i := range v.NumField() {
+	for i := 0; i < v.NumField(); i++ {
 		f := t.Field(i)
 		if !gotoken.IsExported(f.Name) {
 			continue
@@ -294,7 +295,7 @@ func (d *debugPrinter) addNodeRefs(v reflect.Value) {
 		}
 	case reflect.Struct:
 		t := v.Type()
-		for i := range v.NumField() {
+		for i := 0; i < v.NumField(); i++ {
 			f := t.Field(i)
 			if !gotoken.IsExported(f.Name) {
 				continue
@@ -419,25 +420,16 @@ func DebugStr(x interface{}) (out string) {
 
 	case *ast.Field:
 		out := DebugStr(v.Label)
-		if v.Alias != nil {
-			out += "~"
-			if v.Alias.Label != nil {
-				// Dual form
-				out += "("
-				out += DebugStr(v.Alias.Label)
-				out += ","
-				out += DebugStr(v.Alias.Field)
-				out += ")"
-			} else {
-				// Simple form
-				out += DebugStr(v.Alias.Field)
-			}
-		}
-		if t := v.Constraint; t != token.ILLEGAL {
+		if t, ok := internal.ConstraintToken(v); ok {
 			out += t.String()
 		}
 		if v.Value != nil {
-			out += ": "
+			switch v.Token {
+			case token.ILLEGAL, token.COLON:
+				out += ": "
+			default:
+				out += fmt.Sprintf(" %s ", v.Token)
+			}
 			out += DebugStr(v.Value)
 			for _, a := range v.Attrs {
 				out += " "
@@ -480,9 +472,6 @@ func DebugStr(x interface{}) (out string) {
 		out += op
 		out += DebugStr(v.Y)
 		return out
-
-	case *ast.PostfixExpr:
-		return DebugStr(v.X) + v.Op.String()
 
 	case []*ast.CommentGroup:
 		var a []string
