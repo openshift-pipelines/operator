@@ -25,18 +25,14 @@ type ModuleFile struct {
 	// If there's an error, it might not a be CUE file.
 	FilePath string
 
-	// Syntax (and SyntaxError) are the results from invoking
-	// [parser.ParseFile]
-	Syntax      *ast.File
-	SyntaxError error
+	// Syntax includes only the portion of the file up to and including
+	// the imports. It will be nil if there was an error reading the file.
+	Syntax *ast.File
 }
 
 // AllImports returns a sorted list of all the package paths
 // imported by the module files produced by modFilesIter
 // in canonical form.
-//
-// If the modFilesIter yields an err then AllImports immediately stops
-// and returns the accumulated package paths.
 func AllImports(modFilesIter iter.Seq2[ModuleFile, error]) ([]string, error) {
 	pkgPaths := make(map[string]bool)
 	for mf, err := range modFilesIter {
@@ -44,7 +40,7 @@ func AllImports(modFilesIter iter.Seq2[ModuleFile, error]) ([]string, error) {
 			return nil, fmt.Errorf("cannot read %q: %v", mf.FilePath, err)
 		}
 		// TODO look at build tags and omit files with "ignore" tags.
-		for imp := range mf.Syntax.ImportSpecs() {
+		for _, imp := range mf.Syntax.Imports {
 			pkgPath, err := strconv.Unquote(imp.Path.Value)
 			if err != nil {
 				// TODO location formatting
@@ -61,9 +57,6 @@ func AllImports(modFilesIter iter.Seq2[ModuleFile, error]) ([]string, error) {
 // PackageFiles returns an iterator that produces all the CUE files
 // inside the package with the given name at the given location.
 // If pkgQualifier is "*", files from all packages in the directory will be produced.
-//
-// The iterator will yield an error if an I/O error is encountered
-// when accessing the fsys.
 //
 // TODO(mvdan): this should now be called InstanceFiles, to follow the naming from
 // https://cuelang.org/docs/concept/modules-packages-instances/#instances.
@@ -213,10 +206,6 @@ func yieldAllModFiles(fsys fs.FS, fpath string, topDir bool, yield func(ModuleFi
 // at the given path if selectPackage returns true for the file's
 // package name.
 //
-// yield is only invoked with a non-nil error if that error originates
-// within fsys. In particular, errors from the parser are found via
-// the [ModuleFile.SyntaxError] field.
-//
 // It returns the yielded package name (if any) and reports whether
 // the iteration should continue.
 func yieldPackageFile(fsys fs.FS, fpath string, selectPackage func(pkgName string) bool, yield func(ModuleFile, error) bool) (pkgName string, cont bool) {
@@ -227,7 +216,7 @@ func yieldPackageFile(fsys fs.FS, fpath string, selectPackage func(pkgName strin
 		FilePath: fpath,
 	}
 	var syntax *ast.File
-	var syntaxErr error
+	var err error
 	if cueFS, ok := fsys.(module.ReadCUEFS); ok {
 		// The FS implementation supports reading CUE syntax directly.
 		// A notable FS implementation that does this is the one
@@ -236,9 +225,9 @@ func yieldPackageFile(fsys fs.FS, fpath string, selectPackage func(pkgName strin
 		// TODO maybe we should make the options here match
 		// the default parser options used by cue/load for better
 		// cache behavior.
-		syntax, syntaxErr = cueFS.ReadCUEFile(fpath, parser.NewConfig(parser.ImportsOnly))
-		if syntax == nil && !errors.Is(syntaxErr, errors.ErrUnsupported) {
-			return "", yield(pf, syntaxErr)
+		syntax, err = cueFS.ReadCUEFile(fpath, parser.NewConfig(parser.ImportsOnly))
+		if err != nil && !errors.Is(err, errors.ErrUnsupported) {
+			return "", yield(pf, err)
 		}
 	}
 	if syntax == nil {
@@ -263,9 +252,9 @@ func yieldPackageFile(fsys fs.FS, fpath string, selectPackage func(pkgName strin
 		}
 		// Add a leading "./" so that a parse error filename is consistent
 		// with the other error filenames created elsewhere in the codebase.
-		syntax, syntaxErr = parser.ParseFile("./"+fpath, data, parser.ImportsOnly)
-		if syntax == nil {
-			return "", yield(pf, syntaxErr)
+		syntax, err = parser.ParseFile("./"+fpath, data, parser.ImportsOnly)
+		if err != nil {
+			return "", yield(pf, err)
 		}
 	}
 
@@ -273,7 +262,6 @@ func yieldPackageFile(fsys fs.FS, fpath string, selectPackage func(pkgName strin
 		return "", true
 	}
 	pf.Syntax = syntax
-	pf.SyntaxError = syntaxErr
 	return syntax.PackageName(), yield(pf, nil)
 }
 

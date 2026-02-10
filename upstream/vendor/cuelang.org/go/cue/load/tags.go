@@ -83,12 +83,14 @@ type TagVar struct {
 	Description string
 }
 
+const rfc3339 = "2006-01-02T15:04:05.999999999Z"
+
 // DefaultTagVars creates a new map with a set of supported injection variables.
 func DefaultTagVars() map[string]TagVar {
 	return map[string]TagVar{
 		"now": {
 			Func: func() (ast.Expr, error) {
-				return ast.NewString(time.Now().UTC().Format(time.RFC3339Nano)), nil
+				return ast.NewString(time.Now().UTC().Format(rfc3339)), nil
 			},
 		},
 		"os": {
@@ -123,7 +125,10 @@ func DefaultTagVars() map[string]TagVar {
 		"rand": {
 			Func: func() (ast.Expr, error) {
 				var b [16]byte
-				rand.Read(b[:])
+				_, err := rand.Read(b[:])
+				if err != nil {
+					return nil, err
+				}
 				var hx [34]byte
 				hx[0] = '0'
 				hx[1] = 'x'
@@ -138,7 +143,8 @@ func varToString(s string, err error) (ast.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ast.NewString(s), nil
+	x := ast.NewString(s)
+	return x, nil
 }
 
 // A tag binds an identifier to a field to allow passing command-line values.
@@ -195,7 +201,7 @@ func parseTag(pos token.Pos, body string) (t *tag, err errors.Error) {
 	}
 
 	if s, ok, _ := a.Lookup(1, "short"); ok {
-		for s := range strings.SplitSeq(s, "|") {
+		for _, s := range strings.Split(s, "|") {
 			if !ast.IsValidIdent(t.key) {
 				return t, errors.Newf(pos, "invalid identifier %q", s)
 			}
@@ -256,7 +262,8 @@ func findTags(b *build.Instance) (tags []*tag, errs errors.Error) {
 			case *ast.Field:
 				// TODO: allow optional fields?
 				_, _, err := ast.LabelName(x.Label)
-				if err != nil || x.Constraint != token.ILLEGAL {
+				_, ok := internal.ConstraintToken(x)
+				if err != nil || ok {
 					findInvalidTags(n, "@tag not allowed within field constraint")
 					return false
 				}

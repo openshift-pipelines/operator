@@ -37,9 +37,15 @@ func ReadAll(filename string, src any) ([]byte, error) {
 			return src, nil
 		case *bytes.Buffer:
 			// is io.Reader, but src is already available in []byte form
-			return src.Bytes(), nil
+			if src != nil {
+				return src.Bytes(), nil
+			}
 		case io.Reader:
-			return io.ReadAll(src)
+			var buf bytes.Buffer
+			if _, err := io.Copy(&buf, src); err != nil {
+				return nil, err
+			}
+			return buf.Bytes(), nil
 		}
 		return nil, fmt.Errorf("invalid source type %T", src)
 	}
@@ -57,8 +63,6 @@ func Open(filename string, src any) (io.ReadCloser, error) {
 			return io.NopCloser(strings.NewReader(src)), nil
 		case []byte:
 			return io.NopCloser(bytes.NewReader(src)), nil
-		case io.ReadCloser:
-			return src, nil
 		case io.Reader:
 			return io.NopCloser(src), nil
 		}

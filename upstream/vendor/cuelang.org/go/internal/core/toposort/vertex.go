@@ -258,13 +258,13 @@ func analyseStructs(v *adt.Vertex, builder *GraphBuilder) []*structMeta {
 	// uncover the position of the earliest reference.
 	for _, arc := range v.Arcs {
 		builder.EnsureNode(arc.Label)
-		for c := range arc.LeafConjuncts() {
+		arc.VisitLeafConjuncts(func(c adt.Conjunct) bool {
 			field := c.Field()
 			debug("self arc conjunct field %p :: %T, expr %p :: %T (%v)\n",
 				field, field, c.Expr(), c.Expr(), c.Expr().Source())
 			sMetas, found := nodeToStructMetas[field]
 			if !found {
-				continue
+				return true
 			}
 			if src := field.Source(); src != nil {
 				for sMeta := range sMetas {
@@ -273,7 +273,7 @@ func analyseStructs(v *adt.Vertex, builder *GraphBuilder) []*structMeta {
 			}
 			refs := c.CloseInfo.CycleInfo.Refs
 			if refs == nil {
-				continue
+				return true
 			}
 			debug(" ref %p :: %T (%v)\n",
 				refs.Ref, refs.Ref, refs.Ref.Source().Pos())
@@ -288,17 +288,20 @@ func analyseStructs(v *adt.Vertex, builder *GraphBuilder) []*structMeta {
 					sMeta.pos = pos
 				}
 			}
-		}
+
+			return true
+		})
 	}
 
 	// Explore our own conjuncts, and the decls from our StructList, to
 	// find explicit unifications, and mark structMetas accordingly.
 	var worklist []adt.Expr
-	for c := range v.LeafConjuncts() {
+	v.VisitLeafConjuncts(func(c adt.Conjunct) bool {
 		debug("self conjunct field %p :: %T, expr %p :: %T\n",
 			c.Field(), c.Field(), c.Expr(), c.Expr())
 		worklist = append(worklist, c.Expr())
-	}
+		return true
+	})
 	for _, si := range structInfos {
 		for _, decl := range si.StructLit.Decls {
 			if expr, ok := decl.(adt.Expr); ok {
@@ -332,14 +335,15 @@ func analyseStructs(v *adt.Vertex, builder *GraphBuilder) []*structMeta {
 func dynamicFieldsFeatures(v *adt.Vertex) map[*adt.DynamicField][]adt.Feature {
 	var m map[*adt.DynamicField][]adt.Feature
 	for _, arc := range v.Arcs {
-		for c := range arc.LeafConjuncts() {
+		arc.VisitLeafConjuncts(func(c adt.Conjunct) bool {
 			if dynField, ok := c.Field().(*adt.DynamicField); ok {
 				if m == nil {
 					m = make(map[*adt.DynamicField][]adt.Feature)
 				}
 				m[dynField] = append(m[dynField], arc.Label)
 			}
-		}
+			return true
+		})
 	}
 	return m
 }

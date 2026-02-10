@@ -33,7 +33,6 @@ func (tc *TektonConfig) SetDefaults(ctx context.Context) {
 	tc.Spec.Chain.setDefaults()
 	tc.Spec.Result.setDefaults()
 	tc.Spec.TektonPruner.SetDefaults()
-	tc.Spec.Scheduler.SetDefaults()
 
 	if IsOpenShiftPlatform() {
 		if tc.Spec.Platforms.OpenShift.PipelinesAsCode == nil {

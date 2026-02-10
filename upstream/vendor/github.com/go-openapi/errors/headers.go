@@ -9,8 +9,8 @@ import (
 	"net/http"
 )
 
-// Validation represents a failure of a precondition.
-type Validation struct { //nolint: errname // changing the name to abide by the naming rule would bring a breaking change.
+// Validation represents a failure of a precondition
+type Validation struct { //nolint: errname
 	code    int32
 	Name    string
 	In      string
@@ -19,18 +19,16 @@ type Validation struct { //nolint: errname // changing the name to abide by the 
 	Values  []any
 }
 
-// Error implements the standard error interface.
 func (e *Validation) Error() string {
 	return e.message
 }
 
-// Code returns the HTTP status code for this validation error.
-// Returns 422 (Unprocessable Entity) by default.
+// Code the error code
 func (e *Validation) Code() int32 {
 	return e.code
 }
 
-// MarshalJSON implements the JSON encoding interface.
+// MarshalJSON implements the JSON encoding interface
 func (e Validation) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"code":    e.code,
@@ -42,7 +40,7 @@ func (e Validation) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// ValidateName sets the name for a validation or updates it for a nested property.
+// ValidateName sets the name for a validation or updates it for a nested property
 func (e *Validation) ValidateName(name string) *Validation {
 	if name != "" {
 		if e.Name == "" {
@@ -61,7 +59,7 @@ const (
 	responseFormatFail = `unsupported media type requested, only %v are available`
 )
 
-// InvalidContentType error for an invalid content type.
+// InvalidContentType error for an invalid content type
 func InvalidContentType(value string, allowed []string) *Validation {
 	values := make([]any, 0, len(allowed))
 	for _, v := range allowed {
@@ -77,7 +75,7 @@ func InvalidContentType(value string, allowed []string) *Validation {
 	}
 }
 
-// InvalidResponseFormat error for an unacceptable response format request.
+// InvalidResponseFormat error for an unacceptable response format request
 func InvalidResponseFormat(value string, allowed []string) *Validation {
 	values := make([]any, 0, len(allowed))
 	for _, v := range allowed {

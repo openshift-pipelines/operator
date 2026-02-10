@@ -342,7 +342,7 @@ func getKeysFromCertOrJWK(certificate string) ([]verificationKey, error) {
 		if !ok {
 			continue
 		}
-		var key any
+		var key interface{}
 		if err := jwk.Export(k, &key); err != nil {
 			return nil, err
 		}

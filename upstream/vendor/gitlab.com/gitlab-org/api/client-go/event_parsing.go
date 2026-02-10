@@ -18,12 +18,11 @@ package gitlab
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 )
 
-// EventType represents a GitLab event type.
+// EventType represents a Gitlab event type.
 type EventType string
 
 // List of available event types.
@@ -63,12 +62,10 @@ const (
 )
 
 type noteEvent struct {
-	ObjectKind       string                    `json:"object_kind"`
-	ObjectAttributes noteEventObjectAttributes `json:"object_attributes"`
-}
-
-type noteEventObjectAttributes struct {
-	NoteableType string `json:"noteable_type"`
+	ObjectKind       string `json:"object_kind"`
+	ObjectAttributes struct {
+		NoteableType string `json:"noteable_type"`
+	} `json:"object_attributes"`
 }
 
 type serviceEvent struct {
@@ -279,7 +276,7 @@ func ParseWebhook(eventType EventType, payload []byte) (event any, err error) {
 		case projectEvent:
 			event = &ProjectResourceAccessTokenEvent{}
 		default:
-			return nil, errors.New("unexpected resource access token payload")
+			return nil, fmt.Errorf("unexpected resource access token payload")
 		}
 	case EventTypeServiceHook:
 		service := &serviceEvent{}

@@ -373,12 +373,18 @@ func (c *Context) Encode(x interface{}, option ...EncodeOption) Value {
 	ctx := c.ctx()
 	// TODO: is true the right default?
 	expr := convert.GoValueToValue(ctx, x, options.nilIsTop)
-	n := exprToVertex(expr)
+	var n *adt.Vertex
+	if v, ok := expr.(*adt.Vertex); ok {
+		n = v
+	} else {
+		n = &adt.Vertex{}
+		n.AddConjunct(adt.MakeRootConjunct(nil, expr))
+	}
 	n.Finalize(ctx)
 	return c.make(n)
 }
 
-// EncodeType converts a Go type to a CUE [Value].
+// Encode converts a Go type to a CUE [Value].
 //
 // The returned value will represent an error, accessible through [Value.Err],
 // if any error occurred.
@@ -393,7 +399,13 @@ func (c *Context) EncodeType(x interface{}, option ...EncodeOption) Value {
 	if err != nil {
 		return c.makeError(err)
 	}
-	n := exprToVertex(expr)
+	var n *adt.Vertex
+	if v, ok := expr.(*adt.Vertex); ok {
+		n = v
+	} else {
+		n = &adt.Vertex{}
+		n.AddConjunct(adt.MakeRootConjunct(nil, expr))
+	}
 	n.Finalize(ctx)
 	return c.make(n)
 }

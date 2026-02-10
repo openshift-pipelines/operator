@@ -17,6 +17,7 @@ package subsume
 
 import (
 	"cuelang.org/go/cue/errors"
+	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
 )
 
@@ -113,8 +114,6 @@ func unifyValue(c *adt.OpContext, a, b adt.Value) adt.Value {
 	return x
 }
 
-var ErrInexact = errors.New("inexact subsumption")
-
 func (s *subsumer) getError() (err errors.Error) {
 	c := s.ctx
 	// src := binSrc(token.NoPos, opUnify, gt, lt)
@@ -133,7 +132,7 @@ func (s *subsumer) getError() (err errors.Error) {
 	}
 	err = s.errs
 	if s.inexact {
-		err = errors.Wrap(err, ErrInexact)
+		err = errors.Wrap(err, internal.ErrInexact)
 	}
 	return err
 }

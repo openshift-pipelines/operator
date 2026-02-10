@@ -90,24 +90,24 @@ func WithKeysetPaginationParameters(nextLink string) RequestOptionFunc {
 
 // WithOffsetPaginationParameters takes a page number and modifies the request
 // to use that page for offset-based pagination, overriding any existing page value.
-func WithOffsetPaginationParameters(page int64) RequestOptionFunc {
+func WithOffsetPaginationParameters(page int) RequestOptionFunc {
 	return func(req *retryablehttp.Request) error {
 		q := req.URL.Query()
 		q.Del("page")
-		q.Add("page", strconv.FormatInt(page, 10))
+		q.Add("page", strconv.Itoa(page))
 		req.URL.RawQuery = q.Encode()
 		return nil
 	}
 }
 
-// WithSudo takes either a username or user ID and sets the Sudo request header.
+// WithSudo takes either a username or user ID and sets the SUDO request header.
 func WithSudo(uid any) RequestOptionFunc {
 	return func(req *retryablehttp.Request) error {
 		user, err := parseID(uid)
 		if err != nil {
 			return err
 		}
-		req.Header.Set("Sudo", user)
+		req.Header.Set("SUDO", user)
 		return nil
 	}
 }
@@ -117,11 +117,11 @@ func WithToken(authType AuthType, token string) RequestOptionFunc {
 	return func(req *retryablehttp.Request) error {
 		switch authType {
 		case JobToken:
-			req.Header.Set("Job-Token", token)
+			req.Header.Set("JOB-TOKEN", token)
 		case OAuthToken:
 			req.Header.Set("Authorization", "Bearer "+token)
 		case PrivateToken:
-			req.Header.Set("Private-Token", token)
+			req.Header.Set("PRIVATE-TOKEN", token)
 		}
 		return nil
 	}
