@@ -31,7 +31,8 @@ LABEL \
       description="Red Hat OpenShift Pipelines Operator Webhook" \
       io.k8s.display-name="Red Hat OpenShift Pipelines Operator Webhook" \
       io.k8s.description="Red Hat OpenShift Pipelines Operator Webhook" \
-      io.openshift.tags="operator,tekton,openshift,webhook"
+      io.openshift.tags="operator,tekton,openshift,webhook" \
+      cpe="cpe:/a:redhat:openshift_pipelines:1.20::el9"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
