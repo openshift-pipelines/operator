@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Update images from project.yaml to "generated" files
-ENVIRONMENT=${1:-"staging"}
+ENVIRONMENT=${1:-"devel"}
 case "$ENVIRONMENT" in
   "devel")
     TARGET_REGISTRY="quay.io/openshift-pipeline"
