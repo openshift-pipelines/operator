@@ -25,6 +25,9 @@ spec:
     - name: revision
       type: string
       default: master
+    - name: DEFAULT_OCP_VERSION
+      type: string
+      default: "4.21"
 
   tasks:
     - name: parse-metadata
@@ -61,17 +64,17 @@ spec:
       runAfter:
         - provision-eaas-space
       params:
-        - name: applicationName
-          value: "$(tasks.parse-metadata.results.application-name)"
+        - name: componentName
+          value: "$(tasks.parse-metadata.results.component-name)"
       taskSpec:
         params:
-          - name: applicationName
+          - name: componentName
             type: string
         results:
           - name: clusterName
             value: "$(steps.create-cluster.results.clusterName)"
           - name: ocpVersion
-            description: The OCP version extracted from application name
+            description: The OCP version extracted from component name
             type: string
         steps:
           - name: get-supported-versions
@@ -90,22 +93,21 @@ spec:
           - name: extract-and-pick-version
             image: quay.io/openshift-pipeline/ci:latest
             env:
-              - name: APPLICATION_NAME
-                value: "$(params.applicationName)"
+              - name: COMPONENT_NAME
+                value: "$(params.componentName)"
             script: |
               #!/usr/bin/env bash
-              set -e
-              
-              # Extract OCP version from APPLICATION_NAME
-              # Expected format: openshift-pipelines-index-4-19-1-22 -> 4.19
-              echo "Application Name: $APPLICATION_NAME"
+              set -e              
+              # Extract OCP version from COMPONENT_NAME
+              # Expected format: operator-1-22-index-4-19 -> 4.19
+              echo "Component Name: $COMPONENT_NAME"
               
               # Extract version pattern (e.g., "4-19" from "openshift-pipelines-index-4-19-1-22")
-              VERSION_PATTERN=$(echo "$APPLICATION_NAME" | grep -oE '[0-9]+-[0-9]+' | head -1)
+              VERSION_PATTERN=$(echo "$COMPONENT_NAME" | grep -oE '[0-9]+-[0-9]+' | tail -1 || $DEFAULT_OCP_VERSION)
               
               if [ -z "$VERSION_PATTERN" ]; then
-                echo "Warning: Could not extract version from application name, will use default"
-                OCP_VERSION="4.20"
+                echo "Warning: Could not extract version from component name, will use default"
+                OCP_VERSION=$DEFAULT_OCP_VERSION
               else
                 # Convert "4-19" to "4.19"
                 OCP_VERSION=$(echo "$VERSION_PATTERN" | tr '-' '.')
@@ -149,13 +151,13 @@ spec:
       runAfter:
         - provision-cluster
       params:
-        - name: bundleImage
+        - name: indexImage
           value: "$(tasks.parse-metadata.results.component-container-image)"
         - name: namespace
           value: "$(params.NAMESPACE)"
       taskSpec:
         params:
-          - name: bundleImage
+          - name: indexImage
             type: string
           - name: namespace
             type: string
@@ -191,7 +193,7 @@ spec:
                 value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
             script: |
               #!/usr/bin/env bash
-              export INDEX_IMAGE=$(params.bundleImage)
+              export INDEX_IMAGE=$(params.indexImage)
               cat <<EOF | oc apply -f-
                 apiVersion: operators.coreos.com/v1alpha1
                 kind: CatalogSource
