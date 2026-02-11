@@ -1,0 +1,72 @@
+name: Sync Tekton Files from Next to Main
+
+# NOTE: We need this because Mintmaker only updates the files present in the next branch
+# and we are already using these files from the main branch. Without the update we are using
+# the older versions which results in violations in the CI checks.
+
+on:
+  push:
+    branches:
+      - next
+    paths:
+      - '.tekton/docker-build-ta.yaml'
+      - '.tekton/fbc-build.yaml'
+  workflow_dispatch:
+
+jobs:
+  sync-tekton-files:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name openshift-pipelines-bot
+          git config user.email pipelines-extcomm@redhat.com
+
+      - name: Create sync branch from main
+        run: |
+          git fetch origin main
+          git checkout main
+          SOURCE_BRANCH="actions/sync/tekton-files-from-next"
+          git checkout -b ${SOURCE_BRANCH}
+          echo "SOURCE_BRANCH=${SOURCE_BRANCH}" >> $GITHUB_ENV
+
+      - name: Copy Tekton files from next
+        run: |
+          git checkout origin/next -- .tekton/docker-build-ta.yaml .tekton/fbc-build.yaml
+
+      - name: Commit changes and create PR
+        run: |
+          git add .tekton/docker-build-ta.yaml .tekton/fbc-build.yaml
+          
+          if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
+            echo "No changes to sync, exiting"
+            exit 0
+          fi
+          
+          git commit -F- <<EOF
+          [bot:main] Sync Tekton files from next branch
+
+          Auto-synced by GitHub Actions from next branch:
+          - .tekton/docker-build-ta.yaml
+          - .tekton/fbc-build.yaml
+          EOF
+          
+          git push -f origin ${SOURCE_BRANCH}
+          
+          if [ "$(gh pr list --base main --head ${SOURCE_BRANCH} --json url --jq 'length')" = "0" ]; then
+            echo "creating PR..."
+            gh pr create -B main -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved --fill
+          else
+            echo "a PR already exists, editing..."
+            gh pr edit --title "[bot:main] Sync Tekton files from next branch" --fill
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
