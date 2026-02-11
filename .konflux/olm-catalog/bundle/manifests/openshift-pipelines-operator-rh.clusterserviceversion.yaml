@@ -18,9 +18,9 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.20.0 <5.0.5-778'
+    olm.skipRange: '>=1.20.0 <5.0.5-779'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
-    operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev"]'
+    operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonschedulers.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
     repository: https://github.com/tektoncd/operator
     support: Red Hat
@@ -30,7 +30,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v5.0.5-778
+  name: openshift-pipelines-operator-rh.v5.0.5-779
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -287,6 +287,27 @@ spec:
             x-descriptors:
               - urn:alm:descriptor:com.tectonic.ui:label
         version: v1alpha1
+      - description: Represents an installation of latest version of Tekton Scheduler
+        displayName: Tekton Scheduler
+        kind: TektonScheduler
+        name: tektonschedulers.operator.tekton.dev
+        resources:
+          - kind: tektoninstallersets
+            name: ''
+            version: v1alpha1
+        specDescriptors:
+          - description: Namespace where Tekton Scheduler installed
+            displayName: Target Namespace
+            path: targetNamespace
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:label
+        statusDescriptors:
+          - description: The version of Tekton Scheduler installed
+            displayName: Version
+            path: version
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:label
+        version: v1alpha1
       - description: Represents an installation of latest version of Tekton Triggers
         displayName: Tekton Triggers
         kind: TektonTrigger
@@ -348,21 +369,23 @@ spec:
     ### Components
 
 
-    - Tekton Pipelines: v1.6.0
+    - Tekton Pipelines: v1.9.0
 
     - Tekton Triggers: v0.34.0
 
-    - Pipelines as Code: v0.39.3
+    - Pipelines as Code: v0.41.1
 
-    - Tekton Chains: v0.26.0
+    - Tekton Chains: v0.26.2
 
     - Tekton Hub (tech-preview): v1.23.6
 
-    - Tekton Results: v0.17.2
+    - Tekton Results (tech-preview): v0.17.2
 
-    - Manual Approval Gate (tech-preview): v0.7.0
+    - Manual Approval Gate (tech-preview): v0.8.0
 
     - Tekton Pruner: v0.3.5
+
+    - Tekton Scheduler (tech-preview): v0.3.0
 
 
     ## Getting Started
@@ -1169,8 +1192,8 @@ spec:
           serviceAccountName: openshift-pipelines-operator
       deployments:
         - label:
-            operator.tekton.dev/release: v0.78.1
-            version: v0.78.1
+            operator.tekton.dev/release: devel
+            version: devel
           name: openshift-pipelines-operator
           spec:
             replicas: 1
@@ -1187,7 +1210,7 @@ spec:
                 containers:
                   - args:
                       - -controllers
-                      - tektonconfig,tektonpipeline,tektontrigger,tektonhub,tektonchain,tektonaddon,tektonresult,openshiftpipelinesascode,manualapprovalgate,tektonpruner
+                      - tektonconfig,tektonpipeline,tektontrigger,tektonhub,tektonchain,tektonaddon,tektonresult,openshiftpipelinesascode,manualapprovalgate,tektonpruner,tektonscheduler
                       - -unique-process-name
                       - tekton-operator-lifecycle
                     env:
@@ -1212,7 +1235,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 5.0.5-778
+                        value: 5.0.5-779
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1230,7 +1253,7 @@ spec:
                       - name: IMAGE_HUB_TEKTON_HUB_DB
                         value: registry.redhat.io/rhel9/postgresql-15@sha256:90ec347a35ab8a5d530c8d09f5347b13cc71df04f3b994bfa8b1a409b1171d59
                       - name: IMAGE_ADDONS_PARAM_BUILDER_IMAGE
-                        value: registry.redhat.io/rhel9/buildah@sha256:4e604d18fc609d25b2fc99814281944acaac78e8cd5e47b8359709b8b505db86
+                        value: registry.redhat.io/rhel9/buildah@sha256:0e29338c43fbf9847f2060d7685b872594e3b39bfcf56278f470279089e48048
                       - name: IMAGE_ADDONS_PARAM_KN_IMAGE
                         value: registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:e213fd263772c5286aa560132cd8c043cf2946f04f96eedf18cd240859bd8a48
                       - name: IMAGE_ADDONS_MVN_SETTINGS
@@ -1294,9 +1317,9 @@ spec:
                       - name: IMAGE_ADDONS_SKOPEO_RESULTS
                         value: registry.redhat.io/rhel9/skopeo@sha256:3c1d54513adc2998955731da23ec354a15942fa7dd2e37dc818f85a947f400d4
                       - name: IMAGE_ADDONS_BUILD
-                        value: registry.redhat.io/rhel9/buildah@sha256:4e604d18fc609d25b2fc99814281944acaac78e8cd5e47b8359709b8b505db86
+                        value: registry.redhat.io/rhel9/buildah@sha256:0e29338c43fbf9847f2060d7685b872594e3b39bfcf56278f470279089e48048
                       - name: IMAGE_ADDONS_S2I_BUILD
-                        value: registry.redhat.io/rhel9/buildah@sha256:4e604d18fc609d25b2fc99814281944acaac78e8cd5e47b8359709b8b505db86
+                        value: registry.redhat.io/rhel9/buildah@sha256:0e29338c43fbf9847f2060d7685b872594e3b39bfcf56278f470279089e48048
                       - name: IMAGE_ADDONS_S2I_GENERATE
                         value: registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:bc10e7d6122ede5cf4f2882c200447683255465a1080e826761e90bfb983506e
                       - name: IMAGE_ADDONS_LOAD_SCRIPTS
@@ -1329,6 +1352,10 @@ spec:
                         value: quay.io/openshift-pipeline/pipelines-manual-approval-gate-webhook-rhel9@sha256:9f4070894d2fcc55fd7a3db93a089d25208d3e64691610f4b3fb130c26b73551
                       - name: IMAGE_PRUNER_CONTROLLER
                         value: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:f3c8753c88846ccab0d34d8e6040a4bf3f21968ec6dec2246a8192bfa70906e8
+                      - name: IMAGE_SCHEDULER_MANAGER
+                        value: quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:da6d8b6db000a4bc9c3eabc9c095c8db75694245bf7d19d2bd602d4b6f7ee3d4
+                      - name: IMAGE_SCHEDULER_WEBHOOK
+                        value: quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:da6d8b6db000a4bc9c3eabc9c095c8db75694245bf7d19d2bd602d4b6f7ee3d4
                       - name: IMAGE_PRUNER_WEBHOOK
                         value: quay.io/openshift-pipeline/pipelines-pruner-webhook-rhel9@sha256:e640d0e01736af6519d4341ce4b0440991e35044fd45d0a048d72af097d239e7
                       - name: IMAGE_PAC_PAC_CONTROLLER
@@ -1382,7 +1409,7 @@ spec:
                       - name: PROFILING_PORT
                         value: '9009'
                       - name: VERSION
-                        value: v0.78.1
+                        value: devel
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: CONFIG_LEADERELECTION_NAME
@@ -1405,8 +1432,8 @@ spec:
                     type: RuntimeDefault
                 serviceAccountName: openshift-pipelines-operator
         - label:
-            operator.tekton.dev/release: v0.78.1
-            version: v0.78.1
+            operator.tekton.dev/release: devel
+            version: devel
           name: tekton-operator-webhook
           spec:
             replicas: 1
@@ -1548,11 +1575,11 @@ spec:
       name: IMAGE_ADDONS_SKOPEO_COPY
     - image: registry.redhat.io/rhel9/skopeo@sha256:3c1d54513adc2998955731da23ec354a15942fa7dd2e37dc818f85a947f400d4
       name: IMAGE_ADDONS_SKOPEO_RESULTS
-    - image: registry.redhat.io/rhel9/buildah@sha256:4e604d18fc609d25b2fc99814281944acaac78e8cd5e47b8359709b8b505db86
+    - image: registry.redhat.io/rhel9/buildah@sha256:0e29338c43fbf9847f2060d7685b872594e3b39bfcf56278f470279089e48048
       name: IMAGE_ADDONS_PARAM_BUILDER_IMAGE
-    - image: registry.redhat.io/rhel9/buildah@sha256:4e604d18fc609d25b2fc99814281944acaac78e8cd5e47b8359709b8b505db86
+    - image: registry.redhat.io/rhel9/buildah@sha256:0e29338c43fbf9847f2060d7685b872594e3b39bfcf56278f470279089e48048
       name: IMAGE_ADDONS_BUILD
-    - image: registry.redhat.io/rhel9/buildah@sha256:4e604d18fc609d25b2fc99814281944acaac78e8cd5e47b8359709b8b505db86
+    - image: registry.redhat.io/rhel9/buildah@sha256:0e29338c43fbf9847f2060d7685b872594e3b39bfcf56278f470279089e48048
       name: IMAGE_ADDONS_S2I_BUILD
     - image: registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:bc10e7d6122ede5cf4f2882c200447683255465a1080e826761e90bfb983506e
       name: IMAGE_ADDONS_GENERATE
@@ -1598,6 +1625,10 @@ spec:
       name: IMAGE_MAG_MANUAL_APPROVAL
     - image: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:f3c8753c88846ccab0d34d8e6040a4bf3f21968ec6dec2246a8192bfa70906e8
       name: IMAGE_PRUNER_CONTROLLER
+    - image: quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:da6d8b6db000a4bc9c3eabc9c095c8db75694245bf7d19d2bd602d4b6f7ee3d4
+      name: IMAGE_SCHEDULER_MANAGER
+    - image: quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:da6d8b6db000a4bc9c3eabc9c095c8db75694245bf7d19d2bd602d4b6f7ee3d4
+      name: IMAGE_SCHEDULER_WEBHOOK
     - image: quay.io/openshift-pipeline/pipelines-pruner-webhook-rhel9@sha256:e640d0e01736af6519d4341ce4b0440991e35044fd45d0a048d72af097d239e7
       name: IMAGE_PRUNER_WEBHOOK
     - image: quay.io/openshift-pipeline/pipelines-pipelines-as-code-controller-rhel9@sha256:287c5fe1d32a7b72b25d4d6ee040b8769652cf903334ae5b4be2485737ee4c05
@@ -1620,5 +1651,5 @@ spec:
       name: IMAGE_ADDONS_MAVEN_GOALS
     - image: quay.io/openshift-pipeline/pipelines-console-plugin-rhel9@sha256:bb058b3de08a97a38b1eb1c65df636dcb0632194c30c4d57569762097f9b6b86
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
-  replaces: openshift-pipelines-operator-rh.v5.0.5-777
-  version: 5.0.5-778
+  replaces: openshift-pipelines-operator-rh.v5.0.5-778
+  version: 5.0.5-779
