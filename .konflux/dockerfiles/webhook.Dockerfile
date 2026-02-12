@@ -24,14 +24,15 @@ COPY head ${KO_DATA_PATH}/HEAD
 
 LABEL \
       com.redhat.component="openshift-pipelines-operator-webhook-rhel9-container" \
-      name="openshift-pipelines/pipelines-operator-webhook-rhel9" \
-      version="next" \
-      summary="Red Hat OpenShift Pipelines Operator Webhook" \
+      cpe="cpe:/a:redhat:openshift_pipelines:1.22::el9" \
+      description="Red Hat OpenShift Pipelines operator webhook" \
+      io.k8s.description="Red Hat OpenShift Pipelines operator webhook" \
+      io.k8s.display-name="Red Hat OpenShift Pipelines operator webhook" \
+      io.openshift.tags="tekton,openshift,operator,webhook" \
       maintainer="pipelines-extcomm@redhat.com" \
-      description="Red Hat OpenShift Pipelines Operator Webhook" \
-      io.k8s.display-name="Red Hat OpenShift Pipelines Operator Webhook" \
-      io.k8s.description="Red Hat OpenShift Pipelines Operator Webhook" \
-      io.openshift.tags="operator,tekton,openshift,webhook"
+      name="openshift-pipelines/pipelines-operator-webhook-rhel9" \
+      summary="Red Hat OpenShift Pipelines operator webhook" \
+      version="v1.22.0"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532

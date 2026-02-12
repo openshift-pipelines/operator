@@ -24,14 +24,15 @@ COPY head ${KO_DATA_PATH}/HEAD
 
 LABEL \
       com.redhat.component="openshift-pipelines-rhel9-operator-container" \
-      name="openshift-pipelines/pipelines-rhel9-operator" \
-      version="next" \
-      summary="Red Hat OpenShift Pipelines Operator" \
+      cpe="cpe:/a:redhat:openshift_pipelines:1.22::el9" \
+      description="Red Hat OpenShift Pipelines operator operator" \
+      io.k8s.description="Red Hat OpenShift Pipelines operator operator" \
+      io.k8s.display-name="Red Hat OpenShift Pipelines operator operator" \
+      io.openshift.tags="tekton,openshift,operator,operator" \
       maintainer="pipelines-extcomm@redhat.com" \
-      description="Red Hat OpenShift Pipelines Operator" \
-      io.k8s.display-name="Red Hat OpenShift Pipelines Operator" \
-      io.k8s.description="Red Hat OpenShift Pipelines Operator" \
-      io.openshift.tags="operator,tekton,openshift"
+      name="openshift-pipelines/pipelines-rhel9-operator" \
+      summary="Red Hat OpenShift Pipelines operator operator" \
+      version="v1.22.0"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
