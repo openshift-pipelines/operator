@@ -58,8 +58,8 @@ rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/metadata/*
 rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/manifest/*
 export BUNDLE_ARGS="--workspace ./openshift \
                     --operator-release-version ${CURRENT_VERSION} \
-                    --channels latest,${CHANNEL_NAME} \
-                    --default-channel latest \
+                    --channels ${CHANNEL_NAME} \
+                    --default-channel  \
                     --fetch-strategy-local \
                     --upgrade-strategy-replaces \
                     --operator-release-previous-version openshift-pipelines-operator-rh.v${PREVIOUS_VERSION} \
@@ -141,5 +141,5 @@ sed -i -E 's%LABEL com.redhat.openshift.versions=".*%LABEL com.redhat.openshift.
     .konflux/olm-catalog/bundle/Dockerfile
 
 # update channels in operator bundle dockerfile
-sed -i -E 's%LABEL operators.operatorframework.io.bundle.channels.v1=".*%LABEL operators.operatorframework.io.bundle.channels.v1="'latest,${CHANNEL_NAME}'"%' \
+sed -i -E 's%LABEL operators.operatorframework.io.bundle.channels.v1=".*%LABEL operators.operatorframework.io.bundle.channels.v1="'${CHANNEL_NAME}'"%' \
     .konflux/olm-catalog/bundle/Dockerfile
