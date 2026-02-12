@@ -5,7 +5,7 @@ set -e
 # ex: for 1.19 it will be openshift-pipelines-operator-rh.v1.19.0, for 1.17.2 it will be openshift-pipelines-operator-rh.v1.17.2
 
 # Update images from project.yaml to "generated" files
-VERSION=${1:-"v4.20"}
+VERSION=${1:-"v4.21"}
 ENVIRONMENT=${2:-"devel"}
 
 CATALOG_JSON=".konflux/olm-catalog/index/${VERSION}/catalog-template.json"
