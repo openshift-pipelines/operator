@@ -14,8 +14,8 @@
     echo "BUNDLE_NAME : $BUNDLE_NAME"
     echo "Bundle Version : $BUNDLE_VERSION"
 
-    SOURCE_PATTEN="quay.io/.*/(.*@sha256:.+)"
-    TARGET_PATTEN="$TARGET_REGISTRY/\1"
+    SOURCE_PATTEN="quay.io/.*/(.*)-rhel9(@sha256:.+)"
+    TARGET_PATTEN="$TARGET_REGISTRY/pipelines-\1\2"
     BUNDLE_IMAGE=$(echo "${BUNDLE_IMAGE}" | sed -E "s|$SOURCE_PATTEN|$TARGET_PATTEN|g")
     echo "Updated bundle image: $BUNDLE_IMAGE" >&2
 
