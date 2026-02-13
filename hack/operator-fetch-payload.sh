@@ -59,7 +59,7 @@ rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/manifest/*
 export BUNDLE_ARGS="--workspace ./openshift \
                     --operator-release-version ${CURRENT_VERSION} \
                     --channels ${CHANNEL_NAME} \
-                    --default-channel  \
+                    --default-channel  ${CHANNEL_NAME} \
                     --fetch-strategy-local \
                     --upgrade-strategy-replaces \
                     --operator-release-previous-version openshift-pipelines-operator-rh.v${PREVIOUS_VERSION} \
