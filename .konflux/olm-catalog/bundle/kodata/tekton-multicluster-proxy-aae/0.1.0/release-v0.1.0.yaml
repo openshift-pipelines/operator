@@ -1,0 +1,142 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    name: proxy-aae
+  name: proxy-aae
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: proxy-aae
+  namespace: proxy-aae
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: proxy-aae
+rules:
+- apiGroups:
+  - kueue.x-k8s.io
+  resources:
+  - workloads
+  - multikueueclusters
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - tekton.dev
+  resources:
+  - pipelineruns
+  - taskruns
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/log
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - selfsubjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: proxy-aae
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: proxy-aae
+subjects:
+- kind: ServiceAccount
+  name: proxy-aae
+  namespace: proxy-aae
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: proxy-aae
+  name: proxy-aae
+  namespace: proxy-aae
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: proxy-aae
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: proxy-aae
+  name: proxy-aae
+  namespace: proxy-aae
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxy-aae
+  template:
+    metadata:
+      labels:
+        app: proxy-aae
+    spec:
+      containers:
+      - env:
+        - name: WORKERS_SECRET_NAMESPACE
+          value: kueue-system
+        - name: REQUEST_TIMEOUT
+          value: 30s
+        - name: DEFAULT_LOG_TAIL_LINES
+          value: "100"
+        - name: LOG_LEVEL
+          value: "2"
+        image: quay.io/openshift-pipeline/multicluster-proxy-aae-rhel9@sha256:59b7b5dff5fe5f6d4e3cc814911ca032c97b22793669ac34a0d163290f649366
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        name: proxy-aae
+        ports:
+        - containerPort: 8080
+          name: http
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+      serviceAccountName: proxy-aae

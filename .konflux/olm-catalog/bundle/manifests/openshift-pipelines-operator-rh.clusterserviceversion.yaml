@@ -20,7 +20,7 @@ metadata:
     features.operators.openshift.io/token-auth-gcp: 'false'
     olm.skipRange: '>=1.21.0 <1.22.0'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
-    operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonschedulers.operator.tekton.dev"]'
+    operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonschedulers.operator.tekton.dev","tektonmulticlusterproxyaaes.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
     repository: https://github.com/tektoncd/operator
     support: Red Hat
@@ -137,6 +137,9 @@ spec:
           - kind: openshiftpipelinesascodes
             name: pipelinesascode
             version: v1alpha1
+          - kind: tektonmulticlusterproxyaaes
+            name: multicluster-proxy-aae
+            version: v1alpha1
         specDescriptors:
           - description: Namespace where Tekton components are installed
             displayName: Target Namespace
@@ -221,6 +224,27 @@ spec:
           - description: The version of Operator installed
             displayName: ObservedGeneration
             path: observedGeneration
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:label
+        version: v1alpha1
+      - description: Represents an installation of the multicluster-proxy-aae component for multi-cluster
+        displayName: Tekton Multicluster Proxy AAE
+        kind: TektonMulticlusterProxyAAE
+        name: tektonmulticlusterproxyaaes.operator.tekton.dev
+        resources:
+          - kind: tektoninstallersets
+            name: ''
+            version: v1alpha1
+        specDescriptors:
+          - description: Namespace where Tekton Multicluster Proxy AAE is installed
+            displayName: Target Namespace
+            path: targetNamespace
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:label
+        statusDescriptors:
+          - description: The version of Tekton Multicluster Proxy AAE installed
+            displayName: Version
+            path: version
             x-descriptors:
               - urn:alm:descriptor:com.tectonic.ui:label
         version: v1alpha1
@@ -386,6 +410,8 @@ spec:
     - Tekton Pruner: v0.3.5
 
     - Tekton Scheduler (tech-preview): v0.3.0
+
+    - Multicluster Proxy AAE (tech-preview): v0.1.0
 
 
     ## Getting Started
@@ -1210,7 +1236,7 @@ spec:
                 containers:
                   - args:
                       - -controllers
-                      - tektonconfig,tektonpipeline,tektontrigger,tektonhub,tektonchain,tektonaddon,tektonresult,openshiftpipelinesascode,manualapprovalgate,tektonpruner,tektonscheduler
+                      - tektonconfig,tektonpipeline,tektontrigger,tektonhub,tektonchain,tektonaddon,tektonresult,openshiftpipelinesascode,manualapprovalgate,tektonpruner,tektonscheduler,tektonmulticlusterproxyaae
                       - -unique-process-name
                       - tekton-operator-lifecycle
                     env:
@@ -1356,6 +1382,8 @@ spec:
                         value: quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:ba1fc862eea6a3ac848de3026d87f065327312ddbde3623ad00cd945795fc867
                       - name: IMAGE_SCHEDULER_WEBHOOK
                         value: quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:ba1fc862eea6a3ac848de3026d87f065327312ddbde3623ad00cd945795fc867
+                      - name: IMAGE_MULTICLUSTERPROXYAAE_PROXY_SERVER
+                        value: registry.redhat.io/openshift-pipelines/pipelines-multicluster-proxy-aae-rhel9@
                       - name: IMAGE_PRUNER_WEBHOOK
                         value: quay.io/openshift-pipeline/pipelines-pruner-webhook-rhel9@sha256:34e66d49dfaa5b02c0eea281ee73e77f75f41f2b09312df03374da300778066f
                       - name: IMAGE_PAC_PAC_CONTROLLER
@@ -1629,6 +1657,8 @@ spec:
       name: IMAGE_SCHEDULER_MANAGER
     - image: quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:ba1fc862eea6a3ac848de3026d87f065327312ddbde3623ad00cd945795fc867
       name: IMAGE_SCHEDULER_WEBHOOK
+    - image: registry.redhat.io/openshift-pipelines/pipelines-multicluster-proxy-aae-rhel9@
+      name: IMAGE_MULTICLUSTERPROXYAAE_PROXY_SERVER
     - image: quay.io/openshift-pipeline/pipelines-pruner-webhook-rhel9@sha256:34e66d49dfaa5b02c0eea281ee73e77f75f41f2b09312df03374da300778066f
       name: IMAGE_PRUNER_WEBHOOK
     - image: quay.io/openshift-pipeline/pipelines-pipelines-as-code-controller-rhel9@sha256:3792585160722402b7fb9d27e942e1a774a72e2e8139153316ad1b51651ed976
