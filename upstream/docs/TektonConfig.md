@@ -47,6 +47,7 @@ spec:
   pipeline:
     await-sidecar-readiness: true
     coschedule: workspaces
+    disable-affinity-assistant: false
     disable-creds-init: false
     disable-home-env-overwrite: true
     disable-working-directory-overwrite: true
@@ -237,6 +238,7 @@ Example:
 
 ```yaml
 pipeline:
+  disable-affinity-assistant: false
   disable-creds-init: false
   disable-home-env-overwrite: true
   disable-working-directory-overwrite: true

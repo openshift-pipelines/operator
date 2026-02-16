@@ -599,7 +599,7 @@ type PipelineRunList struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []PipelineRun `json:"items"`
+	Items           []PipelineRun `json:"items,omitempty"`
 }
 
 // PipelineTaskRun reports the results of running a step in the Task. Each

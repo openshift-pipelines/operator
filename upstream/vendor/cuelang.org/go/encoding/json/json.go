@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
@@ -237,7 +238,7 @@ func patchExpr(n ast.Node, patchPos func(n ast.Node)) {
 
 				// TODO(legacy): remove checking for '_' prefix once hidden
 				// fields are removed.
-				if ast.StringLabelNeedsQuoting(u) {
+				if !ast.IsValidIdent(u) || strings.HasPrefix(u, "_") {
 					break // keep string
 				}
 
