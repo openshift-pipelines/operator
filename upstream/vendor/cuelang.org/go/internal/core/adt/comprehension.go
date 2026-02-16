@@ -77,6 +77,8 @@ type envComprehension struct {
 
 	// runtime-related fields
 
+	err *Bottom
+
 	// envs holds all the environments that define a single "yield" result in
 	// combination with the comprehension struct.
 	envs []*Environment // nil: unprocessed, non-nil: done.
@@ -96,6 +98,8 @@ type envYield struct {
 
 	// Values specific to the field corresponding to this envYield
 
+	// This envYield was added to selfComprehensions
+	self bool
 	// This envYield was successfully executed and the resulting conjuncts were
 	// added.
 	inserted bool
@@ -144,7 +148,13 @@ func (n *nodeContext) insertComprehension(
 
 	x := c.Value
 
-	ci.setOptionalV3(nil)
+	if !n.ctx.isDevVersion() {
+		ci = ci.SpawnEmbed(c)
+		ci.closeInfo.span |= ComprehensionSpan
+	} else {
+		ci.setOptionalV3(nil)
+	}
+
 	node := n.node.DerefDisjunct()
 
 	var decls []Decl
@@ -179,8 +189,12 @@ func (n *nodeContext) insertComprehension(
 				}
 
 				conjunct := MakeConjunct(env, c, ci)
-				n.assertInitialized()
-				n.insertArc(f.Label, ArcPending, conjunct, conjunct.CloseInfo, false)
+				if n.ctx.isDevVersion() {
+					n.assertInitialized()
+					n.insertArc(f.Label, ArcPending, conjunct, conjunct.CloseInfo, false)
+				} else {
+					n.insertFieldUnchecked(f.Label, ArcPending, conjunct)
+				}
 
 				fields = append(fields, f)
 
@@ -203,7 +217,11 @@ func (n *nodeContext) insertComprehension(
 				conjunct := MakeConjunct(env, c, ci)
 				n.assertInitialized()
 				arc := n.insertFieldUnchecked(f.Label, ArcMember, conjunct)
-				arc.MultiLet = true // NOTE: v2 was f.IsMulti
+				if n.ctx.isDevVersion() {
+					arc.MultiLet = true
+				} else {
+					arc.MultiLet = f.IsMulti
+				}
 
 				fields = append(fields, f)
 
@@ -264,9 +282,19 @@ func (n *nodeContext) insertComprehension(
 		}
 	}
 
-	t := n.scheduleTask(handleComprehension, env, x, ci)
-	t.comp = ec
-	t.leaf = c
+	if n.ctx.isDevVersion() {
+		t := n.scheduleTask(handleComprehension, env, x, ci)
+		t.comp = ec
+		t.leaf = c
+	} else {
+		n.comprehensions = append(n.comprehensions, envYield{
+			envComprehension: ec,
+			leaf:             c,
+			env:              env,
+			id:               ci,
+			expr:             x,
+		})
+	}
 }
 
 type compState struct {
@@ -283,7 +311,7 @@ func (c *OpContext) yield(
 	node *Vertex, // errors are associated with this node
 	env *Environment, // env for field for which this yield is called
 	comp *Comprehension,
-	state Flags,
+	state combinedFlags,
 	f YieldFunc, // called for every result
 ) *Bottom {
 	s := &compState{
@@ -326,6 +354,71 @@ func (s *compState) yield(env *Environment) (ok bool) {
 	return !c.HasErr()
 }
 
+// injectComprehension evaluates and inserts embeddings. It first evaluates all
+// embeddings before inserting the results to ensure that the order of
+// evaluation does not matter.
+func (n *nodeContext) injectComprehensions(state vertexStatus) (progress bool) {
+	unreachableForDev(n.ctx)
+
+	workRemaining := false
+
+	// We use variables, instead of range, as the list may grow dynamically.
+	for i := 0; i < len(n.comprehensions); i++ {
+		d := &n.comprehensions[i]
+		if d.self || d.inserted {
+			continue
+		}
+		if err := n.processComprehension(d, state); err != nil {
+			// TODO:  Detect that the nodes are actually equal
+			if err.ForCycle && err.Value == n.node {
+				n.selfComprehensions = append(n.selfComprehensions, *d)
+				progress = true
+				d.self = true
+				return
+			}
+
+			d.err = err
+			workRemaining = true
+
+			continue
+
+			// TODO: add this when it can be done without breaking other
+			// things.
+			//
+			// // Add comprehension to ensure incomplete error is inserted.
+			// // This ensures that the error is reported in the Vertex
+			// // where the comprehension was defined, and not just in the
+			// // node below. This, in turn, is necessary to support
+			// // certain logic, like export, that expects to be able to
+			// // detect an "incomplete" error at the first level where it
+			// // is necessary.
+			// n := d.node.getNodeContext(ctx)
+			// n.addBottom(err)
+
+		}
+		progress = true
+	}
+
+	if !workRemaining {
+		n.comprehensions = n.comprehensions[:0] // Signal that all work is done.
+	}
+
+	return progress
+}
+
+// injectSelfComprehensions processes comprehensions that were earlier marked
+// as iterating over the node in which they are defined. Such comprehensions
+// are legal as long as they do not modify the arc set of the node.
+func (n *nodeContext) injectSelfComprehensions(state vertexStatus) {
+	unreachableForDev(n.ctx)
+
+	// We use variables, instead of range, as the list may grow dynamically.
+	for i := 0; i < len(n.selfComprehensions); i++ {
+		n.processComprehension(&n.selfComprehensions[i], state)
+	}
+	n.selfComprehensions = n.selfComprehensions[:0] // Signal that all work is done.
+}
+
 // processComprehension processes a single Comprehension conjunct.
 // It returns an incomplete error if there was one. Fatal errors are
 // processed as a "successfully" completed computation.
@@ -339,7 +432,7 @@ func (n *nodeContext) processComprehension(d *envYield, state vertexStatus) *Bot
 			envs = append(envs, env)
 		}
 
-		if err := ctx.yield(d.vertex, d.env, d.comp, Flags{
+		if err := ctx.yield(d.vertex, d.env, d.comp, combinedFlags{
 			status:    state,
 			condition: allKnown,
 			mode:      ignore,
@@ -412,7 +505,11 @@ func (n *nodeContext) processComprehension(d *envYield, state vertexStatus) *Bot
 
 		env = linkChildren(env, d.leaf)
 
-		n.scheduleConjunct(Conjunct{env, d.expr, id}, id)
+		if ctx.isDevVersion() {
+			n.scheduleConjunct(Conjunct{env, d.expr, id}, id)
+		} else {
+			n.addExprConjunct(Conjunct{env, d.expr, id}, state)
+		}
 	}
 
 	return nil

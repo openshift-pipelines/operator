@@ -106,7 +106,6 @@ type eval struct {
 	tracers                     []QueryTracer
 	tracingOpts                 tracing.Options
 	queryID                     uint64
-	timeStart                   int64
 	index                       int
 	genvarid                    int
 	indexing                    bool
@@ -172,17 +171,16 @@ func (e *eval) string(s *strings.Builder) {
 func (e *eval) builtinFunc(name string) (*ast.Builtin, BuiltinFunc, bool) {
 	decl, ok := ast.BuiltinMap[name]
 	if ok {
-		if f, ok := builtinFunctions[name]; ok {
+		f, ok := builtinFunctions[name]
+		if ok {
 			return decl, f, true
 		}
-		if bi, ok := e.builtins[name]; ok {
-			return decl, bi.Func, true
+	} else {
+		bi, ok := e.builtins[name]
+		if ok {
+			return bi.Decl, bi.Func, true
 		}
 	}
-	if bi, ok := e.builtins[name]; ok {
-		return bi.Decl, bi.Func, true
-	}
-
 	return nil, nil, false
 }
 
@@ -953,7 +951,7 @@ func (e *eval) evalCall(terms []*ast.Term, iter unifyIterator) error {
 	var bctx *BuiltinContext
 
 	// Creating a BuiltinContext is expensive, so only do it if the builtin depends on it.
-	if !bi.CanSkipBctx {
+	if bi.NeedsBuiltInContext() {
 		var parentID uint64
 		if e.parent != nil {
 			parentID = e.parent.queryID
@@ -962,10 +960,6 @@ func (e *eval) evalCall(terms []*ast.Term, iter unifyIterator) error {
 		var capabilities *ast.Capabilities
 		if e.compiler != nil {
 			capabilities = e.compiler.Capabilities()
-		}
-
-		if e.time == nil {
-			e.time = ast.NumberTerm(int64ToJSONNumber(e.timeStart))
 		}
 
 		bctx = &BuiltinContext{
@@ -1652,11 +1646,12 @@ func (e *eval) getRules(ref ast.Ref, args []*ast.Term) (*ast.IndexResult, error)
 
 	var result *ast.IndexResult
 	var err error
-	resolver.e = e
 	if e.indexing {
+		resolver.e = e
 		resolver.args = args
 		result, err = index.Lookup(resolver)
 	} else {
+		resolver.e = e
 		result, err = index.AllRules(resolver)
 	}
 	if err != nil {

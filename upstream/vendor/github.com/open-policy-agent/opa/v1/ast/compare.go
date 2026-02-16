@@ -5,10 +5,9 @@
 package ast
 
 import (
-	"cmp"
+	"encoding/json"
 	"fmt"
 	"math/big"
-	"strings"
 )
 
 // Compare returns an integer indicating whether two AST values are less than,
@@ -78,7 +77,8 @@ func Compare(a, b any) int {
 	case Null:
 		return 0
 	case Boolean:
-		if a == b.(Boolean) {
+		b := b.(Boolean)
+		if a.Equal(b) {
 			return 0
 		}
 		if !a {
@@ -86,10 +86,64 @@ func Compare(a, b any) int {
 		}
 		return 1
 	case Number:
-		return NumberCompare(a, b.(Number))
+		if ai, err := json.Number(a).Int64(); err == nil {
+			if bi, err := json.Number(b.(Number)).Int64(); err == nil {
+				if ai == bi {
+					return 0
+				}
+				if ai < bi {
+					return -1
+				}
+				return 1
+			}
+		}
+
+		// We use big.Rat for comparing big numbers.
+		// It replaces big.Float due to following reason:
+		// big.Float comes with a default precision of 64, and setting a
+		// larger precision results in more memory being allocated
+		// (regardless of the actual number we are parsing with SetString).
+		//
+		// Note: If we're so close to zero that big.Float says we are zero, do
+		// *not* big.Rat).SetString on the original string it'll potentially
+		// take very long.
+		var bigA, bigB *big.Rat
+		fa, ok := new(big.Float).SetString(string(a))
+		if !ok {
+			panic("illegal value")
+		}
+		if fa.IsInt() {
+			if i, _ := fa.Int64(); i == 0 {
+				bigA = new(big.Rat).SetInt64(0)
+			}
+		}
+		if bigA == nil {
+			bigA, ok = new(big.Rat).SetString(string(a))
+			if !ok {
+				panic("illegal value")
+			}
+		}
+
+		fb, ok := new(big.Float).SetString(string(b.(Number)))
+		if !ok {
+			panic("illegal value")
+		}
+		if fb.IsInt() {
+			if i, _ := fb.Int64(); i == 0 {
+				bigB = new(big.Rat).SetInt64(0)
+			}
+		}
+		if bigB == nil {
+			bigB, ok = new(big.Rat).SetString(string(b.(Number)))
+			if !ok {
+				panic("illegal value")
+			}
+		}
+
+		return bigA.Cmp(bigB)
 	case String:
 		b := b.(String)
-		if a == b {
+		if a.Equal(b) {
 			return 0
 		}
 		if a < b {
@@ -99,7 +153,8 @@ func Compare(a, b any) int {
 	case Var:
 		return VarCompare(a, b.(Var))
 	case Ref:
-		return termSliceCompare(a, b.(Ref))
+		b := b.(Ref)
+		return termSliceCompare(a, b)
 	case *Array:
 		b := b.(*Array)
 		return termSliceCompare(a.elems, b.elems)
@@ -109,9 +164,11 @@ func Compare(a, b any) int {
 		if x, ok := b.(*lazyObj); ok {
 			b = x.force()
 		}
-		return a.Compare(b.(*object))
+		b := b.(*object)
+		return a.Compare(b)
 	case Set:
-		return a.Compare(b.(Set))
+		b := b.(Set)
+		return a.Compare(b)
 	case *ArrayComprehension:
 		b := b.(*ArrayComprehension)
 		if cmp := Compare(a.Term, b.Term); cmp != 0 {
@@ -134,31 +191,44 @@ func Compare(a, b any) int {
 		}
 		return a.Body.Compare(b.Body)
 	case Call:
-		return termSliceCompare(a, b.(Call))
+		b := b.(Call)
+		return termSliceCompare(a, b)
 	case *Expr:
-		return a.Compare(b.(*Expr))
+		b := b.(*Expr)
+		return a.Compare(b)
 	case *SomeDecl:
-		return a.Compare(b.(*SomeDecl))
+		b := b.(*SomeDecl)
+		return a.Compare(b)
 	case *Every:
-		return a.Compare(b.(*Every))
+		b := b.(*Every)
+		return a.Compare(b)
 	case *With:
-		return a.Compare(b.(*With))
+		b := b.(*With)
+		return a.Compare(b)
 	case Body:
-		return a.Compare(b.(Body))
+		b := b.(Body)
+		return a.Compare(b)
 	case *Head:
-		return a.Compare(b.(*Head))
+		b := b.(*Head)
+		return a.Compare(b)
 	case *Rule:
-		return a.Compare(b.(*Rule))
+		b := b.(*Rule)
+		return a.Compare(b)
 	case Args:
-		return termSliceCompare(a, b.(Args))
+		b := b.(Args)
+		return termSliceCompare(a, b)
 	case *Import:
-		return a.Compare(b.(*Import))
+		b := b.(*Import)
+		return a.Compare(b)
 	case *Package:
-		return a.Compare(b.(*Package))
+		b := b.(*Package)
+		return a.Compare(b)
 	case *Annotations:
-		return a.Compare(b.(*Annotations))
+		b := b.(*Annotations)
+		return a.Compare(b)
 	case *Module:
-		return a.Compare(b.(*Module))
+		b := b.(*Module)
+		return a.Compare(b)
 	}
 	panic(fmt.Sprintf("illegal value: %T", a))
 }
@@ -356,85 +426,4 @@ func RefCompare(a, b Ref) int {
 
 func RefEqual(a, b Ref) bool {
 	return termSliceEqual(a, b)
-}
-
-func NumberCompare(x, y Number) int {
-	xs, ys := string(x), string(y)
-
-	var xIsF, yIsF bool
-
-	// Treat "1" and "1.0", "1.00", etc as "1"
-	if strings.Contains(xs, ".") {
-		if tx := strings.TrimRight(xs, ".0"); tx != xs {
-			// Still a float after trimming?
-			xIsF = strings.Contains(tx, ".")
-			xs = tx
-		}
-	}
-	if strings.Contains(ys, ".") {
-		if ty := strings.TrimRight(ys, ".0"); ty != ys {
-			yIsF = strings.Contains(ty, ".")
-			ys = ty
-		}
-	}
-	if xs == ys {
-		return 0
-	}
-
-	var xi, yi int64
-	var xf, yf float64
-	var xiOK, yiOK, xfOK, yfOK bool
-
-	if xi, xiOK = x.Int64(); xiOK {
-		if yi, yiOK = y.Int64(); yiOK {
-			return cmp.Compare(xi, yi)
-		}
-	}
-
-	if xIsF && yIsF {
-		if xf, xfOK = x.Float64(); xfOK {
-			if yf, yfOK = y.Float64(); yfOK {
-				if xf == yf {
-					return 0
-				}
-				// could still be "equal" depending on precision, so we continue?
-			}
-		}
-	}
-
-	var a *big.Rat
-	fa, ok := new(big.Float).SetString(string(x))
-	if !ok {
-		panic("illegal value")
-	}
-	if fa.IsInt() {
-		if i, _ := fa.Int64(); i == 0 {
-			a = new(big.Rat).SetInt64(0)
-		}
-	}
-	if a == nil {
-		a, ok = new(big.Rat).SetString(string(x))
-		if !ok {
-			panic("illegal value")
-		}
-	}
-
-	var b *big.Rat
-	fb, ok := new(big.Float).SetString(string(y))
-	if !ok {
-		panic("illegal value")
-	}
-	if fb.IsInt() {
-		if i, _ := fb.Int64(); i == 0 {
-			b = new(big.Rat).SetInt64(0)
-		}
-	}
-	if b == nil {
-		b, ok = new(big.Rat).SetString(string(y))
-		if !ok {
-			panic("illegal value")
-		}
-	}
-
-	return a.Cmp(b)
 }

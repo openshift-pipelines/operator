@@ -14,7 +14,7 @@
 
 // Package koala converts XML to and from CUE, as described in the proposal for the [koala] encoding.
 // This encoding is inspired by the [BadgerFish] convention for translating XML to JSON.
-// It differs from this to better fit CUE syntax, (as "$" and "@" are special characters),
+// It differs from this to better fit CUE syntax, (as "$" and "@" are special characters), 
 // and for improved readability, as described in the koala proposal.
 //
 // XML elements are modeled as CUE structs, their attributes are modeled as struct fields
@@ -145,10 +145,11 @@ func (dec *Decoder) decoderInnerText(xmlToken xml.CharData, contentOffset int64)
 		return fmt.Errorf("text content outside of an XML element is not supported")
 	}
 	pos := dec.tokenFile.Pos(int(contentOffset), token.NoRelPos)
-	txtLabel := ast.NewStringLabel(contentAttribute)
-	ast.SetPos(txtLabel, pos)
+	txtContentPosition := pos
+	txtLabel := ast.NewString(contentAttribute)
+	txtLabel.ValuePos = txtContentPosition
 	val := toBasicLit(textContent)
-	ast.SetPos(val, pos)
+	val.ValuePos = txtContentPosition
 	textContentNode := &ast.Field{
 		Label:    txtLabel,
 		Value:    val,
@@ -187,7 +188,10 @@ func (dec *Decoder) decodeStartElement(xmlToken xml.StartElement, startOffset in
 	// Covers the root node.
 	if dec.currField.field == nil {
 		dec.currXmlElement = &xmlElement{xmlName: xmlToken.Name, attr: xmlToken.Attr}
-		cueElement := dec.cueFieldFromXmlElement(xmlToken, dec.currXmlElement, startOffset)
+		cueElement, err := dec.cueFieldFromXmlElement(xmlToken, dec.currXmlElement, startOffset)
+		if err != nil {
+			return err
+		}
 		dec.currField.assignNewCurrField(cueElement)
 		dec.astRoot = ast.NewStruct(dec.currField.field)
 		ast.SetPos(dec.astRoot, dec.tokenFile.Pos(0, token.NoRelPos))
@@ -205,7 +209,10 @@ func (dec *Decoder) decodeStartElement(xmlToken xml.StartElement, startOffset in
 	parentXmlNode.children = append(parentXmlNode.children, dec.currXmlElement)
 	// For the CUE ast: step down the CUE hierarchy.
 	dec.ancestors = append(dec.ancestors, dec.currField)
-	newElement := dec.cueFieldFromXmlElement(xmlToken, dec.currXmlElement, startOffset)
+	newElement, err := dec.cueFieldFromXmlElement(xmlToken, dec.currXmlElement, startOffset)
+	if err != nil {
+		return err
+	}
 	// Check if this new XML element has a name that's been seen before at the current level.
 	prefixedXmlElementName := prefixedElementName(xmlToken, dec.currXmlElement)
 	sameNameElements := dec.currField.currFieldChildren[prefixedXmlElementName]
@@ -247,11 +254,11 @@ func isWhiteSpace(s string) bool {
 // cueFieldFromXmlElement creates a new [ast.Field] to model the given xml element information
 // in [xml.StartElement] and [xmlElement]. The startOffset represents the offset
 // for the beginning of the start tag of the given XML element.
-func (dec *Decoder) cueFieldFromXmlElement(elem xml.StartElement, xmlNode *xmlElement, startOffset int64) *ast.Field {
+func (dec *Decoder) cueFieldFromXmlElement(elem xml.StartElement, xmlNode *xmlElement, startOffset int64) (*ast.Field, error) {
 	elementName := prefixedElementName(elem, xmlNode)
-	resLabel := ast.NewStringLabel(elementName)
+	resLabel := ast.NewString(elementName)
 	pos := dec.tokenFile.Pos(int(startOffset), token.NoRelPos)
-	ast.SetPos(resLabel, pos)
+	resLabel.ValuePos = pos
 	resultValue := &ast.StructLit{}
 	result := &ast.Field{
 		Label:    resLabel,
@@ -261,10 +268,10 @@ func (dec *Decoder) cueFieldFromXmlElement(elem xml.StartElement, xmlNode *xmlEl
 	// Extract attributes as children.
 	for _, a := range elem.Attr {
 		attrName := prefixedAttrName(a, elem, xmlNode)
-		label := ast.NewStringLabel(attributeSymbol + attrName)
+		label := ast.NewString(attributeSymbol + attrName)
 		value := toBasicLit(a.Value)
-		ast.SetPos(label, pos)
-		ast.SetPos(value, pos)
+		label.ValuePos = pos
+		value.ValuePos = pos
 		attrExpr := &ast.Field{
 			Label:    label,
 			Value:    value,
@@ -272,7 +279,7 @@ func (dec *Decoder) cueFieldFromXmlElement(elem xml.StartElement, xmlNode *xmlEl
 		}
 		resultValue.Elts = append(resultValue.Elts, attrExpr)
 	}
-	return result
+	return result, nil
 }
 
 // prefixedElementName returns the full name of an element,

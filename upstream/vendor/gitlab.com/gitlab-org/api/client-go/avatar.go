@@ -22,10 +22,6 @@ import (
 
 type (
 	AvatarRequestsServiceInterface interface {
-		// GetAvatar gets the avatar URL for a user with the given email address.
-		//
-		// GitLab API docs:
-		// https://docs.gitlab.com/api/avatar/#get-details-on-an-account-avatar
 		GetAvatar(opt *GetAvatarOptions, options ...RequestOptionFunc) (*Avatar, *Response, error)
 	}
 
@@ -53,14 +49,24 @@ type Avatar struct {
 // https://docs.gitlab.com/api/avatar/#get-details-on-an-account-avatar
 type GetAvatarOptions struct {
 	Email *string `url:"email,omitempty" json:"email,omitempty"`
-	Size  *int64  `url:"size,omitempty" json:"size,omitempty"`
+	Size  *int    `url:"size,omitempty" json:"size,omitempty"`
 }
 
+// GetAvatar gets the avatar URL for a user with the given email address.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/api/avatar/#get-details-on-an-account-avatar
 func (s *AvatarRequestsService) GetAvatar(opt *GetAvatarOptions, options ...RequestOptionFunc) (*Avatar, *Response, error) {
-	return do[*Avatar](s.client,
-		withMethod(http.MethodGet),
-		withPath("avatar"),
-		withAPIOpts(opt),
-		withRequestOpts(options...),
-	)
+	req, err := s.client.NewRequest(http.MethodGet, "avatar", opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	avatar := new(Avatar)
+	response, err := s.client.Do(req, avatar)
+	if err != nil {
+		return nil, response, err
+	}
+
+	return avatar, response, nil
 }

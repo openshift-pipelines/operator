@@ -313,7 +313,7 @@ func stateCompletions(s *scheduler) condition {
 // allChildConjunctsKnown indicates that all conjuncts have been added by
 // the parents and every conjunct that may add fields to subfields have been
 // processed.
-func (v *Vertex) allChildConjunctsKnown(ctx *OpContext) bool {
+func (v *Vertex) allChildConjunctsKnown() bool {
 	if v == nil {
 		return true
 	}
@@ -328,9 +328,7 @@ func (v *Vertex) allChildConjunctsKnown(ctx *OpContext) bool {
 		return true
 	}
 
-	n := v.getState(ctx)
-
-	return n.meets(fieldConjunctsKnown | allAncestorsProcessed)
+	return v.state.meets(fieldConjunctsKnown | allAncestorsProcessed)
 }
 
 func (n *nodeContext) scheduleTask(r *runner, env *Environment, x Node, ci CloseInfo) *task {

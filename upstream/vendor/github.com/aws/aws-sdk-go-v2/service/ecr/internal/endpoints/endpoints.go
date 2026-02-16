@@ -349,9 +349,6 @@ var defaultPartitions = endpoints.Partitions{
 				},
 			},
 			endpoints.EndpointKey{
-				Region: "ap-southeast-6",
-			}: endpoints.Endpoint{},
-			endpoints.EndpointKey{
 				Region: "ap-southeast-7",
 			}: endpoints.Endpoint{
 				Hostname: "api.ecr.ap-southeast-7.amazonaws.com",
@@ -1069,9 +1066,6 @@ var defaultPartitions = endpoints.Partitions{
 					Region: "us-isob-east-1",
 				},
 			},
-			endpoints.EndpointKey{
-				Region: "us-isob-west-1",
-			}: endpoints.Endpoint{},
 		},
 	},
 	{

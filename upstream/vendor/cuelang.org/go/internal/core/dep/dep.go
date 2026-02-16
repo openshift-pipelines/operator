@@ -17,6 +17,7 @@ package dep
 
 import (
 	"cuelang.org/go/cue/errors"
+	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
 )
 
@@ -196,7 +197,6 @@ func Visit(cfg *Config, c *adt.OpContext, n *adt.Vertex, f VisitFunc) error {
 		all:        cfg.Descend,
 		top:        true,
 		cfgDynamic: cfg.Dynamic,
-		resolved:   map[refEntry]bool{},
 	}
 	return v.visitReusingVisitor(n, true)
 }
@@ -236,9 +236,10 @@ func (v *visitor) visit(n *adt.Vertex, top bool) (err error) {
 		}
 	}()
 
-	for x := range n.LeafConjuncts() {
+	n.VisitLeafConjuncts(func(x adt.Conjunct) bool {
 		v.markExpr(x.Env, x.Elem())
-	}
+		return true
+	})
 
 	return nil
 }
@@ -268,9 +269,6 @@ type visitor struct {
 	cfgDynamic bool
 
 	marked marked
-
-	// resolved dedups resolving references to prevent exponential blowup.
-	resolved map[refEntry]bool
 }
 
 type refEntry struct {
@@ -299,9 +297,6 @@ func (c *visitor) markExpr(env *adt.Environment, expr adt.Elem) {
 		c.markExpr(env, x.Y)
 
 	case *adt.UnaryExpr:
-		c.markExpr(env, x.X)
-
-	case *adt.OpenExpr:
 		c.markExpr(env, x.X)
 
 	case *adt.Interpolation:
@@ -362,18 +357,10 @@ func (c *visitor) markExpr(env *adt.Environment, expr adt.Elem) {
 
 // markResolve resolves dependencies.
 func (c *visitor) markResolver(env *adt.Environment, r adt.Resolver) {
-	if c.resolved[refEntry{env, r}] {
-		// TODO: this seems to still not remove everything. Consider a
-		// different approach.
-		return
-	}
-
 	// Note: it is okay to pass an empty CloseInfo{} here as we assume that
 	// all nodes are finalized already and we need neither closedness nor cycle
 	// checks.
 	ref, _ := c.ctxt.Resolve(adt.MakeConjunct(env, r, adt.CloseInfo{}), r)
-	c.resolved[refEntry{env, r}] = true
-	c.ctxt.Stats().ResolveDep++
 
 	// TODO: consider the case where an inlined composite literal does not
 	// resolve, but has references. For instance, {a: k, ref}.b would result
@@ -427,7 +414,13 @@ func (c *visitor) reportDependency(env *adt.Environment, ref adt.Resolver, v *ad
 		reference = c.topRef
 	}
 
-	inspect := v.IsDetached() || !v.MayAttach()
+	inspect := false
+
+	if c.ctxt.Version == internal.DevVersion {
+		inspect = v.IsDetached() || !v.MayAttach()
+	} else {
+		inspect = !v.Rooted()
+	}
 
 	if inspect {
 		// TODO: there is currently no way to inspect where a non-rooted node
@@ -496,8 +489,9 @@ func (c *visitor) reportDependency(env *adt.Environment, ref adt.Resolver, v *ad
 
 	c.numRefs++
 
-	// Note: we did not finalize in V2.
-	v.Unify(c.ctxt, adt.FinalizeWithoutTypoCheck)
+	if c.ctxt.Version == internal.DevVersion {
+		v.Finalize(c.ctxt)
+	}
 
 	d := Dependency{
 		Node:      v,
@@ -545,11 +539,12 @@ func hasLetParent(v *adt.Vertex) bool {
 
 // markConjuncts transitively marks all reference of the current node.
 func (c *visitor) markConjuncts(v *adt.Vertex) {
-	for x := range v.LeafConjuncts() {
+	v.VisitLeafConjuncts(func(x adt.Conjunct) bool {
 		// Use Elem instead of Expr to preserve the Comprehension to, in turn,
 		// ensure an Environment is inserted for the Value clause.
 		c.markExpr(x.Env, x.Elem())
-	}
+		return true
+	})
 }
 
 // markInternalResolvers marks dependencies for rootless nodes. As these
@@ -562,9 +557,10 @@ func (c *visitor) markInternalResolvers(env *adt.Environment, r adt.Resolver, v 
 	// As lets have no path and we otherwise will not process them, we set
 	// processing all to true.
 	if c.marked != nil && hasLetParent(v) {
-		for x := range v.LeafConjuncts() {
+		v.VisitLeafConjuncts(func(x adt.Conjunct) bool {
 			c.marked.markExpr(x.Expr())
-		}
+			return true
+		})
 	}
 
 	c.markConjuncts(v)
@@ -594,7 +590,7 @@ func (c *visitor) evaluateInner(env *adt.Environment, x adt.Expr, r adt.Resolver
 		return
 	}
 	// TODO(perf): one level of  evaluation would suffice.
-	v.Unify(c.ctxt, adt.FinalizeWithoutTypoCheck)
+	v.Finalize(c.ctxt)
 
 	saved := len(c.pathStack)
 	c.pathStack = append(c.pathStack, refEntry{env, r})

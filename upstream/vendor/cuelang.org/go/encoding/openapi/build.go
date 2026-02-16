@@ -28,8 +28,8 @@ import (
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/token"
+	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
-	"cuelang.org/go/internal/core/subsume"
 )
 
 type buildContext struct {
@@ -79,7 +79,7 @@ func schemas(g *Generator, inst cue.InstanceOrValue) (schemas *ast.StructLit, er
 		}
 
 		// verify that certain elements are still passed.
-		for f := range strings.SplitSeq(
+		for _, f := range strings.Split(
 			"version,title,allOf,anyOf,not,enum,Schema/properties,Schema/items"+
 				"nullable,type", ",") {
 			if fieldFilter.MatchString(f) {
@@ -551,7 +551,7 @@ func (b *builder) disjunction(a []cue.Value, f typeFunc) {
 				continue
 			}
 			err := v.Subsume(w, cue.Schema())
-			if err == nil || errors.Is(err, subsume.ErrInexact) {
+			if err == nil || errors.Is(err, internal.ErrInexact) {
 				subsumed = append(subsumed, schemas[j])
 			}
 		}
@@ -873,7 +873,7 @@ func (b *builder) listCap(v cue.Value) {
 		// must be type, so okay.
 	case cue.NotEqualOp:
 		i := b.int(a[0])
-		b.setNot("allOf", ast.NewList(
+		b.setNot("allOff", ast.NewList(
 			b.kv("minItems", i),
 			b.kv("maxItems", i),
 		))
@@ -913,7 +913,7 @@ func (b *builder) number(v cue.Value) {
 
 	case cue.NotEqualOp:
 		i := b.big(a[0])
-		b.setNot("allOf", ast.NewList(
+		b.setNot("allOff", ast.NewList(
 			b.kv("minimum", i),
 			b.kv("maximum", i),
 		))

@@ -27,33 +27,11 @@ import (
 
 type (
 	TopicsServiceInterface interface {
-		// ListTopics returns a list of project topics in the GitLab instance ordered
-		// by number of associated projects.
-		//
-		// GitLab API docs: https://docs.gitlab.com/api/topics/#list-topics
 		ListTopics(opt *ListTopicsOptions, options ...RequestOptionFunc) ([]*Topic, *Response, error)
-		// GetTopic gets a project topic by ID.
-		//
-		// GitLab API docs: https://docs.gitlab.com/api/topics/#get-a-topic
-		GetTopic(topic int64, options ...RequestOptionFunc) (*Topic, *Response, error)
-		// CreateTopic creates a new project topic.
-		//
-		// GitLab API docs:
-		// https://docs.gitlab.com/api/topics/#create-a-project-topic
+		GetTopic(topic int, options ...RequestOptionFunc) (*Topic, *Response, error)
 		CreateTopic(opt *CreateTopicOptions, options ...RequestOptionFunc) (*Topic, *Response, error)
-		// UpdateTopic updates a project topic. Only available to administrators.
-		//
-		// To remove a topic avatar set the TopicAvatar.Filename to an empty string
-		// and set TopicAvatar.Image to nil.
-		//
-		// GitLab API docs:
-		// https://docs.gitlab.com/api/topics/#update-a-project-topic
-		UpdateTopic(topic int64, opt *UpdateTopicOptions, options ...RequestOptionFunc) (*Topic, *Response, error)
-		// DeleteTopic deletes a project topic. Only available to administrators.
-		//
-		// GitLab API docs:
-		// https://docs.gitlab.com/api/topics/#delete-a-project-topic
-		DeleteTopic(topic int64, options ...RequestOptionFunc) (*Response, error)
+		UpdateTopic(topic int, opt *UpdateTopicOptions, options ...RequestOptionFunc) (*Topic, *Response, error)
+		DeleteTopic(topic int, options ...RequestOptionFunc) (*Response, error)
 	}
 
 	// TopicsService handles communication with the topics related methods
@@ -71,7 +49,7 @@ var _ TopicsServiceInterface = (*TopicsService)(nil)
 //
 // GitLab API docs: https://docs.gitlab.com/api/topics/
 type Topic struct {
-	ID                 int64  `json:"id"`
+	ID                 int    `json:"id"`
 	Name               string `json:"name"`
 	Title              string `json:"title"`
 	Description        string `json:"description"`
@@ -91,30 +69,43 @@ type ListTopicsOptions struct {
 	Search *string `url:"search,omitempty" json:"search,omitempty"`
 }
 
+// ListTopics returns a list of project topics in the GitLab instance ordered
+// by number of associated projects.
+//
+// GitLab API docs: https://docs.gitlab.com/api/topics/#list-topics
 func (s *TopicsService) ListTopics(opt *ListTopicsOptions, options ...RequestOptionFunc) ([]*Topic, *Response, error) {
-	res, resp, err := do[[]*Topic](s.client,
-		withMethod(http.MethodGet),
-		withPath("topics"),
-		withAPIOpts(opt),
-		withRequestOpts(options...),
-	)
+	req, err := s.client.NewRequest(http.MethodGet, "topics", opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var t []*Topic
+	resp, err := s.client.Do(req, &t)
 	if err != nil {
 		return nil, resp, err
 	}
-	return res, resp, nil
+
+	return t, resp, nil
 }
 
-func (s *TopicsService) GetTopic(topic int64, options ...RequestOptionFunc) (*Topic, *Response, error) {
-	res, resp, err := do[*Topic](s.client,
-		withMethod(http.MethodGet),
-		withPath("topics/%d", topic),
-		withAPIOpts(nil),
-		withRequestOpts(options...),
-	)
+// GetTopic gets a project topic by ID.
+//
+// GitLab API docs: https://docs.gitlab.com/api/topics/#get-a-topic
+func (s *TopicsService) GetTopic(topic int, options ...RequestOptionFunc) (*Topic, *Response, error) {
+	u := fmt.Sprintf("topics/%d", topic)
+
+	req, err := s.client.NewRequest(http.MethodGet, u, nil, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	t := new(Topic)
+	resp, err := s.client.Do(req, t)
 	if err != nil {
 		return nil, resp, err
 	}
-	return res, resp, nil
+
+	return t, resp, nil
 }
 
 // CreateTopicOptions represents the available CreateTopic() options.
@@ -143,6 +134,10 @@ func (a *TopicAvatar) MarshalJSON() ([]byte, error) {
 	return json.Marshal((*alias)(a))
 }
 
+// CreateTopic creates a new project topic.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/api/topics/#create-a-project-topic
 func (s *TopicsService) CreateTopic(opt *CreateTopicOptions, options ...RequestOptionFunc) (*Topic, *Response, error) {
 	var err error
 	var req *retryablehttp.Request
@@ -184,16 +179,25 @@ type UpdateTopicOptions struct {
 	Avatar      *TopicAvatar `url:"-" json:"avatar,omitempty"`
 }
 
-func (s *TopicsService) UpdateTopic(topic int64, opt *UpdateTopicOptions, options ...RequestOptionFunc) (*Topic, *Response, error) {
+// UpdateTopic updates a project topic. Only available to administrators.
+//
+// To remove a topic avatar set the TopicAvatar.Filename to an empty string
+// and set TopicAvatar.Image to nil.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/api/topics/#update-a-project-topic
+func (s *TopicsService) UpdateTopic(topic int, opt *UpdateTopicOptions, options ...RequestOptionFunc) (*Topic, *Response, error) {
+	u := fmt.Sprintf("topics/%d", topic)
+
 	var err error
 	var req *retryablehttp.Request
 
 	if opt.Avatar == nil || (opt.Avatar.Filename == "" && opt.Avatar.Image == nil) {
-		req, err = s.client.NewRequest(http.MethodPut, fmt.Sprintf("topics/%d", topic), opt, options)
+		req, err = s.client.NewRequest(http.MethodPut, u, opt, options)
 	} else {
 		req, err = s.client.UploadRequest(
 			http.MethodPut,
-			fmt.Sprintf("topics/%d", topic),
+			u,
 			opt.Avatar.Image,
 			opt.Avatar.Filename,
 			UploadAvatar,
@@ -214,12 +218,17 @@ func (s *TopicsService) UpdateTopic(topic int64, opt *UpdateTopicOptions, option
 	return t, resp, nil
 }
 
-func (s *TopicsService) DeleteTopic(topic int64, options ...RequestOptionFunc) (*Response, error) {
-	_, resp, err := do[none](s.client,
-		withMethod(http.MethodDelete),
-		withPath("topics/%d", topic),
-		withAPIOpts(nil),
-		withRequestOpts(options...),
-	)
-	return resp, err
+// DeleteTopic deletes a project topic. Only available to administrators.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/api/topics/#delete-a-project-topic
+func (s *TopicsService) DeleteTopic(topic int, options ...RequestOptionFunc) (*Response, error) {
+	u := fmt.Sprintf("topics/%d", topic)
+
+	req, err := s.client.NewRequest(http.MethodDelete, u, nil, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.client.Do(req, nil)
 }

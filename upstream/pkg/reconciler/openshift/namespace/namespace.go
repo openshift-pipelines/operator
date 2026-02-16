@@ -244,6 +244,10 @@ func (ac *reconciler) reconcileValidatingWebhook(ctx context.Context, caCert []b
 
 	webhook := configuredWebhook.DeepCopy()
 
+	// Clear out any previous (bad) OwnerReferences.
+	// See: https://github.com/knative/serving/issues/5845
+	webhook.OwnerReferences = nil
+
 	for i, wh := range webhook.Webhooks {
 		if wh.Name != webhook.Name {
 			continue

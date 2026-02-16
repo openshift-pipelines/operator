@@ -11,31 +11,27 @@ import (
 	"github.com/open-policy-agent/opa/v1/storage"
 )
 
-const (
-	ArrayIndexTypeMsg      = "array index must be integer"
-	DoesNotExistMsg        = "document does not exist"
-	OutOfRangeMsg          = "array index out of range"
-	RootMustBeObjectMsg    = "root must be object"
-	RootCannotBeRemovedMsg = "root cannot be removed"
-)
+const ArrayIndexTypeMsg = "array index must be integer"
+const DoesNotExistMsg = "document does not exist"
+const OutOfRangeMsg = "array index out of range"
 
-var (
-	NotFoundErr            = &storage.Error{Code: storage.NotFoundErr, Message: DoesNotExistMsg}
-	RootMustBeObjectErr    = &storage.Error{Code: storage.InvalidPatchErr, Message: RootMustBeObjectMsg}
-	RootCannotBeRemovedErr = &storage.Error{Code: storage.InvalidPatchErr, Message: RootCannotBeRemovedMsg}
-)
+func NewNotFoundError(path storage.Path) *storage.Error {
+	return NewNotFoundErrorWithHint(path, DoesNotExistMsg)
+}
 
 func NewNotFoundErrorWithHint(path storage.Path, hint string) *storage.Error {
+	message := path.String() + ": " + hint
 	return &storage.Error{
 		Code:    storage.NotFoundErr,
-		Message: path.String() + ": " + hint,
+		Message: message,
 	}
 }
 
 func NewNotFoundErrorf(f string, a ...any) *storage.Error {
+	msg := fmt.Sprintf(f, a...)
 	return &storage.Error{
 		Code:    storage.NotFoundErr,
-		Message: fmt.Sprintf(f, a...),
+		Message: msg,
 	}
 }
 
@@ -43,12 +39,5 @@ func NewWriteConflictError(p storage.Path) *storage.Error {
 	return &storage.Error{
 		Code:    storage.WriteConflictErr,
 		Message: p.String(),
-	}
-}
-
-func NewInvalidPatchError(f string, a ...any) *storage.Error {
-	return &storage.Error{
-		Code:    storage.InvalidPatchErr,
-		Message: fmt.Sprintf(f, a...),
 	}
 }
