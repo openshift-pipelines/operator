@@ -3,7 +3,6 @@ kind: PipelineRun
 metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator?rev={{revision}}
-    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/next/.tekton/fbc-build.yaml"
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
@@ -32,6 +31,25 @@ spec:
     value: .konflux/olm-catalog/index/v4.16/Dockerfile.catalog
   pipelineRef:
     name: fbc-build
+  taskRunSpecs:
+  - pipelineTaskName: fbc-fips-check-oci-ta
+    stepSpecs:
+    - name: get-unique-related-images
+      computeResources:
+        requests:
+          memory: 24Gi
+          cpu: "1"
+        limits:
+          memory: 24Gi
+          cpu: "1"
+    - name: fips-operator-check-step-action
+      computeResources:
+        requests:
+          memory: 24Gi
+          cpu: "8"
+        limits:
+          memory: 24Gi
+          cpu: "8"
   taskRunTemplate:
     serviceAccountName: build-pipeline-operator-1-15-index-4-16
   workspaces:
