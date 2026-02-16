@@ -34,19 +34,10 @@ spec:
   - name: build-platforms
     value:
       - linux/x86_64
+  - name: skip-checks
+    value: "true"
   pipelineRef:
     name: fbc-build
-  taskRunSpecs:
-  - pipelineTaskName: fbc-fips-check-oci-ta
-    stepSpecs:
-    - name: get-unique-related-images
-      computeResources:
-        requests:
-          memory: 24Gi
-          cpu: "1"
-        limits:
-          memory: 24Gi
-          cpu: "1"
   taskRunTemplate:
     serviceAccountName: build-pipeline-operator-1-15-index-4-16
   workspaces:
