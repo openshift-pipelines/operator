@@ -6,7 +6,7 @@
     echo "Getting bundle image for environment: $environment" >&2
     TARGET_REGISTRY=$(target_registry $environment)
     echo "Target registry: $TARGET_REGISTRY" >&2
-    BUNDLE_IMAGE=$(yq '.images[] | select(.name == "IMAGE_OPERATOR_BUNDLE") | .value' project.yaml)
+    BUNDLE_IMAGE=$(yq '.images[] | select(.name == "IMAGE_OPERATOR_BUNDLE") | .value' bundle.yaml)
     echo "Original bundle image: $BUNDLE_IMAGE" >&2
     BUNDLE_JSON=$(opm render --skip-tls-verify -o json ${BUNDLE_IMAGE})
     BUNDLE_NAME=$(echo $BUNDLE_JSON | jq -r '.name')
