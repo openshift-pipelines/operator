@@ -20,7 +20,7 @@ metadata:
     features.operators.openshift.io/token-auth-gcp: 'false'
     olm.skipRange: '>=1.21.0 <1.22.0'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
-    operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonschedulers.operator.tekton.dev","tektonmulticlusterproxyaaes.operator.tekton.dev"]'
+    operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonschedulers.operator.tekton.dev","tektonmulticlusterproxyaaes.operator.tekton.dev","syncerservices.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
     repository: https://github.com/tektoncd/operator
     support: Red Hat
@@ -73,6 +73,27 @@ spec:
               - urn:alm:descriptor:com.tectonic.ui:label
         statusDescriptors:
           - description: The version of Pipelines As Code installed
+            displayName: Version
+            path: version
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:label
+        version: v1alpha1
+      - description: Represents an installation of latest version of Syncer Service
+        displayName: Syncer Service
+        kind: SyncerService
+        name: syncerservices.operator.tekton.dev
+        resources:
+          - kind: tektoninstallersets
+            name: ''
+            version: v1alpha1
+        specDescriptors:
+          - description: Namespace where Syncer Service installed
+            displayName: Target Namespace
+            path: targetNamespace
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:label
+        statusDescriptors:
+          - description: The version of Syncer Service installed
             displayName: Version
             path: version
             x-descriptors:
@@ -1236,7 +1257,7 @@ spec:
                 containers:
                   - args:
                       - -controllers
-                      - tektonconfig,tektonpipeline,tektontrigger,tektonhub,tektonchain,tektonaddon,tektonresult,openshiftpipelinesascode,manualapprovalgate,tektonpruner,tektonscheduler,tektonmulticlusterproxyaae
+                      - tektonconfig,tektonpipeline,tektontrigger,tektonhub,tektonchain,tektonaddon,tektonresult,openshiftpipelinesascode,manualapprovalgate,tektonpruner,tektonscheduler,tektonmulticlusterproxyaae,syncerservice
                       - -unique-process-name
                       - tekton-operator-lifecycle
                     env:
@@ -1384,6 +1405,8 @@ spec:
                         value: quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:62899afb8612529b8442c1de7d9bc21ebe090b5bf07cea5b3227fa821047429e
                       - name: IMAGE_MULTICLUSTERPROXYAAE_PROXY_SERVER
                         value: quay.io/openshift-pipeline/pipelines-multicluster-proxy-aae-proxy-server-rhel9@sha256:d578dfceb9631461259e85210da756bd2231867eac5fa7650b9edad7e43cf963
+                      - name: IMAGE_SYNCER_SERVICE_WORKLOAD_CONTROLLER
+                        value: registry.redhat.io/openshift-pipelines/pipelines-syncer-service-rhel9@
                       - name: IMAGE_PRUNER_WEBHOOK
                         value: quay.io/openshift-pipeline/pipelines-pruner-webhook-rhel9@sha256:34e66d49dfaa5b02c0eea281ee73e77f75f41f2b09312df03374da300778066f
                       - name: IMAGE_PAC_PAC_CONTROLLER
@@ -1659,6 +1682,8 @@ spec:
       name: IMAGE_SCHEDULER_WEBHOOK
     - image: quay.io/openshift-pipeline/pipelines-multicluster-proxy-aae-proxy-server-rhel9@sha256:d578dfceb9631461259e85210da756bd2231867eac5fa7650b9edad7e43cf963
       name: IMAGE_MULTICLUSTERPROXYAAE_PROXY_SERVER
+    - image: registry.redhat.io/openshift-pipelines/pipelines-syncer-service-rhel9@
+      name: IMAGE_SYNCER_SERVICE_WORKLOAD_CONTROLLER
     - image: quay.io/openshift-pipeline/pipelines-pruner-webhook-rhel9@sha256:34e66d49dfaa5b02c0eea281ee73e77f75f41f2b09312df03374da300778066f
       name: IMAGE_PRUNER_WEBHOOK
     - image: quay.io/openshift-pipeline/pipelines-pipelines-as-code-controller-rhel9@sha256:135d65f15972cffed20b4515c4da6eac125cdd44089b7ef09829d9bdee966f54
