@@ -9,14 +9,14 @@ RUN ["/bin/opm", "serve", "/configs", "--cache-dir=/tmp/cache", "--cache-only"]
 # Core bundle labels.
 
 LABEL \
-      com.redhat.component="openshift-operator/pipelines-index-4.16-container" \
+      com.redhat.component="openshift-pipelines-index-4.16-container" \
       cpe="cpe:/a:redhat:openshift_pipelines:1.22::el9" \
       description="Red Hat OpenShift Pipelines operator index-4.16" \
       io.k8s.description="Red Hat OpenShift Pipelines operator index-4.16" \
       io.k8s.display-name="Red Hat OpenShift Pipelines operator index-4.16" \
       io.openshift.tags="tekton,openshift,operator,index-4.16" \
       maintainer="pipelines-extcomm@redhat.com" \
-      name="openshift-pipelines/operator/pipelines-index-4.16" \
+      name="openshift-pipelines/pipelines-index-4.16" \
       operators.operatorframework.io.bundle.channel.default.v1="latest" \
       operators.operatorframework.io.bundle.channels.v1="latest,pipelines-1.22" \
       operators.operatorframework.io.bundle.manifests.v1="manifests/" \
