@@ -127,6 +127,7 @@ spec:
               protocol: TCP
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             runAsUser: 65532
             capabilities:
               drop:
@@ -152,6 +153,12 @@ spec:
           volumeMounts:
             - name: tekton-hub-db
               mountPath: /var/lib/postgresql/data
+            - name: pg-run
+              mountPath: /var/run/postgresql
+            - name: pg-tmp
+              mountPath: /tmp
+            - name: pg-home
+              mountPath: /var/lib/pgsql
           readinessProbe:
             exec:
               command: [bash, -c, "psql -w -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c 'SELECT 1'"]
@@ -168,6 +175,12 @@ spec:
         - name: tekton-hub-db
           persistentVolumeClaim:
             claimName: tekton-hub-db
+        - name: pg-run
+          emptyDir: {}
+        - name: pg-tmp
+          emptyDir: {}
+        - name: pg-home
+          emptyDir: {}
       restartPolicy: Always
 
 ---
