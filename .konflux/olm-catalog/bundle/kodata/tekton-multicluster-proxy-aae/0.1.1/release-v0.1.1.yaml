@@ -74,14 +74,16 @@ subjects:
 apiVersion: v1
 kind: Service
 metadata:
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: proxy-server-tls
   labels:
     app: proxy-aae
   name: proxy-aae
   namespace: proxy-aae
 spec:
   ports:
-  - name: http
-    port: 80
+  - name: https
+    port: 443
     protocol: TCP
     targetPort: 8080
   selector:
@@ -106,7 +108,10 @@ spec:
         app: proxy-aae
     spec:
       containers:
-      - env:
+      - args:
+        - --tls-cert=/etc/tls/tls.crt
+        - --tls-key=/etc/tls/tls.key
+        env:
         - name: WORKERS_SECRET_NAMESPACE
           value: kueue-system
         - name: REQUEST_TIMEOUT
@@ -115,21 +120,23 @@ spec:
           value: "100"
         - name: LOG_LEVEL
           value: "2"
-        image: quay.io/openshift-pipeline/multicluster-proxy-aae-rhel9@sha256:59b7b5dff5fe5f6d4e3cc814911ca032c97b22793669ac34a0d163290f649366
+        image: quay.io/openshift-pipeline/multicluster-proxy-aae-rhel9@sha256:d7a8dc328f243c0054918713d1447e7978870567fc1d883f6ceb9bae0fd07f6a:v0.1.1
         livenessProbe:
           httpGet:
             path: /health
             port: 8080
+            scheme: HTTPS
           initialDelaySeconds: 30
           periodSeconds: 10
         name: proxy-aae
         ports:
         - containerPort: 8080
-          name: http
+          name: https
         readinessProbe:
           httpGet:
             path: /ready
             port: 8080
+            scheme: HTTPS
           initialDelaySeconds: 5
           periodSeconds: 5
         resources:
@@ -139,4 +146,12 @@ spec:
           requests:
             cpu: 100m
             memory: 128Mi
+        volumeMounts:
+        - mountPath: /etc/tls
+          name: tls-certs
+          readOnly: true
       serviceAccountName: proxy-aae
+      volumes:
+      - name: tls-certs
+        secret:
+          secretName: proxy-server-tls
