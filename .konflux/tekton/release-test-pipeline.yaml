@@ -61,11 +61,11 @@ spec:
       runAfter:
         - provision-eaas-space
       params:
-        - name: applicationName
-          value: "$(tasks.parse-metadata.results.application-name)"
+        - name: componentName
+          value: "$(tasks.parse-metadata.results.component-name)"
       taskSpec:
         params:
-          - name: applicationName
+          - name: componentName
             type: string
         results:
           - name: clusterName
@@ -90,24 +90,24 @@ spec:
           - name: extract-and-pick-version
             image: quay.io/openshift-pipeline/ci:latest
             env:
-              - name: APPLICATION_NAME
-                value: "$(params.applicationName)"
+              - name: COMPONENT_NAME
+                value: "$(params.componentName)"
             script: |
               #!/usr/bin/env bash
               set -e
               
-              # Extract OCP version from APPLICATION_NAME
-              # Expected format: openshift-pipelines-index-4-19-1-22 -> 4.19
-              echo "Application Name: $APPLICATION_NAME"
+              # Extract OCP version from COMPONENT_NAME
+              # Expected format: operator-1-22-index-4-20 -> 4.20
+              echo "Component Name: $COMPONENT_NAME"
               
-              # Extract version pattern (e.g., "4-19" from "openshift-pipelines-index-4-19-1-22")
-              VERSION_PATTERN=$(echo "$APPLICATION_NAME" | grep -oE '[0-9]+-[0-9]+' | head -1)
+              # Extract version pattern (e.g., "4-19" from "operator-1-22-index-4-20")
+              VERSION_PATTERN=$(echo "$COMPONENT_NAME" | grep -oE '[0-9]+-[0-9]+' | tail -1)
               
               if [ -z "$VERSION_PATTERN" ]; then
                 echo "Warning: Could not extract version from application name, will use default"
                 OCP_VERSION="4.20"
               else
-                # Convert "4-19" to "4.19"
+                # Convert "4-20" to "4.20"
                 OCP_VERSION=$(echo "$VERSION_PATTERN" | tr '-' '.')
                 echo "Extracted OCP Version: $OCP_VERSION"
               fi
