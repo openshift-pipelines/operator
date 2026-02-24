@@ -16,6 +16,7 @@ package adt
 
 import (
 	"fmt"
+	"slices"
 
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/token"
@@ -77,9 +78,16 @@ func (n *nodeContext) scheduleConjunct(c Conjunct, id CloseInfo) {
 		}
 
 	case Value:
-		// TODO: perhaps some values could be shared.
-		n.unshare()
 		n.insertValueConjunct(env, x, id)
+
+	case *OpenExpr:
+		// This is not strictly necessary, but it ensures the same code path
+		// is taken for references that now have been rewritten to have a ...
+		// suffix.
+		c.x = x.X
+		c.CloseInfo.Opened = true // NOTE: seems unnecessary, but just to be sure.
+		id.Opened = true
+		n.scheduleConjunct(c, id)
 
 	case *BinaryExpr:
 		// NOTE: do not unshare: a conjunction could still allow structure
@@ -126,13 +134,11 @@ func (n *nodeContext) scheduleConjunct(c Conjunct, id CloseInfo) {
 			cloneID: id,
 			holeID:  n.ctx.holeID,
 			src:     x,
-			expr:    x,
 		}
 		for _, dv := range x.Values {
 			d.disjuncts = append(d.disjuncts, disjunct{
-				expr:      dv.Val,
-				isDefault: dv.Default,
-				mode:      mode(x.HasDefaults, dv.Default),
+				expr: dv.Val,
+				mode: mode(x.HasDefaults, dv.Default),
 			})
 		}
 		n.scheduleDisjunction(d)
@@ -197,10 +203,8 @@ func (n *nodeContext) scheduleStruct(env *Environment,
 
 	s.Init(n.ctx)
 
-	// TODO: do we still need to AddStruct and do we still need to Disable?
-	parent := n.node.AddStruct(s, childEnv, ci)
-	parent.Disable = true // disable until processing is done.
-	ci.IsClosed = false
+	// TODO: do we still need to AddStruct?
+	n.node.AddStruct(s, childEnv, ci)
 
 	// TODO(perf): precompile whether struct has embedding.
 loop1:
@@ -277,9 +281,6 @@ loop1:
 		n.aStruct = s
 		n.aStructID = ci
 	}
-
-	// TODO: probably no longer necessary.
-	parent.Disable = false
 }
 
 // scheduleVertexConjuncts injects the conjuncst of src n. If src was not fully
@@ -303,6 +304,9 @@ func (n *nodeContext) scheduleVertexConjuncts(c Conjunct, arc *Vertex, closeInfo
 		!arc.ClosedNonRecursive &&
 		closeInfo.enclosingEmbed != 0 {
 		closeInfo.FromDef = false
+	}
+	if arc.ClosedRecursive && c.CloseInfo.Opened {
+		n.embedsRecursivelyClosed = true
 	}
 
 	// disjunctions, we need to dereference he underlying node.
@@ -339,11 +343,8 @@ func (n *nodeContext) scheduleVertexConjuncts(c Conjunct, arc *Vertex, closeInfo
 
 	ciKey := closeInfo
 	ciKey.Refs = nil
-	ciKey.Inline = false
-	if n.ctx.isDevVersion() {
-		// No need to key on CloseInfo with evalv3.
-		ciKey = CloseInfo{}
-	}
+	// No need to key on CloseInfo with evalv3.
+	ciKey = CloseInfo{}
 
 	// Also check arc.Label: definitions themselves do not have the FromDef to
 	// reflect their closedness. This means that if we are structure sharing, we
@@ -353,14 +354,17 @@ func (n *nodeContext) scheduleVertexConjuncts(c Conjunct, arc *Vertex, closeInfo
 	// once.
 	switch isDef, _ := IsDef(c.Expr()); {
 	case isDef || arc.Label.IsDef() || closeInfo.TopDef:
+		if c.CloseInfo.Opened {
+			n.embedsRecursivelyClosed = true
+		}
 		n.isDef = true
 		// n.node.ClosedRecursive = true // TODO: should we set this here?
 		closeInfo.FromDef = true
 		closeInfo.TopDef = false
 
-		closeInfo = n.addResolver(arc, closeInfo, false)
+		closeInfo = n.addResolver(c.x, arc, closeInfo, false)
 	default:
-		closeInfo = n.addResolver(arc, closeInfo, true)
+		closeInfo = n.addResolver(c.x, arc, closeInfo, true)
 	}
 	if closeInfo.defID != 0 && closeInfo.opID == n.ctx.opID {
 		c.CloseInfo.opID = closeInfo.opID
@@ -370,10 +374,8 @@ func (n *nodeContext) scheduleVertexConjuncts(c Conjunct, arc *Vertex, closeInfo
 	}
 
 	key := arcKey{arc, ciKey}
-	for _, k := range n.arcMap {
-		if key == k {
-			return
-		}
+	if slices.Contains(n.arcMap, key) {
+		return
 	}
 	n.arcMap = append(n.arcMap, key)
 
@@ -433,7 +435,7 @@ func (n *nodeContext) addNotify2(v *Vertex, c CloseInfo) {
 
 // Literal conjuncts
 
-// NoSharingSentinel is a sentinel value that is used to disable sharing of
+// NoShareSentinel is a sentinel value that is used to disable sharing of
 // nodes. We make this an error to make it clear that we discard the value.
 var NoShareSentinel = &Bottom{
 	Err: errors.Newf(token.NoPos, "no sharing"),
@@ -451,7 +453,14 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 
 			// If this is a definition, it will be repeated in the evaluation.
 			if !x.IsFromDisjunction() {
-				id = n.addResolver(x, id, false)
+				id = n.addResolver(v, x, id, false)
+			}
+		} else if x.ClosedRecursive {
+			n.node.ClosedRecursive = true
+
+			// If this is a definition, it will be repeated in the evaluation.
+			if !x.IsFromDisjunction() {
+				id = n.addResolver(v, x, id, false)
 			}
 		}
 		if _, ok := x.BaseValue.(*StructMarker); ok {
@@ -498,14 +507,15 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 		return
 
 	case *Bottom:
+		n.unshare()
 		if x == NoShareSentinel {
-			n.unshare()
 			return
 		}
 		n.addBottom(x)
 		return
 
 	case *Builtin:
+		n.unshare()
 		if v := x.BareValidator(); v != nil {
 			n.insertValueConjunct(env, v, id)
 			return
@@ -519,6 +529,7 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 	switch x := v.(type) {
 	case *Disjunction:
 		n.updateCyclicStatusV3(id)
+		n.unshare()
 
 		// TODO(perf): reuse envDisjunct values so that we can also reuse the
 		// disjunct slice.
@@ -531,13 +542,11 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 			cloneID: id,
 			holeID:  n.ctx.holeID,
 			src:     x,
-			value:   x,
 		}
 		for i, dv := range x.Values {
 			d.disjuncts = append(d.disjuncts, disjunct{
-				expr:      dv,
-				isDefault: i < x.NumDefaults,
-				mode:      mode(x.HasDefaults, i < x.NumDefaults),
+				expr: dv,
+				mode: mode(x.HasDefaults, i < x.NumDefaults),
 			})
 		}
 		n.scheduleDisjunction(d)
@@ -557,44 +566,41 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 		n.updateConjunctInfo(TopKind, id, cHasTop)
 
 	case *BasicType:
+		n.unshare()
 		n.updateCyclicStatusV3(id)
 		if x.K != TopKind {
 			n.updateConjunctInfo(TopKind, id, cHasTop)
 		}
 
 	case *BoundValue:
+		n.unshare()
 		n.updateCyclicStatusV3(id)
 
 		switch x.Op {
-		case LessThanOp, LessEqualOp:
-			if y := n.upperBound; y != nil {
+		case LessThanOp, LessEqualOp, GreaterThanOp, GreaterEqualOp:
+			bound := &n.upperBound
+			if x.Op == GreaterThanOp || x.Op == GreaterEqualOp {
+				bound = &n.lowerBound
+			}
+			if y := *bound; y != nil {
 				v := SimplifyBounds(ctx, n.kind, x, y)
 				if err := valueError(v); err != nil {
 					err.AddPosition(v)
-					err.AddPosition(n.upperBound)
-					err.AddClosedPositions(id)
+					err.AddPosition(*bound)
+					err.AddClosedPositions(n.ctx, id)
 				}
-				n.upperBound = nil
+				*bound = nil
 				n.insertValueConjunct(env, v, id)
 				return
 			}
-			n.upperBound = x
+			*bound = x
 
-		case GreaterThanOp, GreaterEqualOp:
-			if y := n.lowerBound; y != nil {
-				v := SimplifyBounds(ctx, n.kind, x, y)
-				if err := valueError(v); err != nil {
-					err.AddPosition(v)
-					err.AddPosition(n.lowerBound)
-					err.AddClosedPositions(id)
-				}
-				n.lowerBound = nil
-				n.insertValueConjunct(env, v, id)
-				return
-			}
-			n.lowerBound = x
+		case EqualOp, NotEqualOp:
+			// We treat equality as an open validator.
+			n.updateConjunctInfo(TopKind, id, cHasOpenValidator|cHasTop)
+			fallthrough
 
-		case EqualOp, NotEqualOp, MatchOp, NotMatchOp:
+		case MatchOp, NotMatchOp:
 			// This check serves as simplifier, but also to remove duplicates.
 			k := 0
 			match := false
@@ -616,10 +622,12 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 			if !match {
 				n.checks = append(n.checks, MakeConjunct(env, x, id))
 			}
+
 			return
 		}
 
 	case Validator:
+		n.unshare()
 		// This check serves as simplifier, but also to remove duplicates.
 		cx := MakeConjunct(env, x, id)
 		kind := x.Kind()
@@ -667,16 +675,35 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 	// handled above.
 
 	case Value: // *NullLit, *BoolLit, *NumLit, *StringLit, *BytesLit, *Builtin
+		n.unshare()
+		if p, isData := pos(v).Priority(); isData {
+			id.Priority = p
+		}
+
 		n.updateCyclicStatusV3(id)
 
 		if y := n.scalar; y != nil {
+			p1 := n.scalarID.Priority
+			p2 := id.Priority
+			if p1 != 0 && p2 != 0 {
+				if p1 > p2 {
+					// all good
+					break
+				} else if p1 < p2 {
+					goto patchConjunct
+				}
+			}
 			if b, ok := BinOp(ctx, errOnDiffType, EqualOp, x, y).(*Bool); !ok || !b.B {
 				n.reportConflict(x, y, x.Kind(), y.Kind(), n.scalarID, id)
 			}
 			break
 		}
+	patchConjunct:
 		n.scalar = x
 		n.scalarID = id
+		// TODO: only set "scalarKnown" if there are no other high priority
+		// conjuncts. Alternatively, we should process high priority conjuncts
+		// in the scheduler first.
 		n.signal(scalarKnown)
 
 	default:
@@ -688,7 +715,7 @@ func (n *nodeContext) insertValueConjunct(env *Environment, v Value, id CloseInf
 			if err := valueError(u); err != nil {
 				err.AddPosition(n.lowerBound)
 				err.AddPosition(n.upperBound)
-				err.AddClosedPositions(id)
+				err.AddClosedPositions(n.ctx, id)
 			}
 			n.lowerBound = nil
 			n.upperBound = nil
