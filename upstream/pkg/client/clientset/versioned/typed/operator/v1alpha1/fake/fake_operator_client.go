@@ -36,6 +36,10 @@ func (c *FakeOperatorV1alpha1) OpenShiftPipelinesAsCodes() v1alpha1.OpenShiftPip
 	return newFakeOpenShiftPipelinesAsCodes(c)
 }
 
+func (c *FakeOperatorV1alpha1) SyncerServices() v1alpha1.SyncerServiceInterface {
+	return newFakeSyncerServices(c)
+}
+
 func (c *FakeOperatorV1alpha1) TektonAddons() v1alpha1.TektonAddonInterface {
 	return newFakeTektonAddons(c)
 }
@@ -60,6 +64,10 @@ func (c *FakeOperatorV1alpha1) TektonInstallerSets() v1alpha1.TektonInstallerSet
 	return newFakeTektonInstallerSets(c)
 }
 
+func (c *FakeOperatorV1alpha1) TektonMulticlusterProxyAAEs() v1alpha1.TektonMulticlusterProxyAAEInterface {
+	return newFakeTektonMulticlusterProxyAAEs(c)
+}
+
 func (c *FakeOperatorV1alpha1) TektonPipelines() v1alpha1.TektonPipelineInterface {
 	return newFakeTektonPipelines(c)
 }
@@ -70,6 +78,10 @@ func (c *FakeOperatorV1alpha1) TektonPruners() v1alpha1.TektonPrunerInterface {
 
 func (c *FakeOperatorV1alpha1) TektonResults() v1alpha1.TektonResultInterface {
 	return newFakeTektonResults(c)
+}
+
+func (c *FakeOperatorV1alpha1) TektonSchedulers() v1alpha1.TektonSchedulerInterface {
+	return newFakeTektonSchedulers(c)
 }
 
 func (c *FakeOperatorV1alpha1) TektonTriggers() v1alpha1.TektonTriggerInterface {

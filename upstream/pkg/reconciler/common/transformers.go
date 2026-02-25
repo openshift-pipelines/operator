@@ -25,8 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	mf "github.com/manifestival/manifestival"
 	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 	"go.uber.org/zap"
@@ -41,22 +39,26 @@ import (
 	apimachineryRuntime "k8s.io/apimachinery/pkg/runtime"
 	"knative.dev/pkg/logging"
 	"knative.dev/pkg/ptr"
+	"sigs.k8s.io/yaml"
 )
 
 const (
-	AnnotationPreserveNS          = "operator.tekton.dev/preserve-namespace"
-	AnnotationPreserveRBSubjectNS = "operator.tekton.dev/preserve-rb-subject-namespace"
-	ImageRegistryOverride         = "TEKTON_REGISTRY_OVERRIDE"
-	PipelinesImagePrefix          = "IMAGE_PIPELINES_"
-	TriggersImagePrefix           = "IMAGE_TRIGGERS_"
-	AddonsImagePrefix             = "IMAGE_ADDONS_"
-	PacImagePrefix                = "IMAGE_PAC_"
-	ChainsImagePrefix             = "IMAGE_CHAINS_"
-	ManualApprovalGatePrefix      = "IMAGE_MAG_"
-	PrunerImagePrefix             = "IMAGE_PRUNER_"
-	ResultsImagePrefix            = "IMAGE_RESULTS_"
-	HubImagePrefix                = "IMAGE_HUB_"
-	DashboardImagePrefix          = "IMAGE_DASHBOARD_"
+	AnnotationPreserveNS            = "operator.tekton.dev/preserve-namespace"
+	AnnotationPreserveRBSubjectNS   = "operator.tekton.dev/preserve-rb-subject-namespace"
+	ImageRegistryOverride           = "TEKTON_REGISTRY_OVERRIDE"
+	PipelinesImagePrefix            = "IMAGE_PIPELINES_"
+	TriggersImagePrefix             = "IMAGE_TRIGGERS_"
+	AddonsImagePrefix               = "IMAGE_ADDONS_"
+	PacImagePrefix                  = "IMAGE_PAC_"
+	ChainsImagePrefix               = "IMAGE_CHAINS_"
+	ManualApprovalGatePrefix        = "IMAGE_MAG_"
+	PrunerImagePrefix               = "IMAGE_PRUNER_"
+	SchedulerImagePrefix            = "IMAGE_SCHEDULER_"
+	MulticlusterProxyAAEImagePrefix = "IMAGE_MULTICLUSTERPROXYAAE_"
+	SyncerServiceImagePrefix        = "IMAGE_SYNCER_SERVICE_"
+	ResultsImagePrefix              = "IMAGE_RESULTS_"
+	HubImagePrefix                  = "IMAGE_HUB_"
+	DashboardImagePrefix            = "IMAGE_DASHBOARD_"
 
 	DefaultTargetNamespace = "tekton-pipelines"
 
@@ -76,6 +78,7 @@ func transformers(ctx context.Context, obj v1alpha1.TektonComponent) []mf.Transf
 		injectNamespaceCRDWebhookClientConfig(obj.GetSpec().GetTargetNamespace()),
 		injectNamespaceCRClusterInterceptorClientConfig(obj.GetSpec().GetTargetNamespace()),
 		injectNamespaceClusterRole(obj.GetSpec().GetTargetNamespace()),
+		ReplaceNamespaceInWebhookNamespaceSelector(obj.GetSpec().GetTargetNamespace()),
 		AddDeploymentRestrictedPSA(),
 	}
 }
@@ -1245,4 +1248,78 @@ func getSortedKeys(input map[string]interface{}) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// replaces the namespace in ValidatingWebhookConfiguration namespaceSelector
+func ReplaceNamespaceInWebhookNamespaceSelector(targetNamespace string) mf.Transformer {
+	return func(u *unstructured.Unstructured) error {
+		if !strings.EqualFold(u.GetKind(), "ValidatingWebhookConfiguration") {
+			return nil
+		}
+		// Accept either spec.webhooks (some older patterns) or top-level webhooks (current API structure).
+		webhooks, foundSpec, errSpec := unstructured.NestedSlice(u.Object, "spec", "webhooks")
+		pathIsSpec := true
+		if errSpec != nil || !foundSpec {
+			// Fallback to top-level
+			webhooksTop, foundTop, errTop := unstructured.NestedSlice(u.Object, "webhooks")
+			if errTop != nil || !foundTop {
+				// Nothing to transform
+				return nil
+			}
+			webhooks = webhooksTop
+			pathIsSpec = false
+		}
+		changed := false
+		for i := range webhooks {
+			wh, ok := webhooks[i].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			nsSel, okNs := wh["namespaceSelector"].(map[string]interface{})
+			if !okNs {
+				continue
+			}
+			matchExprs, okExpr := nsSel["matchExpressions"].([]interface{})
+			if !okExpr {
+				continue
+			}
+			for j := range matchExprs {
+				expr, ok := matchExprs[j].(map[string]interface{})
+				if !ok {
+					continue
+				}
+				values, okVals := expr["values"].([]interface{})
+				if !okVals || len(values) == 0 {
+					continue
+				}
+				for k := range values {
+					valStr, ok := values[k].(string)
+					if !ok || targetNamespace == "" {
+						continue
+					}
+					if strings.Contains(valStr, DefaultTargetNamespace) {
+						newVal := strings.ReplaceAll(valStr, DefaultTargetNamespace, targetNamespace)
+						if newVal != valStr {
+							values[k] = newVal
+							changed = true
+						}
+					}
+				}
+				expr["values"] = values
+				matchExprs[j] = expr
+			}
+			nsSel["matchExpressions"] = matchExprs
+			wh["namespaceSelector"] = nsSel
+			webhooks[i] = wh
+		}
+		if changed {
+			if pathIsSpec {
+				_ = unstructured.SetNestedSlice(u.Object, webhooks, "spec", "webhooks")
+			} else {
+				// Top-level assignment
+				u.Object["webhooks"] = webhooks
+			}
+		}
+		return nil
+	}
 }

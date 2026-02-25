@@ -57,6 +57,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Operator().V1alpha1().ManualApprovalGates().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("openshiftpipelinesascodes"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Operator().V1alpha1().OpenShiftPipelinesAsCodes().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("syncerservices"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Operator().V1alpha1().SyncerServices().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("tektonaddons"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Operator().V1alpha1().TektonAddons().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("tektonchains"):
@@ -69,12 +71,16 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Operator().V1alpha1().TektonHubs().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("tektoninstallersets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Operator().V1alpha1().TektonInstallerSets().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("tektonmulticlusterproxyaaes"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Operator().V1alpha1().TektonMulticlusterProxyAAEs().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("tektonpipelines"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Operator().V1alpha1().TektonPipelines().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("tektonpruners"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Operator().V1alpha1().TektonPruners().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("tektonresults"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Operator().V1alpha1().TektonResults().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("tektonschedulers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Operator().V1alpha1().TektonSchedulers().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("tektontriggers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Operator().V1alpha1().TektonTriggers().Informer()}, nil
 

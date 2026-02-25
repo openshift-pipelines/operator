@@ -30,15 +30,18 @@ type OperatorV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	ManualApprovalGatesGetter
 	OpenShiftPipelinesAsCodesGetter
+	SyncerServicesGetter
 	TektonAddonsGetter
 	TektonChainsGetter
 	TektonConfigsGetter
 	TektonDashboardsGetter
 	TektonHubsGetter
 	TektonInstallerSetsGetter
+	TektonMulticlusterProxyAAEsGetter
 	TektonPipelinesGetter
 	TektonPrunersGetter
 	TektonResultsGetter
+	TektonSchedulersGetter
 	TektonTriggersGetter
 }
 
@@ -53,6 +56,10 @@ func (c *OperatorV1alpha1Client) ManualApprovalGates() ManualApprovalGateInterfa
 
 func (c *OperatorV1alpha1Client) OpenShiftPipelinesAsCodes() OpenShiftPipelinesAsCodeInterface {
 	return newOpenShiftPipelinesAsCodes(c)
+}
+
+func (c *OperatorV1alpha1Client) SyncerServices() SyncerServiceInterface {
+	return newSyncerServices(c)
 }
 
 func (c *OperatorV1alpha1Client) TektonAddons() TektonAddonInterface {
@@ -79,6 +86,10 @@ func (c *OperatorV1alpha1Client) TektonInstallerSets() TektonInstallerSetInterfa
 	return newTektonInstallerSets(c)
 }
 
+func (c *OperatorV1alpha1Client) TektonMulticlusterProxyAAEs() TektonMulticlusterProxyAAEInterface {
+	return newTektonMulticlusterProxyAAEs(c)
+}
+
 func (c *OperatorV1alpha1Client) TektonPipelines() TektonPipelineInterface {
 	return newTektonPipelines(c)
 }
@@ -89,6 +100,10 @@ func (c *OperatorV1alpha1Client) TektonPruners() TektonPrunerInterface {
 
 func (c *OperatorV1alpha1Client) TektonResults() TektonResultInterface {
 	return newTektonResults(c)
+}
+
+func (c *OperatorV1alpha1Client) TektonSchedulers() TektonSchedulerInterface {
+	return newTektonSchedulers(c)
 }
 
 func (c *OperatorV1alpha1Client) TektonTriggers() TektonTriggerInterface {
