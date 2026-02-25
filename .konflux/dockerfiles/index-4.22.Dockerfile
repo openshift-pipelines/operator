@@ -8,14 +8,14 @@ RUN ["/bin/opm", "serve", "/configs", "--cache-dir=/tmp/cache", "--cache-only"]
 
 # Core bundle labels.
 LABEL \
-      com.redhat.component="openshift-pipelines-index-4.21-container" \
-      cpe="cpe:/a:redhat:openshift_pipelines:1.22::el9" \
-      description="Red Hat OpenShift Pipelines operator index-4.21" \
-      io.k8s.description="Red Hat OpenShift Pipelines operator index-4.21" \
-      io.k8s.display-name="Red Hat OpenShift Pipelines operator index-4.21" \
-      io.openshift.tags="tekton,openshift,operator,index-4.21" \
+      com.redhat.component="openshift-pipelines-index-4.22-container" \
+      cpe="cpe:/a:redhat:openshift_pipelines:next::el9" \
+      description="Red Hat OpenShift Pipelines operator index-4.22" \
+      io.k8s.description="Red Hat OpenShift Pipelines operator index-4.22" \
+      io.k8s.display-name="Red Hat OpenShift Pipelines operator index-4.22" \
+      io.openshift.tags="tekton,openshift,operator,index-4.22" \
       maintainer="pipelines-extcomm@redhat.com" \
-      name="openshift-pipelines/pipelines-index-4.21" \
+      name="openshift-pipelines/pipelines-index-4.22" \
       operators.operatorframework.io.bundle.channel.default.v1="latest" \
       operators.operatorframework.io.bundle.channels.v1="latest,pipelines-1.22" \
       operators.operatorframework.io.bundle.manifests.v1="manifests/" \
@@ -26,4 +26,4 @@ LABEL \
       operators.operatorframework.io.metrics.builder="operator-sdk-v1.37.0" \
       operators.operatorframework.io.metrics.mediatype.v1="metrics+v1" \
       summary="Red Hat OpenShift Pipelines operator index-4.22" \
-      version="v1.22.0"
+      version="next"
