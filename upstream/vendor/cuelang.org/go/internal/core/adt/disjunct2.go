@@ -14,7 +14,12 @@
 
 package adt
 
-import "slices"
+import (
+	"math"
+	"slices"
+
+	"cuelang.org/go/internal/core/layer"
+)
 
 // # Overview
 //
@@ -201,8 +206,7 @@ type disjunct struct {
 	expr Expr
 	err  *Bottom
 
-	isDefault bool
-	mode      defaultMode
+	mode defaultMode
 }
 
 func (n *nodeContext) scheduleDisjunction(d envDisjunct) {
@@ -384,8 +388,8 @@ func (n *nodeContext) processDisjunctions() *Bottom {
 // crossProduct computes the cross product of the disjuncts of a disjunction
 // with an existing set of results.
 func (n *nodeContext) crossProduct(dst, cross []*nodeContext, dn *envDisjunct, mode runMode) []*nodeContext {
+	// TODO: do we still need this? removing it does not break any tests.
 	defer n.unmarkDepth(n.markDepth())
-	defer n.unmarkOptional(n.markOptional())
 
 	// TODO(perf): use a pre-allocated buffer in n.ctx. Note that the actual
 	// buffer may grow and has a max size of len(cross) * len(dn.disjuncts).
@@ -393,6 +397,7 @@ func (n *nodeContext) crossProduct(dst, cross []*nodeContext, dn *envDisjunct, m
 
 	leftDropsDefault := true
 	rightDropsDefault := true
+	priority, _ := pos(dn.src).Priority()
 
 	for i, p := range cross {
 		ID := n.nextCrossProduct(i, len(cross), p)
@@ -408,9 +413,19 @@ func (n *nodeContext) crossProduct(dst, cross []*nodeContext, dn *envDisjunct, m
 			r, err := p.doDisjunct(c, d.mode, mode, n.node)
 
 			if err != nil {
+				if err.Code == UserError {
+					n.userErrs = append(n.userErrs, err)
+				}
 				// TODO: store more error context
 				dn.disjuncts[j].err = err
 				continue
+			}
+
+			// Promote the priority of defaults.
+			r.origPriority = priority
+			r.priority = p.origPriority
+			if p.defaultMode == isDefault && p.origPriority > priority {
+				r.origPriority = priority
 			}
 
 			tmp = append(tmp, r)
@@ -428,6 +443,17 @@ func (n *nodeContext) crossProduct(dst, cross []*nodeContext, dn *envDisjunct, m
 		// Unroll nested disjunctions.
 		switch len(r.disjuncts) {
 		case 0:
+			// If a default is not dropped in a higher priority, allow still to
+			// become a default, even if other other side has dropped defaults.
+			if !rightDropsDefault && r.origDefaultMode == notDefault &&
+				priority < r.priority {
+				r.origDefaultMode = maybeDefault
+			}
+			if !leftDropsDefault && r.defaultMode == notDefault &&
+				priority > r.priority {
+				r.defaultMode = maybeDefault
+			}
+
 			r.defaultMode = combineDefault2(r.defaultMode, r.origDefaultMode, leftDropsDefault, rightDropsDefault)
 			// r did not have a nested disjunction.
 			dst = appendDisjunct(n.ctx, dst, r)
@@ -475,21 +501,13 @@ func combineDefault2(a, b defaultMode, dropsDefaultA, dropsDefaultB bool) defaul
 // collectErrors collects errors from a failed disjunctions.
 func (n *nodeContext) collectErrors(dn *envDisjunct) (errs *Bottom) {
 	code := EvalError
-	hasUserError := false
 	for _, d := range dn.disjuncts {
 		if b := d.err; b != nil {
+			if b.Code == UserError {
+				continue
+			}
 			if b.Code > code {
 				code = b.Code
-			}
-			switch {
-			case b.Code == UserError:
-				if !hasUserError {
-					n.disjunctErrs = n.disjunctErrs[:0]
-				}
-				hasUserError = true
-
-			case hasUserError:
-				continue
 			}
 			n.disjunctErrs = append(n.disjunctErrs, b)
 		}
@@ -562,6 +580,9 @@ func (n *nodeContext) doDisjunct(c Conjunct, m defaultMode, mode runMode, orig *
 	// a special mode, or evaluating more aggressively if finalize is not given.
 	v.status = unprocessed
 
+	if m == isDefault {
+		c.CloseInfo.Priority, _ = pos(c.x).Priority()
+	}
 	d.scheduleConjunct(c, c.CloseInfo)
 
 	oc.unlinkOverlay()
@@ -569,7 +590,7 @@ func (n *nodeContext) doDisjunct(c Conjunct, m defaultMode, mode runMode, orig *
 	d.defaultMode = n.defaultMode
 	d.origDefaultMode = m
 
-	v.unify(n.ctx, allKnown, mode, true)
+	v.unify(n.ctx, Flags{condition: allKnown, mode: mode, checkTypos: true})
 
 	if err := d.getErrorAll(); err != nil && !isCyclePlaceholder(err) {
 		d.freeDisjunct()
@@ -596,7 +617,11 @@ func (n *nodeContext) finalizeDisjunctions() {
 		x.node.Conjuncts = nil
 
 		if b := x.getErr(); b != nil {
-			n.disjunctErrs = append(n.disjunctErrs, b)
+			if b.Code == UserError {
+				n.userErrs = append(n.userErrs, b)
+			} else {
+				n.disjunctErrs = append(n.disjunctErrs, b)
+			}
 			numErrs++
 			continue
 		}
@@ -607,17 +632,32 @@ func (n *nodeContext) finalizeDisjunctions() {
 		return
 	}
 
+	// Determine highest priority and if the default exists.
+	hasDefaults := false
+	defaultPriority := layer.Priority(math.MinInt8)
+	for _, x := range n.disjuncts {
+		if x.defaultMode == isDefault {
+			hasDefaults = true
+			if x.origPriority > defaultPriority {
+				defaultPriority = x.origPriority
+			}
+		}
+	}
+
 	a := make([]Value, len(n.disjuncts))
 	p := 0
-	hasDefaults := false
 	for i, x := range n.disjuncts {
+		if x.origPriority < defaultPriority && x.defaultMode != isDefault {
+			x.defaultMode = notDefault
+		}
+
 		switch x.defaultMode {
 		case isDefault:
-			a[i] = a[p]
-			a[p] = x.node
-			p++
-			hasDefaults = true
-
+			if x.origPriority == defaultPriority {
+				a[i] = a[p]
+				a[p] = x.node
+				p++
+			}
 		case notDefault:
 			hasDefaults = true
 			fallthrough

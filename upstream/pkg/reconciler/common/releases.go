@@ -104,6 +104,12 @@ func ComponentDir(instance v1alpha1.TektonComponent) string {
 		// Event-based pruner uses "pruner" directory (not "tekton-pruner")
 		// to avoid conflicts with job-based pruner in "tekton-pruner" directory
 		return filepath.Join(koDataDir, "pruner")
+	case *v1alpha1.TektonScheduler:
+		return filepath.Join(koDataDir, "tekton-scheduler")
+	case *v1alpha1.TektonMulticlusterProxyAAE:
+		return filepath.Join(koDataDir, "tekton-multicluster-proxy-aae")
+	case *v1alpha1.SyncerService:
+		return filepath.Join(koDataDir, "syncer-service")
 	}
 	return ""
 }
