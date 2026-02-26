@@ -200,7 +200,7 @@ spec:
   
   steps:
     - name: load-scripts
-      image: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:c89b75be65192a6c571203e62596913d9486fe14575cff9ac81705a6ae064a4d
+      image: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:043080bff45cd129c0852b55a578c1a85e8911de80fadef22a21a034a1eccd56
       workingDir: /scripts
       script: |
         set -e
@@ -213,7 +213,7 @@ spec:
         - name: scripts-dir
           mountPath: /scripts
     - name: prepare
-      image: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:c89b75be65192a6c571203e62596913d9486fe14575cff9ac81705a6ae064a4d
+      image: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:043080bff45cd129c0852b55a578c1a85e8911de80fadef22a21a034a1eccd56
       workingDir: $(workspaces.source.path)
       command:
         - /scripts/prepare.sh
@@ -224,7 +224,7 @@ spec:
           mountPath: "$(params.USER_HOME)"
     
     - name: git-run
-      image: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:c89b75be65192a6c571203e62596913d9486fe14575cff9ac81705a6ae064a4d
+      image: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:043080bff45cd129c0852b55a578c1a85e8911de80fadef22a21a034a1eccd56
       workingDir: $(workspaces.source.path)
       command:
         - /scripts/git-run.sh
