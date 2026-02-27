@@ -3,6 +3,7 @@ kind: PipelineRun
 metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator?rev={{revision}}
+    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/next/.tekton/fbc-build.yaml"
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
@@ -34,8 +35,6 @@ spec:
   - name: build-platforms
     value:
       - linux/x86_64
-  - name: skip-checks
-    value: "true"
   pipelineRef:
     name: fbc-build
   taskRunTemplate:

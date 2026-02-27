@@ -3,6 +3,7 @@ kind: PipelineRun
 metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator?rev={{revision}}
+    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/next/.tekton/fbc-build.yaml"
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
@@ -29,8 +30,6 @@ spec:
     value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/operator-1-15-index-4-16-application/index-4.16:{{revision}}
   - name: dockerfile
     value: .konflux/olm-catalog/index/v4.16/Dockerfile.catalog
-  - name: skip-checks
-    value: "true"
   pipelineRef:
     name: fbc-build
   taskRunTemplate:
