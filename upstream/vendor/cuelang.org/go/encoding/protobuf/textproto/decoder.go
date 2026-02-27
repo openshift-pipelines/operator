@@ -320,10 +320,17 @@ func (d *decoder) decodeMsg(m *mapping, n []*pbast.Node) ast.Expr {
 		}
 
 		if value != nil {
+			var label ast.Label
+			if s := f.CUEName; ast.IsValidIdent(s) {
+				label = ast.NewIdent(s)
+			} else {
+				label = ast.NewString(s)
+
+			}
 			// TODO: convert line number information. However, position
 			// information in textpbfmt packages is too wonky to be useful
 			f := &ast.Field{
-				Label: ast.NewStringLabel(f.CUEName),
+				Label: label,
 				Value: value,
 				// Attrs: []*ast.Attribute{{Text: f.attr.}},
 			}

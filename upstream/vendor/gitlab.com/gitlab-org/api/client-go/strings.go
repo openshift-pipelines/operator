@@ -23,7 +23,7 @@ import (
 )
 
 // Stringify attempts to create a reasonable string representation of types in
-// the GitLab library.  It does things like resolve pointers to their values
+// the Gitlab library.  It does things like resolve pointers to their values
 // and omits struct fields with nil values.
 func Stringify(message any) string {
 	var buf bytes.Buffer

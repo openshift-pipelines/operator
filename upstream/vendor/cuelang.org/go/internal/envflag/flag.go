@@ -40,11 +40,11 @@ func Parse[T any](flags *T, env string) error {
 	deprecated := make(map[string]bool)
 	fv := reflect.ValueOf(flags).Elem()
 	ft := fv.Type()
-	for i := range ft.NumField() {
+	for i := 0; i < ft.NumField(); i++ {
 		field := ft.Field(i)
 		name := strings.ToLower(field.Name)
 		if tagStr, ok := field.Tag.Lookup("envflag"); ok {
-			for f := range strings.SplitSeq(tagStr, ",") {
+			for _, f := range strings.Split(tagStr, ",") {
 				key, rest, hasRest := strings.Cut(f, ":")
 				switch key {
 				case "default":
@@ -67,7 +67,7 @@ func Parse[T any](flags *T, env string) error {
 	}
 
 	var errs []error
-	for elem := range strings.SplitSeq(env, ",") {
+	for _, elem := range strings.Split(env, ",") {
 		if elem == "" {
 			// Allow empty elements such as `,somename=true` so that env vars
 			// can be joined together like
@@ -95,18 +95,18 @@ func Parse[T any](flags *T, env string) error {
 			}
 		} else if field.Kind() == reflect.Bool {
 			// For bools, "somename" is short for "somename=true" or "somename=1".
-			// This mimics how Go flags work, e.g. -knob is short for -knob=true.
+			// This mimicks how Go flags work, e.g. -knob is short for -knob=true.
 			val = true
 		} else {
 			// For any other type, a value must be specified.
-			// This mimics how Go flags work, e.g. -output=path does not allow -output.
+			// This mimicks how Go flags work, e.g. -output=path does not allow -output.
 			errs = append(errs, fmt.Errorf("value needed for %s flag %q", field.Kind(), name))
 			continue
 		}
 
 		if deprecated[name] {
 			// We allow setting deprecated flags to their default value so that
-			// bold explorers will not be penalized for their experimentation.
+			// bold explorers will not be penalised for their experimentation.
 			if field.Interface() != val {
 				errs = append(errs, fmt.Errorf("cannot change default value of deprecated flag %q", name))
 			}

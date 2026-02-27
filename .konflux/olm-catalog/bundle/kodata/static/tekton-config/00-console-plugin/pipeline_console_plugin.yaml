@@ -152,21 +152,11 @@ spec:
   proxy:
     - type: Service
       alias: tekton-results-api-service
-      authorize: true
       endpoint:
         type: Service
         service:
           name: tekton-results-api-service
           namespace: openshift-pipelines
           port: 8080
-    - type: Service
-      alias: multicluster-proxy
-      authorize: true
-      endpoint:
-        type: Service
-        service:
-          name: proxy-aae
-          namespace: openshift-pipelines
-          port: 443
   i18n:
     loadType: Preload   # options: Preload, Lazy

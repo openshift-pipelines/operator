@@ -15,8 +15,6 @@
 package pkg
 
 import (
-	"iter"
-
 	"cuelang.org/go/cue"
 	"cuelang.org/go/internal/core/adt"
 )
@@ -33,7 +31,7 @@ type List struct {
 }
 
 // Elems returns the elements of a list.
-func (l *List) Elems() iter.Seq[*adt.Vertex] {
+func (l *List) Elems() []*adt.Vertex {
 	return l.node.Elems()
 }
 
@@ -66,15 +64,17 @@ func (s *Struct) Len() int {
 
 // IsOpen reports whether s is open or has pattern constraints.
 func (s *Struct) IsOpen() bool {
-	if s.node.IsOpenStruct() {
+	if !s.node.IsClosedStruct() {
 		return true
 	}
-	// Check for pattern constraints which indicate openness.
+	// Technically this is not correct, but it is in the context of where
+	// it is used.
 	if s.node.PatternConstraints != nil && len(s.node.PatternConstraints.Pairs) > 0 {
 		return true
 	}
-	// After removing OptionalTypes, we rely on other checks for openness.
-	return false
+	// The equivalent code for the old implementation.
+	ot := s.node.OptionalTypes()
+	return ot&^adt.HasDynamic != 0
 }
 
 // NumConstraintFields reports the number of explicit optional and required

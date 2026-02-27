@@ -43,7 +43,6 @@ func (p *PackageError) fillPos(cwd string, positions []token.Pos) {
 }
 
 // TODO(localize)
-
 func (p *PackageError) Error() string {
 	// Import cycles deserve special treatment.
 	if p.IsImportCycle {
@@ -74,7 +73,6 @@ func (e *NoFilesError) InputPositions() []token.Pos { return nil }
 func (e *NoFilesError) Path() []string              { return nil }
 
 // TODO(localize)
-
 func (e *NoFilesError) Msg() (string, []interface{}) {
 	// Count files beginning with _, which we will pretend don't exist at all.
 	dummy := 0

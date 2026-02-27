@@ -15,10 +15,10 @@
 package runtime
 
 import (
-	"strconv"
 	"strings"
 
 	"cuelang.org/go/cue/ast"
+	"cuelang.org/go/cue/ast/astutil"
 	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/stats"
@@ -57,9 +57,11 @@ func (x *Runtime) Build(cfg *Config, b *build.Instance) (v *adt.Vertex, errs err
 
 	// Build transitive dependencies.
 	for _, file := range b.Files {
-		for s := range file.ImportSpecs() {
-			errs = errors.Append(errs, x.buildSpec(cfg, b, s))
-		}
+		file.VisitImports(func(d *ast.ImportDecl) {
+			for _, s := range d.Specs {
+				errs = errors.Append(errs, x.buildSpec(cfg, b, s))
+			}
+		})
 	}
 
 	err := x.ResolveFiles(b)
@@ -71,7 +73,7 @@ func (x *Runtime) Build(cfg *Config, b *build.Instance) (v *adt.Vertex, errs err
 	}
 	if cfg != nil && cfg.ImportPath != "" {
 		b.ImportPath = cfg.ImportPath
-		b.PkgName = ast.ParseImportPath(b.ImportPath).Qualifier
+		b.PkgName = astutil.ImportPathName(b.ImportPath)
 	}
 	v, err = compile.Files(cc, x, b.ID(), b.Files...)
 	errs = errors.Append(errs, err)
@@ -119,20 +121,20 @@ func (r *Runtime) CompileFile(cfg *Config, file *ast.File) (*adt.Vertex, *build.
 }
 
 func (x *Runtime) buildSpec(cfg *Config, b *build.Instance, spec *ast.ImportSpec) (errs errors.Error) {
-	path, err := strconv.Unquote(spec.Path.Value)
+	info, err := astutil.ParseImportSpec(spec)
 	if err != nil {
 		return errors.Promote(err, "invalid import path")
 	}
 
-	pkg := b.LookupImport(path)
+	pkg := b.LookupImport(info.ID)
 	if pkg == nil {
-		if strings.Contains(path, ".") {
+		if strings.Contains(info.ID, ".") {
 			return errors.Newf(spec.Pos(),
 				"package %q imported but not defined in %s",
-				path, b.ImportPath)
-		} else if x.index.builtinPaths[path] == nil {
+				info.ID, b.ImportPath)
+		} else if x.index.builtinPaths[info.ID] == nil {
 			return errors.Newf(spec.Pos(),
-				"builtin package %q undefined", path)
+				"builtin package %q undefined", info.ID)
 		}
 		return nil
 	}

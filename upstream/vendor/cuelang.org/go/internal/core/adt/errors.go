@@ -32,20 +32,17 @@ package adt
 //
 
 import (
-	"slices"
-
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/errors"
 	cueformat "cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/token"
-	"cuelang.org/go/internal/iterutil"
 )
 
 // ErrorCode indicates the type of error. The type of error may influence
 // control flow. No other aspects of an error may influence control flow.
 type ErrorCode int8
 
-//go:generate go tool stringer -type=ErrorCode -linecomment
+//go:generate go run golang.org/x/tools/cmd/stringer -type=ErrorCode -linecomment
 
 const (
 	// An EvalError is a fatal evaluation error.
@@ -102,8 +99,9 @@ type Bottom struct {
 	Node *Vertex
 }
 
-func (x *Bottom) Source() ast.Node { return x.Src }
-func (x *Bottom) Kind() Kind       { return BottomKind }
+func (x *Bottom) Source() ast.Node        { return x.Src }
+func (x *Bottom) Kind() Kind              { return BottomKind }
+func (x *Bottom) Specialize(k Kind) Value { return x } // XXX remove
 
 func (b *Bottom) IsIncomplete() bool {
 	if b == nil {
@@ -214,7 +212,7 @@ func CombineErrors(src ast.Node, x, y Value) *Bottom {
 	}
 }
 
-func addPositions(ctx *OpContext, err *ValueError, c Conjunct) {
+func addPositions(err *ValueError, c Conjunct) {
 	switch x := c.x.(type) {
 	case *Field:
 		// if x.ArcType == ArcRequired {
@@ -222,28 +220,26 @@ func addPositions(ctx *OpContext, err *ValueError, c Conjunct) {
 		// }
 	case *ConjunctGroup:
 		for _, c := range *x {
-			addPositions(ctx, err, c)
+			addPositions(err, c)
 		}
 	}
-	if p := c.CloseInfo.Location(ctx); p != nil {
-		err.AddPosition(p)
+	if c.CloseInfo.closeInfo != nil {
+		err.AddPosition(c.CloseInfo.location)
 	}
 }
 
-func NewRequiredNotPresentError(ctx *OpContext, v *Vertex, morePositions ...Node) *Bottom {
+func NewRequiredNotPresentError(ctx *OpContext, v *Vertex) *Bottom {
 	saved := ctx.PushArc(v)
 	err := ctx.Newf("field is required but not present")
-	for _, p := range morePositions {
-		err.AddPosition(p)
-	}
-	for c := range v.LeafConjuncts() {
+	v.VisitLeafConjuncts(func(c Conjunct) bool {
 		if f, ok := c.x.(*Field); ok && f.ArcType == ArcRequired {
 			err.AddPosition(c.x)
 		}
-		if p := c.CloseInfo.Location(ctx); p != nil {
-			err.AddPosition(p)
+		if c.CloseInfo.closeInfo != nil {
+			err.AddPosition(c.CloseInfo.location)
 		}
-	}
+		return true
+	})
 
 	b := &Bottom{
 		Code: IncompleteError,
@@ -257,9 +253,10 @@ func NewRequiredNotPresentError(ctx *OpContext, v *Vertex, morePositions ...Node
 func newRequiredFieldInComprehensionError(ctx *OpContext, x *ForClause, v *Vertex) *Bottom {
 	err := ctx.Newf("missing required field in for comprehension: %v", v.Label)
 	err.AddPosition(x.Src)
-	for c := range v.LeafConjuncts() {
-		addPositions(ctx, err, c)
-	}
+	v.VisitLeafConjuncts(func(c Conjunct) bool {
+		addPositions(err, c)
+		return true
+	})
 	return &Bottom{
 		Code: IncompleteError,
 		Err:  err,
@@ -280,10 +277,7 @@ func (v *Vertex) reportFieldCycleError(c *OpContext, pos token.Pos, f Feature) *
 
 func (v *Vertex) reportFieldError(c *OpContext, pos token.Pos, f Feature, intMsg, stringMsg string) *Bottom {
 	code := IncompleteError
-	// If v is an error, we need to adopt the worst error.
-	if b := v.Bottom(); b != nil && !isCyclePlaceholder(b) {
-		code = b.Code
-	} else if !v.Accept(c, f) {
+	if !v.Accept(c, f) {
 		code = EvalError
 	}
 
@@ -291,7 +285,7 @@ func (v *Vertex) reportFieldError(c *OpContext, pos token.Pos, f Feature, intMsg
 
 	var err errors.Error
 	if f.IsInt() {
-		err = c.NewPosf(pos, intMsg, f.Index(), iterutil.Count(v.Elems()))
+		err = c.NewPosf(pos, intMsg, f.Index(), len(v.Elems()))
 	} else {
 		err = c.NewPosf(pos, stringMsg, label)
 	}
@@ -319,21 +313,21 @@ func (v *ValueError) AddPosition(n Node) {
 	if n == nil {
 		return
 	}
-	v.AddPos(pos(n))
-}
-
-func (v *ValueError) AddPos(p token.Pos) {
-	if p != token.NoPos {
-		if slices.Contains(v.auxpos, p) {
-			return
+	if p := pos(n); p != token.NoPos {
+		for _, q := range v.auxpos {
+			if p == q {
+				return
+			}
 		}
 		v.auxpos = append(v.auxpos, p)
 	}
 }
 
-func (v *ValueError) AddClosedPositions(ctx *OpContext, c CloseInfo) {
-	for n := range c.AncestorPositions(ctx) {
-		v.AddPosition(n)
+func (v *ValueError) AddClosedPositions(c CloseInfo) {
+	for s := c.closeInfo; s != nil; s = s.parent {
+		if loc := s.location; loc != nil {
+			v.AddPosition(loc)
+		}
 	}
 }
 
@@ -366,9 +360,10 @@ func appendNodePositions(a []token.Pos, n Node) []token.Pos {
 		a = append(a, p)
 	}
 	if v, ok := n.(*Vertex); ok {
-		for c := range v.LeafConjuncts() {
+		v.VisitLeafConjuncts(func(c Conjunct) bool {
 			a = appendNodePositions(a, c.Elem())
-		}
+			return true
+		})
 	}
 	return a
 }

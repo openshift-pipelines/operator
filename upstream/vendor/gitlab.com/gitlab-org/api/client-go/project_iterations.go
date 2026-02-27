@@ -42,13 +42,13 @@ var _ ProjectIterationsServiceInterface = (*ProjectIterationsService)(nil)
 //
 // GitLab API docs: https://docs.gitlab.com/api/iterations/
 type ProjectIteration struct {
-	ID          int64      `json:"id"`
-	IID         int64      `json:"iid"`
-	Sequence    int64      `json:"sequence"`
-	GroupID     int64      `json:"group_id"`
+	ID          int        `json:"id"`
+	IID         int        `json:"iid"`
+	Sequence    int        `json:"sequence"`
+	GroupID     int        `json:"group_id"`
 	Title       string     `json:"title"`
 	Description string     `json:"description"`
-	State       int64      `json:"state"`
+	State       int        `json:"state"`
 	CreatedAt   *time.Time `json:"created_at"`
 	UpdatedAt   *time.Time `json:"updated_at"`
 	DueDate     *ISOTime   `json:"due_date"`

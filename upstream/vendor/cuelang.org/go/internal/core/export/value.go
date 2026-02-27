@@ -56,9 +56,10 @@ func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 		e.popFrame(saved)
 	}()
 
-	for c := range n.LeafConjuncts() {
+	n.VisitLeafConjuncts(func(c adt.Conjunct) bool {
 		e.markLets(c.Expr().Source(), s)
-	}
+		return true
+	})
 
 	switch x := n.BaseValue.(type) {
 	case nil:
@@ -102,9 +103,14 @@ func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 	}
 	if result == nil {
 		// fall back to expression mode
+		a := []adt.Conjunct{}
+		n.VisitLeafConjuncts(func(c adt.Conjunct) bool {
+			a = append(a, c)
+			return true
+		})
 		// Use stable sort to ensure that tie breaks (for instance if elements
 		// are not associated with a position) are deterministic.
-		a := slices.SortedStableFunc(n.LeafConjuncts(), cmpConjuncts)
+		slices.SortStableFunc(a, cmpConjuncts)
 
 		exprs := make([]ast.Expr, 0, len(a))
 		for _, c := range a {
@@ -222,9 +228,6 @@ func (e *exporter) value(n adt.Value, a ...adt.Conjunct) (result ast.Expr) {
 		}
 		result = ast.NewBinExpr(token.OR, a...)
 
-	case *adt.NodeLink:
-		return e.value(x.Node, a...)
-
 	default:
 		panic(fmt.Sprintf("unsupported type %T", x))
 	}
@@ -256,13 +259,15 @@ func (e *exporter) bool(n *adt.Bool) (b *ast.BasicLit) {
 	return ast.NewBool(n.B)
 }
 
-func extractBasic(a []adt.Conjunct) *ast.BasicLit {
-	for c := range adt.ConjunctsSeq(a) {
+func extractBasic(a []adt.Conjunct) (lit *ast.BasicLit) {
+	adt.VisitConjuncts(a, func(c adt.Conjunct) bool {
 		if b, ok := c.Source().(*ast.BasicLit); ok {
-			return &ast.BasicLit{Kind: b.Kind, Value: b.Value}
+			lit = &ast.BasicLit{Kind: b.Kind, Value: b.Value}
+			return false
 		}
-	}
-	return nil
+		return true
+	})
+	return lit
 }
 
 func (e *exporter) num(n *adt.Num, orig []adt.Conjunct) *ast.BasicLit {

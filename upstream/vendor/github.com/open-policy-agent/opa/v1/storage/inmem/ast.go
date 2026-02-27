@@ -73,9 +73,10 @@ func (u *updateAST) Apply(v any) any {
 }
 
 func newUpdateAST(data any, op storage.PatchOp, path storage.Path, idx int, value ast.Value) (*updateAST, error) {
+
 	switch data.(type) {
 	case ast.Null, ast.Boolean, ast.Number, ast.String:
-		return nil, errors.NotFoundErr
+		return nil, errors.NewNotFoundError(path)
 	}
 
 	switch data := data.(type) {
@@ -93,10 +94,11 @@ func newUpdateAST(data any, op storage.PatchOp, path storage.Path, idx int, valu
 }
 
 func newUpdateArrayAST(data *ast.Array, op storage.PatchOp, path storage.Path, idx int, value ast.Value) (*updateAST, error) {
+
 	if idx == len(path)-1 {
 		if path[idx] == "-" || path[idx] == strconv.Itoa(data.Len()) {
 			if op != storage.AddOp {
-				return nil, errors.NewInvalidPatchError("%v: invalid patch path", path)
+				return nil, invalidPatchError("%v: invalid patch path", path)
 			}
 
 			cpy := data.Append(ast.NewTerm(value))
@@ -159,7 +161,7 @@ func newUpdateObjectAST(data ast.Object, op storage.PatchOp, path storage.Path, 
 		switch op {
 		case storage.ReplaceOp, storage.RemoveOp:
 			if val == nil {
-				return nil, errors.NotFoundErr
+				return nil, errors.NewNotFoundError(path)
 			}
 		}
 		return &updateAST{path, op == storage.RemoveOp, value}, nil
@@ -169,7 +171,14 @@ func newUpdateObjectAST(data ast.Object, op storage.PatchOp, path storage.Path, 
 		return newUpdateAST(val.Value, op, path, idx+1, value)
 	}
 
-	return nil, errors.NotFoundErr
+	return nil, errors.NewNotFoundError(path)
+}
+
+func interfaceToValue(v any) (ast.Value, error) {
+	if v, ok := v.(ast.Value); ok {
+		return v, nil
+	}
+	return ast.InterfaceToValue(v)
 }
 
 // setInAst updates the value in the AST at the given path with the given value.

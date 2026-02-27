@@ -71,7 +71,7 @@ func resolveFile(
 
 	specs := []*ast.ImportSpec{}
 
-	for spec := range f.ImportSpecs() {
+	for _, spec := range f.Imports {
 		id, err := strconv.Unquote(spec.Path.Value)
 		if err != nil {
 			continue // quietly ignore the error

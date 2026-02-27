@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 
 	"github.com/Masterminds/semver"
@@ -96,9 +95,7 @@ func fetchVersions(github string) (semver.Collection, error) {
 	for _, v := range versions {
 		sVersion, err := semver.NewVersion(v.TagName)
 		if err != nil {
-			// Skip invalid semantic versions (e.g., rc, alpha, beta tags without proper semver format)
-			fmt.Fprintf(os.Stderr, "warn: skipping invalid semantic version for %s: %s\n", github, v.TagName)
-			continue
+			return nil, err
 		}
 		sVersions = append(sVersions, sVersion)
 	}

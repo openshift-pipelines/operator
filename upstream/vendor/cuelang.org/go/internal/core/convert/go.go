@@ -151,7 +151,7 @@ func getName(f *reflect.StructField) string {
 func isOptional(f *reflect.StructField) bool {
 	isOptional := false
 	switch f.Type.Kind() {
-	case reflect.Pointer, reflect.Map, reflect.Chan, reflect.Interface, reflect.Slice:
+	case reflect.Ptr, reflect.Map, reflect.Chan, reflect.Interface, reflect.Slice:
 		// Note: it may be confusing to distinguish between an empty slice and
 		// a nil slice. However, it is also surprising to not be able to specify
 		// a default value for a slice. So for now we will allow it.
@@ -161,7 +161,7 @@ func isOptional(f *reflect.StructField) bool {
 		// TODO: only if first field is not empty.
 		_, opt := splitTag(tag)
 		isOptional = false
-		for f := range strings.SplitSeq(opt, ",") {
+		for _, f := range strings.Split(opt, ",") {
 			switch f {
 			case "opt":
 				isOptional = true
@@ -171,8 +171,10 @@ func isOptional(f *reflect.StructField) bool {
 		}
 	} else if tag, ok = f.Tag.Lookup("json"); ok {
 		isOptional = false
-		if slices.Contains(strings.Split(tag, ",")[1:], "omitempty") {
-			return true
+		for _, f := range strings.Split(tag, ",")[1:] {
+			if f == "omitempty" {
+				return true
+			}
 		}
 	}
 	return isOptional
@@ -182,7 +184,7 @@ func isOptional(f *reflect.StructField) bool {
 func isOmitEmpty(f *reflect.StructField) bool {
 	isOmitEmpty := false
 	switch f.Type.Kind() {
-	case reflect.Pointer, reflect.Map, reflect.Chan, reflect.Interface, reflect.Slice:
+	case reflect.Ptr, reflect.Map, reflect.Chan, reflect.Interface, reflect.Slice:
 		// Note: it may be confusing to distinguish between an empty slice and
 		// a nil slice. However, it is also surprising to not be able to specify
 		// a default value for a slice. So for now we will allow it.
@@ -195,8 +197,10 @@ func isOmitEmpty(f *reflect.StructField) bool {
 	tag, ok := f.Tag.Lookup("json")
 	if ok {
 		isOmitEmpty = false
-		if slices.Contains(strings.Split(tag, ",")[1:], "omitempty") {
-			return true
+		for _, f := range strings.Split(tag, ",")[1:] {
+			if f == "omitempty" {
+				return true
+			}
 		}
 	}
 	return isOmitEmpty
@@ -213,7 +217,7 @@ func GoValueToExpr(ctx *adt.OpContext, nilIsTop bool, x interface{}) adt.Expr {
 func isNil(x reflect.Value) bool {
 	switch x.Kind() {
 	// Only check for supported types; ignore func and chan.
-	case reflect.Pointer, reflect.Map, reflect.Slice, reflect.Interface:
+	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Interface:
 		return x.IsNil()
 	}
 	return false
@@ -400,7 +404,7 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 		case reflect.Float32, reflect.Float64:
 			return c.convertRec(nilIsTop, value.Float())
 
-		case reflect.Pointer:
+		case reflect.Ptr:
 			if value.IsNil() {
 				if nilIsTop {
 					ident, _ := src.(*ast.Ident)
@@ -416,7 +420,7 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 			v := &adt.Vertex{}
 
 			t := value.Type()
-			for i := range value.NumField() {
+			for i := 0; i < value.NumField(); i++ {
 				sf := t.Field(i)
 				if sf.PkgPath != "" {
 					continue
@@ -489,7 +493,10 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 				reflect.Uint, reflect.Uint8, reflect.Uint16,
 				reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 
-				for k, val := range value.Seq2() {
+				iter := value.MapRange()
+				for iter.Next() {
+					k := iter.Key()
+					val := iter.Value()
 					// if isNil(val) {
 					// 	continue
 					// }
@@ -533,8 +540,8 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 
 			v := &adt.Vertex{}
 
-			i := 0
-			for _, val := range value.Seq2() {
+			for i := 0; i < value.Len(); i++ {
+				val := value.Index(i)
 				x := c.convertRec(nilIsTop, val.Interface())
 				if x == nil {
 					return c.ctx.AddErrf("unsupported Go type (%T)",
@@ -546,7 +553,6 @@ func (c *goConverter) convertRec(nilIsTop bool, x interface{}) (result adt.Value
 				list.Elems = append(list.Elems, x)
 				f := adt.MakeIntLabel(adt.IntLabel, int64(i))
 				v.Arcs = append(v.Arcs, c.ensureArcVertex(x, f))
-				i++
 			}
 
 			env := c.ctx.Env(0)
@@ -666,9 +672,9 @@ func (c *goConverter) goTypeToValueRec(allowNullDefault bool, t reflect.Type) (e
 	}
 
 	switch k := t.Kind(); k {
-	case reflect.Pointer:
+	case reflect.Ptr:
 		elem := t.Elem()
-		for elem.Kind() == reflect.Pointer {
+		for elem.Kind() == reflect.Ptr {
 			elem = elem.Elem()
 		}
 		e, _ = c.goTypeToValueRec(false, elem)
@@ -712,7 +718,7 @@ func (c *goConverter) goTypeToValueRec(allowNullDefault bool, t reflect.Type) (e
 		// references. Maybe have a special kind of "hardlink" reference.
 		c.ctx.StoreType(t, obj, nil)
 
-		for i := range t.NumField() {
+		for i := 0; i < t.NumField(); i++ {
 			f := t.Field(i)
 			if f.PkgPath != "" {
 				continue

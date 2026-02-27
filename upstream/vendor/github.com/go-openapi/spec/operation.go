@@ -176,7 +176,7 @@ func (o *Operation) Deprecate() *Operation {
 	return o
 }
 
-// Undeprecate marks the operation as not deprecated
+// Undeprecate marks the operation as not deprected
 func (o *Operation) Undeprecate() *Operation {
 	o.Deprecated = false
 	return o
