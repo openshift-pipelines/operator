@@ -118,6 +118,7 @@ type Config struct {
 type BundleConfig struct {
 	Version string
 	Image   string
+	Tag     string
 }
 
 // Output JSON structs
@@ -265,7 +266,10 @@ func buildChannel(pkg, name string, allEntries map[string][]ChannelEntry) Channe
 
 func updateBundleImage(b *BundleConfig) {
 	if !strings.Contains(b.Image, "@sha256") {
-		inputImage := "registry.redhat.io/openshift-pipelines/pipelines-operator-bundle:v" + b.Version
+		if b.Tag == "" {
+			b.Tag = "v" + b.Version
+		}
+		inputImage := "registry.redhat.io/openshift-pipelines/pipelines-operator-bundle:" + b.Tag
 		ref, err := name.ParseReference(inputImage)
 		if err != nil {
 			log.Fatalf("failed to parse image name: %v", err)
