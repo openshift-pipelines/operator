@@ -25,10 +25,8 @@ import (
 	"cuelang.org/go/cue/literal"
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
-	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/astinternal"
 	"cuelang.org/go/internal/core/adt"
-	"cuelang.org/go/internal/core/runtime"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -138,28 +136,6 @@ type Selector struct {
 // String reports the CUE representation of a selector.
 func (sel Selector) String() string {
 	return sel.sel.String()
-}
-
-// ErrNotAPattern is a sentinel error value indicating that a value is not a
-// pattern, which may be returned by [Selector.Pattern].
-var ErrNotAPattern = newErrValue(
-	Value{idx: runtime.New()},
-	&adt.Bottom{
-		Err:  errors.Newf(token.NoPos, "selector is not a pattern"),
-		Code: adt.EvalError,
-	},
-)
-
-// Pattern returns the label pattern for a pattern constraint selector
-// returned by an iterator with the [Patterns] option enabled.
-//
-// For other selectors, it returns [ErrNotAPattern].
-func (sel Selector) Pattern() Value {
-	switch sel := sel.sel.(type) {
-	case patternSelector:
-		return sel.pattern
-	}
-	return ErrNotAPattern
 }
 
 // Unquoted returns the unquoted value of a string label.
@@ -297,11 +273,6 @@ func pathToStrings(p Path) (a []string) {
 		a = append(a, sel.String())
 	}
 	return a
-}
-
-// Append adds sel as a path component to p.
-func (p Path) Append(sel ...Selector) Path {
-	return Path{path: append(p.path, sel...)}
 }
 
 // ParsePath parses a CUE expression into a Path. Any error resulting from
@@ -492,6 +463,10 @@ func (p Path) Err() error {
 	return errs
 }
 
+func isHiddenOrDefinition(s string) bool {
+	return strings.HasPrefix(s, "#") || strings.HasPrefix(s, "_")
+}
+
 // Hid returns a selector for a hidden field. It panics if pkg is empty.
 // Hidden fields are scoped by package, and pkg indicates for which package
 // the hidden field must apply. For anonymous packages, it must be set to "_".
@@ -530,11 +505,11 @@ func (s scopedSelector) feature(r adt.Runtime) adt.Feature {
 	return adt.MakeIdentLabel(r, s.name, s.pkg)
 }
 
-// Def marks a string as a definition label. An # will be added if a string is
+// A Def marks a string as a definition label. An # will be added if a string is
 // not prefixed with a #. It will panic if s cannot be written as a valid
 // identifier.
 func Def(s string) Selector {
-	if !internal.IsDef(s) {
+	if !strings.HasPrefix(s, "#") && !strings.HasPrefix(s, "_#") {
 		s = "#" + s
 	}
 	if !ast.IsValidIdent(s) {
@@ -556,13 +531,13 @@ func (d definitionSelector) labelType() SelectorType {
 	return DefinitionLabel
 }
 
-func (d definitionSelector) constraintType() SelectorType { return 0 }
+func (s definitionSelector) constraintType() SelectorType { return 0 }
 
 func (d definitionSelector) feature(r adt.Runtime) adt.Feature {
 	return adt.MakeIdentLabel(r, string(d), "")
 }
 
-// Str creates a CUE string label. Definition selectors are defined with [Def].
+// A Str is a CUE string label. Definition selectors are defined with Def.
 func Str(s string) Selector {
 	return Selector{stringSelector(s)}
 }
@@ -571,7 +546,7 @@ type stringSelector string
 
 func (s stringSelector) String() string {
 	str := string(s)
-	if ast.StringLabelNeedsQuoting(str) {
+	if isHiddenOrDefinition(str) || !ast.IsValidIdent(str) {
 		return literal.Label.Quote(str)
 	}
 	return str
@@ -585,7 +560,7 @@ func (s stringSelector) feature(r adt.Runtime) adt.Feature {
 	return adt.MakeStringLabel(r, string(s))
 }
 
-// Index selects a list element by index.
+// An Index selects a list element by index.
 // It returns an invalid selector if the index is out of range.
 func Index[T interface{ int | int64 }](x T) Selector {
 	f, err := adt.MakeLabel(nil, int64(x), adt.IntLabel)
@@ -628,20 +603,6 @@ func (s anySelector) feature(r adt.Runtime) adt.Feature {
 	return adt.Feature(s)
 }
 
-type patternSelector struct {
-	pattern    Value
-	_labelType SelectorType
-}
-
-func (s patternSelector) String() string               { return fmt.Sprintf("[%#v]", s.pattern) }
-func (s patternSelector) isConstraint() bool           { return true }
-func (s patternSelector) labelType() SelectorType      { return s._labelType }
-func (s patternSelector) constraintType() SelectorType { return PatternConstraint }
-func (s patternSelector) feature(r adt.Runtime) adt.Feature {
-	// Only called for non-pattern selectors.
-	panic("unreachable")
-}
-
 // TODO: allow import paths to be represented?
 //
 // // ImportPath defines a lookup at the root of an instance. It must be the first
@@ -650,7 +611,6 @@ func (s patternSelector) feature(r adt.Runtime) adt.Feature {
 //	func ImportPath(s string) Selector {
 //		return importSelector(s)
 //	}
-
 type constraintSelector struct {
 	selector
 	constraint SelectorType

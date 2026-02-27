@@ -153,13 +153,9 @@ func (r reclaimer) reclaim(v *Vertex) bool {
 			// of a disjunct it is reclaimed later as part of [freeDisjunct].
 			return false
 		} else {
-			if n.refCount > 0 {
-				goto skipRoot
-			}
-
 			r.reclaimBaseValueBuffers(v)
 
-			if v.Parent != nil && !v.Label.IsLet() {
+			if n.refCount > 0 || (v.Parent != nil && !v.Label.IsLet()) {
 				goto skipRoot
 			}
 		}
@@ -173,21 +169,9 @@ func (r reclaimer) reclaim(v *Vertex) bool {
 		}
 	}
 
-	// TODO: this is not generally true. A dereferenced disjunct may already be
-	// in use to the point it cannot be freed. Mark such disjuncts to prevent
-	// reclamation or figure out something else. For now we disable to
-	// optimization as its effect is limited.
-	//
-	// See Issue #4055:
-	// 		a: "x"
-	// 		a: _ | error("a")
-	// 		if len(a) > 0 {
-	// 			a: _ | error("b")
-	// 		}
-	//
-	// if w := v.DerefDisjunct(); v != w {
-	// 	r.ctx.reclaimRecursive(w)
-	// }
+	if w := v.DerefDisjunct(); v != w {
+		r.ctx.reclaimRecursive(w)
+	}
 
 skipRoot:
 	if v.PatternConstraints != nil {

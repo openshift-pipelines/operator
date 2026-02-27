@@ -15,7 +15,6 @@
 package client
 
 import (
-	"crypto/tls"
 	"net/http"
 	"time"
 
@@ -31,7 +30,6 @@ type options struct {
 	RetryWaitMin        time.Duration
 	RetryWaitMax        time.Duration
 	InsecureTLS         bool
-	TLSConfig           *tls.Config
 	Logger              interface{}
 	NoDisableKeepalives bool
 	Headers             map[string][]string
@@ -97,13 +95,6 @@ func WithLogger(logger interface{}) Option {
 func WithInsecureTLS(enabled bool) Option {
 	return func(o *options) {
 		o.InsecureTLS = enabled
-	}
-}
-
-// WithTLSConfig sets the TLS config.
-func WithTLSConfig(tlsConfig *tls.Config) Option {
-	return func(o *options) {
-		o.TLSConfig = tlsConfig
 	}
 }
 

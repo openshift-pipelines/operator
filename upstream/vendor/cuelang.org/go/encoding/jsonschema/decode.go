@@ -646,7 +646,7 @@ func (s *state) finalize() (e ast.Expr) {
 	if s.allowedTypes == 0 {
 		// Nothing is possible. This isn't a necessarily a problem, as
 		// we might be inside an allOf or oneOf with other valid constraints.
-		return errorDisallowed()
+		return bottom()
 	}
 
 	s.finalizeObject()
@@ -1008,7 +1008,7 @@ func (s *state) addDefinition(n cue.Value) *definedSchema {
 	var loc SchemaLoc
 	schemaRoot := s.schemaRoot()
 	loc.ID = ref(*schemaRoot.id)
-	loc.ID.Fragment = mustCUEPathToJSONPointer(relPath(n, schemaRoot.pos))
+	loc.ID.Fragment = cuePathToJSONPointer(relPath(n, schemaRoot.pos))
 	idStr := loc.ID.String()
 	def, ok := s.defs[idStr]
 	if ok {
@@ -1090,6 +1090,34 @@ func (s *state) constValue(n cue.Value) ast.Expr {
 	}
 }
 
+func (s *state) value(n cue.Value) ast.Expr {
+	k := n.Kind()
+	switch k {
+	case cue.ListKind:
+		a := []ast.Expr{}
+		for i, _ := n.List(); i.Next(); {
+			a = append(a, s.value(i.Value()))
+		}
+		return setPos(ast.NewList(a...), n)
+
+	case cue.StructKind:
+		a := []ast.Decl{}
+		s.processMap(n, func(key string, n cue.Value) {
+			a = append(a, &ast.Field{
+				Label: ast.NewString(key),
+				Value: s.value(n),
+			})
+		})
+		return setPos(&ast.StructLit{Elts: a}, n)
+
+	default:
+		if !n.IsConcrete() {
+			s.errf(n, "invalid non-concrete value")
+		}
+		return n.Syntax(cue.Final()).(ast.Expr)
+	}
+}
+
 // processMap processes a yaml node, expanding merges.
 //
 // TODO: in some cases we can translate merges into CUE embeddings.
@@ -1156,20 +1184,8 @@ func excludeFields(decls []ast.Decl) []ast.Expr {
 	}
 }
 
-func errorDisallowed() ast.Expr {
-	return ast.NewCall(ast.NewIdent("error"), ast.NewString("disallowed"))
-}
-
-func isErrorCall(e ast.Expr) bool {
-	call, ok := e.(*ast.CallExpr)
-	if !ok {
-		return false
-	}
-	target, ok := call.Fun.(*ast.Ident)
-	if !ok {
-		return false
-	}
-	return target.Name == "error"
+func bottom() ast.Expr {
+	return &ast.BottomLit{}
 }
 
 func top() ast.Expr {
@@ -1180,12 +1196,17 @@ func boolSchema(ok bool) ast.Expr {
 	if ok {
 		return top()
 	}
-	return errorDisallowed()
+	return bottom()
 }
 
 func isTop(s ast.Expr) bool {
 	i, ok := s.(*ast.Ident)
 	return ok && i.Name == "_"
+}
+
+func isBottom(e ast.Expr) bool {
+	_, ok := e.(*ast.BottomLit)
+	return ok
 }
 
 func addTag(field ast.Label, tag, value string) *ast.Field {

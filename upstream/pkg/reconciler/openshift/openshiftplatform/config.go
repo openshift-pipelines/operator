@@ -20,16 +20,13 @@ import (
 	k8sInstallerSet "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektoninstallerset"
 	openshiftManualApprovalGate "github.com/tektoncd/operator/pkg/reconciler/openshift/manualapprovalgate"
 	"github.com/tektoncd/operator/pkg/reconciler/openshift/openshiftpipelinesascode"
-	openshiftSyncerService "github.com/tektoncd/operator/pkg/reconciler/openshift/syncerservice"
 	openshiftAddon "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonaddon"
 	openshiftChain "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonchain"
 	openshiftConfig "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonconfig"
 	openshiftHub "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonhub"
-	openshiftMulticlusterProxyAAE "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonmulticlusterproxyaae"
 	openshiftPipeline "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonpipeline"
 	openshiftPruner "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonpruner"
 	openshiftResult "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonresult"
-	openshiftScheduler "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonscheduler"
 	openshiftTrigger "github.com/tektoncd/operator/pkg/reconciler/openshift/tektontrigger"
 	"github.com/tektoncd/operator/pkg/reconciler/platform"
 	"knative.dev/pkg/injection"
@@ -89,18 +86,6 @@ var (
 		platform.ControllerTektonPruner: injection.NamedControllerConstructor{
 			Name:                  string(platform.ControllerTektonPruner),
 			ControllerConstructor: openshiftPruner.NewController,
-		},
-		platform.ControllerTektonScheduler: injection.NamedControllerConstructor{
-			Name:                  string(platform.ControllerTektonScheduler),
-			ControllerConstructor: openshiftScheduler.NewController,
-		},
-		platform.ControllerMulticlusterProxyAAE: injection.NamedControllerConstructor{
-			Name:                  string(platform.ControllerMulticlusterProxyAAE),
-			ControllerConstructor: openshiftMulticlusterProxyAAE.NewController,
-		},
-		platform.ControllerSyncerService: injection.NamedControllerConstructor{
-			Name:                  string(platform.ControllerSyncerService),
-			ControllerConstructor: openshiftSyncerService.NewController,
 		},
 	}
 )

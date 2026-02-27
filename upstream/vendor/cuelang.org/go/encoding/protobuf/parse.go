@@ -277,11 +277,7 @@ func (p *protoConverter) resolveTopScope(pos scanner.Position, name string, opti
 		if k == -1 {
 			i = len(name)
 		}
-		curName := name[:i]
-		if local, ok := strings.CutPrefix(curName, p.protoPkg+"."); ok {
-			curName = local
-		}
-		if m, ok := p.scope[0][curName]; ok {
+		if m, ok := p.scope[0][name[:i]]; ok {
 			if m.pkg != nil {
 				p.imported[m.pkg.qualifiedImportPath()] = true
 			}
@@ -302,7 +298,7 @@ func (p *protoConverter) resolveTopScope(pos scanner.Position, name string, opti
 }
 
 func (p *protoConverter) doImport(v *proto.Import) error {
-	if p.mapBuiltinPackage(v.Filename) {
+	if v.Filename == "cue/cue.proto" {
 		return nil
 	}
 
@@ -321,6 +317,10 @@ func (p *protoConverter) doImport(v *proto.Import) error {
 		err := errors.Newf(p.toCUEPos(v.Position), "could not find import %q", v.Filename)
 		p.state.addErr(err)
 		return err
+	}
+
+	if !p.mapBuiltinPackage(v.Position, v.Filename, filename == "") {
+		return nil
 	}
 
 	imp, err := p.state.parse(filename, nil)
@@ -530,7 +530,6 @@ func (p *protoConverter) messageField(s *ast.StructLit, i int, v proto.Visitee) 
 
 		if !o.required {
 			f.Optional = token.NoSpace.Pos()
-			f.Constraint = token.OPTION
 		}
 
 	case *proto.Enum:
@@ -724,7 +723,6 @@ func (p *protoConverter) oneOf(x *proto.Oneof) {
 			newStruct()
 			oneOf := p.parseField(s, 0, x.Field)
 			oneOf.Optional = token.NoPos
-			oneOf.Constraint = token.ILLEGAL
 
 		case *proto.Comment:
 			cg := comment(x, false)
@@ -764,7 +762,6 @@ func (p *protoConverter) parseField(s *ast.StructLit, i int, x *proto.Field) *as
 
 	if !o.required {
 		f.Optional = token.NoSpace.Pos()
-		f.Constraint = token.OPTION
 	}
 	return f
 }
@@ -799,7 +796,6 @@ func (p *optionParser) parse(options []*proto.Option) {
 			p.message.Elts = append(p.message.Elts, constraint)
 			if !p.required {
 				constraint.Optional = token.NoSpace.Pos()
-				constraint.Constraint = token.OPTION
 			}
 		case "(google.api.field_behavior)":
 			if o.Constant.Source == "REQUIRED" {

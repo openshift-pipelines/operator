@@ -23,11 +23,9 @@ import (
 	k8sDashboard "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektondashboard"
 	k8sHub "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektonhub"
 	k8sInstallerSet "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektoninstallerset"
-	k8sMulticlusterProxyAAE "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektonmulticlusterproxyaae"
 	k8sPipeline "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektonpipeline"
 	k8sTektonPruner "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektonpruner"
 	k8sResult "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektonresult"
-	k8stektonscheduler "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektonscheduler"
 	k8sTrigger "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektontrigger"
 	"github.com/tektoncd/operator/pkg/reconciler/platform"
 	"knative.dev/pkg/injection"
@@ -64,12 +62,6 @@ var (
 		platform.ControllerManualApprovalGate: injection.NamedControllerConstructor{
 			Name:                  string(platform.ControllerManualApprovalGate),
 			ControllerConstructor: k8sManualApprovalGate.NewController},
-		platform.ControllerTektonScheduler: injection.NamedControllerConstructor{
-			Name:                  string(platform.ControllerTektonScheduler),
-			ControllerConstructor: k8stektonscheduler.NewController},
-		platform.ControllerMulticlusterProxyAAE: injection.NamedControllerConstructor{
-			Name:                  string(platform.ControllerMulticlusterProxyAAE),
-			ControllerConstructor: k8sMulticlusterProxyAAE.NewController},
 		platform.ControllerTektonPruner: injection.NamedControllerConstructor{
 			Name:                  string(platform.ControllerTektonPruner),
 			ControllerConstructor: k8sTektonPruner.NewController},

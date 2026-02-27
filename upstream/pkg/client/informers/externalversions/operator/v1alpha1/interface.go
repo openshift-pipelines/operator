@@ -28,8 +28,6 @@ type Interface interface {
 	ManualApprovalGates() ManualApprovalGateInformer
 	// OpenShiftPipelinesAsCodes returns a OpenShiftPipelinesAsCodeInformer.
 	OpenShiftPipelinesAsCodes() OpenShiftPipelinesAsCodeInformer
-	// SyncerServices returns a SyncerServiceInformer.
-	SyncerServices() SyncerServiceInformer
 	// TektonAddons returns a TektonAddonInformer.
 	TektonAddons() TektonAddonInformer
 	// TektonChains returns a TektonChainInformer.
@@ -42,16 +40,12 @@ type Interface interface {
 	TektonHubs() TektonHubInformer
 	// TektonInstallerSets returns a TektonInstallerSetInformer.
 	TektonInstallerSets() TektonInstallerSetInformer
-	// TektonMulticlusterProxyAAEs returns a TektonMulticlusterProxyAAEInformer.
-	TektonMulticlusterProxyAAEs() TektonMulticlusterProxyAAEInformer
 	// TektonPipelines returns a TektonPipelineInformer.
 	TektonPipelines() TektonPipelineInformer
 	// TektonPruners returns a TektonPrunerInformer.
 	TektonPruners() TektonPrunerInformer
 	// TektonResults returns a TektonResultInformer.
 	TektonResults() TektonResultInformer
-	// TektonSchedulers returns a TektonSchedulerInformer.
-	TektonSchedulers() TektonSchedulerInformer
 	// TektonTriggers returns a TektonTriggerInformer.
 	TektonTriggers() TektonTriggerInformer
 }
@@ -75,11 +69,6 @@ func (v *version) ManualApprovalGates() ManualApprovalGateInformer {
 // OpenShiftPipelinesAsCodes returns a OpenShiftPipelinesAsCodeInformer.
 func (v *version) OpenShiftPipelinesAsCodes() OpenShiftPipelinesAsCodeInformer {
 	return &openShiftPipelinesAsCodeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// SyncerServices returns a SyncerServiceInformer.
-func (v *version) SyncerServices() SyncerServiceInformer {
-	return &syncerServiceInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // TektonAddons returns a TektonAddonInformer.
@@ -112,11 +101,6 @@ func (v *version) TektonInstallerSets() TektonInstallerSetInformer {
 	return &tektonInstallerSetInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
-// TektonMulticlusterProxyAAEs returns a TektonMulticlusterProxyAAEInformer.
-func (v *version) TektonMulticlusterProxyAAEs() TektonMulticlusterProxyAAEInformer {
-	return &tektonMulticlusterProxyAAEInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
 // TektonPipelines returns a TektonPipelineInformer.
 func (v *version) TektonPipelines() TektonPipelineInformer {
 	return &tektonPipelineInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
@@ -130,11 +114,6 @@ func (v *version) TektonPruners() TektonPrunerInformer {
 // TektonResults returns a TektonResultInformer.
 func (v *version) TektonResults() TektonResultInformer {
 	return &tektonResultInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// TektonSchedulers returns a TektonSchedulerInformer.
-func (v *version) TektonSchedulers() TektonSchedulerInformer {
-	return &tektonSchedulerInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // TektonTriggers returns a TektonTriggerInformer.

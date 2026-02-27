@@ -15,8 +15,6 @@
 package export
 
 import (
-	"slices"
-
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal"
@@ -38,16 +36,17 @@ func extractDocs(v *adt.Vertex) (docs []*ast.CommentGroup) {
 	fields := []*ast.Field{}
 
 	// Collect docs directly related to this Vertex.
-	for x := range v.LeafConjuncts() {
+	v.VisitLeafConjuncts(func(x adt.Conjunct) bool {
 		// TODO: Is this still being used?
 		if v, ok := x.Elem().(*adt.Vertex); ok {
 			docs = append(docs, extractDocs(v)...)
+			return true
 		}
 
 		switch f := x.Field().Source().(type) {
 		case *ast.Field:
 			if hasShorthandValue(f) {
-				continue
+				return true
 			}
 			fields = append(fields, f)
 			for _, cg := range f.Comments() {
@@ -60,17 +59,19 @@ func extractDocs(v *adt.Vertex) (docs []*ast.CommentGroup) {
 			fdocs, _ := internal.FileComments(f)
 			docs = append(docs, fdocs...)
 		}
-	}
+
+		return true
+	})
 
 	// Collect docs from parent scopes in collapsed fields.
 	for p := v.Parent; p != nil; p = p.Parent {
 
 		newFields := []*ast.Field{}
 
-		for x := range p.LeafConjuncts() {
+		p.VisitLeafConjuncts(func(x adt.Conjunct) bool {
 			f, ok := x.Source().(*ast.Field)
 			if !ok || !hasShorthandValue(f) {
-				continue
+				return true
 			}
 
 			nested := nestedField(f)
@@ -84,7 +85,8 @@ func extractDocs(v *adt.Vertex) (docs []*ast.CommentGroup) {
 					}
 				}
 			}
-		}
+			return true
+		})
 
 		fields = newFields
 	}
@@ -124,8 +126,10 @@ func nestedField(f *ast.Field) *ast.Field {
 }
 
 func containsDoc(a []*ast.CommentGroup, cg *ast.CommentGroup) bool {
-	if slices.Contains(a, cg) {
-		return true
+	for _, c := range a {
+		if c == cg {
+			return true
+		}
 	}
 
 	for _, c := range a {
@@ -138,9 +142,10 @@ func containsDoc(a []*ast.CommentGroup, cg *ast.CommentGroup) bool {
 }
 
 func ExtractFieldAttrs(v *adt.Vertex) (attrs []*ast.Attribute) {
-	for x := range v.LeafConjuncts() {
+	v.VisitLeafConjuncts(func(x adt.Conjunct) bool {
 		attrs = extractFieldAttrs(attrs, x.Field())
-	}
+		return true
+	})
 	return attrs
 }
 

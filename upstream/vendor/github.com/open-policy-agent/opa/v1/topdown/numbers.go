@@ -15,10 +15,8 @@ import (
 
 type randIntCachingKey string
 
-var (
-	zero = big.NewInt(0)
-	one  = big.NewInt(1)
-)
+var zero = big.NewInt(0)
+var one = big.NewInt(1)
 
 func builtinNumbersRange(bctx BuiltinContext, operands []*ast.Term, iter func(*ast.Term) error) error {
 	if canGenerateCheapRange(operands) {
@@ -47,9 +45,8 @@ func builtinNumbersRangeStep(bctx BuiltinContext, operands []*ast.Term, iter fun
 	if canGenerateCheapRangeStep(operands) {
 		step, _ := builtins.IntOperand(operands[2].Value, 3)
 		if step <= 0 {
-			return errors.New("numbers.range_step: step must be a positive integer")
+			return errors.New("numbers.range_step: step must be a positive number above zero")
 		}
-
 		return generateCheapRange(operands, step, iter)
 	}
 
@@ -69,7 +66,7 @@ func builtinNumbersRangeStep(bctx BuiltinContext, operands []*ast.Term, iter fun
 	}
 
 	if step.Cmp(zero) <= 0 {
-		return errors.New("numbers.range_step: step must be a positive integer")
+		return errors.New("numbers.range_step: step must be a positive number above zero")
 	}
 
 	ast, err := generateRange(bctx, x, y, step, "numbers.range_step")
@@ -161,9 +158,11 @@ func generateRange(bctx BuiltinContext, x *big.Int, y *big.Int, step *big.Int, f
 }
 
 func builtinRandIntn(bctx BuiltinContext, operands []*ast.Term, iter func(*ast.Term) error) error {
+
 	strOp, err := builtins.StringOperand(operands[0].Value, 1)
 	if err != nil {
 		return err
+
 	}
 
 	n, err := builtins.IntOperand(operands[1].Value, 2)
@@ -179,7 +178,7 @@ func builtinRandIntn(bctx BuiltinContext, operands []*ast.Term, iter func(*ast.T
 		n = -n
 	}
 
-	key := randIntCachingKey(fmt.Sprintf("%s-%d", strOp, n))
+	var key = randIntCachingKey(fmt.Sprintf("%s-%d", strOp, n))
 
 	if val, ok := bctx.Cache.Get(key); ok {
 		return iter(val.(*ast.Term))

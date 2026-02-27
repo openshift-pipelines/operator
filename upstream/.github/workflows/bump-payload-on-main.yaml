@@ -12,57 +12,25 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository_owner == 'tektoncd'  # do not run this elsewhere
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-    - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5  # v6.2.0
+    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
       with:
         go-version-file: "go.mod"
     - name: run operator-tool bump
       run: |
         export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-        make components/bump 2> bump-output.txt || true
-        cat bump-output.txt >&2
-    - name: generate commit message and PR body
-      id: generate-message
-      run: |
-        if [[ -f bump-output.txt ]]; then
-          ./.github/scripts/generate-bump-message.sh bump-output.txt commit-message.txt pr-body.txt
-          if [[ -f commit-message.txt ]]; then
-            COMMIT_MSG=$(cat commit-message.txt)
-            PR_TITLE=$(head -n1 commit-message.txt)
-            echo "commit_message<<EOF" >> $GITHUB_OUTPUT
-            echo "${COMMIT_MSG}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-            echo "pr_title=${PR_TITLE}" >> $GITHUB_OUTPUT
-            if [[ -f pr-body.txt ]]; then
-              echo "pr_body<<EOF" >> $GITHUB_OUTPUT
-              cat pr-body.txt >> $GITHUB_OUTPUT
-              echo "EOF" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "commit_message=chore: bump payload versions" >> $GITHUB_OUTPUT
-            echo "pr_title=chore: bump payload versions" >> $GITHUB_OUTPUT
-            echo "pr_body=Automated component version bump" >> $GITHUB_OUTPUT
-          fi
-        else
-          echo "commit_message=chore: bump payload versions" >> $GITHUB_OUTPUT
-          echo "pr_title=chore: bump payload versions" >> $GITHUB_OUTPUT
-          echo "pr_body=Automated component version bump" >> $GITHUB_OUTPUT
-        fi
-    - name: clean up temporary files
-      run: |
-        rm -f bump-output.txt commit-message.txt pr-body.txt
+        make components/bump
     - name: create pull request
-      uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0  # v8.1.0
+      uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
       with:
-        token: ${{ secrets.CHATOPS_TOKEN }}
-        commit-message: ${{ steps.generate-message.outputs.commit_message }}
+        token: ${{ secrets.TEKTON_BOT_TOKEN }}
+        commit-message: Bump payloads versions
         committer: tekton-bot <tekton-bot@users.noreply.github.com>
         author: Vincent Demeester <vdemeest@redhat.com>
         signoff: true
         # author: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>
         branch: bot-bump-payload
         delete-branch: true
-        title: ${{ steps.generate-message.outputs.pr_title }}
-        body: ${{ steps.generate-message.outputs.pr_body }}
+        title: "[bot] bump payload versions"
         labels: |
           release-note-none

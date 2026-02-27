@@ -96,6 +96,7 @@ func encodeCanonical(obj interface{}, result *strings.Builder) (err error) {
 			if i < (len(mapKeys) - 1) {
 				result.WriteString(",")
 			}
+			i++
 		}
 		result.WriteString("}")
 

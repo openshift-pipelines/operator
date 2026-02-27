@@ -29,7 +29,6 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
-	"unicode/utf8"
 )
 
 // ByteAt reports the ith byte of the underlying strings or byte.
@@ -61,7 +60,7 @@ func MinRunes(s string, min int) bool {
 	// TODO: CUE strings cannot be invalid UTF-8. In case this changes, we need
 	// to use the following conversion to count properly:
 	// s, _ = unicodeenc.UTF8.NewDecoder().String(s)
-	return utf8.RuneCountInString(s) >= min
+	return len([]rune(s)) >= min
 }
 
 // MaxRunes reports whether the number of runes (Unicode codepoints) in a string
@@ -69,7 +68,7 @@ func MinRunes(s string, min int) bool {
 // except all strings for which this property holds
 func MaxRunes(s string, max int) bool {
 	// See comment in MinRunes implementation.
-	return utf8.RuneCountInString(s) <= max
+	return len([]rune(s)) <= max
 }
 
 // ToTitle returns a copy of the string s with all Unicode letters that begin

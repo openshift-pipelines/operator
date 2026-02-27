@@ -153,11 +153,6 @@ func (in *Template) DeepCopyInto(out *Template) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.HostUsers != nil {
-		in, out := &in.HostUsers, &out.HostUsers
-		*out = new(bool)
-		**out = **in
-	}
 	if in.TopologySpreadConstraints != nil {
 		in, out := &in.TopologySpreadConstraints, &out.TopologySpreadConstraints
 		*out = make([]v1.TopologySpreadConstraint, len(*in))

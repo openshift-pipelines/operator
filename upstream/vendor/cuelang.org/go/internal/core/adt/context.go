@@ -16,7 +16,6 @@ package adt
 
 import (
 	"fmt"
-	"iter"
 	"reflect"
 	"regexp"
 	"sync/atomic"
@@ -86,41 +85,18 @@ func New(v *Vertex, cfg *Config) *OpContext {
 	return ctx
 }
 
+// See also: [unreachableForDev]
 func (c *OpContext) isDevVersion() bool {
+	if c.Version == internal.EvalVersionUnset {
+		panic("OpContext was not provided with an evaluator version")
+	}
 	return c.Version == internal.DevVersion
 }
 
-// An OpContext holds context associated with an on-going CUE
-// evaluation. It functions both as an optimized memory store,
-// amortizing allocations during an evaluation, and as a record of the
-// current state within an evaluation.
-//
-// It should only be used on values that are created with the Runtime
-// with which an OpContext is created.
-//
-// An OpContext is not goroutine safe and only one goroutine may use an
-// OpContext at a time.
-//
-// An OpContext is typically used for an entire operation involving CUE
-// values that are derived from the same [cue.Context], such as any call
-// to exported Go APIs like methods on [cue.Value].
-//
-// An OpContext stores:
-// - errors encountered during the evaluation
-// - the current vertex and its parents
-// - statistics on evaluation operations
-//
-// The recorded set of errors is added to by calls to [OpContext.AddErr],
-// [OpContext.AddErr], [OpContext.AddErrf], and in general
-// any other operation that encounters an error.
-//
-// The current vertex is modified by calling [OpContext.PushArc], which
-// must be balanced by a corresponding call to [OpContext.PopArc].
-//
-// The entire state, including recorded errors and the current vertex, can be
-// reset by calling [OpContext.PushState], which must be balanced by a
-// corresponding call to [OpContext.PopState], causing the original
-// errors and vertex to be restored.
+// An OpContext implements CUE's unification operation. It only
+// operates on values that are created with the Runtime with which an OpContext
+// is associated. An OpContext is not goroutine safe and only one goroutine may
+// use an OpContext at a time.
 type OpContext struct {
 	Runtime
 	Format func(Runtime, Node) string
@@ -134,9 +110,9 @@ type OpContext struct {
 	nest int
 
 	// used in typocheck.go
-	nextDefID    defID         // next available defID
-	containments []containment // parent relations
-	redirectsBuf []replaceID   // reusable buffer used in containsDefID
+	nextDefID    defID       // next available defID
+	containments []defID     // parent relations
+	redirectsBuf []replaceID // reusable buffer used in containsDefID
 
 	stats        stats.Counts
 	freeListNode *nodeContext
@@ -156,8 +132,7 @@ type OpContext struct {
 	// TODO: remove this again once we have a proper way of detecting references
 	// across optional boundaries in hasAncestorV3. We can probably do this
 	// with an optional depth counter.
-	// See the TODO in unify.go for toFinalize.
-	// toFinalize []*Vertex
+	toFinalize []*Vertex
 
 	// freeScope tracks the nodeContexts that are currently responsible for
 	// allocating new inlined vertices. Only nodes within the current scope can
@@ -176,15 +151,35 @@ type OpContext struct {
 	// TODO(perf): have two generations: one for each pass of the closedness
 	// algorithm, so that the results of the first pass can be reused for all
 	// features of a node.
-	opID uint64
+	opID   uint64
+	closed map[*closeInfo]*closeStats
+	todo   *closeStats
 
 	// evalDepth indicates the current depth of evaluation. It is used to
 	// detect structural cycles and their severity.s
 	evalDepth int
 
+	// optionalMark indicates the evalDepth at which the last optional field,
+	// pattern constraint or other construct that may contain errors was
+	// encountered. A value of 0 indicates we are not within such field.
+	optionalMark int
+
 	// holdID is a unique identifier for the current "hole", a choice of
 	// disjunct to be made when processing disjunctions.
 	holeID int
+
+	// inDisjunct indicates that non-monotonic checks should be skipped.
+	// This is used if we want to do some extra work to eliminate disjunctions
+	// early. The result of unification should be thrown away if this check is
+	// used.
+	//
+	// TODO: replace this with a mechanism to determine the correct set (per
+	// conjunct) of StructInfos to include in closedness checking.
+	inDisjunct int
+
+	// inConstaint overrides inDisjunct as field matching should always be
+	// enabled.
+	inConstraint int
 
 	// inDetached indicates that inline structs evaluated in the current context
 	// should never be shared. This is the case, for instance, with the source
@@ -223,6 +218,13 @@ type OpContext struct {
 
 func (c *OpContext) CloseInfo() CloseInfo         { return c.ci }
 func (c *OpContext) UpdateCloseInfo(ci CloseInfo) { c.ci = ci }
+
+func (n *nodeContext) skipNonMonotonicChecks() bool {
+	if n.ctx.inConstraint > 0 {
+		return false
+	}
+	return n.ctx.inDisjunct > 0
+}
 
 func (c *OpContext) Pos() token.Pos {
 	if c.src == nil {
@@ -264,7 +266,7 @@ func (c *OpContext) Env(upCount int32) *Environment {
 
 func (c *OpContext) relNode(upCount int32) *Vertex {
 	e := c.e.up(c, upCount)
-	c.unify(e.Vertex, Flags{
+	c.unify(e.Vertex, combinedFlags{
 		status:    partial,
 		condition: allKnown,
 		mode:      ignore,
@@ -288,7 +290,7 @@ func (c *OpContext) concreteIsPossible(op Op, x Expr) bool {
 	return true
 }
 
-// AssertConcreteIsPossible reports whether the given expression can evaluate to a concrete value.
+// Assert that the given expression can evaluate to a concrete value.
 func AssertConcreteIsPossible(op Op, x Expr) bool {
 	switch v := x.(type) {
 	case *Bottom:
@@ -367,12 +369,6 @@ type frame struct {
 	ci  CloseInfo
 }
 
-// PushState resets c as if it was a newly created context
-// with the same configuration c was created with,
-// returning a value which should be used to restore the current
-// state by passing it to a matching call to [OpContext.PopState].
-//
-// If src is nil, c will still refer to the same source node.
 func (c *OpContext) PushState(env *Environment, src ast.Node) (saved frame) {
 	saved.env = c.e
 	saved.err = c.errs
@@ -406,7 +402,6 @@ func (c *OpContext) PushConjunct(x Conjunct) (saved frame) {
 	return saved
 }
 
-// PopState restores a state pushed by [OpContext.PushState].
 func (c *OpContext) PopState(s frame) *Bottom {
 	err := c.errs
 	c.e = s.env
@@ -455,14 +450,14 @@ func (c *OpContext) Resolve(x Conjunct, r Resolver) (v *Vertex, b *Bottom) {
 			panic(x)
 		}
 	}()
-	return c.resolveState(x, r, Flags{
+	return c.resolveState(x, r, combinedFlags{
 		status:    finalized,
 		condition: allKnown,
 		mode:      finalize,
 	})
 }
 
-func (c *OpContext) resolveState(x Conjunct, r Resolver, state Flags) (*Vertex, *Bottom) {
+func (c *OpContext) resolveState(x Conjunct, r Resolver, state combinedFlags) (*Vertex, *Bottom) {
 	s := c.PushConjunct(x)
 
 	arc := r.resolve(c, state)
@@ -487,13 +482,19 @@ func (c *OpContext) resolveState(x Conjunct, r Resolver, state Flags) (*Vertex, 
 func (c *OpContext) Lookup(env *Environment, r Resolver) (*Vertex, *Bottom) {
 	s := c.PushState(env, r.Source())
 
-	arc := r.resolve(c, Flags{
+	arc := r.resolve(c, combinedFlags{
 		status:    partial,
 		condition: allKnown,
 		mode:      ignore,
 	})
 
 	err := c.PopState(s)
+
+	if arc != nil && !c.isDevVersion() {
+		// TODO(deref): lookup should probably not use DerefValue, but
+		// rather only dereference disjunctions.
+		arc = arc.DerefValue()
+	}
 
 	return arc, err
 }
@@ -531,7 +532,7 @@ func (c *OpContext) Validate(check Conjunct, value Value) *Bottom {
 func (c *OpContext) concrete(env *Environment, x Expr, msg interface{}) (result Value, complete bool) {
 	s := c.PushState(env, x.Source())
 
-	state := Flags{
+	state := combinedFlags{
 		status:    partial,
 		condition: concreteKnown,
 		mode:      yield,
@@ -596,7 +597,7 @@ func (c *OpContext) getDefault(v Value) (result Value, ok bool) {
 func (c *OpContext) Evaluate(env *Environment, x Expr) (result Value, complete bool) {
 	s := c.PushState(env, x.Source())
 
-	val := c.evalState(x, Flags{
+	val := c.evalState(x, combinedFlags{
 		status:    partial,
 		condition: concreteKnown,
 		mode:      finalize,
@@ -633,7 +634,7 @@ func (c *OpContext) EvaluateKeepState(x Expr) (result Value) {
 	src := c.src
 	c.src = x.Source()
 
-	result, ci := c.evalStateCI(x, Flags{
+	result, ci := c.evalStateCI(x, combinedFlags{
 		status:    partial,
 		condition: concreteKnown,
 		mode:      finalize,
@@ -645,11 +646,29 @@ func (c *OpContext) EvaluateKeepState(x Expr) (result Value) {
 	return result
 }
 
+func (c *OpContext) evaluateRec(v Conjunct, state combinedFlags) Value {
+	x := v.Expr()
+	s := c.PushConjunct(v)
+
+	val := c.evalState(x, state)
+	if val == nil {
+		// Be defensive: this never happens, but just in case.
+		Assertf(c, false, "nil return value: unspecified error")
+		val = &Bottom{
+			Code: IncompleteError,
+			Err:  c.Newf("UNANTICIPATED ERROR"),
+			Node: c.vertex,
+		}
+	}
+	_ = c.PopState(s)
+
+	return val
+}
+
 // value evaluates expression v within the current environment. The result may
 // be nil if the result is incomplete. value leaves errors untouched to that
 // they can be collected by the caller.
-func (c *OpContext) value(x Expr, state Flags) (result Value) {
-	state.concrete = true
+func (c *OpContext) value(x Expr, state combinedFlags) (result Value) {
 	v := c.evalState(x, state)
 
 	v, _ = c.getDefault(v)
@@ -657,12 +676,12 @@ func (c *OpContext) value(x Expr, state Flags) (result Value) {
 	return v
 }
 
-func (c *OpContext) evalState(v Expr, state Flags) (result Value) {
+func (c *OpContext) evalState(v Expr, state combinedFlags) (result Value) {
 	result, _ = c.evalStateCI(v, state)
 	return result
 }
 
-func (c *OpContext) evalStateCI(v Expr, state Flags) (result Value, ci CloseInfo) {
+func (c *OpContext) evalStateCI(v Expr, state combinedFlags) (result Value, ci CloseInfo) {
 	savedSrc := c.src
 	c.src = v.Source()
 	err := c.errs
@@ -679,7 +698,10 @@ func (c *OpContext) evalStateCI(v Expr, state Flags) (result Value, ci CloseInfo
 				switch b.Code {
 				case IncompleteError:
 				case CycleError:
-					break
+					if state.status == partial || c.isDevVersion() {
+						break
+					}
+					fallthrough
 				default:
 					result = b
 				}
@@ -709,11 +731,6 @@ func (c *OpContext) evalStateCI(v Expr, state Flags) (result Value, ci CloseInfo
 	case Value:
 		return x, c.ci
 
-	case *OpenExpr:
-		v, ci := c.evalStateCI(x.X, state)
-		ci.Opened = true
-		return v, ci
-
 	case Evaluator:
 		v := x.evaluate(c, state)
 		return v, c.ci
@@ -729,7 +746,7 @@ func (c *OpContext) evalStateCI(v Expr, state Flags) (result Value, ci CloseInfo
 		// TODO(3977): register internal nodes for later verifications. The
 		// following limits the possibility of some common and useful cycles.
 		//
-		// if arc.Internal() {
+		// if arc.Internal() && c.isDevVersion() {
 		//  mode := state.conditions()
 		//  state = final(partial, mode|allTasksCompleted)
 		// }
@@ -743,60 +760,69 @@ func (c *OpContext) evalStateCI(v Expr, state Flags) (result Value, ci CloseInfo
 		// TODO: is this indirect necessary?
 		// arc = arc.Indirect()
 
-		if n := arc.getState(c); n != nil {
-			c.ci, _ = n.detectCycleV3(arc, nil, x, c.ci)
+		if c.isDevVersion() {
+			if n := arc.getState(c); n != nil {
+				c.ci, _ = n.detectCycleV3(arc, nil, x, c.ci)
+			}
+		} else {
+			if n := arc.state; n != nil {
+				c.ci, _ = n.markCycle(arc, nil, x, c.ci)
+			}
 		}
 
-		if s := arc.getState(c); s != nil {
-			defer s.retainProcess().releaseProcess()
+		if !c.isDevVersion() {
+			c.ci.Inline = true
+		}
 
-			origNeeds := state.condition
-			needs := origNeeds | arcTypeKnown
-			runMode := state.mode
+		if c.isDevVersion() {
+			if s := arc.getState(c); s != nil {
+				defer s.retainProcess().releaseProcess()
 
-			switch runMode {
-			case finalize:
-				arc.unify(c, Flags{condition: needs, mode: attemptOnly, checkTypos: true}) // to set scalar
-				s.freeze(needs)
-			case attemptOnly:
-				arc.unify(c, Flags{condition: needs, mode: attemptOnly, checkTypos: true}) // to set scalar
+				origNeeds := state.condition
+				needs := origNeeds | arcTypeKnown
+				runMode := state.mode
 
-			case yield:
-				arc.unify(c, Flags{condition: needs, mode: runMode, checkTypos: true}) // to set scalar
+				switch runMode {
+				case finalize:
+					arc.unify(c, needs, attemptOnly, true) // to set scalar
+					s.freeze(needs)
+				case attemptOnly:
+					arc.unify(c, needs, attemptOnly, true) // to set scalar
 
-				evaluating := arc.status == evaluating
-				if state.concrete && orig != arc && orig.state != nil && orig.state.meets(scalarKnown) && IsRecursivelyConcrete(arc) {
-					evaluating = false
-				}
+				case yield:
+					arc.unify(c, needs, runMode, true) // to set scalar
 
-				// We cannot resolve a value that represents an unresolved
-				// disjunction.
-				if evaluating && orig != arc && arc.IsDisjunct {
-					task := c.current()
-					if origNeeds == scalarKnown && !orig.state.meets(scalarKnown) {
-						orig.state.defaultAttemptInCycle = task.node.node
-						task.waitFor(&orig.state.scheduler, needs)
-						s.yield()
-						panic("unreachable")
+					evaluating := arc.status == evaluating
+
+					// We cannot resolve a value that represents an unresolved
+					// disjunction.
+					if evaluating && orig != arc && arc.IsDisjunct {
+						task := c.current()
+						if origNeeds == scalarKnown && !orig.state.meets(scalarKnown) {
+							orig.state.defaultAttemptInCycle = task.node.node
+							task.waitFor(&orig.state.scheduler, needs)
+							s.yield()
+							panic("unreachable")
+						}
+						err := c.Newf("unresolved disjunction: %v", x)
+						b := &Bottom{Code: CycleError, Err: err}
+						return b, c.ci
 					}
-					err := c.Newf("unresolved disjunction: %v", x)
-					b := &Bottom{Code: CycleError, Err: err}
-					return b, c.ci
+
+					hasCycleBreakingValue := s.hasFieldValue ||
+						!isCyclePlaceholder(arc.BaseValue)
+
+					if evaluating && !hasCycleBreakingValue {
+						err := c.Newf("cycle with field: %v", x)
+						b := &Bottom{Code: CycleError, Err: err}
+						c.AddBottom(b)
+						break
+					}
+
+					v := c.evaluate(arc, x, state)
+
+					return v, c.ci
 				}
-
-				hasCycleBreakingValue := s.hasFieldValue ||
-					!isCyclePlaceholder(arc.BaseValue)
-
-				if evaluating && !hasCycleBreakingValue {
-					err := c.Newf("cycle with field: %v", x)
-					b := &Bottom{Code: CycleError, Err: err}
-					c.AddBottom(b)
-					break
-				}
-
-				v := c.evaluate(arc, x, state)
-
-				return v, c.ci
 			}
 		}
 		arc = arc.DerefValue()
@@ -826,7 +852,7 @@ func (c *OpContext) wrapCycleError(src ast.Node, b *Bottom) *Bottom {
 // unifyNode returns a possibly partially evaluated node value.
 //
 // TODO: maybe return *Vertex, *Bottom
-func (c *OpContext) unifyNode(expr Expr, state Flags) (result Value) {
+func (c *OpContext) unifyNode(expr Expr, state combinedFlags) (result Value) {
 	savedSrc := c.src
 	c.src = expr.Source()
 	err := c.errs
@@ -889,35 +915,187 @@ func (c *OpContext) unifyNode(expr Expr, state Flags) (result Value) {
 	// TODO: is this indirect necessary?
 	// v = v.Indirect()
 
-	if n := v.getState(c); n != nil {
-		defer n.retainProcess().releaseProcess()
+	if c.isDevVersion() {
+		if n := v.getState(c); n != nil {
+			defer n.retainProcess().releaseProcess()
 
-		// A lookup counts as new structure. See the commend in Section
-		// "Lookups in inline cycles" in cycle.go.
-		if !c.ci.IsCyclic || v.Label.IsLet() {
-			// TODO: fix! Setting this when we are not structure sharing can
-			// cause some hangs. We are conservative and not set this in
-			// this case, with the potential that some configurations will
-			// break. It is probably related to let.
-			n.hasNonCycle = true
+			// A lookup counts as new structure. See the commend in Section
+			// "Lookups in inline cycles" in cycle.go.
+			if !c.ci.IsCyclic || v.Label.IsLet() {
+				// TODO: fix! Setting this when we are not structure sharing can
+				// cause some hangs. We are conservative and not set this in
+				// this case, with the potential that some configurations will
+				// break. It is probably related to let.
+				n.hasNonCycle = true
+			}
+
+			// Always yield to not get spurious errors.
+			n.process(arcTypeKnown, yield)
+			// It is possible that the node is only midway through
+			// evaluating a disjunction. In this case, we want to ensure
+			// that disjunctions are finalized, so that disjunction shows
+			// up in BaseValue.
+			if len(n.disjuncts) > 0 {
+				n.node.unify(c, arcTypeKnown, yield, false)
+			}
 		}
-
-		// Always yield to not get spurious errors.
-		n.process(arcTypeKnown, yield)
-		// It is possible that the node is only midway through
-		// evaluating a disjunction. In this case, we want to ensure
-		// that disjunctions are finalized, so that disjunction shows
-		// up in BaseValue.
-		if len(n.disjuncts) > 0 {
-			n.node.unify(c, Flags{condition: arcTypeKnown, mode: yield, checkTypos: false})
+	} else {
+		if v.isUndefined() || state.status > v.Status() {
+			c.unify(v, state)
 		}
 	}
 
 	return v
 }
 
-func (c *OpContext) lookup(x *Vertex, pos token.Pos, l Feature, flags Flags) *Vertex {
-	return x.lookup(c, pos, l, flags)
+func (c *OpContext) lookup(x *Vertex, pos token.Pos, l Feature, flags combinedFlags) *Vertex {
+	if c.isDevVersion() {
+		return x.lookup(c, pos, l, flags)
+	}
+
+	state := flags.status
+
+	if l == InvalidLabel || x == nil {
+		// TODO: is it possible to have an invalid label here? Maybe through the
+		// API?
+		return &Vertex{}
+	}
+
+	// var kind Kind
+	// if x.BaseValue != nil {
+	// 	kind = x.BaseValue.Kind()
+	// }
+
+	switch x.BaseValue.(type) {
+	case *StructMarker:
+		if l.Typ() == IntLabel {
+			c.addErrf(0, pos, "invalid struct selector %v (type int)", l)
+			return nil
+		}
+
+	case *ListMarker:
+		switch {
+		case l.Typ() == IntLabel:
+			switch {
+			case l.Index() < 0:
+				c.addErrf(0, pos, "invalid list index %v (index must be non-negative)", l)
+				return nil
+			case l.Index() > len(x.Arcs):
+				c.addErrf(0, pos, "invalid list index %v (out of bounds)", l)
+				return nil
+			}
+
+		case l.IsDef(), l.IsHidden(), l.IsLet():
+
+		default:
+			c.addErrf(0, pos, "invalid list index %v (type string)", l)
+			return nil
+		}
+
+	case nil:
+		// c.addErrf(IncompleteError, pos, "incomplete value %s", x)
+		// return nil
+
+	case *Bottom:
+
+	default:
+		kind := x.BaseValue.Kind()
+		if kind&(ListKind|StructKind) != 0 {
+			// c.addErrf(IncompleteError, pos,
+			// 	"cannot look up %s in incomplete type %s (type %s)",
+			// 	l, x.Source(), kind)
+			// return nil
+		} else if !l.IsDef() && !l.IsHidden() && !l.IsLet() {
+			c.addErrf(0, pos,
+				"invalid selector %v for value of type %s", l, kind)
+			return nil
+		}
+	}
+
+	a := x.Lookup(l)
+
+	var hasCycle bool
+
+	if a != nil {
+		// Ensure that a's status is at least of the required level. Otherwise,
+		// ensure that any remaining unprocessed conjuncts are processed by
+		// calling c.Unify(a, Partial). The ensures that need to rely on
+		// hasAllConjuncts, but that are finalized too early, get conjuncts
+		// processed beforehand.
+		if state > a.status {
+			c.unify(a, combinedFlags{
+				status: state,
+			})
+		} else if a.state != nil {
+			c.unify(a, combinedFlags{
+				status: partial,
+			})
+		}
+
+		// TODO(refRequired): see comment in unify.go:Vertex.lookup near the
+		// namesake TODO.
+		if a.ArcType == ArcOptional {
+			code := IncompleteError
+			if hasCycle {
+				code = CycleError
+			}
+			label := l.SelectorString(c.Runtime)
+			c.AddBottom(&Bottom{
+				Code:      code,
+				Permanent: x.status >= conjuncts,
+				Err: c.NewPosf(pos,
+					"cannot reference optional field: %s", label),
+				Node: x,
+			})
+		}
+	} else {
+		if x.state != nil {
+			x.state.assertInitialized()
+
+			for _, e := range x.state.exprs {
+				if isCyclePlaceholder(e.err) {
+					hasCycle = true
+				}
+			}
+		}
+		code := IncompleteError
+		// As long as we have incomplete information, we cannot mark the
+		// inability to look up a field as "final", as it may resolve down the
+		// line.
+		permanent := x.status >= conjuncts
+		if m, _ := x.BaseValue.(*ListMarker); m != nil && !m.IsOpen {
+			permanent = true
+		}
+		if (state > partial || permanent) && !x.Accept(c, l) {
+			code = 0
+		} else if hasCycle {
+			code = CycleError
+		}
+		// TODO: if the struct was a literal struct, we can also treat it as
+		// closed and make this a permanent error.
+		label := l.SelectorString(c.Runtime)
+
+		// TODO(errors): add path reference and make message
+		//       "undefined field %s in %s"
+		var err *ValueError
+		switch {
+		case isCyclePlaceholder(x.BaseValue):
+			err = c.NewPosf(pos, "cycle error referencing %s", label)
+			permanent = false
+		case l.IsInt():
+			err = c.NewPosf(pos, "index out of range [%d] with length %d",
+				l.Index(), len(x.Elems()))
+		default:
+			err = c.NewPosf(pos, "undefined field: %s", label)
+		}
+		c.AddBottom(&Bottom{
+			Code:      code,
+			Permanent: permanent,
+			Err:       err,
+			Node:      x,
+		})
+	}
+	return a
 }
 
 func (c *OpContext) undefinedFieldError(v *Vertex, code ErrorCode) {
@@ -966,7 +1144,7 @@ func pos(x Node) token.Pos {
 }
 
 // node is called by SelectorExpr.resolve and IndexExpr.resolve.
-func (c *OpContext) node(orig Node, x Expr, scalar bool, state Flags) *Vertex {
+func (c *OpContext) node(orig Node, x Expr, scalar bool, state combinedFlags) *Vertex {
 	// Do not treat inline structs as closed by default if within a schema.
 	// See comment at top of scheduleVertexConjuncts.
 	if _, ok := x.(Resolver); !ok {
@@ -1022,7 +1200,7 @@ func (c *OpContext) node(orig Node, x Expr, scalar bool, state Flags) *Vertex {
 		// while traversing values. Not evaluating the node here could lead
 		// to a lookup in an unevaluated node, resulting in erroneously failing
 		// lookups.
-		if nv.nonRooted {
+		if c.isDevVersion() && nv.nonRooted {
 			nv.CompleteArcsOnly(c)
 		}
 	default:
@@ -1043,14 +1221,14 @@ func (c *OpContext) node(orig Node, x Expr, scalar bool, state Flags) *Vertex {
 }
 
 // Elems returns the evaluated elements of a list.
-func (c *OpContext) Elems(v Value) iter.Seq[*Vertex] {
+func (c *OpContext) Elems(v Value) []*Vertex {
 	list := c.list(v)
 	list.Finalize(c)
 	return list.Elems()
 }
 
 // RawElems returns the elements of the list without evaluating them.
-func (c *OpContext) RawElems(v Value) iter.Seq[*Vertex] {
+func (c *OpContext) RawElems(v Value) []*Vertex {
 	list := c.list(v)
 	return list.Elems()
 }
@@ -1067,6 +1245,16 @@ func (c *OpContext) list(v Value) *Vertex {
 		return emptyNode
 	}
 	return x
+}
+
+func (c *OpContext) scalar(v Value) Value {
+	v = Unwrap(v)
+	switch v.(type) {
+	case *Null, *Bool, *Num, *String, *Bytes:
+	default:
+		c.typeError(v, ScalarKinds)
+	}
+	return v
 }
 
 var zero = &Num{K: NumberKind}
@@ -1292,25 +1480,9 @@ func (c *OpContext) newBytes(b []byte) Value {
 	return &Bytes{Src: c.src, B: b}
 }
 
-var (
-	boolFalseNoSrc = &Bool{B: false}
-	boolTrueNoSrc  = &Bool{B: true}
-)
-
 func (c *OpContext) newBool(b bool) Value {
 	if c.HasErr() {
 		return c.Err()
-	}
-	// Creating boolean values is a very common operation,
-	// such as when evaluating unary and binary operators.
-	// A significant portion of the time, no source is attached
-	// to the operation, so we can reuse Bool allocations.
-	if c.src == nil {
-		if b {
-			return boolTrueNoSrc
-		} else {
-			return boolFalseNoSrc
-		}
 	}
 	return &Bool{Src: c.src, B: b}
 }
@@ -1328,31 +1500,15 @@ func (c *OpContext) String(x Node) string {
 	return c.Format(c.Runtime, x)
 }
 
-// Formatter wraps an adt.Node with the necessary information to print it.
-//
-// TODO: we could eliminate the need for this by ensuring that errors are
-// _always_ formatted with a printer. We are not far off from this goal, but
-// we need to verify several things.
-// This is mainly possible because we intend to have a global string index
-// using weak references. It also assumes that errors are always printed
-// equally.
-type Formatter struct {
-	X Node
+type stringerFunc func() string
 
-	// F formats Node, resolving references as needed.using Runtime.
-	// TODO: only used for cases where the debug printer is somehow
-	// circumvented. Verify this no longer happens.
-	F func(Runtime, Node) string
-
-	// TODO: is runtime needed? Probably not if we have a global string index.
-	R Runtime
-}
-
-func (f Formatter) String() string { return f.F(f.R, f.X) }
+func (f stringerFunc) String() string { return f() }
 
 // Str reports a string of x via a [fmt.Stringer], for use in errors or debugging.
 func (c *OpContext) Str(x Node) fmt.Stringer {
-	return Formatter{X: x, F: c.Format, R: c.Runtime}
+	return stringerFunc(func() string {
+		return c.String(x)
+	})
 }
 
 // NewList returns a new list for the given values.

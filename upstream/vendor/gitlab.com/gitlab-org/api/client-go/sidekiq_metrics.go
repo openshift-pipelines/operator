@@ -44,16 +44,10 @@ var _ SidekiqServiceInterface = (*SidekiqService)(nil)
 // GitLab API docs:
 // https://docs.gitlab.com/api/sidekiq_metrics/#get-the-current-queue-metrics
 type QueueMetrics struct {
-	Queues map[string]QueueMetricsQueue `json:"queues"`
-}
-
-// QueueMetricsQueue represents the GitLab sidekiq queue metrics queue.
-//
-// GitLab API docs:
-// https://docs.gitlab.com/api/sidekiq_metrics/#get-the-current-queue-metrics
-type QueueMetricsQueue struct {
-	Backlog int64 `json:"backlog"`
-	Latency int64 `json:"latency"`
+	Queues map[string]struct {
+		Backlog int `json:"backlog"`
+		Latency int `json:"latency"`
+	} `json:"queues"`
 }
 
 // GetQueueMetrics lists information about all the registered queues,
@@ -81,22 +75,16 @@ func (s *SidekiqService) GetQueueMetrics(options ...RequestOptionFunc) (*QueueMe
 // GitLab API docs:
 // https://docs.gitlab.com/api/sidekiq_metrics/#get-the-current-process-metrics
 type ProcessMetrics struct {
-	Processes []ProcessMetricsProcess `json:"processes"`
-}
-
-// ProcessMetricsProcess represents the GitLab sidekiq process metrics process.
-//
-// GitLab API docs:
-// https://docs.gitlab.com/api/sidekiq_metrics/#get-the-current-process-metrics
-type ProcessMetricsProcess struct {
-	Hostname    string     `json:"hostname"`
-	Pid         int64      `json:"pid"`
-	Tag         string     `json:"tag"`
-	StartedAt   *time.Time `json:"started_at"`
-	Queues      []string   `json:"queues"`
-	Labels      []string   `json:"labels"`
-	Concurrency int64      `json:"concurrency"`
-	Busy        int64      `json:"busy"`
+	Processes []struct {
+		Hostname    string     `json:"hostname"`
+		Pid         int        `json:"pid"`
+		Tag         string     `json:"tag"`
+		StartedAt   *time.Time `json:"started_at"`
+		Queues      []string   `json:"queues"`
+		Labels      []string   `json:"labels"`
+		Concurrency int        `json:"concurrency"`
+		Busy        int        `json:"busy"`
+	} `json:"processes"`
 }
 
 // GetProcessMetrics lists information about all the Sidekiq workers registered
@@ -124,17 +112,11 @@ func (s *SidekiqService) GetProcessMetrics(options ...RequestOptionFunc) (*Proce
 // GitLab API docs:
 // https://docs.gitlab.com/api/sidekiq_metrics/#get-the-current-job-statistics
 type JobStats struct {
-	Jobs JobStatsJobs `json:"jobs"`
-}
-
-// JobStatsJobs represents the GitLab sidekiq job stats jobs.
-//
-// GitLab API docs:
-// https://docs.gitlab.com/api/sidekiq_metrics/#get-the-current-job-statistics
-type JobStatsJobs struct {
-	Processed int64 `json:"processed"`
-	Failed    int64 `json:"failed"`
-	Enqueued  int64 `json:"enqueued"`
+	Jobs struct {
+		Processed int `json:"processed"`
+		Failed    int `json:"failed"`
+		Enqueued  int `json:"enqueued"`
+	} `json:"jobs"`
 }
 
 // GetJobStats list information about the jobs that Sidekiq has performed.

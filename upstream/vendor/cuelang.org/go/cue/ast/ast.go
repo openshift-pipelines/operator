@@ -18,7 +18,6 @@ package ast
 
 import (
 	"fmt"
-	"iter"
 	"strings"
 
 	"cuelang.org/go/cue/literal"
@@ -148,6 +147,9 @@ func (c *comments) Comments() []*CommentGroup {
 	return *c.groups
 }
 
+// // AddComment adds the given comments to the fields.
+// // If line is true the comment is inserted at the preceding token.
+
 func (c *comments) AddComment(cg *CommentGroup) {
 	if cg == nil {
 		return
@@ -167,13 +169,6 @@ func (c *comments) AddComment(cg *CommentGroup) {
 
 func (c *comments) SetComments(cgs []*CommentGroup) {
 	if c.groups == nil {
-		if cgs == nil {
-			// Replacing no comments with a nil slice is a no-op.
-			// Avoid allocating below.
-			// Note that we continue for other zero-length slices,
-			// as the caller may want to reuse memory.
-			return
-		}
 		a := cgs
 		c.groups = &a
 		return
@@ -255,10 +250,10 @@ func (g *CommentGroup) Text() string {
 		}
 
 		// Split on newlines.
-		cl := strings.SplitSeq(c, "\n")
+		cl := strings.Split(c, "\n")
 
 		// Walk lines, stripping trailing white space and adding to list.
-		for l := range cl {
+		for _, l := range cl {
 			lines = append(lines, stripTrailingWhitespace(l))
 		}
 	}
@@ -306,10 +301,7 @@ func (a *Attribute) Split() (key, body string) {
 
 // A Field represents a field declaration in a struct.
 type Field struct {
-	// TODO(mvdan): remove the deprecated fields below in early 2026.
-
-	Label Label         // must have at least one element.
-	Alias *PostfixAlias // optional postfix alias (nil if no alias)
+	Label Label // must have at least one element.
 	// Deprecated: use [Field.Constraint]
 	Optional   token.Pos
 	Constraint token.Token // token.ILLEGAL, token.OPTION, or token.NOT
@@ -355,35 +347,6 @@ type Alias struct {
 func (a *Alias) Pos() token.Pos  { return a.Ident.Pos() }
 func (a *Alias) pos() *token.Pos { return a.Ident.pos() }
 func (a *Alias) End() token.Pos  { return a.Expr.End() }
-
-// A PostfixAlias represents the new postfix alias syntax using ~.
-// It appears in field declarations after the label.
-//
-// Simple form: label~X where X captures the field reference
-// Dual form: label~(K,V) where K captures the label name string and V captures the field reference
-type PostfixAlias struct {
-	Tilde token.Pos // position of "~"
-
-	// Dual form: ~(K,V)
-	Lparen token.Pos // position of "(" (invalid if simple form)
-	Label  *Ident    // K: label name capture (nil if simple form)
-	Comma  token.Pos // position of "," (invalid if simple form)
-	Rparen token.Pos // position of ")" (invalid if simple form)
-
-	// Both forms: the field reference (always non-nil)
-	Field *Ident // X or V: captures the field reference
-
-	comments
-}
-
-func (a *PostfixAlias) Pos() token.Pos  { return a.Tilde }
-func (a *PostfixAlias) pos() *token.Pos { return &a.Tilde }
-func (a *PostfixAlias) End() token.Pos {
-	if a.Rparen.IsValid() {
-		return a.Rparen.Add(1)
-	}
-	return a.Field.End()
-}
 
 // A Comprehension node represents a comprehension declaration.
 type Comprehension struct {
@@ -437,7 +400,7 @@ type Ident struct {
 	Name string
 
 	Scope Node // scope in which node was found or nil if referring directly
-	Node  Node // node referenced by this identifier, if any; see [cuelang.org/go/cue/ast/astutil.Resolve]
+	Node  Node
 
 	comments
 	label
@@ -455,21 +418,9 @@ type BasicLit struct {
 	label
 }
 
-// TODO: introduce and use NewBytes and perhaps NewText (in the
+// TODO: introduce and use NewLabel and NewBytes and perhaps NewText (in the
 // later case NewString would return a string or bytes type) to distinguish from
 // NewString. Consider how to pass indentation information.
-
-// NewStringLabel creates a new string label with the given string,
-// quoting it as a string literal only if necessary,
-// as outlined in [StringLabelNeedsQuoting].
-//
-// To create labels for definition or hidden fields, use [NewIdent].
-func NewStringLabel(name string) Label {
-	if StringLabelNeedsQuoting(name) {
-		return NewString(name)
-	}
-	return NewIdent(name)
-}
 
 // NewString creates a new BasicLit with a string value without position.
 // It quotes the given string.
@@ -780,16 +731,6 @@ type BinaryExpr struct {
 	expr
 }
 
-// A PostfixExpr node represents an expression followed by a postfix operator.
-type PostfixExpr struct {
-	X     Expr        // expression
-	Op    token.Token // postfix operator // ... or ?
-	OpPos token.Pos   // position of operator
-
-	comments
-	expr
-}
-
 // NewBinExpr creates for list of expressions of length 2 or greater a chained
 // binary expression of the form (((x1 op x2) op x3) ...). For lists of length
 // 1 it returns the expression itself. It panics for empty lists.
@@ -849,8 +790,6 @@ func (x *UnaryExpr) Pos() token.Pos     { return x.OpPos }
 func (x *UnaryExpr) pos() *token.Pos    { return &x.OpPos }
 func (x *BinaryExpr) Pos() token.Pos    { return x.X.Pos() }
 func (x *BinaryExpr) pos() *token.Pos   { return x.X.pos() }
-func (x *PostfixExpr) Pos() token.Pos   { return x.X.Pos() }
-func (x *PostfixExpr) pos() *token.Pos  { return x.X.pos() }
 func (x *BottomLit) Pos() token.Pos     { return x.Bottom }
 func (x *BottomLit) pos() *token.Pos    { return &x.Bottom }
 
@@ -885,15 +824,7 @@ func (x *SliceExpr) End() token.Pos    { return x.Rbrack.Add(1) }
 func (x *CallExpr) End() token.Pos     { return x.Rparen.Add(1) }
 func (x *UnaryExpr) End() token.Pos    { return x.X.End() }
 func (x *BinaryExpr) End() token.Pos   { return x.Y.End() }
-func (x *PostfixExpr) End() token.Pos {
-	switch x.Op {
-	case token.ELLIPSIS:
-		return x.OpPos.Add(3) // len("...")
-	default:
-		return x.OpPos.Add(1) // most single-char operators
-	}
-}
-func (x *BottomLit) End() token.Pos { return x.Bottom.Add(1) }
+func (x *BottomLit) End() token.Pos    { return x.Bottom.Add(1) }
 
 // ----------------------------------------------------------------------------
 // Convenience functions for Idents
@@ -940,6 +871,10 @@ func (s *ImportSpec) pos() *token.Pos {
 	}
 	return s.Path.pos()
 }
+
+// func (s *AliasSpec) Pos() token.Pos { return s.Name.Pos() }
+// func (s *ValueSpec) Pos() token.Pos { return s.Names[0].Pos() }
+// func (s *TypeSpec) Pos() token.Pos  { return s.Name.Pos() }
 
 func (s *ImportSpec) End() token.Pos {
 	if s.EndPos != token.NoPos {
@@ -1016,11 +951,8 @@ type File struct {
 	Filename string
 	Decls    []Decl // top-level declarations; or nil
 
-	// Deprecated: use [File.ImportSpecs].
-	// TODO(mvdan): remove in mid 2026.
-	Imports []*ImportSpec // imports in this file
-
-	Unresolved []*Ident // unresolved identifiers in this file
+	Imports    []*ImportSpec // imports in this file
+	Unresolved []*Ident      // unresolved identifiers in this file
 
 	// TODO remove this field: it's here as a temporary
 	// entity so that tests can determine which version
@@ -1052,43 +984,16 @@ outer:
 	return f.Decls[:p]
 }
 
-// VisitImports iterates through the import declarations in the file.
-//
-// Deprecated: use [File.ImportDecls].
 func (f *File) VisitImports(fn func(d *ImportDecl)) {
-	for d := range f.ImportDecls() {
-		fn(d)
-	}
-}
-
-// ImportDecls iterates through the import declarations in the file.
-func (f *File) ImportDecls() iter.Seq[*ImportDecl] {
-	return func(yield func(d *ImportDecl) bool) {
-		for _, d := range f.Decls {
-			switch x := d.(type) {
-			case *CommentGroup:
-			case *Package:
-			case *Attribute:
-			case *ImportDecl:
-				if !yield(x) {
-					return
-				}
-			default:
-				return
-			}
-		}
-	}
-}
-
-// ImportSpecs iterates through all the import specs from all the import decls in the file.
-func (f *File) ImportSpecs() iter.Seq[*ImportSpec] {
-	return func(yield func(d *ImportSpec) bool) {
-		for d := range f.ImportDecls() {
-			for _, spec := range d.Specs {
-				if !yield(spec) {
-					return
-				}
-			}
+	for _, d := range f.Decls {
+		switch x := d.(type) {
+		case *CommentGroup:
+		case *Package:
+		case *Attribute:
+		case *ImportDecl:
+			fn(x)
+		default:
+			return
 		}
 	}
 }

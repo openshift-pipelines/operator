@@ -26,11 +26,7 @@ func (v *Vertex) isInitialized() bool {
 }
 
 func (n *nodeContext) assertInitialized() {
-	if n != nil {
-		if n.node == nil {
-			// Can happen for unit tests.
-			return
-		}
+	if n != nil && n.ctx.isDevVersion() {
 		if v := n.node; !v.isInitialized() {
 			panic(fmt.Sprintf("vertex %p not initialized", v))
 		}
@@ -120,11 +116,7 @@ func (n *nodeContext) scheduleConjuncts() {
 //	func (v *Vertex) unify@(c *OpContext, needs condition, mode runMode) bool {
 //		return v.unifyC(c, needs, mode, true)
 //	}
-func (v *Vertex) unify(c *OpContext, flags Flags) bool {
-	needs := flags.condition
-	mode := flags.mode
-	checkTypos := flags.checkTypos
-
+func (v *Vertex) unify(c *OpContext, needs condition, mode runMode, checkTypos bool) bool {
 	if c.LogEval > 0 {
 		defer c.Un(c.Indentf(v, "UNIFY(%x, %v)", needs, mode))
 	}
@@ -197,7 +189,7 @@ func (v *Vertex) unify(c *OpContext, flags Flags) bool {
 	// Note that if mode is final, we will guarantee that the conditions for
 	// this if clause are met down the line. So we assume this is already the
 	// case and set the signal accordingly if so.
-	if !v.Rooted() || v.Parent.allChildConjunctsKnown(c) || mode == finalize {
+	if !v.Rooted() || v.Parent.allChildConjunctsKnown() || mode == finalize {
 		n.signal(allAncestorsProcessed)
 	}
 
@@ -240,7 +232,7 @@ func (v *Vertex) unify(c *OpContext, flags Flags) bool {
 		n.process(pendingKnown, attemptOnly)
 		if n.node.ArcType == ArcPending {
 			for _, a := range n.node.Arcs {
-				a.unify(c, Flags{condition: needs, mode: attemptOnly, checkTypos: checkTypos})
+				a.unify(c, needs, attemptOnly, checkTypos)
 			}
 		}
 		// TODO(evalv3): do we need this? Error messages are slightly better,
@@ -309,7 +301,7 @@ func (v *Vertex) unify(c *OpContext, flags Flags) bool {
 		}
 		// We unify here to proactively detect cycles. We do not need to,
 		// nor should we, if have have already found one.
-		v.unify(n.ctx, Flags{condition: needs, mode: mode, checkTypos: checkTypos})
+		v.unify(n.ctx, needs, mode, checkTypos)
 	}
 
 	// At this point, no more conjuncts will be added, so we could decrement
@@ -395,7 +387,7 @@ func (v *Vertex) unify(c *OpContext, flags Flags) bool {
 			// Ensure the shared node is processed to the requested level. This is
 			// typically needed for scalar values.
 			if w.status == unprocessed {
-				w.unify(c, Flags{condition: needs, mode: mode, checkTypos: false})
+				w.unify(c, needs, mode, false)
 			}
 
 			return n.meets(needs)
@@ -424,7 +416,7 @@ func (v *Vertex) unify(c *OpContext, flags Flags) bool {
 
 		// Ensure that shared nodes comply to the same requirements as we
 		// need for the current node.
-		w.unify(c, Flags{condition: needs, mode: mode, checkTypos: checkTypos})
+		w.unify(c, needs, mode, checkTypos)
 
 		return true
 	}
@@ -523,14 +515,7 @@ func (n *nodeContext) completeNodeTasks(mode runMode) {
 		defer n.ctx.Un(n.ctx.Indentf(n.node, "(%v)", mode))
 	}
 
-	// In attemptOnly mode, don't assert initialization to allow processing
-	// of partially initialized vertices
-	if mode != attemptOnly {
-		n.assertInitialized()
-	} else if n.node != nil && !n.node.isInitialized() {
-		// In attemptOnly mode, skip processing if vertex is not initialized
-		return
-	}
+	n.assertInitialized()
 
 	if n.isCompleting > 0 {
 		return
@@ -550,7 +535,7 @@ func (n *nodeContext) completeNodeTasks(mode runMode) {
 		}
 	}
 
-	if v.IsDynamic || v.Label.IsLet() || v.Parent.allChildConjunctsKnown(n.ctx) {
+	if v.IsDynamic || v.Label.IsLet() || v.Parent.allChildConjunctsKnown() {
 		n.signal(allAncestorsProcessed)
 	}
 
@@ -619,7 +604,7 @@ func (n *nodeContext) completeAllArcs(needs condition, mode runMode, checkTypos 
 		a := n.node.Arcs[arcPos]
 		// TODO: Consider skipping lets.
 
-		if !a.unify(n.ctx, Flags{condition: needs, mode: mode, checkTypos: checkTypos}) {
+		if !a.unify(n.ctx, needs, mode, checkTypos) {
 			success = false
 		}
 
@@ -687,7 +672,7 @@ func (n *nodeContext) completeAllArcs(needs condition, mode runMode, checkTypos 
 		ctx := n.ctx
 		f := ctx.PushState(c.env, c.expr.Source())
 
-		v := ctx.evalState(c.expr, Flags{
+		v := ctx.evalState(c.expr, combinedFlags{
 			status:    finalized,
 			condition: allKnown,
 			mode:      ignore,
@@ -782,7 +767,7 @@ func (n *nodeContext) evalArcTypes(mode runMode) {
 		if a.ArcType != ArcPending {
 			continue
 		}
-		a.unify(n.ctx, Flags{condition: arcTypeKnown, mode: mode, checkTypos: false})
+		a.unify(n.ctx, arcTypeKnown, mode, false)
 		// Ensure the arc is processed up to the desired level
 		if a.ArcType == ArcPending {
 			// TODO: cancel tasks?
@@ -798,7 +783,7 @@ func root(v *Vertex) *Vertex {
 	return v
 }
 
-func (v *Vertex) lookup(c *OpContext, pos token.Pos, f Feature, flags Flags) *Vertex {
+func (v *Vertex) lookup(c *OpContext, pos token.Pos, f Feature, flags combinedFlags) *Vertex {
 	task := c.current()
 	needs := flags.condition
 	runMode := flags.mode
@@ -891,6 +876,10 @@ func (v *Vertex) lookup(c *OpContext, pos token.Pos, f Feature, flags Flags) *Ve
 			// arcType be known at this point, but that does not seem to work.
 			// Revisit once we have the structural cycle detection in place.
 
+			// TODO: should we avoid notifying ArcPending vertices here?
+			if task != nil {
+				arcState.addNotify2(task.node.node, task.id)
+			}
 			if arc.ArcType == ArcPending {
 				return arcReturn
 			}
@@ -908,11 +897,11 @@ func (v *Vertex) lookup(c *OpContext, pos token.Pos, f Feature, flags Flags) *Ve
 			// some values to be remain unevaluated.
 			switch {
 			case needs == arcTypeKnown|fieldSetKnown:
-				arc.unify(c, Flags{condition: needs, mode: finalize, checkTypos: false})
+				arc.unify(c, needs, finalize, false)
 			default:
 				// Now we can't finalize, at least try to get as far as we
 				// can and only yield if we really have to.
-				if !arc.unify(c, Flags{condition: needs, mode: attemptOnly, checkTypos: false}) {
+				if !arc.unify(c, needs, attemptOnly, false) {
 					arcState.process(needs, yield)
 				}
 			}
@@ -923,17 +912,7 @@ func (v *Vertex) lookup(c *OpContext, pos token.Pos, f Feature, flags Flags) *Ve
 	}
 
 	switch arc.ArcType {
-	case ArcRequired:
-		label := f.SelectorString(c.Runtime)
-		b := &Bottom{
-			Code: IncompleteError,
-			Err:  c.NewPosf(pos, "required field missing: %s", label),
-			Node: v,
-		}
-		// TODO: yield failure
-		c.AddBottom(b) // TODO: unify error mechanism.
-		return arcReturn
-	case ArcMember:
+	case ArcMember, ArcRequired:
 		return arcReturn
 
 	case ArcOptional:

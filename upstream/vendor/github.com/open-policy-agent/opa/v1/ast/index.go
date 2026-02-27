@@ -213,7 +213,7 @@ func (i *baseDocEqIndex) Lookup(resolver ValueResolver) (*IndexResult, error) {
 	return result, nil
 }
 
-func (i *baseDocEqIndex) AllRules(ValueResolver) (*IndexResult, error) {
+func (i *baseDocEqIndex) AllRules(_ ValueResolver) (*IndexResult, error) {
 	tr := newTrieTraversalResult()
 
 	// Walk over the rule trie and accumulate _all_ rules
@@ -285,14 +285,14 @@ func newrefindices(isVirtual func(Ref) bool) *refindices {
 	}
 }
 
-// anyValue is a fake variable we used to put "naked ref" expressions
-// into the rule index
-var anyValue = Var("__any__")
-
 // Update attempts to update the refindices for the given expression in the
 // given rule. If the expression cannot be indexed the update does not affect
 // the indices.
 func (i *refindices) Update(rule *Rule, expr *Expr) {
+
+	if expr.Negated {
+		return
+	}
 
 	if len(expr.With) > 0 {
 		// NOTE(tsandall): In the future, we may need to consider expressions
@@ -300,36 +300,18 @@ func (i *refindices) Update(rule *Rule, expr *Expr) {
 		return
 	}
 
-	if expr.Negated {
-		// NOTE(sr): We could try to cover simple expressions, like
-		// not input.funky => input.funky == false or undefined (two refindex?)
-		return
-	}
-
 	op := expr.Operator()
-	if op == nil {
-		if ts, ok := expr.Terms.(*Term); ok {
-			// NOTE(sr): If we wanted to cover function args, we'd need to also
-			// check for type "Var" here. But since it's impossible to call a
-			// function with a undefined argument, there's no point to recording
-			// "needs to be anything" for function args
-			if ref, ok := ts.Value.(Ref); ok { // "naked ref"
-				i.updateEq(rule, ref, anyValue)
-			}
-		}
-	}
 
-	a, b := expr.Operand(0), expr.Operand(1)
 	switch {
 	case op.Equal(equalityRef):
-		i.updateEq(rule, a.Value, b.Value)
+		i.updateEq(rule, expr)
 
 	case op.Equal(equalRef) && len(expr.Operands()) == 2:
 		// NOTE(tsandall): if equal() is called with more than two arguments the
 		// output value is being captured in which case the indexer cannot
 		// exclude the rule if the equal() call would return false (because the
 		// false value must still be produced.)
-		i.updateEq(rule, a.Value, b.Value)
+		i.updateEq(rule, expr)
 
 	case op.Equal(globMatchRef) && len(expr.Operands()) == 3:
 		// NOTE(sr): Same as with equal() above -- 4 operands means the output
@@ -384,7 +366,8 @@ func (i *refindices) Mapper(rule *Rule, ref Ref) *valueMapper {
 	return nil
 }
 
-func (i *refindices) updateEq(rule *Rule, a, b Value) {
+func (i *refindices) updateEq(rule *Rule, expr *Expr) {
+	a, b := expr.Operand(0), expr.Operand(1)
 	args := rule.Head.Args
 	if idx, ok := eqOperandsToRefAndValue(i.isVirtual, args, a, b); ok {
 		i.insert(rule, idx)
@@ -443,7 +426,12 @@ func (i *refindices) updateGlobMatch(rule *Rule, expr *Expr) {
 }
 
 func (i *refindices) insert(rule *Rule, index *refindex) {
-	count, _ := i.frequency.Get(index.Ref)
+
+	count, ok := i.frequency.Get(index.Ref)
+	if !ok {
+		count = 0
+	}
+
 	i.frequency.Put(index.Ref, count+1)
 
 	for pos, other := range i.rules[rule] {
@@ -466,7 +454,7 @@ func (i *refindices) index(rule *Rule, ref Ref) *refindex {
 }
 
 type trieWalker interface {
-	Do(any) trieWalker
+	Do(x any) trieWalker
 }
 
 type trieTraversalResult struct {
@@ -828,11 +816,11 @@ func (node *trieNode) traverseUnknown(resolver ValueResolver, tr *trieTraversalR
 // for the argument number. So for `f(x, y) { x = 10; y = 12 }`, we'll
 // bind `args[0]` and `args[1]` to this rule when called for (x=10) and
 // (y=12) respectively.
-func eqOperandsToRefAndValue(isVirtual func(Ref) bool, args []*Term, a, b Value) (*refindex, bool) {
-	switch v := a.(type) {
+func eqOperandsToRefAndValue(isVirtual func(Ref) bool, args []*Term, a, b *Term) (*refindex, bool) {
+	switch v := a.Value.(type) {
 	case Var:
 		for i, arg := range args {
-			if arg.Value.Compare(a) == 0 {
+			if arg.Value.Compare(a.Value) == 0 {
 				if bval, ok := indexValue(b); ok {
 					return &refindex{Ref: Ref{FunctionArgRootDocument, InternedTerm(i)}, Value: bval}, true
 				}
@@ -855,8 +843,8 @@ func eqOperandsToRefAndValue(isVirtual func(Ref) bool, args []*Term, a, b Value)
 	return nil, false
 }
 
-func indexValue(b Value) (Value, bool) {
-	switch b := b.(type) {
+func indexValue(b *Term) (Value, bool) {
+	switch b := b.Value.(type) {
 	case Null, Boolean, Number, String, Var:
 		return b, true
 	case *Array:

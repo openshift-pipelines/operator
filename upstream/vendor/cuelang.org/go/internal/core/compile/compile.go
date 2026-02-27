@@ -219,8 +219,7 @@ func (c *compiler) lookupAlias(k int, id *ast.Ident) aliasEntry {
 	entry, ok := m[name]
 
 	if !ok {
-		err := c.errf(id,
-			"could not find let or alias associated with identifier %q", name)
+		err := c.errf(id, "could not find LetClause associated with identifier %q", name)
 		return aliasEntry{expr: err}
 	}
 
@@ -338,48 +337,29 @@ func (c *compiler) compileExpr(x ast.Expr) adt.Conjunct {
 // verifyVersion checks whether n is a Builtin and then checks whether the
 // Added version is compatible with the file version registered in c.
 func (c *compiler) verifyVersion(src ast.Node, n adt.Expr) adt.Expr {
-	var kind, name, added string
-	switch x := n.(type) {
-	default:
-		return n
-
-	case *adt.Builtin:
-		if x.Added == "" {
-			// No version check needed.
-			return n
-		}
-
-		kind = "builtin"
-		name = x.Name
-		added = x.Added
-
-	case *adt.ValueReference:
-		// NOTE: this is always self or __self.
-		kind = "predeclared identifier"
-		name = x.Src.Name
-		// Check if Self experiment is enabled
-		if !c.experiments.AliasV2 {
-			return c.errf(src, "%s %q requires @experiment(aliasv2)", kind, name)
-		}
-		x.Label = adt.MakeStringLabel(c.index, name)
+	b, ok := n.(*adt.Builtin)
+	if !ok {
 		return n
 	}
-
+	if b.Added == "" {
+		// No version check needed.
+		return n
+	}
 	v := c.experiments.LanguageVersion()
 	if v == "" {
 		// We assume "latest" if the file is not associated with a version.
 		return n
 	}
 
-	if semver.Compare(added, v) <= 0 {
+	if semver.Compare(b.Added, v) <= 0 {
 		// The feature is available in the file version.
 		return n
 	}
 
 	// The feature is not available in the file version.
 	// NonConcrete builtins are not allowed in older versions.
-	return c.errf(src, "%s %q is not available in version %v; "+
-		"it was added in version %q", kind, name, v, added)
+	return c.errf(src, "builtin %q is not available in version %v; "+
+		"it was added in version %q", b.Name, v, b.Added)
 }
 
 // resolve assumes that all existing resolutions are legal. Validation should
@@ -470,35 +450,9 @@ func (c *compiler) resolve(n *ast.Ident) adt.Expr {
 			UpCount: upCount,
 		}
 
-		switch x := n.Node.(type) {
-		case *ast.Ident:
-			// If the identifier refers to a label alias, we link to that.
-			if f.Alias != nil && f.Alias.Label == x {
-				switch lab := f.Label.(type) {
-				case *ast.Ident:
-					if internal.IsDefOrHidden(lab.Name) {
-						return c.errf(x, "label alias cannot reference definition or hidden field")
-					}
-					return c.expr(ast.NewString(lab.Name))
-				case *ast.BasicLit:
-					return c.expr(lab)
-				}
-			}
+		switch f := n.Node.(type) {
 		case *ast.Field:
-			var ident *ast.Ident
-			if alias, _ := x.Label.(*ast.Alias); alias != nil {
-				if x.Alias != nil {
-					return c.errf(x,
-						"field has both label alias and postfix alias")
-				}
-				ident = alias.Ident
-			} else if x.Alias != nil {
-				ident = x.Alias.Field
-			} else {
-				return c.errf(x, "label reference has no alias")
-			}
-
-			_ = c.lookupAlias(k, ident) // mark as used
+			_ = c.lookupAlias(k, f.Label.(*ast.Alias).Ident) // mark as used
 			// The expression of field Label is always done in the same
 			// Environment as pointed to by the UpCount of the DynamicReference
 			// and the evaluation of a DynamicReference assumes this.
@@ -511,11 +465,11 @@ func (c *compiler) resolve(n *ast.Ident) adt.Expr {
 			}
 
 		case *ast.Alias:
-			_ = c.lookupAlias(k, x.Ident) // mark as used
+			_ = c.lookupAlias(k, f.Ident) // mark as used
 			return &adt.ValueReference{
 				Src:     n,
 				UpCount: upCount,
-				Label:   c.label(x.Ident),
+				Label:   c.label(f.Ident),
 			}
 		}
 		return label
@@ -565,43 +519,26 @@ func (c *compiler) resolve(n *ast.Ident) adt.Expr {
 			X:       entry.expr, // TODO: remove usage
 		}
 
-	// Handle new-style postfix aliases: a~X or a~(K,V)
-	case *ast.Field:
-		var ident *ast.Ident
-		lab := f.Label
-		// Old-style label aliases: X=x: y, X=(x): y, X="\(x)":
+	// TODO: handle new-style aliases
 
-		if a, ok := f.Label.(*ast.Alias); ok {
-			ident = a.Ident
-			if f.Alias != nil {
-				return c.errf(f, "field has both label alias and postfix alias")
-			}
-			label, ok := a.Expr.(ast.Label)
-			if !ok {
-				return c.errf(a.Expr, "invalid label expression")
-			}
-			lab = label
-		} else if f.Alias != nil {
-			// Check if this identifier refers to the Field alias or Label alias
-			// The Field alias (X or V) is the value reference
-			// The Label alias (K) in dual form is a string reference
-			if f.Alias.Field == nil {
-				return c.errf(f, "postfix alias must have field component")
-			}
-			ident = f.Alias.Field
-		} else {
+	case *ast.Field:
+		// X=x: y
+		// X=(x): y
+		// X="\(x)": y
+		a, ok := f.Label.(*ast.Alias)
+		if !ok {
 			return c.errf(n, "illegal reference %s", n.Name)
 		}
-
-		aliasInfo := c.lookupAlias(k, ident) // marks alias as used.
-
+		aliasInfo := c.lookupAlias(k, a.Ident) // marks alias as used.
+		lab, ok := a.Expr.(ast.Label)
+		if !ok {
+			return c.errf(a.Expr, "invalid label expression")
+		}
 		name, _, err := ast.LabelName(lab)
 		switch {
 		case errors.Is(err, ast.ErrIsExpression):
 			if aliasInfo.expr == nil {
-				// This can happen when we have a cyclic reference like (x)~x: 3
-				// where the label expression references the alias being defined.
-				return c.errf(n, "cyclic reference in field alias")
+				panic("unreachable")
 			}
 			return &adt.DynamicReference{
 				Src:     n,
@@ -641,10 +578,6 @@ func (c *compiler) addDecls(st *adt.StructLit, a []ast.Decl) {
 	}
 }
 
-func isNonBlank(a *ast.Ident) bool {
-	return a != nil && a.Name != "_"
-}
-
 func (c *compiler) markAlias(d ast.Decl) {
 	switch x := d.(type) {
 	case *ast.Field:
@@ -657,15 +590,6 @@ func (c *compiler) markAlias(d ast.Decl) {
 			e := aliasEntry{source: a}
 
 			c.insertAlias(a.Ident, e)
-		}
-
-		// Register postfix aliases for regular fields (not pattern constraints)
-		// Pattern constraints register aliases in value scope only
-		// Regular field: register in parent scope
-		// Store the Field in the label so we can find it later
-		// Skip _ (blank identifier)
-		if a := x.Alias; a != nil && isNonBlank(a.Field) {
-			c.insertAlias(a.Field, aliasEntry{source: a})
 		}
 
 	case *ast.LetClause:
@@ -697,8 +621,6 @@ func (c *compiler) decl(d ast.Decl) adt.Decl {
 
 		v := x.Value
 		var value adt.Expr
-
-		// Handle value aliases. Deprecated in new aliases.
 		if a, ok := v.(*ast.Alias); ok {
 			c.pushScope(nil, 0, a)
 			c.insertAlias(a.Ident, aliasEntry{source: a})
@@ -716,10 +638,12 @@ func (c *compiler) decl(d ast.Decl) adt.Decl {
 				return c.errf(x, "cannot use _ as label")
 			}
 
+			t, _ := internal.ConstraintToken(x)
+
 			return &adt.Field{
 				Src:     x,
 				Label:   label,
-				ArcType: adt.ConstraintFromToken(x.Constraint),
+				ArcType: adt.ConstraintFromToken(t),
 				Value:   value,
 			}
 
@@ -737,12 +661,6 @@ func (c *compiler) decl(d ast.Decl) adt.Decl {
 				elem = a.Expr
 			}
 
-			// For postfix aliases, use the Field identifier (X or V)
-			// For dual form ~(K,V), we use V as the primary label
-			if a := x.Alias; a != nil && isNonBlank(a.Label) {
-				label = c.label(a.Label)
-			}
-
 			return &adt.BulkOptionalField{
 				Src:    x,
 				Filter: c.expr(elem),
@@ -751,18 +669,22 @@ func (c *compiler) decl(d ast.Decl) adt.Decl {
 			}
 
 		case *ast.ParenExpr:
+			t, _ := internal.ConstraintToken(x)
+
 			return &adt.DynamicField{
 				Src:     x,
 				Key:     c.expr(l),
-				ArcType: adt.ConstraintFromToken(x.Constraint),
+				ArcType: adt.ConstraintFromToken(t),
 				Value:   value,
 			}
 
 		case *ast.Interpolation:
+			t, _ := internal.ConstraintToken(x)
+
 			return &adt.DynamicField{
 				Src:     x,
 				Key:     c.expr(l),
-				ArcType: adt.ConstraintFromToken(x.Constraint),
+				ArcType: adt.ConstraintFromToken(t),
 				Value:   value,
 			}
 		}
@@ -791,6 +713,8 @@ func (c *compiler) decl(d ast.Decl) adt.Decl {
 			IsMulti: refsCompVar,
 			Value:   value,
 		}
+
+	// case: *ast.Alias: // TODO(value alias)
 
 	case *ast.CommentGroup:
 		// Nothing to do for a free-floating comment group.
@@ -824,31 +748,19 @@ func (c *compiler) addLetDecl(d ast.Decl) {
 	switch x := d.(type) {
 	case *ast.Field:
 		lab := x.Label
-		var ident *ast.Ident
 		if a, ok := lab.(*ast.Alias); ok {
-			if x.Alias != nil {
-				c.errf(x, "field has both label alias and postfix alias")
-				return
-			}
-
 			if lab, ok = a.Expr.(ast.Label); !ok {
 				// error reported elsewhere
 				return
 			}
-			ident = a.Ident
 
-		} else if a := x.Alias; a != nil && isNonBlank(a.Field) {
-			ident = x.Alias.Field
-		} else {
-			break
-		}
-
-		switch lab.(type) {
-		case *ast.Ident, *ast.BasicLit, *ast.ListLit:
-			// Even though we won't need the alias, we still register it
-			// for duplicate and failed reference detection.
-		default:
-			c.updateAlias(ident, c.expr(lab.(ast.Expr)))
+			switch lab.(type) {
+			case *ast.Ident, *ast.BasicLit, *ast.ListLit:
+				// Even though we won't need the alias, we still register it
+				// for duplicate and failed reference detection.
+			default:
+				c.updateAlias(a.Ident, c.expr(a.Expr))
+			}
 		}
 
 	case *ast.Alias:
@@ -958,21 +870,12 @@ func (c *compiler) labeledExpr(f ast.Decl, lab labeler, expr ast.Expr) adt.Expr 
 
 func (c *compiler) labeledExprAt(k int, f ast.Decl, lab labeler, expr ast.Expr) adt.Expr {
 	saved := c.stack[k]
-	savedStack := c.stack
 
 	c.stack[k].label = lab
 	c.stack[k].field = f
 
-	if k < len(c.stack)-1 {
-		// Limit the capacity, so that if there is growth, we don't overwrite
-		// any values we need to restore later. This shouldn't happen too often,
-		// as this will result in a non-reclaimable allocation.
-		c.stack = c.stack[: k+1 : k+1]
-	}
-
 	value := c.expr(expr)
 
-	c.stack = savedStack
 	c.stack[k] = saved
 	return value
 }
@@ -1004,7 +907,7 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 	case *ast.ListLit:
 		c.pushScope(nil, 1, n)
 		v := &adt.ListLit{Src: n}
-		elts, ellipsis := listEllipsis(n)
+		elts, ellipsis := internal.ListEllipsis(n)
 		for _, d := range elts {
 			elem := c.elem(d)
 
@@ -1170,44 +1073,17 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 			return &adt.BinaryExpr{Src: n, Op: op, X: x, Y: y} // )
 		}
 
-	case *ast.PostfixExpr:
-		switch n.Op {
-		case token.ELLIPSIS:
-			if c.experiments.ExplicitOpen {
-				return &adt.OpenExpr{
-					Src: n,
-					X:   c.expr(n.X),
-				}
-			}
-			return c.errf(n, "postfix ... operator requires @experiment(explicitopen)")
-		default:
-			return c.errf(n, "unsupported postfix operator %s", n.Op)
-		}
-
 	default:
 		return c.errf(n, "%s values not allowed in this position", ast.Name(n))
 	}
 }
 
-// listEllipsis reports the list type and remaining elements of a list. If we
-// ever relax the usage of ellipsis, this function will likely change. Using
-// this function will ensure keeping correct behavior or causing a compiler failure.
-func listEllipsis(n *ast.ListLit) (elts []ast.Expr, e *ast.Ellipsis) {
-	elts = n.Elts
-	if n := len(elts); n > 0 {
-		var ok bool
-		if e, ok = elts[n-1].(*ast.Ellipsis); ok {
-			elts = elts[:n-1]
-		}
-	}
-	return elts, e
-}
-
-func (c *compiler) assertConcreteIsPossible(src ast.Node, op adt.Op, x adt.Expr) {
+func (c *compiler) assertConcreteIsPossible(src ast.Node, op adt.Op, x adt.Expr) bool {
 	if !adt.AssertConcreteIsPossible(op, x) {
 		str := astinternal.DebugStr(src)
 		c.errf(src, "invalid operand %s ('%s' requires concrete value)", str, op)
 	}
+	return false
 }
 
 func (c *compiler) addDisjunctionElem(d *adt.DisjunctionExpr, n ast.Expr, mark bool) {

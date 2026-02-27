@@ -43,8 +43,8 @@ func (ev *EnvelopeVerifier) Verify(ctx context.Context, e *Envelope) ([]Accepted
 	// If *any* signature is found to be incorrect, it is skipped
 	var acceptedKeys []AcceptedKey
 	usedKeyids := make(map[string]string)
-	unverifiedProviders := make([]Verifier, len(ev.providers))
-	copy(unverifiedProviders, ev.providers)
+	unverified_providers := make([]Verifier, len(ev.providers))
+	copy(unverified_providers, ev.providers)
 	for _, s := range e.Signatures {
 		sig, err := b64Decode(s.Sig)
 		if err != nil {
@@ -55,7 +55,7 @@ func (ev *EnvelopeVerifier) Verify(ctx context.Context, e *Envelope) ([]Accepted
 		// If provider and signature include key IDs but do not match skip.
 		// If a provider recognizes the key, we exit
 		// the loop and use the result.
-		providers := unverifiedProviders
+		providers := unverified_providers
 		for i, v := range providers {
 			keyID, err := v.KeyID()
 
@@ -81,7 +81,7 @@ func (ev *EnvelopeVerifier) Verify(ctx context.Context, e *Envelope) ([]Accepted
 				KeyID:  keyID,
 				Sig:    s,
 			}
-			unverifiedProviders = removeIndex(providers, i)
+			unverified_providers = removeIndex(providers, i)
 
 			// See https://github.com/in-toto/in-toto/pull/251
 			if _, ok := usedKeyids[keyID]; ok {

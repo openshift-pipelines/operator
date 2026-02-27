@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/big"
 	"net/url"
 	"regexp"
 	"slices"
@@ -60,20 +61,20 @@ func InterfaceToValue(x any) (Value, error) {
 	case nil:
 		return NullValue, nil
 	case bool:
-		return InternedValue(x), nil
+		return InternedTerm(x).Value, nil
 	case json.Number:
 		if interned := InternedIntNumberTermFromString(string(x)); interned != nil {
 			return interned.Value, nil
 		}
 		return Number(x), nil
-	case int:
-		return InternedValueOr(x, newIntNumberValue), nil
 	case int64:
-		return InternedValueOr(x, newInt64NumberValue), nil
+		return int64Number(x), nil
 	case uint64:
-		return InternedValueOr(x, newUint64NumberValue), nil
+		return uint64Number(x), nil
 	case float64:
 		return floatNumber(x), nil
+	case int:
+		return intNumber(x), nil
 	case string:
 		return String(x), nil
 	case []any:
@@ -585,7 +586,10 @@ type Boolean bool
 
 // BooleanTerm creates a new Term with a Boolean value.
 func BooleanTerm(b bool) *Term {
-	return &Term{Value: internedBooleanValue(b)}
+	if b {
+		return &Term{Value: InternedTerm(true).Value}
+	}
+	return &Term{Value: InternedTerm(false).Value}
 }
 
 // Equal returns true if the other Value is a Boolean and is equal.
@@ -652,12 +656,12 @@ func NumberTerm(n json.Number) *Term {
 
 // IntNumberTerm creates a new Term with an integer Number value.
 func IntNumberTerm(i int) *Term {
-	return &Term{Value: newIntNumberValue(i)}
+	return &Term{Value: Number(strconv.Itoa(i))}
 }
 
 // UIntNumberTerm creates a new Term with an unsigned integer Number value.
 func UIntNumberTerm(u uint64) *Term {
-	return &Term{Value: newUint64NumberValue(u)}
+	return &Term{Value: uint64Number(u)}
 }
 
 // FloatNumberTerm creates a new Term with a floating point Number value.
@@ -668,10 +672,22 @@ func FloatNumberTerm(f float64) *Term {
 
 // Equal returns true if the other Value is a Number and is equal.
 func (num Number) Equal(other Value) bool {
-	if other, ok := other.(Number); ok {
-		return NumberCompare(num, other) == 0
+	switch other := other.(type) {
+	case Number:
+		if num == other {
+			return true
+		}
+		if n1, ok1 := num.Int64(); ok1 {
+			n2, ok2 := other.Int64()
+			if ok1 && ok2 {
+				return n1 == n2
+			}
+		}
+
+		return num.Compare(other) == 0
+	default:
+		return false
 	}
-	return false
 }
 
 // Compare compares num to other, return <0, 0, or >0 if it is less than, equal to,
@@ -679,7 +695,17 @@ func (num Number) Equal(other Value) bool {
 func (num Number) Compare(other Value) int {
 	// Optimize for the common case, as calling Compare allocates on heap.
 	if otherNum, yes := other.(Number); yes {
-		return NumberCompare(num, otherNum)
+		if ai, ok := num.Int64(); ok {
+			if bi, ok := otherNum.Int64(); ok {
+				if ai == bi {
+					return 0
+				}
+				if ai < bi {
+					return -1
+				}
+				return 1
+			}
+		}
 	}
 
 	return Compare(num, other)
@@ -700,10 +726,13 @@ func (num Number) Hash() int {
 			return i
 		}
 	}
-	if f, ok := num.Float64(); ok {
-		return int(f)
+	f, err := json.Number(num).Float64()
+	if err != nil {
+		bs := []byte(num)
+		h := xxhash.Sum64(bs)
+		return int(h)
 	}
-	return int(xxhash.Sum64String(string(num)))
+	return int(f)
 }
 
 // Int returns the int representation of num if possible.
@@ -744,15 +773,15 @@ func (num Number) String() string {
 	return string(num)
 }
 
-func newIntNumberValue(i int) Value {
+func intNumber(i int) Number {
 	return Number(strconv.Itoa(i))
 }
 
-func newInt64NumberValue(i int64) Value {
+func int64Number(i int64) Number {
 	return Number(strconv.FormatInt(i, 10))
 }
 
-func newUint64NumberValue(u uint64) Value {
+func uint64Number(u uint64) Number {
 	return Number(strconv.FormatUint(u, 10))
 }
 
@@ -1154,68 +1183,52 @@ func IsVarCompatibleString(s string) bool {
 	return varRegexp.MatchString(s)
 }
 
-var bbPool = &sync.Pool{
-	New: func() any {
-		return new(bytes.Buffer)
-	},
-}
-
 func (ref Ref) String() string {
-	// Note(anderseknert):
-	// Options tried in the order of cheapness, where after some effort,
-	// only the last option now requires a (single) allocation:
-	// 1. empty ref
-	// 2. single var ref
-	// 3. built-in function ref
-	// 4. concatenated parts
-	reflen := len(ref)
-	if reflen == 0 {
+	if len(ref) == 0 {
 		return ""
 	}
-	if reflen == 1 {
-		return ref[0].Value.String()
+
+	if len(ref) == 1 {
+		switch p := ref[0].Value.(type) {
+		case Var:
+			return p.String()
+		}
 	}
-	if name, ok := BuiltinNameFromRef(ref); ok {
-		return name
-	}
 
-	_var := ref[0].Value.String()
+	sb := sbPool.Get()
+	defer sbPool.Put(sb)
 
-	bb := bbPool.Get().(*bytes.Buffer)
-	bb.Reset()
-
-	defer bbPool.Put(bb)
-
-	bb.Grow(len(_var) + len(ref[1:])*7) // rough estimate
-	bb.WriteString(_var)
+	sb.Grow(10 * len(ref))
+	sb.WriteString(ref[0].Value.String())
 
 	for _, p := range ref[1:] {
 		switch p := p.Value.(type) {
 		case String:
 			str := string(p)
-			if IsVarCompatibleString(str) && !IsKeyword(str) {
-				bb.WriteByte('.')
-				bb.WriteString(str)
+			if varRegexp.MatchString(str) && !IsKeyword(str) {
+				sb.WriteByte('.')
+				sb.WriteString(str)
 			} else {
-				bb.WriteByte('[')
+				sb.WriteByte('[')
 				// Determine whether we need the full JSON-escaped form
 				if strings.ContainsFunc(str, isControlOrBackslash) {
-					bb.Write(strconv.AppendQuote(bb.AvailableBuffer(), str))
+					// only now pay the cost of expensive JSON-escaped form
+					sb.WriteString(p.String())
 				} else {
-					bb.WriteByte('"')
-					bb.WriteString(str)
-					bb.WriteByte('"')
+					sb.WriteByte('"')
+					sb.WriteString(str)
+					sb.WriteByte('"')
 				}
-				bb.WriteByte(']')
+				sb.WriteByte(']')
 			}
 		default:
-			bb.WriteByte('[')
-			bb.WriteString(p.String())
-			bb.WriteByte(']')
+			sb.WriteByte('[')
+			sb.WriteString(p.String())
+			sb.WriteByte(']')
 		}
 	}
 
-	return bb.String()
+	return sb.String()
 }
 
 // OutputVars returns a VarSet containing variables that would be bound by evaluating
@@ -1766,9 +1779,85 @@ func (s *set) Slice() []*Term {
 func (s *set) insert(x *Term, resetSortGuard bool) {
 	hash := x.Hash()
 	insertHash := hash
+	// This `equal` utility is duplicated and manually inlined a number of
+	// time in this file.  Inlining it avoids heap allocations, so it makes
+	// a big performance difference: some operations like lookup become twice
+	// as slow without it.
+	var equal func(v Value) bool
+
+	switch x := x.Value.(type) {
+	case Null, Boolean, String, Var:
+		equal = func(y Value) bool { return x == y }
+	case Number:
+		if xi, err := json.Number(x).Int64(); err == nil {
+			equal = func(y Value) bool {
+				if y, ok := y.(Number); ok {
+					if yi, err := json.Number(y).Int64(); err == nil {
+						return xi == yi
+					}
+				}
+
+				return false
+			}
+			break
+		}
+
+		// We use big.Rat for comparing big numbers.
+		// It replaces big.Float due to following reason:
+		// big.Float comes with a default precision of 64, and setting a
+		// larger precision results in more memory being allocated
+		// (regardless of the actual number we are parsing with SetString).
+		//
+		// Note: If we're so close to zero that big.Float says we are zero, do
+		// *not* big.Rat).SetString on the original string it'll potentially
+		// take very long.
+		var a *big.Rat
+		fa, ok := new(big.Float).SetString(string(x))
+		if !ok {
+			panic("illegal value")
+		}
+		if fa.IsInt() {
+			if i, _ := fa.Int64(); i == 0 {
+				a = new(big.Rat).SetInt64(0)
+			}
+		}
+		if a == nil {
+			a, ok = new(big.Rat).SetString(string(x))
+			if !ok {
+				panic("illegal value")
+			}
+		}
+
+		equal = func(b Value) bool {
+			if bNum, ok := b.(Number); ok {
+				var b *big.Rat
+				fb, ok := new(big.Float).SetString(string(bNum))
+				if !ok {
+					panic("illegal value")
+				}
+				if fb.IsInt() {
+					if i, _ := fb.Int64(); i == 0 {
+						b = new(big.Rat).SetInt64(0)
+					}
+				}
+				if b == nil {
+					b, ok = new(big.Rat).SetString(string(bNum))
+					if !ok {
+						panic("illegal value")
+					}
+				}
+
+				return a.Cmp(b) == 0
+			}
+
+			return false
+		}
+	default:
+		equal = func(y Value) bool { return Compare(x, y) == 0 }
+	}
 
 	for curr, ok := s.elems[insertHash]; ok; {
-		if KeyHashEqual(curr.Value, x.Value) {
+		if equal(curr.Value) {
 			return
 		}
 
@@ -1794,18 +1883,87 @@ func (s *set) insert(x *Term, resetSortGuard bool) {
 }
 
 func (s *set) get(x *Term) *Term {
-	if len(s.elems) == 0 {
-		return nil
+	hash := x.Hash()
+	// This `equal` utility is duplicated and manually inlined a number of
+	// time in this file.  Inlining it avoids heap allocations, so it makes
+	// a big performance difference: some operations like lookup become twice
+	// as slow without it.
+	var equal func(v Value) bool
+
+	switch x := x.Value.(type) {
+	case Null, Boolean, String, Var:
+		equal = func(y Value) bool { return x == y }
+	case Number:
+		if xi, err := json.Number(x).Int64(); err == nil {
+			equal = func(y Value) bool {
+				if y, ok := y.(Number); ok {
+					if yi, err := json.Number(y).Int64(); err == nil {
+						return xi == yi
+					}
+				}
+
+				return false
+			}
+			break
+		}
+
+		// We use big.Rat for comparing big numbers.
+		// It replaces big.Float due to following reason:
+		// big.Float comes with a default precision of 64, and setting a
+		// larger precision results in more memory being allocated
+		// (regardless of the actual number we are parsing with SetString).
+		//
+		// Note: If we're so close to zero that big.Float says we are zero, do
+		// *not* big.Rat).SetString on the original string it'll potentially
+		// take very long.
+		var a *big.Rat
+		fa, ok := new(big.Float).SetString(string(x))
+		if !ok {
+			panic("illegal value")
+		}
+		if fa.IsInt() {
+			if i, _ := fa.Int64(); i == 0 {
+				a = new(big.Rat).SetInt64(0)
+			}
+		}
+		if a == nil {
+			a, ok = new(big.Rat).SetString(string(x))
+			if !ok {
+				panic("illegal value")
+			}
+		}
+
+		equal = func(b Value) bool {
+			if bNum, ok := b.(Number); ok {
+				var b *big.Rat
+				fb, ok := new(big.Float).SetString(string(bNum))
+				if !ok {
+					panic("illegal value")
+				}
+				if fb.IsInt() {
+					if i, _ := fb.Int64(); i == 0 {
+						b = new(big.Rat).SetInt64(0)
+					}
+				}
+				if b == nil {
+					b, ok = new(big.Rat).SetString(string(bNum))
+					if !ok {
+						panic("illegal value")
+					}
+				}
+
+				return a.Cmp(b) == 0
+			}
+			return false
+
+		}
+
+	default:
+		equal = func(y Value) bool { return Compare(x, y) == 0 }
 	}
 
-	hash := x.Hash()
-
 	for curr, ok := s.elems[hash]; ok; {
-		// Pointer equality check first
-		if curr == x {
-			return curr
-		}
-		if KeyHashEqual(curr.Value, x.Value) {
+		if equal(curr.Value) {
 			return curr
 		}
 
@@ -2146,35 +2304,10 @@ func (obj *object) Insert(k, v *Term) {
 
 // Get returns the value of k in obj if k exists, otherwise nil.
 func (obj *object) Get(k *Term) *Term {
-	if len(obj.elems) == 0 {
-		return nil
-	}
-
-	hash := k.Hash()
-	for curr := obj.elems[hash]; curr != nil; curr = curr.next {
-		// Pointer equality check always fastest, and not too unlikely with interning.
-		if curr.key == k {
-			return curr.value
-		}
-
-		if KeyHashEqual(curr.key.Value, k.Value) {
-			return curr.value
-		}
+	if elem := obj.get(k); elem != nil {
+		return elem.value
 	}
 	return nil
-}
-
-func KeyHashEqual(x, y Value) bool {
-	switch x := x.(type) {
-	case Null, Boolean, String, Var:
-		return x == y
-	case Number:
-		if y, ok := y.(Number); ok {
-			return x.Equal(y)
-		}
-	}
-
-	return Compare(x, y) == 0
 }
 
 // Hash returns the hash code for the Value.
@@ -2383,7 +2516,94 @@ func (obj *object) String() string {
 	return sb.String()
 }
 
-func (*object) get(*Term) *objectElem {
+func (obj *object) get(k *Term) *objectElem {
+	hash := k.Hash()
+
+	// This `equal` utility is duplicated and manually inlined a number of
+	// time in this file.  Inlining it avoids heap allocations, so it makes
+	// a big performance difference: some operations like lookup become twice
+	// as slow without it.
+	var equal func(v Value) bool
+
+	switch x := k.Value.(type) {
+	case Null, Boolean, String, Var:
+		equal = func(y Value) bool { return x == y }
+	case Number:
+		if xi, ok := x.Int64(); ok {
+			equal = func(y Value) bool {
+				if x == y {
+					return true
+				}
+				if y, ok := y.(Number); ok {
+					if yi, ok := y.Int64(); ok {
+						return xi == yi
+					}
+				}
+
+				return false
+			}
+			break
+		}
+
+		// We use big.Rat for comparing big numbers.
+		// It replaces big.Float due to following reason:
+		// big.Float comes with a default precision of 64, and setting a
+		// larger precision results in more memory being allocated
+		// (regardless of the actual number we are parsing with SetString).
+		//
+		// Note: If we're so close to zero that big.Float says we are zero, do
+		// *not* big.Rat).SetString on the original string it'll potentially
+		// take very long.
+		var a *big.Rat
+		fa, ok := new(big.Float).SetString(string(x))
+		if !ok {
+			panic("illegal value")
+		}
+		if fa.IsInt() {
+			if i, _ := fa.Int64(); i == 0 {
+				a = new(big.Rat).SetInt64(0)
+			}
+		}
+		if a == nil {
+			a, ok = new(big.Rat).SetString(string(x))
+			if !ok {
+				panic("illegal value")
+			}
+		}
+
+		equal = func(b Value) bool {
+			if bNum, ok := b.(Number); ok {
+				var b *big.Rat
+				fb, ok := new(big.Float).SetString(string(bNum))
+				if !ok {
+					panic("illegal value")
+				}
+				if fb.IsInt() {
+					if i, _ := fb.Int64(); i == 0 {
+						b = new(big.Rat).SetInt64(0)
+					}
+				}
+				if b == nil {
+					b, ok = new(big.Rat).SetString(string(bNum))
+					if !ok {
+						panic("illegal value")
+					}
+				}
+
+				return a.Cmp(b) == 0
+			}
+
+			return false
+		}
+	default:
+		equal = func(y Value) bool { return Compare(x, y) == 0 }
+	}
+
+	for curr := obj.elems[hash]; curr != nil; curr = curr.next {
+		if equal(curr.key.Value) {
+			return curr
+		}
+	}
 	return nil
 }
 
@@ -2392,9 +2612,88 @@ func (*object) get(*Term) *objectElem {
 func (obj *object) insert(k, v *Term, resetSortGuard bool) {
 	hash := k.Hash()
 	head := obj.elems[hash]
+	// This `equal` utility is duplicated and manually inlined a number of
+	// time in this file.  Inlining it avoids heap allocations, so it makes
+	// a big performance difference: some operations like lookup become twice
+	// as slow without it.
+	var equal func(v Value) bool
+
+	switch x := k.Value.(type) {
+	case Null, Boolean, String, Var:
+		equal = func(y Value) bool { return x == y }
+	case Number:
+		if xi, err := json.Number(x).Int64(); err == nil {
+			equal = func(y Value) bool {
+				if x == y {
+					return true
+				}
+				if y, ok := y.(Number); ok {
+					if yi, err := json.Number(y).Int64(); err == nil {
+						return xi == yi
+					}
+				}
+
+				return false
+			}
+			break
+		}
+
+		// We use big.Rat for comparing big numbers.
+		// It replaces big.Float due to following reason:
+		// big.Float comes with a default precision of 64, and setting a
+		// larger precision results in more memory being allocated
+		// (regardless of the actual number we are parsing with SetString).
+		//
+		// Note: If we're so close to zero that big.Float says we are zero, do
+		// *not* big.Rat).SetString on the original string it'll potentially
+		// take very long.
+		var a *big.Rat
+		fa, ok := new(big.Float).SetString(string(x))
+		if !ok {
+			panic("illegal value")
+		}
+		if fa.IsInt() {
+			if i, _ := fa.Int64(); i == 0 {
+				a = new(big.Rat).SetInt64(0)
+			}
+		}
+		if a == nil {
+			a, ok = new(big.Rat).SetString(string(x))
+			if !ok {
+				panic("illegal value")
+			}
+		}
+
+		equal = func(b Value) bool {
+			if bNum, ok := b.(Number); ok {
+				var b *big.Rat
+				fb, ok := new(big.Float).SetString(string(bNum))
+				if !ok {
+					panic("illegal value")
+				}
+				if fb.IsInt() {
+					if i, _ := fb.Int64(); i == 0 {
+						b = new(big.Rat).SetInt64(0)
+					}
+				}
+				if b == nil {
+					b, ok = new(big.Rat).SetString(string(bNum))
+					if !ok {
+						panic("illegal value")
+					}
+				}
+
+				return a.Cmp(b) == 0
+			}
+
+			return false
+		}
+	default:
+		equal = func(y Value) bool { return Compare(x, y) == 0 }
+	}
 
 	for curr := head; curr != nil; curr = curr.next {
-		if KeyHashEqual(curr.key.Value, k.Value) {
+		if equal(curr.key.Value) {
 			if curr.value.IsGround() {
 				obj.ground--
 			}

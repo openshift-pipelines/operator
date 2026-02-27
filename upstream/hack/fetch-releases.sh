@@ -2,6 +2,9 @@
 
 set -u -e
 
+# Ensure GOTOOLCHAIN is set to auto to allow Go 1.25+ to be downloaded
+export GOTOOLCHAIN="${GOTOOLCHAIN:-auto}"
+
 declare -r SCRIPT_DIR=$(cd $(dirname "$0")/.. && pwd)
 TARGET=""
 FORCE_FETCH_RELEASE=""
@@ -159,12 +162,7 @@ release_yaml_github() {
   echo "URL to download Release YAML is : $url"
 
     ko_data=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata
-    # syncer-service uses non-prefixed directory (similar to pruner/manual-approval-gate)
-    if [[ $component == "syncer-service" ]]; then
-      comp_dir=${ko_data}/${component}
-    else
-      comp_dir=${ko_data}/tekton-${component}
-    fi
+    comp_dir=${ko_data}/${component}
     dirPath=${comp_dir}/${dirVersion}
 
     # destination file
@@ -183,9 +181,6 @@ release_yaml_github() {
       fi
     fi
 
-    #Cleanup the Directory
-    rm -rf $comp_dir || true
-    
     # create a directory
     mkdir -p ${dirPath} || true
 
@@ -206,8 +201,7 @@ release_yaml_pac() {
     local version=$3
 
     ko_data=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata
-    comp_dir=${ko_data}/tekton-addon/pipelines-as-code
-    dirPath=${comp_dir}/${version}
+    dirPath=${ko_data}/tekton-addon/pipelines-as-code/${version}
 
     if [[ ${version} == "stable" ||  ${version} == "nightly" ]]; then
       url="https://raw.githubusercontent.com/openshift-pipelines/pipelines-as-code/${version}/release.yaml"
@@ -225,22 +219,21 @@ release_yaml_pac() {
             echo ""
             return
         fi
+     else
+         rm -rf ${dirPath} || true
+         mkdir -p ${dirPath} || true
+
+         http_response=$(curl -s -o ${dest} -w "%{http_code}" ${url})
+         echo url: ${url}
+
+         if [[ $http_response != "200" ]]; then
+             echo "Error: failed to get $comp yaml, status code: $http_response"
+             exit 1
+         fi
+
+         echo "Info: Added $comp/$fileName:$version release yaml !!"
+         echo ""
      fi
-
-     # Before adding releases, remove existing version directories (same pattern as release_yaml)
-     rm -rf ${comp_dir}/*
-     mkdir -p ${dirPath} || true
-
-     http_response=$(curl -s -o ${dest} -w "%{http_code}" ${url})
-     echo url: ${url}
-
-     if [[ $http_response != "200" ]]; then
-         echo "Error: failed to get $comp yaml, status code: $http_response"
-         exit 1
-     fi
-
-     echo "Info: Added $comp/$fileName:$version release yaml !!"
-     echo ""
 
     runtime=( go java nodejs python generic )
     for run in "${runtime[@]}"
@@ -304,6 +297,7 @@ release_yaml_manualapprovalgate() {
 
 }
 
+
 release_yaml_hub() {
   echo fetching '|' component: ${1} '|' version: ${2}
   local version=$2
@@ -311,7 +305,7 @@ release_yaml_hub() {
   ko_data=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata
   if [ ${version} == "latest" ]
   then
-    version=$(curl -sL https://api.github.com/repos/openshift-pipelines/hub/releases | jq -r ".[].tag_name" | sort -Vr | head -n1)
+    version=$(curl -sL https://api.github.com/repos/tektoncd/hub/releases | jq -r ".[].tag_name" | sort -Vr | head -n1)
     dirPath=${ko_data}/tekton-hub/0.0.0-latest
   else
     dirPath=${ko_data}/tekton-hub/${version}
@@ -342,7 +336,7 @@ release_yaml_hub() {
 
     [[ ${component} == "api" ]] || [[ ${component} == "ui" ]] && fileName=${component}-${TARGET}.yaml
 
-    url="https://github.com/openshift-pipelines/hub/releases/download/${version}/${fileName}"
+    url="https://github.com/tektoncd/hub/releases/download/${version}/${fileName}"
     echo $url
     http_response=$(curl -s -L -o ${destinationFile} -w "%{http_code}" ${url})
     echo url: ${url}
@@ -427,15 +421,6 @@ main() {
   copy_pruner_yaml
   pruner_version=$(go run ./cmd/tool component-version ${CONFIG} pruner)
   release_yaml pruner release 00-pruner ${pruner_version}
-
-  # Tekton Scheduler
-  release_yaml_github scheduler
-
-  # Tekton Multicluster Proxy AAE
-  release_yaml_github multicluster-proxy-aae
-
-  # Syncer Service
-  release_yaml_github syncer-service
 
   echo updated payload tree
   find cmd/${TARGET}/operator/kodata

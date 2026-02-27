@@ -67,7 +67,7 @@ type X509Signature struct {
 }
 
 type X509Certificate struct {
-	ID                   int64      `json:"id"`
+	ID                   int        `json:"id"`
 	Subject              string     `json:"subject"`
 	SubjectKeyIdentifier string     `json:"subject_key_identifier"`
 	Email                string     `json:"email"`
@@ -77,10 +77,10 @@ type X509Certificate struct {
 }
 
 type X509Issuer struct {
-	ID                   int64  `json:"id"`
+	ID                   int    `json:"id"`
 	Subject              string `json:"subject"`
 	SubjectKeyIdentifier string `json:"subject_key_identifier"`
-	CrlURL               string `json:"crl_url"`
+	CrlUrl               string `json:"crl_url"`
 }
 
 // ReleaseNote represents a GitLab version release.

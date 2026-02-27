@@ -31,12 +31,13 @@ func (v *visitor) dynamic(n *adt.Vertex, top bool) {
 	found := false
 	// TODO: Consider if we should only visit the conjuncts of the disjunction
 	// for dynamic mode.
-	for c := range n.LeafConjuncts() {
+	n.VisitLeafConjuncts(func(c adt.Conjunct) bool {
 		if v.marked[c.Expr()] {
 			found = true
-			break
+			return false
 		}
-	}
+		return true
+	})
 
 	if !found {
 		return
@@ -69,9 +70,10 @@ func (m marked) markExpr(x adt.Expr) {
 
 	case nil:
 	case *adt.Vertex:
-		for c := range x.LeafConjuncts() {
+		x.VisitLeafConjuncts(func(c adt.Conjunct) bool {
 			m.markExpr(c.Expr())
-		}
+			return true
+		})
 
 	case *adt.BinaryExpr:
 		if x.Op == adt.AndOp {

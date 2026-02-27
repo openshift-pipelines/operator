@@ -27,28 +27,32 @@ import (
 	"cuelang.org/go/internal/core/adt"
 )
 
-func (w *printer) compactNode(n adt.Node) {
+type compactPrinter struct {
+	printer
+}
+
+func (w *compactPrinter) string(s string) {
+	w.dst = append(w.dst, s...)
+}
+
+func (w *compactPrinter) node(n adt.Node) {
 	switch x := n.(type) {
 	case *adt.Vertex:
 		if x.BaseValue == nil || (w.cfg.Raw && !x.IsData()) {
 			i := 0
-			for c := range x.LeafConjuncts() {
+			x.VisitLeafConjuncts(func(c adt.Conjunct) bool {
 				if i > 0 {
 					w.string(" & ")
 				}
 				i++
 				w.node(c.Elem())
-			}
+				return true
+			})
 			return
 		}
 
 		switch v := x.BaseValue.(type) {
 		case *adt.StructMarker:
-			if !w.pushVertex(x) {
-				return
-			}
-			defer w.popVertex()
-
 			w.string("{")
 			for i, a := range x.Arcs {
 				if i > 0 {
@@ -76,11 +80,6 @@ func (w *printer) compactNode(n adt.Node) {
 			w.string("}")
 
 		case *adt.ListMarker:
-			if !w.pushVertex(x) {
-				return
-			}
-			defer w.popVertex()
-
 			w.string("[")
 			for i, a := range x.Arcs {
 				if i > 0 {
@@ -91,8 +90,6 @@ func (w *printer) compactNode(n adt.Node) {
 			w.string("]")
 
 		case *adt.Vertex:
-			// Disjunction, structure shared, etc.
-
 			if v, ok := w.printShared(x); !ok {
 				w.node(v)
 				w.popVertex()
@@ -165,7 +162,7 @@ func (w *printer) compactNode(n adt.Node) {
 		w.string(`_|_`)
 		if x.Err != nil {
 			w.string("(")
-			w.shortError(x.Err, false)
+			w.string(x.Err.Error())
 			w.string(")")
 		}
 
@@ -272,10 +269,6 @@ func (w *printer) compactNode(n adt.Node) {
 		w.string(" ")
 		w.node(x.Y)
 		w.string(")")
-
-	case *adt.OpenExpr:
-		w.node(x.X)
-		w.string("...")
 
 	case *adt.CallExpr:
 		w.node(x.Fun)

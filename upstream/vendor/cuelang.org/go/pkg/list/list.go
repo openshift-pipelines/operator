@@ -24,7 +24,6 @@ import (
 	"cuelang.org/go/cue/token"
 	"cuelang.org/go/internal/core/adt"
 	"cuelang.org/go/internal/core/eval"
-	"cuelang.org/go/internal/iterutil"
 	"cuelang.org/go/internal/pkg"
 	"cuelang.org/go/internal/types"
 	"cuelang.org/go/internal/value"
@@ -231,7 +230,7 @@ func Reverse(x []cue.Value) []cue.Value {
 
 // MinItems reports whether a has at least n items.
 func MinItems(list pkg.List, n int) (bool, error) {
-	count := iterutil.Count(list.Elems())
+	count := len(list.Elems())
 	if count >= n {
 		return true, nil
 	}
@@ -247,7 +246,7 @@ func MinItems(list pkg.List, n int) (bool, error) {
 
 // MaxItems reports whether a has at most n items.
 func MaxItems(list pkg.List, n int) (bool, error) {
-	count := iterutil.Count(list.Elems())
+	count := len(list.Elems())
 	if count > n {
 		return false, pkg.ValidationError{B: &adt.Bottom{
 			Code: adt.EvalError,
