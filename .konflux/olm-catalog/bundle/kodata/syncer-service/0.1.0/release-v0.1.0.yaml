@@ -1,0 +1,162 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app: workload-controller
+  name: syncer-service
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workload-controller
+  namespace: syncer-service
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: workload-controller
+rules:
+- apiGroups:
+  - kueue.x-k8s.io
+  resources:
+  - workloads
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - kueue.x-k8s.io
+  resources:
+  - workloads/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - kueue.x-k8s.io
+  resources:
+  - multikueueclusters
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - tekton.dev
+  resources:
+  - pipelineruns
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  - configmaps
+  - persistentvolumeclaims
+  - serviceaccounts
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: workload-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: workload-controller
+subjects:
+- kind: ServiceAccount
+  name: workload-controller
+  namespace: syncer-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: workload-controller
+  name: workload-controller
+  namespace: syncer-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workload-controller
+  template:
+    metadata:
+      labels:
+        app: workload-controller
+    spec:
+      containers:
+      - env:
+        - name: SYSTEM_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CONFIG_LOGGING_NAME
+          value: config-logging
+        - name: CONFIG_OBSERVABILITY_NAME
+          value: config-observability
+        - name: METRICS_DOMAIN
+          value: kueue.x-k8s.io/secret-service
+        - name: KUEUE_NAMESPACE
+          value: kueue-system
+        image: quay.io/openshift-pipeline/syncer-service-rhel9@sha256:e3ccea802b3c46ccbe00f39ada77d41950ee19b0fcc769191f3eb161d6b733f5
+        imagePullPolicy: Always
+        name: controller
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65532
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: workload-controller

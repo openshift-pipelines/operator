@@ -50,10 +50,12 @@ func Sanitize(f *ast.File) error {
 	}
 
 	// Gather all names.
+	stack := make([]*scope, 0, 8)
 	s := &scope{
-		errFn:   z.errf,
-		nameFn:  z.addName,
-		identFn: z.markUsed,
+		errFn:      z.errf,
+		nameFn:     z.addName,
+		identFn:    z.markUsed,
+		scopeStack: &stack,
 	}
 	ast.Walk(f, s.Before, nil)
 	if z.errs != nil {
@@ -61,11 +63,13 @@ func Sanitize(f *ast.File) error {
 	}
 
 	// Add imports and unshadow.
+	stack = stack[:0]
 	s = &scope{
-		file:    f,
-		errFn:   z.errf,
-		identFn: z.handleIdent,
-		index:   make(map[string]entry),
+		file:       f,
+		errFn:      z.errf,
+		identFn:    z.handleIdent,
+		index:      make(map[string]entry),
+		scopeStack: &stack,
 	}
 	z.fileScope = s
 	ast.Walk(f, s.Before, nil)
@@ -170,7 +174,7 @@ func (z *sanitizer) markUsed(s *scope, n *ast.Ident) bool {
 
 func (z *sanitizer) cleanImports() {
 	var fileImports []*ast.ImportSpec
-	z.file.VisitImports(func(decl *ast.ImportDecl) {
+	for decl := range z.file.ImportDecls() {
 		newLen := 0
 		for _, spec := range decl.Specs {
 			if _, ok := z.referenced[spec]; ok {
@@ -180,18 +184,15 @@ func (z *sanitizer) cleanImports() {
 			}
 		}
 		decl.Specs = decl.Specs[:newLen]
-	})
+	}
 	z.file.Imports = fileImports
 	// Ensure that the first import always starts a new section
 	// so that if the file has a comment, it won't be associated with
 	// the import comment rather than the file.
-	first := true
-	z.file.VisitImports(func(decl *ast.ImportDecl) {
-		if first {
-			ast.SetRelPos(decl, token.NewSection)
-			first = false
-		}
-	})
+	for decl := range z.file.ImportDecls() {
+		ast.SetRelPos(decl, token.NewSection)
+		break
+	}
 }
 
 func (z *sanitizer) handleIdent(s *scope, n *ast.Ident) bool {
@@ -212,7 +213,7 @@ func (z *sanitizer) handleIdent(s *scope, n *ast.Ident) bool {
 
 		_ = z.addImport(spec)
 		info, _ := ParseImportSpec(spec)
-		z.fileScope.insert(info.Ident, spec, spec)
+		z.fileScope.insert(info.Ident, spec, spec, nil)
 		return true
 	}
 
@@ -242,7 +243,7 @@ func (z *sanitizer) handleIdent(s *scope, n *ast.Ident) bool {
 				Path: x.Path,
 			})
 			z.importMap[xi.ID] = spec
-			z.fileScope.insert(name, spec, spec)
+			z.fileScope.insert(name, spec, spec, nil)
 		}
 
 		info, _ := ParseImportSpec(spec)

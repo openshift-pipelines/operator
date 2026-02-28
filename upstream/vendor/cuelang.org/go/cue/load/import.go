@@ -64,10 +64,8 @@ func (l *loader) importPkg(pos token.Pos, p *build.Instance) []*build.Instance {
 		return []*build.Instance{p}
 	}
 
-	for _, item := range l.stk {
-		if item == p.ImportPath {
-			return retErr(&PackageError{Message: errors.NewMessagef("package import cycle not allowed")})
-		}
+	if slices.Contains(l.stk, p.ImportPath) {
+		return retErr(&PackageError{Message: errors.NewMessagef("package import cycle not allowed")})
 	}
 	l.stk.Push(p.ImportPath)
 	defer l.stk.Pop()
@@ -390,12 +388,17 @@ func importPathFromAbsDir(c *Config, absDir string, origPath string) (importPath
 		return "", fmt.Errorf("cannot determine import path for %q (root undefined)", origPath)
 	}
 
-	dir := filepath.Clean(absDir)
-	if !strings.HasPrefix(dir, c.ModuleRoot) {
+	subdir, ok := strings.CutPrefix(filepath.Clean(absDir), c.ModuleRoot)
+	if !ok {
 		return "", fmt.Errorf("cannot determine import path for %q (dir outside of root)", origPath)
 	}
 
-	pkg := filepath.ToSlash(dir[len(c.ModuleRoot):])
+	pkg := filepath.ToSlash(subdir)
+	if pkg != "" && !strings.HasPrefix(pkg, "/") {
+		// [Config.ModuleRoot] was the root of the filesystem,
+		// and it had a trailing slash which got removed as a prefix; add it back.
+		pkg = "/" + pkg
+	}
 	switch {
 	case strings.HasPrefix(pkg, "/cue.mod/"):
 		pkg = pkg[len("/cue.mod/"):]

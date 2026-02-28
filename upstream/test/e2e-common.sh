@@ -41,7 +41,7 @@ function install_operator_resources() {
 
   echo ">> Deploying Tekton Operator Resources"
 
-  # Ensure GOTOOLCHAIN is set to auto before running make
+  # Allow Go to automatically download the required toolchain version from go.mod
   export GOTOOLCHAIN=auto
   make KO_BIN=$(which ko) KUSTOMIZE_BIN=$(which kustomize) TARGET=${TARGET:-kubernetes} apply || fail_test "Tekton Operator installation failed"
 
