@@ -18,8 +18,8 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue/errors"
-	"cuelang.org/go/internal"
 	"cuelang.org/go/internal/core/adt"
+	"cuelang.org/go/internal/iterutil"
 )
 
 // This file contains predeclared builtins.
@@ -92,13 +92,12 @@ var lenBuiltin = &adt.Builtin{
 
 		v := args[0]
 		if x, ok := v.(*adt.Vertex); ok {
-			x.LockArcs = true
 			switch x.BaseValue.(type) {
 			case nil:
 				// This should not happen, but be defensive.
 				return c.NewErrf("unevaluated vertex")
 			case *adt.ListMarker:
-				return c.NewInt64(int64(len(x.Elems())), v)
+				return c.NewInt64(int64(iterutil.Count(x.Elems())), v)
 
 			case *adt.StructMarker:
 				n := 0
@@ -144,22 +143,80 @@ var closeBuiltin = &adt.Builtin{
 		if !ok {
 			return c.NewErrf("struct argument must be concrete")
 		}
-		var v *adt.Vertex
-		if c.Version == internal.DevVersion {
-			// TODO(evalv3) this is a rather convoluted and inefficient way to
-			// accomplish signaling vertex should be closed. In most cases, it
-			// would suffice to set IsClosed in the CloseInfo. However, that
-			// does not cover all code paths. Consider simplifying this.
-			v = c.Wrap(s, c.CloseInfo())
-			v.ClosedNonRecursive = true
-		} else {
-			if m, ok := s.BaseValue.(*adt.StructMarker); ok && m.NeedClose {
-				return s
-			}
-			v = s.Clone()
-			v.BaseValue = &adt.StructMarker{NeedClose: true}
-		}
+		// TODO(evalv3) this is a rather convoluted and inefficient way to
+		// accomplish signaling vertex should be closed. In most cases, it
+		// would suffice to set IsClosed in the CloseInfo. However, that
+		// does not cover all code paths. Consider simplifying this.
+		v := c.Wrap(s, c.CloseInfo())
+		v.ClosedNonRecursive = true
 		return v
+	},
+}
+
+var closeAllBuiltin = &adt.Builtin{
+	Name:   "__closeAll",
+	Params: []adt.Param{topParam},
+	Result: adt.TopKind,
+	Func: func(call *adt.CallContext) adt.Expr {
+		c := call.OpContext()
+
+		x := call.Expr(0)
+		switch x.(type) {
+		case *adt.StructLit, *adt.ListLit:
+			if src := x.Source(); src == nil || !src.Pos().Experiment().ExplicitOpen {
+				// Allow usage if explicit open is set
+				return c.NewErrf("__closeAll may only be used when explicitopen is enabled")
+			}
+		default:
+			return c.NewErrf("argument must be a struct or list literal")
+		}
+
+		// must be literal struct
+		args := call.Args()
+
+		s, ok := args[0].(*adt.Vertex)
+		if !ok {
+			return c.NewErrf("struct argument must be concrete")
+		}
+
+		s.ClosedRecursive = true
+
+		return s
+	},
+}
+
+var recloseBuiltin = &adt.Builtin{
+	Name:   "__reclose",
+	Params: []adt.Param{topParam},
+	Result: adt.TopKind,
+	Func: func(call *adt.CallContext) adt.Expr {
+		c := call.OpContext()
+
+		x := call.Expr(0)
+		switch x.(type) {
+		case *adt.StructLit, *adt.ListLit:
+			if src := x.Source(); src == nil || !src.Pos().Experiment().ExplicitOpen {
+				// Allow usage if explicit open is set
+				return c.NewErrf("__reclose may only be used when explicitopen is enabled")
+			}
+		default:
+			return c.NewErrf("argument must be a struct or list literal")
+		}
+
+		// must be literal struct
+		args := call.Args()
+
+		// Note that we could have an embedded scalar here, so having a struct
+		// or list does not guarantee that the result is that as well.
+		//
+		//	#Def: 1
+		//	a: __reclose({ #Def })
+		//
+		if s, ok := args[0].(*adt.Vertex); ok && s.ShouldRecursivelyClose() {
+			s.ClosedRecursive = true
+		}
+
+		return args[0]
 	},
 }
 
@@ -167,17 +224,17 @@ var andBuiltin = &adt.Builtin{
 	Name:   "and",
 	Params: []adt.Param{listParam},
 	Result: adt.IntKind,
-	RawFunc: func(call *adt.CallContext) adt.Value {
+	Func: func(call *adt.CallContext) adt.Expr {
 		c := call.OpContext()
-		arg := call.Arg(0)
+		args := call.Args()
 
-		list := c.RawElems(arg)
-		if len(list) == 0 {
-			return &adt.Top{}
-		}
+		seq := c.RawElems(args[0])
 		a := []adt.Value{}
-		for _, c := range list {
+		for c := range seq {
 			a = append(a, c)
+		}
+		if len(a) == 0 {
+			return &adt.Top{}
 		}
 		return &adt.Conjunction{Values: a}
 	},
@@ -193,7 +250,7 @@ var orBuiltin = &adt.Builtin{
 		args := call.Args()
 
 		d := []adt.Disjunct{}
-		for _, c := range c.RawElems(args[0]) {
+		for c := range c.RawElems(args[0]) {
 			d = append(d, adt.Disjunct{Val: c, Default: false})
 		}
 		if len(d) == 0 {
