@@ -1,12 +1,13 @@
-FROM registry.redhat.io/openshift4/ose-operator-registry-rhel9:v4.18 
+FROM registry.redhat.io/openshift4/ose-operator-registry-rhel9:v4.16
 
 ENTRYPOINT ["/bin/opm"]
 CMD ["serve", "/configs", "--cache-dir=/tmp/cache"]
 
-COPY .konflux/olm-catalog/index/v4.18/catalog/ /configs
+COPY .konflux/olm-catalog/index/v4.16/catalog/ /configs
 RUN ["/bin/opm", "serve", "/configs", "--cache-dir=/tmp/cache", "--cache-only"]
 
 # Core bundle labels.
+
 LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
 LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
