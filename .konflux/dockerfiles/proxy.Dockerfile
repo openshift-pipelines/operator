@@ -22,15 +22,15 @@ COPY head ${KO_DATA_PATH}/HEAD
 
 LABEL \
       com.redhat.component="openshift-pipelines-operator-proxy-rhel9-container" \
-      name="openshift-pipelines/pipelines-operator-proxy-rhel9" \
-      version="1.21.0" \
-      summary="Red Hat OpenShift Pipelines Operator Proxy" \
+      cpe="cpe:/a:redhat:openshift_pipelines:1.21::el9" \
+      description="Red Hat OpenShift Pipelines operator proxy" \
+      io.k8s.description="Red Hat OpenShift Pipelines operator proxy" \
+      io.k8s.display-name="Red Hat OpenShift Pipelines operator proxy" \
+      io.openshift.tags="tekton,openshift,operator,proxy" \
       maintainer="pipelines-extcomm@redhat.com" \
-      description="Red Hat OpenShift Pipelines Operator Proxy" \
-      io.k8s.display-name="Red Hat OpenShift Pipelines Operator Proxy" \
-      io.k8s.description="Red Hat OpenShift Pipelines Operator Proxy" \
-      io.openshift.tags="operator,tekton,openshift,proxy" \
-      cpe="cpe:/a:redhat:openshift_pipelines:1.21::el9"
+      name="openshift-pipelines/pipelines-operator-proxy-rhel9" \
+      summary="Red Hat OpenShift Pipelines operator proxy" \
+      version="v1.21.1"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
