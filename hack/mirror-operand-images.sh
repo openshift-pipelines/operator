@@ -5,16 +5,13 @@ TARGET_REGISTRY="quay.io/openshift-pipeline"
 LENGTH=$(yq e '.images | length' project.yaml)
 
 
-
 function ensure_mirror() {
     input=$1
 
-    SOURCE_PATTEN="quay.io/.*/(pipeline-)?(.*@sha256:.+)"
-    TARGET_PATTEN="${TARGET_REGISTRY}/pipelines-\2"
+    SOURCE_PATTEN="quay.io/.*/(.*@sha256:.+)"
+    TARGET_PATTEN="${TARGET_REGISTRY}/\1"
     output=$(echo "$input" | sed -E "s|$SOURCE_PATTEN|$TARGET_PATTEN|g")
 
-     #Update Operator Image operator-operator to operator
-     output=$(echo "$output" | sed -E "s/operator-operator-rhel9/rhel9-operator/g")
 
      if [ $output == $input ]; then
       echo -e "\e[33m Image ${input} is already in the target registry, skipping \e[0m" >&2
