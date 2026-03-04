@@ -8,7 +8,16 @@ on:
     paths:
       - nightly-bundle.yaml
       - bundle.yaml
-      - olm/
+      - olm/**
+      - .github/workflows/render-olm-catalog.yaml
+  pull_request:
+    branches:
+      - release-v*
+      - next
+    paths:
+      - nightly-bundle.yaml
+      - bundle.yaml
+      - olm/**
       - .github/workflows/render-olm-catalog.yaml
   workflow_dispatch:
     inputs:
@@ -50,6 +59,7 @@ jobs:
         run: |
           ./hack/render-catalog.sh
       - name: Commit Changes and Generate PR
+        if: github.event_name == pull_request
         run: |
           git config user.name openshift-pipelines-bot
           git config user.email pipelines-extcomm@redhat.com
