@@ -59,7 +59,7 @@ jobs:
         run: |
           ./hack/render-catalog.sh
       - name: Commit Changes and Generate PR
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'pull_request'
         run: |
           git config user.name openshift-pipelines-bot
           git config user.email pipelines-extcomm@redhat.com
