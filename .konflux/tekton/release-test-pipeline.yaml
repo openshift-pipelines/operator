@@ -290,6 +290,8 @@ spec:
             emptyDir: { }
           - name: source
             emptyDir: { }
+          - name: go-cache
+            emptyDir: { }
         stepTemplate:
           image: $(params.image)
           volumeMounts:
@@ -297,6 +299,13 @@ spec:
               mountPath: /source
             - name: credentials
               mountPath: /credentials
+            - name: go-cache
+              mountPath: /go-cache
+          env:
+            - name: GOMODCACHE
+              value: /go-cache/mod
+            - name: GOCACHE
+              value: /go-cache/build
         steps:
           - name: create-repo
             image: $(params.image)
@@ -348,6 +357,9 @@ spec:
                     name: github
                     optional: true
             script: |
+              go mod download
+              go build -p 1 ./...
+              gauge config check_updates false
               gauge run --tags="" --log-level=debug --verbose specs/konflux-olm.spec
 
           - name: run-e2e-tests
@@ -362,7 +374,7 @@ spec:
                     key: config.json
                     name: quay-io-dockerconfig
             script: |
-              
+
               export CHAINS_REPOSITORY=quay.io/openshift-pipeline/chainstest
 
               gauge run --tags="" --log-level=debug --verbose specs/pipelines/
@@ -382,6 +394,8 @@ spec:
             emptyDir: { }
           - name: source
             emptyDir: { }
+          - name: go-cache
+            emptyDir: { }
         stepTemplate:
           image: $(params.image)
           volumeMounts:
@@ -389,6 +403,13 @@ spec:
               mountPath: /source
             - name: credentials
               mountPath: /credentials
+            - name: go-cache
+              mountPath: /go-cache
+          env:
+            - name: GOMODCACHE
+              value: /go-cache/mod
+            - name: GOCACHE
+              value: /go-cache/build
         steps:
           - name: create-repo
             image: $(params.image)
@@ -440,6 +461,9 @@ spec:
                     name: github
                     optional: true
             script: |
+              go mod download
+              go build -p 1 ./...
+              gauge config check_updates false
               gauge run --tags="" --log-level=debug --verbose specs/konflux-olm.spec
 
           - name: run-e2e-tests
@@ -454,7 +478,7 @@ spec:
                     key: config.json
                     name: quay-io-dockerconfig
             script: |
-              
+
               export CHAINS_REPOSITORY=quay.io/openshift-pipeline/chainstest
               gauge run --tags="" --log-level=debug --verbose specs/metrics/
 
@@ -473,6 +497,8 @@ spec:
             emptyDir: { }
           - name: source
             emptyDir: { }
+          - name: go-cache
+            emptyDir: { }
         stepTemplate:
           image: $(params.image)
           volumeMounts:
@@ -480,6 +506,13 @@ spec:
               mountPath: /source
             - name: credentials
               mountPath: /credentials
+            - name: go-cache
+              mountPath: /go-cache
+          env:
+            - name: GOMODCACHE
+              value: /go-cache/mod
+            - name: GOCACHE
+              value: /go-cache/build
         steps:
           - name: create-repo
             image: $(params.image)
@@ -531,6 +564,9 @@ spec:
                     name: github
                     optional: true
             script: |
+              go mod download
+              go build -p 1 ./...
+              gauge config check_updates false
               gauge run --tags="" --log-level=debug --verbose specs/konflux-olm.spec
 
           - name: run-e2e-tests
@@ -545,7 +581,7 @@ spec:
                     key: config.json
                     name: quay-io-dockerconfig
             script: |
-              
+
               export CHAINS_REPOSITORY=quay.io/openshift-pipeline/chainstest
 
               gauge run --tags="" --log-level=debug --verbose specs/manualapprovalgate/     
