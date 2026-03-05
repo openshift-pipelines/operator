@@ -10,7 +10,7 @@ RUN ["/bin/opm", "serve", "/configs", "--cache-dir=/tmp/cache", "--cache-only"]
 
 LABEL \
       com.redhat.component="openshift-pipelines-index-4.18-container" \
-      cpe="cpe:/a:redhat:openshift_pipelines:next::el9" \
+      cpe="cpe:/a:redhat:openshift_pipelines:1.18::el9" \
       description="Red Hat OpenShift Pipelines operator index-4.18" \
       io.k8s.description="Red Hat OpenShift Pipelines operator index-4.18" \
       io.k8s.display-name="Red Hat OpenShift Pipelines operator index-4.18" \
@@ -27,6 +27,6 @@ LABEL \
       operators.operatorframework.io.metrics.builder="operator-sdk-v1.37.0" \
       operators.operatorframework.io.metrics.mediatype.v1="metrics+v1" \
       summary="Red Hat OpenShift Pipelines operator index-4.18" \
-      version="next"
+      version="v1.18.0"
 
 
