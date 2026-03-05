@@ -4,21 +4,22 @@ kind: PipelineRun
 metadata:
   annotations:
     pipelinesascode.tekton.dev/cancel-in-progress: "true" # Cancel in-progress pipelines
+    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/next/.tekton/docker-build-ta.yaml"
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator.git?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "next" &&
+    pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
+      == "release-v1.18.x" &&
       ((".konflux/olm-catalog/bundle/***".pathChanged()) ||
-      ".konflux/dockerfiles/bundle.Dockerfile".pathChanged() || ".tekton/*build*.yaml".pathChanged() ||
-      ".tekton/operator-next-bundle-push.yaml".pathChanged())
-  creationTimestamp: null
+      ".konflux/dockerfiles/bundle.Dockerfile".pathChanged() ||
+      ".tekton/operator-1-18-bundle-pull-request.yaml".pathChanged())
   labels:
-    appstudio.openshift.io/application: openshift-pipelines-core-next
-    appstudio.openshift.io/component: operator-next-bundle
+    appstudio.openshift.io/application: openshift-pipelines-core-1-18
+    appstudio.openshift.io/component: operator-1-18-bundle
     pipelines.appstudio.openshift.io/type: build
-  name: operator-next-bundle-on-push
+  name: operator-1-18-bundle-on-pull-request
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -29,24 +30,27 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-bundle:{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-bundle:on-pr-{{revision}}
+  - name: image-expires-after
+    value: 5d
   - name: dockerfile
     value: .konflux/dockerfiles/bundle.Dockerfile
   - name: additional-tags
     value:
-      - "next"
+      - "on-pr-v1.18.0"
   - name: build-platforms
     value:
-      - linux/x86_64
+    - linux/x86_64
   - name: build-image-index
     value: false
+  
   - name: prefetch-input
     value: |
       {"type": "rpm", "path": ".konflux/rpms"}
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-next-bundle
+    serviceAccountName: build-pipeline-operator-1-18-bundle
   workspaces:
   - name: git-auth
     secret:
