@@ -20,9 +20,25 @@
     echo "Updated bundle image: $BUNDLE_IMAGE" >&2
 
     #Update the bundle image and version in the olm config.yaml file only for 5.0.x versions
-    export BUNDLE_IMAGE BUNDLE_VERSION
-    yq -i e '(.bundles[] | select(.version | test("^5\\.0\\..*"))).image = env(BUNDLE_IMAGE)' $ROOT_DIR/olm/config.yaml
-    yq -i e '(.bundles[] | select(.version | test("^5\\.0\\..*"))).version = env(BUNDLE_VERSION)' $ROOT_DIR/olm/config.yaml
+    FILE="$ROOT_DIR/olm/config.yaml"
+    if [[ "$BUNDLE_VERSION" == *-* ]]; then
+        BASE_VERSION="${BUNDLE_VERSION%-*}"
+    else
+        BASE_VERSION="$BUNDLE_VERSION"
+    fi
+
+   export BUNDLE_IMAGE BUNDLE_VERSION BASE_VERSION
+   EXISTING=$(yq e '.bundles[] | select(.version | test("^" + env(BASE_VERSION) + "(-.*)?$")) | .version' "$FILE")
+   if [[ -n "$EXISTING" ]]; then
+     echo "Updating existing bundle $EXISTING -> $BUNDLE_VERSION"
+     yq -i '(.bundles[] | select(.version | test("^" + env(BASE_VERSION) + "(.*)?$"))).version = env(BUNDLE_VERSION)' "$FILE"
+     yq -i '(.bundles[] | select(.version == env(BUNDLE_VERSION))).image = env(BUNDLE_IMAGE)' "$FILE"
+   else
+     echo "Adding new bundle version $BUNDLE_VERSION"
+     yq -i '.bundles += [{"version": env(BUNDLE_VERSION), "image": env(BUNDLE_IMAGE)}]' "$FILE"
+   fi
+
+
 }
 
 function target_registry() {
