@@ -1,0 +1,109 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: e2e-test-pipelines
+spec:
+  params:
+    - name: EAAS_SPACE_SECRET_REF
+      type: string
+    - name: GIT_RELEASE_TESTS_URI
+      default: https://github.com/openshift-pipelines/release-tests.git
+    - name: GIT_RELEASE_TESTS_BRANCH
+      default: master
+    - name: CATALOG_SOURCE
+      description: Provide catalog-source name through which user have to subscribe operator
+      default: redhat-operators
+    - name: CHAINS_REPOSITORY
+      default: "quay.io/openshift-pipeline/chainstest"
+      description: the url of the repository where the test image will be pushed
+    - name: CLUSTER_NAME
+      description: Cluster name
+    - name: FAIL_ON_ERROR
+      default: "false"
+    - name: IMAGE
+      description: release-tests image
+      default: quay.io/openshift-pipeline/ci
+    - name: RUN_AS
+      description: Provide user privilege to runs tests with  (eg one of admin/non-admin)
+      default: "non-admin"
+    - name: SPECS
+      description: Run tests only from that specific directory
+    - name: TAGS
+      description: Tags defines the nature of test cases you want to execute. (eg "e2e,integration")
+      default: "e2e,non-admin"
+
+  volumes:
+    - name: credentials
+      emptyDir: { }
+    - name: source
+      emptyDir: { }
+    - name: go-cache
+      emptyDir: { }
+  stepTemplate:
+    image: $(params.IMAGE)
+    volumeMounts:
+      - name: source
+        mountPath: /source
+      - name: credentials
+        mountPath: /credentials
+      - name: go-cache
+        mountPath: /go-cache
+    env:
+      - name: GOMODCACHE
+        value: /go-cache/mod
+      - name: GOCACHE
+        value: /go-cache/build
+  steps:
+    - name: create-repo
+      image: $(params.IMAGE)
+      script: |
+        mkdir -p /source/repo
+        chmod 777 /source/repo
+    - name: fetch-repo
+      ref:
+        resolver: http
+        params:
+          - name: url
+            value: https://raw.githubusercontent.com/openshift-pipelines/tektoncd-catalog/p/stepactions/stepaction-git-clone/0.4.1/stepaction-git-clone.yaml
+      params:
+        - name: OUTPUT_PATH
+          value: /source/repo
+        - name: URL
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: REVISION
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+    - name: get-kubeconfig
+      ref:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/build-definitions.git
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+      params:
+        - name: eaasSpaceSecretRef
+          value: "$(params.EAAS_SPACE_SECRET_REF)"
+        - name: clusterName
+          value: "$(params.CLUSTER_NAME)"
+        - name: credentials
+          value: credentials
+    - name: run-e2e-tests-pipeline
+      image: $(params.IMAGE)
+      workingDir: /source/repo
+      env:
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: github-token
+              name: github
+              optional: true
+        - name: KUBECONFIG
+          value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+      script: |
+        go mod download
+        go build -p 1 ./...
+        gauge config check_updates false
+        gauge run --tags="$(params.TAGS)" --log-level=debug --verbose $(params.SPECS)
