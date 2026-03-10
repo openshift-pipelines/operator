@@ -25,6 +25,8 @@ spec:
       default: https://github.com/openshift-pipelines/operator
     - name: RELEASE_TEST_TASKS_BRANCH
       default: main
+    - name: INSTANCE_TYPE
+      default: m5.2xlarge
 
   tasks:
     - name: parse-metadata
@@ -144,7 +146,7 @@ spec:
               - name: version
                 value: "$(steps.extract-and-pick-version.results.version)"
               - name: instanceType
-                value: m5.2xlarge
+                value: $(params.INSTANCE_TYPE)
               - name: fips
                 value: true
     # Create Catalog Source to install Operator
