@@ -1,0 +1,312 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: multikueue-setup
+spec:
+  params:
+    - name: CATALOG_SOURCE
+      description: Provide catalog-source name through which user have to subscribe operator
+      default: redhat-operators
+    - name: IMAGE
+      default: quay.io/openshift-pipeline/ci
+    - name: OSP_INDEX_IMAGE
+      default: "quay.io/openshift-pipeline/pipelines-index-4.20:v1.22.0"
+    - name: MULTI_CLUSTER_ROLE
+      default: "spoke"
+    - name: KUEBECONFIG_SECRET
+      type: string
+  volumes:
+    - name: credentials
+      secret:
+        secretName: $(params.KUEBECONFIG_SECRET)
+  stepTemplate:
+    image: $(params.IMAGE)
+    volumeMounts:
+      - name: credentials
+        mountPath: /credentials
+    env:
+      - name: KUEUE_NAMESPACE
+        value: openshift-kueue-operator
+      - name: KUBECONFIG
+        value: /credentials/kubeconfig
+      - name: CATALOG_SOURCE
+        value: $(params.CATALOG_SOURCE)
+  steps:
+    - name: create-kueue-namespace
+      onError: continue
+      script: |
+        oc create ns $KUEUE_NAMESPACE
+    - name: create-operator-group
+      script: |
+        cat <<EOF | oc apply -f -
+          apiVersion: operators.coreos.com/v1
+          kind: OperatorGroup
+          metadata:
+            name: kueue-operator-group
+            namespace: $KUEUE_NAMESPACE
+          spec: {}
+        EOF
+    - name: install-rhbok-operator
+      script: |
+        cat << EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: kueue-operator
+          namespace: $KUEUE_NAMESPACE
+        spec:
+          channel: stable-v1.3
+          installPlanApproval: Automatic
+          name: kueue-operator
+          source: redhat-operators
+          sourceNamespace: openshift-marketplace
+        EOF
+
+    - name: create-kueue-cr
+      script: |
+        cat << EOF | kubectl apply -f -
+        apiVersion: kueue.openshift.io/v1
+        kind: Kueue
+        metadata:
+          name: cluster
+        spec:
+          config:
+            integrations:
+              externalFrameworks:
+              - group: tekton.dev
+                resource: pipelineruns
+                version: v1
+              frameworks:
+              - BatchJob
+              - Pod
+              - Deployment
+            multiKueue:
+              externalFrameworks:
+              - group: tekton.dev
+                resource: pipelineruns
+                version: v1
+          logLevel: Normal
+          managementState: Managed
+          operatorLogLevel: Normal
+        EOF
+
+    - name: create-osp-catalog
+      env:
+        - name: INDEX_IMAGE
+          value: "$(params.OSP_INDEX_IMAGE)"
+      script: |
+        #!/usr/bin/env bash
+        cat <<EOF | oc apply -f-
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: CatalogSource
+          metadata:
+            name: "custom-osp"
+            namespace: openshift-marketplace
+          spec:
+            sourceType: grpc
+            image: $INDEX_IMAGE
+            displayName: "Custom OSP"
+            publisher: Red Hat Local
+            updateStrategy:
+            registryPoll:
+            interval: 30m
+        EOF
+
+    - name: install-pipelines-operator
+      image: $(params.IMAGE)
+      script: |
+        cat <<EOF | oc apply -f-
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: openshift-pipelines-operator-rh
+          namespace: openshift-operators
+        spec:
+          name: openshift-pipelines-operator-rh
+          source: "custom-osp"
+          sourceNamespace: openshift-marketplace
+          channel: latest
+        EOF
+
+    - name: configure-rbac-for-tekton
+      script: |
+        cat <<EOF | kubectl apply -f -
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: kueue-tekton-permissions
+        rules:
+          - apiGroups:
+              - tekton.dev
+            resources:
+              - pipelineruns
+              - pipelineruns/status
+            verbs:
+              - create
+              - delete
+              - get
+              - list
+              - patch
+              - update
+              - watch
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: kueue-tekton-permissions-binding
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: kueue-tekton-permissions
+        subjects:
+          - kind: ServiceAccount
+            name: kueue-controller-manager
+            namespace: $KUEUE_NAMESPACE
+        EOF
+
+    - name: configure-network-policy-egress
+      script: |
+        cat <<EOF | kubectl apply -f -
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name: kueue-allow-egress-external
+          namespace: $KUEUE_NAMESPACE
+        spec:
+          podSelector:
+            matchLabels:
+              app.openshift.io/name: kueue
+          policyTypes:
+            - Egress
+          egress:
+            - ports:
+                - port: 443
+                  protocol: TCP
+                - port: 80
+                  protocol: TCP
+        EOF
+
+    - name: apply-multikueue-spoke-resources
+      when:
+        - input: "$(params.MULTI_CLUSTER_ROLE)"
+          operator: in
+          values: [ "Spoke" ]
+      script: |
+        cat <<EOF | kubectl apply -f -
+        apiVersion: kueue.x-k8s.io/v1beta2
+        kind: ResourceFlavor
+        metadata:
+          name: "default-flavor"
+        ---
+        apiVersion: kueue.x-k8s.io/v1beta2
+        kind: ClusterQueue
+        metadata:
+          name: "cluster-queue"
+        spec:
+          namespaceSelector: {}
+          resourceGroups:
+          - coveredResources: ["cpu", "memory", "tekton.dev/pipelineruns"]
+            flavors:
+            - name: "default-flavor"
+              resources:
+              - name: "cpu"
+                nominalQuota: 9
+              - name: "memory"
+                nominalQuota: 36Gi
+              - name: "tekton.dev/pipelineruns"
+                nominalQuota: "1"
+        ---
+        apiVersion: kueue.x-k8s.io/v1beta2
+        kind: LocalQueue
+        metadata:
+          namespace: "default"
+          name: "pipelines-queue" # This is Default Queue name from pipelines operator
+        spec:
+          clusterQueue: "cluster-queue"
+        EOF
+    - name: apply-multikueue-hub-resources
+      when:
+        - input: "$(params.MULTI_CLUSTER_ROLE)"
+          operator: in
+          values: [ "Hub" ]
+      script: |
+        cat <<EOF | kubectl apply -f -
+        apiVersion: kueue.x-k8s.io/v1beta2
+        kind: ResourceFlavor
+        metadata:
+          name: "default-flavor"
+        ---
+        apiVersion: kueue.x-k8s.io/v1beta2
+        kind: ClusterQueue
+        metadata:
+          name: "cluster-queue"
+        spec:
+          namespaceSelector: {}
+          resourceGroups:
+          - coveredResources: ["cpu", "memory", "tekton.dev/pipelineruns"]
+            flavors:
+            - name: "default-flavor"
+              resources:
+              - name: "cpu"
+                nominalQuota: 9
+              - name: "memory"
+                nominalQuota: 36Gi
+              - name: "tekton.dev/pipelineruns"
+                nominalQuota: "10"
+          admissionChecksStrategy:
+            admissionChecks:
+              - name: sample-multikueue
+        ---
+        apiVersion: kueue.x-k8s.io/v1beta2
+        kind: LocalQueue
+        metadata:
+          name: "pipelines-queue"
+        spec:
+          clusterQueue: "cluster-queue"
+        ---
+        apiVersion: kueue.x-k8s.io/v1beta2
+        kind: AdmissionCheck
+        metadata:
+          name: sample-multikueue
+        spec:
+          controllerName: kueue.x-k8s.io/multikueue
+          parameters:
+            apiGroup: kueue.x-k8s.io
+            kind: MultiKueueConfig
+            name: multikueue-test
+        ---
+        apiVersion: kueue.x-k8s.io/v1beta2
+        kind: MultiKueueConfig
+        metadata:
+          name: multikueue-test
+        spec:
+          clusters:          
+        EOF
+
+    - name: enable-multi-cluster
+      script: |
+        set -x
+        kubectl patch tektonconfig config --type='merge' -p '
+        {
+          "spec": {
+            "scheduler": {
+              "disabled": false,
+              "multi-cluster-disabled": false,
+              "multi-cluster-role": "$(params.MULTI_CLUSTER_ROLE)"
+            }
+          }
+        }'
+#    - name: verification
+#      script: |
+
+
+#    - name: install-cert-manager
+#      script: |
+#        cat << EOF | bash
+#        curl -sL https://raw.githubusercontent.com/openshift/kueue-operator/refs/heads/main/hack/deploy-cert-manager.sh -o deploy-cert-manager.sh
+#        chmod +x ./deploy-cert-manager.sh
+#        ./deploy-cert-manager.sh
+#        EOF
+#    - name: create-worker-kuebeconfig-secret
+#      image: $(params.IMAGE)

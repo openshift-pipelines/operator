@@ -1,0 +1,544 @@
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: release-tests-multikueue
+spec:
+  description: |
+    An integration test which provisions an ephemeral Hypershift cluster and deploys an Operator
+    bundle from a Konflux snapshot.
+  params:
+    - description: Snapshot of the application
+      name: SNAPSHOT
+      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+      type: string
+    - description: Namespace where the the Operator bundle will be deployed.
+      name: NAMESPACE
+      default: openshift-operators
+      type: string
+    - name: IMAGE
+      type: string
+      default: quay.io/openshift-pipeline/ci:latest
+    - name: TAGS
+      default: "e2e,non-admin"
+    - name: RELEASE_TEST_TASKS_REPO
+      default: https://github.com/openshift-pipelines/operator
+    - name: RELEASE_TEST_TASKS_BRANCH
+      default: main
+    - name: INSTANCE_TYPE
+      default: m5.2xlarge
+
+  tasks:
+    - name: parse-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/integration-examples
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/test_metadata.yaml
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+    - name: provision-eaas-space
+      runAfter:
+        - parse-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/build-definitions.git
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: task/eaas-provision-space/0.1/eaas-provision-space.yaml
+      params:
+        - name: ownerName
+          value: $(context.pipelineRun.name)
+        - name: ownerUid
+          value: $(context.pipelineRun.uid)
+    - name: provision-cluster
+      runAfter:
+        - provision-eaas-space
+      params:
+        - name: componentName
+          value: "$(tasks.parse-metadata.results.component-name)"
+      taskSpec:
+        params:
+          - name: componentName
+            type: string
+        results:
+          - name: clusterVersion
+            type: string
+          - name: ocpVersion
+            description: The OCP version extracted from application name
+            type: string
+        steps:
+          - name: get-supported-versions
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-get-supported-ephemeral-cluster-versions/0.1/eaas-get-supported-ephemeral-cluster-versions.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+          - name: extract-and-pick-version
+            image: $(params.IMAGE)
+            env:
+              - name: COMPONENT_NAME
+                value: "$(params.componentName)"
+            script: |
+              #!/usr/bin/env bash
+              set -e
+              
+              # Extract OCP version from COMPONENT_NAME
+              # Expected format: operator-1-22-index-4-20 -> 4.20
+              echo "Component Name: $COMPONENT_NAME"
+              
+              # Extract version pattern (e.g., "4-19" from "operator-1-22-index-4-20")
+              VERSION_PATTERN=$(echo "$COMPONENT_NAME" | grep -oE '[0-9]+-[0-9]+' | tail -1)
+              
+              if [ -z "$VERSION_PATTERN" ]; then
+                echo "Warning: Could not extract version from application name, will use default"
+                OCP_VERSION="4.20"
+              else
+                # Convert "4-20" to "4.20"
+                OCP_VERSION=$(echo "$VERSION_PATTERN" | tr '-' '.')
+                echo "Extracted OCP Version: $OCP_VERSION"
+              fi
+              
+              echo -n "$OCP_VERSION" | tee /tekton/results/ocpVersion
+              
+              # Fetch the latest patch version for this OCP version
+              echo "Fetching latest patch version for ${OCP_VERSION}..."
+              RELEASE_URL="https://multi.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable-multi/latest?prefix=${OCP_VERSION}."
+              echo "GET $RELEASE_URL"
+              
+              RELEASE_INFO=$(curl -s "$RELEASE_URL")
+              echo "$RELEASE_INFO"
+              
+              VERSION=$(echo "$RELEASE_INFO" | jq -r '.name')
+              echo "Selected version: $VERSION"
+              
+              # Write result for create-cluster step
+              echo -n "$VERSION" | tee /tekton/results/clusterVersion
+
+    # Create Hub Cluster
+    - name: create-hub-cluster
+      runAfter:
+        - provision-cluster
+      taskSpec:
+        steps:
+          - name: create-cluster
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-create-ephemeral-cluster-hypershift-aws/0.1/eaas-create-ephemeral-cluster-hypershift-aws.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+              - name: version
+                value: $(tasks.provision-cluster.results.clusterVersion)
+              - name: instanceType
+                value: $(params.INSTANCE_TYPE)
+              - name: fips
+                value: true
+    # Create Spoke Cluster
+    - name: create-spoke-cluster
+      runAfter:
+        - provision-cluster
+      taskSpec:
+        steps:
+          - name: create-cluster
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-create-ephemeral-cluster-hypershift-aws/0.1/eaas-create-ephemeral-cluster-hypershift-aws.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+              - name: version
+                value: $(tasks.provision-cluster.results.clusterVersion)
+              - name: instanceType
+                value: $(params.INSTANCE_TYPE)
+              - name: fips
+                value: true
+
+#
+#    - name: create-spoke-cluster
+#      runAfter:
+#        - provision-cluster
+#    - name: create-catalog-source
+#      runAfter:
+#        - provision-cluster
+#      taskSpec:
+#        volumes:
+#          - name: credentials
+#            emptyDir: { }
+#        stepTemplate:
+#          image: $(params.IMAGE)
+#          volumeMounts:
+#            - name: credentials
+#              mountPath: /credentials
+#        steps:
+#          - name: get-kubeconfig
+#            ref:
+#              resolver: git
+#              params:
+#                - name: url
+#                  value: https://github.com/konflux-ci/build-definitions.git
+#                - name: revision
+#                  value: main
+#                - name: pathInRepo
+#                  value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+#            params:
+#              - name: eaasSpaceSecretRef
+#                value: $(tasks.provision-eaas-space.results.secretRef)
+#              - name: clusterName
+#                value: "$(tasks.provision-cluster.results.clusterName)"
+#              - name: credentials
+#                value: credentials
+#          - name: create-catalog
+#            env:
+#              - name: INDEX_IMAGE
+#                value: "$(tasks.parse-metadata.results.component-container-image)"
+#              - name: KUBECONFIG
+#                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+#            script: |
+#              #!/usr/bin/env bash
+#              cat <<EOF | oc apply -f-
+#                apiVersion: operators.coreos.com/v1alpha1
+#                kind: CatalogSource
+#                metadata:
+#                  name: "custom-osp-nightly"
+#                  namespace: openshift-marketplace
+#                spec:
+#                  sourceType: grpc
+#                  image: $INDEX_IMAGE
+#                  displayName: "Custom OSP Nightly"
+#                  publisher: Red Hat Local
+#                  updateStrategy:
+#                  registryPoll:
+#                  interval: 30m
+#              EOF
+#
+#    #Release Tests - Install Pipelines Operator
+#    - name: install-pipelines-operator
+#      taskRef:
+#        resolver: git
+#        params:
+#          - name: url
+#            value: $(params.RELEASE_TEST_TASKS_REPO)
+#          - name: revision
+#            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+#          - name: pathInRepo
+#            value: .konflux/tekton/task-e2e-pipeline.yaml
+#      params:
+#        - name: EAAS_SPACE_SECRET_REF
+#          value: $(tasks.provision-eaas-space.results.secretRef)
+#        - name: CLUSTER_NAME
+#          value: $(tasks.provision-cluster.results.clusterName)
+#        - name: IMAGE
+#          value: $(params.IMAGE)
+#        - name: RUN_AS
+#          value: "admin"
+#        - name: SPECS
+#          value: "specs/olm.spec"
+#        - name: TAGS
+#          value: "install"
+#        - name: CATALOG_SOURCE
+#          value: "custom-osp-nightly"
+#      runAfter:
+#        - create-catalog-source
+#    #Release Tests - Chains
+#    - name: release-tests-chains
+#      onError: continue
+#      taskRef:
+#        resolver: git
+#        params:
+#          - name: url
+#            value: $(params.RELEASE_TEST_TASKS_REPO)
+#          - name: revision
+#            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+#          - name: pathInRepo
+#            value: .konflux/tekton/task-e2e-pipeline.yaml
+#      params:
+#        - name: EAAS_SPACE_SECRET_REF
+#          value: $(tasks.provision-eaas-space.results.secretRef)
+#        - name: CLUSTER_NAME
+#          value: $(tasks.provision-cluster.results.clusterName)
+#        - name: IMAGE
+#          value: $(params.IMAGE)
+#        - name: RUN_AS
+#          value: "admin"
+#        - name: SPECS
+#          value: "specs/chains/"
+#        - name: TAGS
+#          value: "$(params.TAGS)"
+#      runAfter:
+#        - install-pipelines-operator
+#
+#    #Release Tests - Manual Approval Gate
+#    - name: release-tests-manual-approval
+#      onError: continue
+#      taskRef:
+#        resolver: git
+#        params:
+#          - name: url
+#            value: $(params.RELEASE_TEST_TASKS_REPO)
+#          - name: revision
+#            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+#          - name: pathInRepo
+#            value: .konflux/tekton/task-e2e-pipeline.yaml
+#      params:
+#        - name: EAAS_SPACE_SECRET_REF
+#          value: $(tasks.provision-eaas-space.results.secretRef)
+#        - name: CLUSTER_NAME
+#          value: $(tasks.provision-cluster.results.clusterName)
+#        - name: IMAGE
+#          value: $(params.IMAGE)
+#        - name: RUN_AS
+#          value: "admin"
+#        - name: SPECS
+#          value: "specs/manualapprovalgate/"
+#        - name: TAGS
+#          value: "$(params.TAGS)"
+#      runAfter:
+#        - install-pipelines-operator
+#
+#    #Release Tests - Metrics
+#    - name: release-tests-metrics
+#      onError: continue
+#      taskRef:
+#        resolver: git
+#        params:
+#          - name: url
+#            value: $(params.RELEASE_TEST_TASKS_REPO)
+#          - name: revision
+#            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+#          - name: pathInRepo
+#            value: .konflux/tekton/task-e2e-pipeline.yaml
+#      params:
+#        - name: EAAS_SPACE_SECRET_REF
+#          value: $(tasks.provision-eaas-space.results.secretRef)
+#        - name: CLUSTER_NAME
+#          value: $(tasks.provision-cluster.results.clusterName)
+#        - name: IMAGE
+#          value: $(params.IMAGE)
+#        - name: RUN_AS
+#          value: "admin"
+#        - name: SPECS
+#          value: "specs/metrics/"
+#        - name: TAGS
+#          value: "$(params.TAGS)"
+#      runAfter:
+#        - install-pipelines-operator
+#
+#    #Release Tests - Pipelines as Code
+#    - name: release-tests-pac
+#      onError: continue
+#      taskRef:
+#        resolver: git
+#        params:
+#          - name: url
+#            value: $(params.RELEASE_TEST_TASKS_REPO)
+#          - name: revision
+#            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+#          - name: pathInRepo
+#            value: .konflux/tekton/task-e2e-pipeline.yaml
+#      params:
+#        - name: EAAS_SPACE_SECRET_REF
+#          value: $(tasks.provision-eaas-space.results.secretRef)
+#        - name: CLUSTER_NAME
+#          value: $(tasks.provision-cluster.results.clusterName)
+#        - name: IMAGE
+#          value: $(params.IMAGE)
+#        - name: RUN_AS
+#          value: "admin"
+#        - name: SPECS
+#          value: "specs/pac/"
+#        - name: TAGS
+#          value: "$(params.TAGS)"
+#      runAfter:
+#        - install-pipelines-operator
+#
+#    #Release Tests - Versions
+#    - name: release-tests-versions
+#      onError: continue
+#      taskRef:
+#        resolver: git
+#        params:
+#          - name: url
+#            value: $(params.RELEASE_TEST_TASKS_REPO)
+#          - name: revision
+#            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+#          - name: pathInRepo
+#            value: .konflux/tekton/task-e2e-pipeline.yaml
+#      params:
+#        - name: EAAS_SPACE_SECRET_REF
+#          value: $(tasks.provision-eaas-space.results.secretRef)
+#        - name: CLUSTER_NAME
+#          value: $(tasks.provision-cluster.results.clusterName)
+#        - name: IMAGE
+#          value: $(params.IMAGE)
+#        - name: RUN_AS
+#          value: "admin"
+#        - name: SPECS
+#          value: "specs/versions.spec"
+#        - name: TAGS
+#          value: "$(params.TAGS)"
+#      runAfter:
+#        - install-pipelines-operator
+#
+#    #Release Tests - Pipelines
+#    - name: release-tests-pipelines
+#      onError: continue
+#      taskRef:
+#        resolver: git
+#        params:
+#          - name: url
+#            value: $(params.RELEASE_TEST_TASKS_REPO)
+#          - name: revision
+#            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+#          - name: pathInRepo
+#            value: .konflux/tekton/task-e2e-pipeline.yaml
+#      params:
+#        - name: EAAS_SPACE_SECRET_REF
+#          value: $(tasks.provision-eaas-space.results.secretRef)
+#        - name: CLUSTER_NAME
+#          value: $(tasks.provision-cluster.results.clusterName)
+#        - name: IMAGE
+#          value: $(params.IMAGE)
+#        - name: RUN_AS
+#          value: "non-admin"
+#        - name: SPECS
+#          value: "specs/pipelines/"
+#        - name: TAGS
+#          value: "$(params.TAGS)"
+#      runAfter:
+#        - install-pipelines-operator
+#
+#    #Release Tests - Triggers
+#    - name: release-tests-triggers
+#      onError: continue
+#      taskRef:
+#        resolver: git
+#        params:
+#          - name: url
+#            value: $(params.RELEASE_TEST_TASKS_REPO)
+#          - name: revision
+#            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+#          - name: pathInRepo
+#            value: .konflux/tekton/task-e2e-pipeline.yaml
+#      params:
+#        - name: EAAS_SPACE_SECRET_REF
+#          value: $(tasks.provision-eaas-space.results.secretRef)
+#        - name: CLUSTER_NAME
+#          value: $(tasks.provision-cluster.results.clusterName)
+#        - name: IMAGE
+#          value: $(params.IMAGE)
+#        - name: RUN_AS
+#          value: "non-admin"
+#        - name: SPECS
+#          value: "specs/triggers/"
+#        - name: TAGS
+#          value: "$(params.TAGS)"
+#      runAfter:
+#        - install-pipelines-operator
+#
+#    #Release Tests - Results
+#    - name: release-tests-results
+#      onError: continue
+#      taskRef:
+#        resolver: git
+#        params:
+#          - name: url
+#            value: $(params.RELEASE_TEST_TASKS_REPO)
+#          - name: revision
+#            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+#          - name: pathInRepo
+#            value: .konflux/tekton/task-e2e-pipeline.yaml
+#      params:
+#        - name: EAAS_SPACE_SECRET_REF
+#          value: $(tasks.provision-eaas-space.results.secretRef)
+#        - name: CLUSTER_NAME
+#          value: $(tasks.provision-cluster.results.clusterName)
+#        - name: IMAGE
+#          value: $(params.IMAGE)
+#        - name: RUN_AS
+#          value: "non-admin"
+#        - name: SPECS
+#          value: "specs/results/"
+#        - name: TAGS
+#          value: "$(params.TAGS)"
+#      runAfter:
+#        - install-pipelines-operator
+#
+#    #Release Tests - Triggers TLS
+#    - name: release-tests-triggers-tls
+#      onError: continue
+#      taskRef:
+#        resolver: git
+#        params:
+#          - name: url
+#            value: $(params.RELEASE_TEST_TASKS_REPO)
+#          - name: revision
+#            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+#          - name: pathInRepo
+#            value: .konflux/tekton/task-e2e-pipeline.yaml
+#      params:
+#        - name: EAAS_SPACE_SECRET_REF
+#          value: $(tasks.provision-eaas-space.results.secretRef)
+#        - name: CLUSTER_NAME
+#          value: $(tasks.provision-cluster.results.clusterName)
+#        - name: IMAGE
+#          value: $(params.IMAGE)
+#        - name: RUN_AS
+#          value: "non-admin"
+#        - name: SPECS
+#          value: "specs/triggers/eventlistener.spec"
+#        - name: TAGS
+#          value: "tls & $(params.TAGS)"
+#      runAfter:
+#        - install-pipelines-operator
+#
+#  finally:
+#    # Verify aggregate status and fail pipeline if any e2e task failed
+#    - name: verify-e2e-tests-status
+#      params:
+#        - name: aggregateStatus
+#          value: "$(tasks.status)"
+#      taskSpec:
+#        params:
+#          - name: aggregateStatus
+#        steps:
+#          - image: $(params.IMAGE)
+#            name: verify-aggregate-status
+#            script: |
+#              #!/bin/sh
+#              echo "📋 Aggregate Status: $(params.aggregateStatus)"
+#
+#              if [[ "$(params.aggregateStatus)" != "Succeeded" ]]; then
+#                echo "❌ Pipeline contains failed tasks!"
+#                echo "💡 Check individual task logs for detailed error information"
+#                exit 1
+#              fi
+#
+#              echo "✅ All tasks succeeded!"

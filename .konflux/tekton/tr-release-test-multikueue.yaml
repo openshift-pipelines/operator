@@ -1,0 +1,16 @@
+---
+apiVersion: tekton.dev/v1
+kind: TaskRun
+metadata:
+  generateName: release-test-multikueue-
+  labels:
+    appstudio.openshift.io/application: openshift-pipelines-index-1-22
+    appstudio.openshift.io/component: operator-1-22-index-4-17
+spec:
+  params:
+    - name: MULTI_CLUSTER_ROLE
+      value: "Hub"
+    - name: KUEBECONFIG_SECRET
+      value: "hub-kuebeconfig"
+  taskRef:
+    name: multikueue-setup

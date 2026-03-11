@@ -1,0 +1,111 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: multikueue-spoke-setup
+spec:
+  params:
+    - name: CATALOG_SOURCE
+      description: Provide catalog-source name through which user have to subscribe operator
+      default: redhat-operators
+    - name: IMAGE
+      default: quay.io/openshift-pipeline/ci
+    - name: OSP_INDEX_IMAGE
+      default: "quay.io/openshift-pipeline/pipelines-index-4.20:v1.22.0"
+    - name: MULTI_CLUSTER_ROLE
+      default: "spoke"
+    - name: KUEBECONFIG_SECRET
+      type: string
+  volumes:
+    - name: credentials
+      secret:
+        secretName: $(params.KUEBECONFIG_SECRET)
+  stepTemplate:
+    image: $(params.IMAGE)
+    volumeMounts:
+      - name: credentials
+        mountPath: /credentials
+    env:
+      - name: KUEUE_NAMESPACE
+        value: openshift-kueue-operator
+      - name: KUBECONFIG
+        value: /credentials/kubeconfig
+      - name: SPOKE_NAME
+        value: spoke-1
+  steps:
+    - name: create-service-account
+      script: |
+        echo "Create ServiceAccount"
+        kubectl create sa multikueue-sa -n default
+            
+        echo "Create ClusterRole"
+        cat <<EOF | kubectl apply -f -
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            name: multikueue-sa-role
+          rules:
+            - apiGroups: [""]
+              resources: ["pods"]
+              verbs: ["get", "list", "watch", "create", "delete"]
+            - apiGroups: ["batch"]
+              resources: ["jobs"]
+              verbs: ["get", "list", "watch", "create", "delete"]
+            - apiGroups: ["kueue.x-k8s.io"]
+              resources: ["workloads", "workloads/status"]
+              verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
+            - apiGroups: ["tekton.dev"]
+              resources: ["pipelineruns", "pipelineruns/status"]
+              verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
+        EOF
+        
+        echo "Bind Role to ServiceAccount"
+        kubectl create clusterrolebinding multikueue-sa-crb \
+            --clusterrole=multikueue-sa-role \
+            --serviceaccount=default:multikueue-sa
+        
+
+    - name: generate-kube-config
+      script: |
+        cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: Secret
+          type: kubernetes.io/service-account-token
+          metadata:
+            name: multikueue-sa-token
+            namespace: default
+            annotations:
+              kubernetes.io/service-account.name: "multikueue-sa"
+        EOF
+            
+        echo "Wait for token population" 
+        sleep 10
+        
+        echo "Extract Token and CA Certificate"
+        SA_TOKEN=$(kubectl get secret multikueue-sa-token -n default -o jsonpath='{.data.token}' | base64 -d)
+        CA_CERT=$(kubectl get secret multikueue-sa-token -n default -o jsonpath='{.data.ca\.crt}')
+        SERVER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+            
+        echo "Create Kubeconfig file"
+        cat <<EOF > ${SPOKE_NAME}.kubeconfig
+          apiVersion: v1
+          clusters:
+            - cluster:
+                server: ${SERVER_URL}
+                certificate-authority-data: ${CA_CERT}
+              name: ${SPOKE_NAME}-cluster
+          contexts:
+            - context:
+                cluster: ${SPOKE_NAME}-cluster
+                user: multikueue-sa
+              name: ${SPOKE_NAME}-context
+          current-context: ${SPOKE_NAME}-context
+          kind: Config
+          preferences: {}
+          users:
+            - name: multikueue-sa
+              user:
+                token: ${SA_TOKEN}
+        EOF
+
+
