@@ -25,6 +25,8 @@ spec:
       default: https://github.com/openshift-pipelines/operator
     - name: RELEASE_TEST_TASKS_BRANCH
       default: main
+    - name: GIT_RELEASE_TESTS_BRANCH
+      default: master
     - name: INSTANCE_TYPE
       default: m5.2xlarge
 
@@ -419,12 +421,16 @@ spec:
           value: $(tasks.provision-cluster.results.clusterName)
         - name: IMAGE
           value: $(params.IMAGE)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
         - name: RUN_AS
           value: "non-admin"
         - name: SPECS
           value: "specs/triggers/"
         - name: TAGS
-          value: "$(params.TAGS)"
+          value: "$(params.TAGS) && !tls"
+        - name: OCP_VERSION
+          value: "$(tasks.provision-cluster.results.ocpVersion)"
       runAfter:
         - install-pipelines-operator
 
