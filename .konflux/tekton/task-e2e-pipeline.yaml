@@ -32,6 +32,8 @@ spec:
     - name: TAGS
       description: Tags defines the nature of test cases you want to execute. (eg "e2e,integration")
       default: "e2e,non-admin"
+    - name: OCP_VERSION
+      default: ""
 
   volumes:
     - name: credentials
@@ -106,8 +108,17 @@ spec:
           value: "$(params.CATALOG_SOURCE)"
         - name: CHAINS_REPOSITORY
           value: "$(params.CHAINS_REPOSITORY)"
+        - name: OCP_VERSION
+          value: "$(params.OCP_VERSION)"
       script: |
         go mod download
         go build -p 1 ./...
         gauge config check_updates false
-        gauge run --tags="$(params.TAGS)" --log-level=debug --verbose $(params.SPECS)
+        
+        # Some of the tests fail on specific OCP versions
+        set +H
+        tags="$(params.TAGS),!skip-$OCP_VERSION"
+        set -H
+        
+        echo "Running $(params.SPECS) with tags $tags"
+        gauge run --tags="$tags" --log-level=debug --verbose $(params.SPECS)
