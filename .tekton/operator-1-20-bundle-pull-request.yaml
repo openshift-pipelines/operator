@@ -1,4 +1,4 @@
-# Generated for Konflux Application openshift-pipelines-core by openshift-pipelines/hack. DO NOT EDIT
+# Generated for Konflux Application openshift-pipelines-operator-1.20 by openshift-pipelines/hack. DO NOT EDIT
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
@@ -12,11 +12,12 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
       == "release-v1.20.x" &&
-      ((".konflux/olm-catalog/bundle/***".pathChanged()) ||
-      ".konflux/dockerfiles/bundle.Dockerfile".pathChanged() ||
+      ((".konflux/patches/***".pathChanged() || ".konflux/olm-catalog/bundle/***".pathChanged()) ||
+      ".konflux/olm-catalog/bundle/Dockerfile".pathChanged() ||
       ".tekton/operator-1-20-bundle-pull-request.yaml".pathChanged())
+  creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: openshift-pipelines-core-1-20
+    appstudio.openshift.io/application: openshift-pipelines-operator-1-20
     appstudio.openshift.io/component: operator-1-20-bundle
     pipelines.appstudio.openshift.io/type: build
   name: operator-1-20-bundle-on-pull-request
@@ -25,19 +26,14 @@ spec:
   params:
   - name: git-url
     value: '{{source_url}}'
-  - name: upstream-git-url
-    value: 'https://github.com/tektoncd/operator'
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/pipelines-operator-bundle:on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/tekton-ecosystem-tenant/1-20/operator-bundle-rhel9:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: .konflux/dockerfiles/bundle.Dockerfile
-  - name: additional-tags
-    value:
-      - "on-pr-v1.20.4"
+    value: .konflux/olm-catalog/bundle/Dockerfile
   - name: build-platforms
     value:
     - linux/x86_64
