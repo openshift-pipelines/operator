@@ -6,7 +6,7 @@ set -e
 
 # Update images from project.yaml to "generated" files
 VERSION=${1:-"v4.20"}
-ENVIRONMENT=${2:-"devel"}
+ENVIRONMENT=${2:-"staging"}
 
 CATALOG_JSON=".konflux/olm-catalog/index/${VERSION}/catalog-template.json"
 BUNDLE_IMAGE=$(yq '.images[] | select(.name == "IMAGE_OPERATOR_BUNDLE") | .value' project.yaml)
