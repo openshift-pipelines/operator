@@ -1,4 +1,4 @@
-ARG GO_BUILDER=brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.25 
+ARG GO_BUILDER=registry.access.redhat.com/ubi9/go-toolset:1.25
 ARG RUNTIME=registry.redhat.io/ubi8/ubi:latest@sha256:a9bd8791589bee5bc0f9444fc37bdf7e8fabb8edf1d3f71dd673d31688c10950
 
 FROM $GO_BUILDER AS builder
@@ -24,16 +24,16 @@ COPY .konflux/olm-catalog/bundle/kodata /kodata
 COPY head ${KO_DATA_PATH}/HEAD
 
 LABEL \
-      com.redhat.component="openshift-pipelines-operator-webhook-rhel8-container" \
-      name="openshift-pipelines/pipelines-operator-webhook-rhel8" \
-      version="1.15.4" \
-      cpe="cpe:/a:redhat:openshift_pipelines:1.15::el8" \
-      summary="Red Hat OpenShift Pipelines Operator Webhook" \
-      maintainer="pipelines-extcomm@redhat.com" \
-      description="Red Hat OpenShift Pipelines Operator Webhook" \
-      io.k8s.display-name="Red Hat OpenShift Pipelines Operator Webhook" \
-      io.k8s.description="Red Hat OpenShift Pipelines Operator Webhook" \
-      io.openshift.tags="operator,tekton,openshift,webhook"
+    com.redhat.component="openshift-pipelines-operator-webhook-rhel9-container" \
+    cpe="cpe:/a:redhat:openshift_pipelines:1.15::el9" \
+    description="Red Hat OpenShift Pipelines operator webhook" \
+    io.k8s.description="Red Hat OpenShift Pipelines operator webhook" \
+    io.k8s.display-name="Red Hat OpenShift Pipelines operator webhook" \
+    io.openshift.tags="tekton,openshift,operator,webhook" \
+    maintainer="pipelines-extcomm@redhat.com" \
+    name="openshift-pipelines/pipelines-operator-webhook-rhel9" \
+    summary="Red Hat OpenShift Pipelines operator webhook" \
+    version="v1.15.5"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
