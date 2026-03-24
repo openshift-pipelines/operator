@@ -13,7 +13,7 @@ require (
 	github.com/manifestival/manifestival v0.7.2
 	github.com/markbates/inflect v1.0.4
 	github.com/openshift-pipelines/pipelines-as-code v0.41.1
-	github.com/openshift/api v0.0.0-20240521185306-0314f31e7774
+	github.com/openshift/api v0.0.0-20260320151444-324a1bcb9f55
 	github.com/openshift/apiserver-library-go v0.0.0-20230816171015-6bfafa975bfb
 	github.com/openshift/client-go v0.0.0-20240523113335-452272e0496d
 	github.com/sigstore/cosign/v2 v2.6.2
@@ -32,9 +32,9 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.5.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.2
-	k8s.io/api v0.35.0
+	k8s.io/api v0.35.1
 	k8s.io/apiextensions-apiserver v0.35.0
-	k8s.io/apimachinery v0.35.0
+	k8s.io/apimachinery v0.35.1
 	k8s.io/client-go v1.5.2
 	k8s.io/code-generator v0.34.1
 	k8s.io/utils v0.0.0-20260108192941-914a6e750570
