@@ -12,25 +12,7 @@ SOURCE=upstream
 # minor release example: new release: 1.14.0, PREVIOUS_VERSION will be 1.13.0
 # patch release example: new release: 1.13.2, PREVIOUS_VERSION will be 1.13.1SOURCE=upstream/tektoncd-operator
 # FIXME: figure out CURRENT_VERSION vs PREVIOUS_VERSION
-# Read and sanitize CURRENT_VERSION from project.yaml
-RAW_CURRENT_VERSION=$(yq e '.versions.current' project.yaml)
-if [[ -z "$RAW_CURRENT_VERSION" || "$RAW_CURRENT_VERSION" == "null" ]]; then
-    echo >&2 "Error: versions.current is missing or empty in project.yaml"
-    exit 1
-fi
-
-# Sanitize version: remove trailing hyphen if present (fixes 1.19.0- -> 1.19.0)
-CURRENT_VERSION="${RAW_CURRENT_VERSION%-}"
-
-# Validate that the sanitized version is a valid semantic version
-if ! [[ "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
-    echo >&2 "Error: After sanitization, versions.current '$CURRENT_VERSION' is not a valid semantic version"
-    echo >&2 "Expected format: MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-PRERELEASE (e.g., 1.19.0 or 1.19.0-alpha.1)"
-    exit 1
-fi
-
-echo "Using sanitized CURRENT_VERSION: $CURRENT_VERSION (from raw: $RAW_CURRENT_VERSION)"
-
+CURRENT_VERSION=$(yq e '.versions.current' project.yaml)
 PREVIOUS_VERSION=$(yq e '.versions.previous' project.yaml)
 PREVIOUS_VERSION_RANGE=$(yq e '.versions.previous_range' project.yaml)
 CHANNEL_NAME=$(yq e '.versions.channel' project.yaml)
@@ -58,8 +40,8 @@ rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/metadata/*
 rm -fR ${SOURCE}/operatorhub/openshift/release-artifacts/manifest/*
 export BUNDLE_ARGS="--workspace ./openshift \
                     --operator-release-version ${CURRENT_VERSION} \
-                    --channels ${CHANNEL_NAME} \
-                    --default-channel  ${CHANNEL_NAME} \
+                    --channels latest,${CHANNEL_NAME} \
+                    --default-channel latest \
                     --fetch-strategy-local \
                     --upgrade-strategy-replaces \
                     --operator-release-previous-version openshift-pipelines-operator-rh.v${PREVIOUS_VERSION} \
@@ -73,6 +55,7 @@ rm -fRv .konflux/olm-catalog/bundle/manifests/*
 echo "Copy generated bundle data to this onebundle…"
 cp -rv ${SOURCE}/operatorhub/openshift/release-artifacts/bundle/metadata .konflux/olm-catalog/bundle
 cp -rv ${SOURCE}/operatorhub/openshift/release-artifacts/bundle/manifests .konflux/olm-catalog/bundle
+
 
 for f in .konflux/olm-catalog/bundle/manifests/*.yaml; do
     if [[ $(yq e '.metadata.labels.version' ${f}) == null ]]; then
@@ -90,6 +73,7 @@ yq e -i 'del(.metadata.annotations["createdAt"])' \
 # Add valid-subscription annotation
 yq e -i '.metadata.annotations["operators.openshift.io/valid-subscription"] = "[\"OpenShift Container Platform\", \"OpenShift Platform Plus\"]"' \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+
 
 # Update VERSION env variable to use ${VERSION=}
 yq e -i "(.spec.install.spec.deployments[] | select (.name == \"openshift-pipelines-operator\") | .spec.template.spec.containers[0].env[] | select (.name == \"VERSION\") | .value) = \"${CURRENT_VERSION}\"" \
@@ -138,8 +122,9 @@ yq --inplace 'del(.properties[] | select(.type == "olm.maxOpenShiftVersion"))' \
 
 # update OCP minimum verson
 sed -i -E 's%LABEL com.redhat.openshift.versions=".*%LABEL com.redhat.openshift.versions="'v${MIN_OPENSHIFT_VERSION}'"%' \
-    .konflux/olm-catalog/bundle/Dockerfile
+    .konflux/dockerfiles/bundle.Dockerfile
 
 # update channels in operator bundle dockerfile
-sed -i -E 's%LABEL operators.operatorframework.io.bundle.channels.v1=".*%LABEL operators.operatorframework.io.bundle.channels.v1="'${CHANNEL_NAME}'"%' \
-    .konflux/olm-catalog/bundle/Dockerfile
+sed -i -E 's%LABEL operators.operatorframework.io.bundle.channels.v1=".*%LABEL operators.operatorframework.io.bundle.channels.v1="'latest,${CHANNEL_NAME}'"%' \
+    .konflux/dockerfiles/bundle.Dockerfile
+

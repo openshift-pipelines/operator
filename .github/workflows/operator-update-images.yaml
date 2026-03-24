@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - next
+      - main
       - release-v*
     paths:
       - project.yaml
@@ -28,14 +29,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout the current repo
-        uses: actions/checkout@v4
-        
-      - name: Configure Docker authentication
-        env:
-          DOCKER_CONFIG: /home/runner/.docker
-          DOCKER_JSON: ${{ secrets.DOCKER_REGISTRY_SECRET }}
-        run: |
-          echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json  
+        uses: actions/checkout@v5
 
       - name: update-image-references
         run: |
@@ -50,7 +44,7 @@ jobs:
           git config user.email pipelines-extcomm@redhat.com
           git checkout -b ${SOURCE_BRANCH}
           
-          git add -f  head .konflux
+          git add -f  head .konflux olm
           
           if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
             echo "No change, exiting"
@@ -63,6 +57,8 @@ jobs:
           
           git push -f origin ${SOURCE_BRANCH}
           pr_list=$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json number)
+          echo "Waiting for 10s before updating PRs"
+          sleep 10
           if [ "$(echo $pr_list | jq length)" = "0" ]; then
             echo "creating PR..."
             gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill

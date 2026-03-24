@@ -6,7 +6,7 @@
     echo "Getting bundle image for environment: $environment" >&2
     TARGET_REGISTRY=$(target_registry $environment)
     echo "Target registry: $TARGET_REGISTRY" >&2
-    BUNDLE_IMAGE=$(yq '.images[] | select(.name == "IMAGE_OPERATOR_BUNDLE") | .value' project.yaml)
+    BUNDLE_IMAGE=$(yq '.images[] | select(.name == "IMAGE_OPERATOR_BUNDLE") | .value' bundle.yaml)
     echo "Original bundle image: $BUNDLE_IMAGE" >&2
     BUNDLE_JSON=$(opm render --skip-tls-verify -o json ${BUNDLE_IMAGE})
     BUNDLE_NAME=$(echo $BUNDLE_JSON | jq -r '.name')
@@ -14,8 +14,8 @@
     echo "BUNDLE_NAME : $BUNDLE_NAME"
     echo "Bundle Version : $BUNDLE_VERSION"
 
-    SOURCE_PATTEN="quay.io/.*/(.*)-rhel9(@sha256:.+)"
-    TARGET_PATTEN="$TARGET_REGISTRY/pipelines-\1\2"
+    SOURCE_PATTEN="quay.io/.*/(.*@sha256:.+)"
+    TARGET_PATTEN="$TARGET_REGISTRY/\1"
     BUNDLE_IMAGE=$(echo "${BUNDLE_IMAGE}" | sed -E "s|$SOURCE_PATTEN|$TARGET_PATTEN|g")
     echo "Updated bundle image: $BUNDLE_IMAGE" >&2
 
