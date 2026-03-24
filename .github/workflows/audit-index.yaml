@@ -1,0 +1,33 @@
+name: Audit bundle
+
+on:
+  pull_request:
+    branches:
+      - next
+      - release-*
+    paths:
+      - '.github/workflows/audit-index.yaml'
+      - '.konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml'
+      - 'project.yaml'
+  push:
+    branches:
+      - next
+      - release-*
+    paths:
+      - '.github/workflows/audit-index.yaml'
+      - '.konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml'
+      - 'project.yaml'
+  workflow_dispatch:
+jobs:
+  # Detect when a repository has multiple images but not
+  # all images were built off the same revision
+  audit-repositories-in-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Collect images per repo
+        run: .github/audit-project.sh
+
