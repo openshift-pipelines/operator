@@ -5,28 +5,28 @@ COPY .konflux/olm-catalog/bundle/kodata /kodata
 COPY .konflux/olm-catalog/bundle/manifests /manifests
 COPY .konflux/olm-catalog/bundle/metadata/annotations.yaml /metadata/annotations.yaml
 
-LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
-LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
-LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
-LABEL operators.operatorframework.io.bundle.package.v1=serverless-operator
-LABEL operators.operatorframework.io.bundle.channel.default.v1="pipelines-1.20"
-LABEL operators.operatorframework.io.bundle.channels.v1="pipelines-1.20"
-
 LABEL \
-      com.redhat.component="openshift-pipelines-operator-bundle-container" \
-      name="openshift-pipelines/pipelines-operator-bundle-container" \
-      version="1.20.3" \ 
-      summary="Red Hat OpenShift Pipelines Operator Bundle" \
-      maintainer="pipelines-extcomm@redhat.com" \
-      description="Red Hat OpenShift Pipelines Operator Bundle" \
-      io.k8s.display-name="Red Hat OpenShift Pipelines Operator Bundle" \
-      io.k8s.description="Red Hat OpenShift Pipelines Operator Bundle" \
-      com.redhat.delivery.operator.bundle=true \
-      com.redhat.delivery.backport=false \
-      io.openshift.tags="pipelines,tekton,openshift" \
-      vendor="Red Hat, Inc." \
-      distribution-scope="public" \
-      url="https://access.redhat.com/containers/#/registry.access.redhat.com/ubi9-minimal/images/9.4-1227.1725849298" \
-      release="1227.1725849298"
+    com.redhat.component="openshift-pipelines-operator-bundle-container" \
+    com.redhat.delivery.backport="false" \
+    com.redhat.delivery.operator.bundle="true" \
+    cpe="cpe:/a:redhat:openshift_pipelines:1.20::el9" \
+    description="Red Hat OpenShift Pipelines operator bundle" \
+    distribution-scope="public" \
+    io.k8s.description="Red Hat OpenShift Pipelines operator bundle" \
+    io.k8s.display-name="Red Hat OpenShift Pipelines operator bundle" \
+    io.openshift.tags="tekton,openshift,operator,bundle" \
+    maintainer="pipelines-extcomm@redhat.com" \
+    name="openshift-pipelines/pipelines-operator-bundle" \
+    operators.operatorframework.io.bundle.channel.default.v1="pipelines-1.20" \
+    operators.operatorframework.io.bundle.channels.v1="pipelines-1.20" \
+    operators.operatorframework.io.bundle.manifests.v1="manifests/" \
+    operators.operatorframework.io.bundle.mediatype.v1="registry+v1" \
+    operators.operatorframework.io.bundle.metadata.v1="metadata/" \
+    operators.operatorframework.io.bundle.package.v1="serverless-operator" \
+    release="1227.1725849298" \
+    summary="Red Hat OpenShift Pipelines operator bundle" \
+    url="https://access.redhat.com/containers/#/registry.access.redhat.com/ubi9-minimal/images/9.4-1227.1725849298" \
+    vendor="Red Hat, Inc." \
+    version="v1.20.4"
 
 USER 65532
