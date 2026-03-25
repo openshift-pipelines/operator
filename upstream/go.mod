@@ -50,7 +50,7 @@ replace (
 	k8s.io/apimachinery => k8s.io/apimachinery v0.32.4
 	k8s.io/client-go => k8s.io/client-go v0.32.4
 	k8s.io/code-generator => k8s.io/code-generator v0.32.4
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20250627150254-e9823e99808e
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20260319004828-5883c5ee87b9
 	knative.dev/eventing => knative.dev/eventing v0.30.3
 	knative.dev/pkg => knative.dev/pkg v0.0.0-20250415155312-ed3e2158b883
 )
@@ -317,7 +317,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250820003526-c297c0c1eb9d // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
-	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4 // indirect
+	k8s.io/kube-openapi v0.0.0-20260319004828-5883c5ee87b9 // indirect
 	knative.dev/hack v0.0.0-20250331013814-c577ed9f7775 // indirect
 	sigs.k8s.io/controller-runtime v0.23.1 // indirect
 	sigs.k8s.io/gateway-api v1.5.0 // indirect
@@ -325,4 +325,5 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/release-utils v0.12.3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.7.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect
 )
