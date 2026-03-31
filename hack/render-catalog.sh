@@ -18,13 +18,17 @@ else
   OCP_VERSIONS=("$OCP_VERSIONS")
 fi
 
+OLM_CONFIG="$OLM_DIR/olm.yaml"
+rm -vf $OLM_CONFIG
+
+
 # Generate the catalog for each version
 for VERSION in ${OCP_VERSIONS[@]}; do
   echo "Generating catalog for $VERSION"
   CATALOG_JSON="$OLM_DIR/index/${VERSION}/catalog-template.json"
   RENDERED_CATALOG_JSON="$OLM_DIR/index/${VERSION}/catalog/openshift-pipelines-operator-rh/catalog.json"
   echo "generating catalog template $CATALOG_JSON"
-  (cd $ROOT_DIR/olm && go run olm.go config.yaml $CATALOG_JSON)
+  (cd $ROOT_DIR/olm && go run olm.go config.yaml $CATALOG_JSON $OLM_CONFIG)
   render_catalog $VERSION $CATALOG_JSON $RENDERED_CATALOG_JSON
 done
 

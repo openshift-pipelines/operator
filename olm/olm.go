@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -14,6 +15,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"golang.org/x/mod/semver"
 	"gopkg.in/yaml.v3"
 )
 
@@ -25,31 +27,101 @@ func main() {
 
 	// Read YAML
 	var filePath = os.Args[1]
-	raw, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		panic(err)
-	}
 
 	var outputFile = "catalog-template.json"
 	if len(os.Args) > 2 {
 		outputFile = os.Args[2]
 	}
+
+	olmFileName := filepath.Join(os.TempDir(), "olm.yaml")
+	if len(os.Args) > 3 {
+		olmFileName = os.Args[3]
+	}
+	reuseBundle := false
 	var cfg Config
-	if err := yaml.Unmarshal(raw, &cfg); err != nil {
-		panic(err)
+	if fileExists(olmFileName) {
+		log.Println("OLM config file already exists. Parsing", olmFileName)
+		raw, err := ioutil.ReadFile(olmFileName)
+		if err != nil {
+			log.Println("Error reading OLM config file:", err)
+		} else if err := yaml.Unmarshal(raw, &cfg); err != nil {
+			log.Printf("Error parsing %s: %v", olmFileName, err)
+			reuseBundle = false
+		} else {
+			reuseBundle = cfg.Channels != nil && cfg.BundleVersions != nil
+		}
+		if reuseBundle {
+			log.Println("OLM File is valid, Skipping Bundle Creation")
+		}
+
+	}
+	if !reuseBundle {
+		raw, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			panic(err)
+		}
+		if err := yaml.Unmarshal(raw, &cfg); err != nil {
+			log.Fatalf("Error reading config  %s: %v", olmFileName, err)
+		}
+
+		var bundles = cfg.BundleVersions
+		var channels = cfg.Channels
+
+		minVersion := cfg.MinVersion
+		if minVersion == "" {
+			minVersion = "v1.15.0"
+		}
+		if !strings.HasPrefix(minVersion, "v") {
+			minVersion = "v" + minVersion
+		}
+
+		for _, b := range cfg.Bundles {
+			updateBundleImage(&b)
+			bundleVersion := BundleVersion{parseVersion(b.Version), b.Image}
+			channel := channelName(bundleVersion)
+			if !slices.Contains(channels, channel) {
+				channels = append(channels, channel)
+			}
+			bundles = append(bundles, bundleVersion)
+		}
+		for _, tag := range findBundleTags(minVersion) {
+			bundleImage := getBundleImage(tag)
+			bundleVersion := BundleVersion{parseVersion(strings.Trim(tag, "v")), bundleImage}
+			channel := channelName(bundleVersion)
+			if !slices.Contains(channels, channel) {
+				channels = append(channels, channel)
+			}
+			if !slices.Contains(bundles, bundleVersion) {
+				bundles = append(bundles, bundleVersion)
+			}
+		}
+
+		sort.Slice(bundles, func(i, j int) bool {
+			return bundles[i].Version.Compare(bundles[j].Version) < 0
+		})
+
+		fmt.Printf("Channels: %s\n", strings.Join(channels, ", "))
+		for _, b := range bundles {
+			fmt.Printf("  %s\n", b.Version.Raw)
+		}
+
+		cfg.BundleVersions = bundles
+		cfg.Channels = channels
+
+		// Write to olm.yaml
+		olmFile := createFile(olmFileName)
+		defer olmFile.Close()
+		encoder := yaml.NewEncoder(olmFile)
+		encoder.SetIndent(2)
+
+		err = encoder.Encode(cfg)
+		if err != nil {
+			panic(err)
+		}
 	}
 
-	var bundles []BundleVersion
-	var channels []string
-	for _, b := range cfg.Bundles {
-		updateBundleImage(&b)
-		bundleVersion := BundleVersion{parseVersion(b.Version), b.Image}
-		channel := channelName(bundleVersion)
-		if !slices.Contains(channels, channel) {
-			channels = append(channels, channel)
-		}
-		bundles = append(bundles, bundleVersion)
-	}
+	var bundles = cfg.BundleVersions
+	var channels = cfg.Channels
 
 	// Build output template
 	out := Template{
@@ -89,30 +161,35 @@ func main() {
 	// Output JSON
 	// Open file
 	log.Println("Writing catalog to output file:", outputFile)
-	f, err := os.Create(outputFile)
-	if err != nil {
-		log.Fatal("could not create catalog file:"+outputFile, out, err)
-	}
-
+	// Create file
+	f := createFile(outputFile)
+	defer f.Close()
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
 	enc.SetEscapeHTML(false)
 	enc.Encode(out)
 
-	log.Println("Catalog file written to:", outputFile)
+	log.Println("Catalog Template file written to:", outputFile)
 
-	err = f.Close()
+	err := f.Close()
 	if err != nil {
 		log.Fatal("could not close catalog file:"+outputFile, err)
 	}
 }
 
+func generateBundles() {
+
+}
+
 // Input Configuration Struct
 type Config struct {
-	Package        string         `yaml:"package"`
-	Base64data     string         `yaml:"base64data"`
-	DefaultChannel string         `yaml:"defaultChannel"`
-	Bundles        []BundleConfig `yaml:"bundles"`
+	Package        string          `yaml:"package"`
+	Base64data     string          `yaml:"base64data"`
+	DefaultChannel string          `yaml:"defaultChannel"`
+	Bundles        []BundleConfig  `yaml:"bundles"`
+	BundleVersions []BundleVersion `yaml:"bundleVersions"`
+	Channels       []string        `yaml:"channels"`
+	MinVersion     string          `yaml:"minVersion"`
 }
 
 type BundleConfig struct {
@@ -165,7 +242,8 @@ type BundleVersion struct {
 // Parse & sort versions
 
 // parse semantic version including extra suffix (5.0.5-742)
-var verRegex = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)(.*)$`)
+var verRegex = regexp.MustCompile(`^v?(\d+)\.(\d+)\.(\d+)(-\d+)?$`)
+var tagRegex = regexp.MustCompile(`^v(\d+)\.(\d+)\.(\d+)$`)
 
 type Version struct {
 	Raw    string
@@ -186,7 +264,6 @@ func parseVersion(v string) Version {
 	fmt.Sscanf(m[1], "%d", &ver.Major)
 	fmt.Sscanf(m[2], "%d", &ver.Minor)
 	fmt.Sscanf(m[3], "%d", &ver.Patch)
-	ver.Suffix = m[4]
 	return ver
 }
 
@@ -197,10 +274,7 @@ func (v Version) Compare(other Version) int {
 	if v.Minor != other.Minor {
 		return v.Minor - other.Minor
 	}
-	if v.Patch != other.Patch {
-		return v.Patch - other.Patch
-	}
-	return strings.Compare(v.Suffix, other.Suffix)
+	return v.Patch - other.Patch
 }
 
 func buildAllEntries(pkg string, bundles []BundleVersion) map[string][]ChannelEntry {
@@ -264,6 +338,50 @@ func buildChannel(pkg, name string, allEntries map[string][]ChannelEntry) Channe
 	return channel
 }
 
+const (
+	BUNDLE_REPO = "registry.redhat.io/openshift-pipelines/pipelines-operator-bundle"
+)
+
+func findBundleTags(minVersion string) []string {
+	repo, err := name.NewRepository(BUNDLE_REPO)
+	if err != nil {
+		log.Fatalf("failed to parse image name: %v", err)
+	}
+	tags, _ := remote.List(repo, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	var result []string
+	for _, tag := range tags {
+		if tagRegex.MatchString(tag) {
+			if semver.Compare(tag, minVersion) >= 0 {
+				result = append(result, tag)
+			}
+
+		}
+	}
+	fmt.Println("found bundle tags:", result)
+	return result
+}
+
+func getBundleImage(tag string) string {
+	inputImage := BUNDLE_REPO + ":" + tag
+	ref, err := name.ParseReference(inputImage)
+	if err != nil {
+		log.Fatalf("failed to parse image name: %v", err)
+	}
+
+	// 2. Fetch the descriptor from the remote registry
+	// This uses your local docker/podman credentials automatically
+	desc, err := remote.Get(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	if err != nil {
+		log.Fatalf("failed to fetch image descriptor: %v", err)
+	}
+
+	// 3. Construct the new string using the digest
+	// desc.Digest contains the sha256 hash
+	digestImage := fmt.Sprintf("%s@%s", ref.Context().Name(), desc.Digest.String())
+	//log.Printf("fetched image %s:%s", tag, digestImage)
+	return digestImage
+}
+
 func updateBundleImage(b *BundleConfig) {
 	if !strings.Contains(b.Image, "@sha256") {
 		if b.Tag == "" {
@@ -290,4 +408,23 @@ func updateBundleImage(b *BundleConfig) {
 		fmt.Printf("Resolved: %s\n", digestImage)
 		b.Image = digestImage
 	}
+}
+
+func createFile(filename string) *os.File {
+
+	dir := filepath.Dir(filename)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		log.Fatalf("failed to create dir %s: %v", dir, err)
+	}
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Fatalf("failed to create %s: %v", filename, err)
+	}
+	return file
+
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
