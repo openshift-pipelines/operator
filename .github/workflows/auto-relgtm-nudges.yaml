@@ -1,0 +1,62 @@
+# Centralized workflow to re-apply lgtm on Konflux nudge PRs across all branches.
+#
+# When Konflux rebases (force-pushes) an open nudge PR, prow strips the lgtm
+# label ("New changes detected"). This workflow re-applies lgtm so Tide can
+# merge the PR without manual intervention.
+#
+# Replaces the former per-branch auto-merge-release-*.yaml and
+# auto-approve-konflux-nudges.yaml workflows that were removed in d8a4fcb9.
+name: Auto re-lgtm Konflux nudges
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: auto-relgtm-nudges
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  re-lgtm:
+    if: github.repository_owner == 'openshift-pipelines'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Re-apply lgtm to stuck nudge PRs
+        run: |
+          # Find all open nudge PRs that have 'approved' but are missing 'lgtm'.
+          # These are PRs where Konflux force-pushed and prow stripped lgtm.
+          stuck_prs=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --label konflux-nudge \
+            --label approved \
+            --limit 200 \
+            --json number,title,labels,baseRefName \
+            --jq '.[] | select([.labels[].name] | index("lgtm") | not) | "\(.number)\t\(.baseRefName)\t\(.title)"')
+
+          if [ -z "$stuck_prs" ]; then
+            echo "No stuck nudge PRs found"
+            exit 0
+          fi
+
+          echo "Found stuck nudge PRs (have approved, missing lgtm):"
+          echo "$stuck_prs"
+          echo ""
+
+          failed=0
+          echo "$stuck_prs" | while IFS=$'\t' read -r pr_number base_branch title; do
+            echo "Re-lgtm PR #${pr_number} (${base_branch}): ${title}"
+            if ! gh pr edit "$pr_number" --repo "${{ github.repository }}" --add-label lgtm; then
+              echo "::error::Failed to re-apply lgtm to PR #${pr_number}"
+              failed=1
+            fi
+          done
+
+          exit $failed
+        env:
+          GH_TOKEN: ${{ github.token }}
