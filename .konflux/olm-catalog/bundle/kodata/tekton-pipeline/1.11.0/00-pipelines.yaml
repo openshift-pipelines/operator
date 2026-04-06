@@ -583,8 +583,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.10.2"
-    version: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
+    version: "v1.11.0"
 spec:
   group: tekton.dev
   preserveUnknownFields: false
@@ -1419,8 +1419,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.10.2"
-    version: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
+    version: "v1.11.0"
 spec:
   group: tekton.dev
   preserveUnknownFields: false
@@ -2807,8 +2807,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.10.2"
-    version: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
+    version: "v1.11.0"
 spec:
   group: tekton.dev
   preserveUnknownFields: false
@@ -3235,9 +3235,10 @@ spec:
                           operator:
                             description: |-
                               Operator represents a key's relationship to the value.
-                              Valid operators are Exists and Equal. Defaults to Equal.
+                              Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                               Exists is equivalent to wildcard for value, so that a pod can
                               tolerate all taints of a particular category.
+                              Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                             type: string
                           tolerationSeconds:
                             description: |-
@@ -4086,9 +4087,10 @@ spec:
                                 operator:
                                   description: |-
                                     Operator represents a key's relationship to the value.
-                                    Valid operators are Exists and Equal. Defaults to Equal.
+                                    Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                                     Exists is equivalent to wildcard for value, so that a pod can
                                     tolerate all taints of a particular category.
+                                    Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                                   type: string
                                 tolerationSeconds:
                                   description: |-
@@ -4809,6 +4811,24 @@ spec:
                                     signerName:
                                       description: Kubelet's generated CSRs will be addressed to this signer.
                                       type: string
+                                    userAnnotations:
+                                      description: |-
+                                        userAnnotations allow pod authors to pass additional information to
+                                        the signer implementation.  Kubernetes does not restrict or validate this
+                                        metadata in any way.
+
+                                        These values are copied verbatim into the `spec.unverifiedUserAnnotations` field of
+                                        the PodCertificateRequest objects that Kubelet creates.
+
+                                        Entries are subject to the same validation as object metadata annotations,
+                                        with the addition that all keys must be domain-prefixed. No restrictions
+                                        are placed on values, except an overall size limitation on the entire field.
+
+                                        Signers should document the keys and values they support. Signers should
+                                        deny requests that contain keys they do not recognize.
+                                      type: object
+                                      additionalProperties:
+                                        type: string
                                 secret:
                                   description: secret information about the secret data to project
                                   type: object
@@ -6486,9 +6506,10 @@ spec:
                                 operator:
                                   description: |-
                                     Operator represents a key's relationship to the value.
-                                    Valid operators are Exists and Equal. Defaults to Equal.
+                                    Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                                     Exists is equivalent to wildcard for value, so that a pod can
                                     tolerate all taints of a particular category.
+                                    Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                                   type: string
                                 tolerationSeconds:
                                   description: |-
@@ -7177,9 +7198,10 @@ spec:
                               operator:
                                 description: |-
                                   Operator represents a key's relationship to the value.
-                                  Valid operators are Exists and Equal. Defaults to Equal.
+                                  Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                                   Exists is equivalent to wildcard for value, so that a pod can
                                   tolerate all taints of a particular category.
+                                  Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                                 type: string
                               tolerationSeconds:
                                 description: |-
@@ -7902,6 +7924,24 @@ spec:
                                     signerName:
                                       description: Kubelet's generated CSRs will be addressed to this signer.
                                       type: string
+                                    userAnnotations:
+                                      description: |-
+                                        userAnnotations allow pod authors to pass additional information to
+                                        the signer implementation.  Kubernetes does not restrict or validate this
+                                        metadata in any way.
+
+                                        These values are copied verbatim into the `spec.unverifiedUserAnnotations` field of
+                                        the PodCertificateRequest objects that Kubelet creates.
+
+                                        Entries are subject to the same validation as object metadata annotations,
+                                        with the addition that all keys must be domain-prefixed. No restrictions
+                                        are placed on values, except an overall size limitation on the entire field.
+
+                                        Signers should document the keys and values they support. Signers should
+                                        deny requests that contain keys they do not recognize.
+                                      type: object
+                                      additionalProperties:
+                                        type: string
                                 secret:
                                   description: secret information about the secret data to project
                                   type: object
@@ -8719,8 +8759,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.10.2"
-    version: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
+    version: "v1.11.0"
 spec:
   group: tekton.dev
   preserveUnknownFields: false
@@ -9875,8 +9915,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.10.2"
-    version: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
+    version: "v1.11.0"
 spec:
   group: tekton.dev
   preserveUnknownFields: false
@@ -17093,8 +17133,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.10.2"
-    version: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
+    version: "v1.11.0"
 spec:
   group: tekton.dev
   preserveUnknownFields: false
@@ -17560,9 +17600,10 @@ spec:
                           operator:
                             description: |-
                               Operator represents a key's relationship to the value.
-                              Valid operators are Exists and Equal. Defaults to Equal.
+                              Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                               Exists is equivalent to wildcard for value, so that a pod can
                               tolerate all taints of a particular category.
+                              Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                             type: string
                           tolerationSeconds:
                             description: |-
@@ -18642,6 +18683,24 @@ spec:
                                     signerName:
                                       description: Kubelet's generated CSRs will be addressed to this signer.
                                       type: string
+                                    userAnnotations:
+                                      description: |-
+                                        userAnnotations allow pod authors to pass additional information to
+                                        the signer implementation.  Kubernetes does not restrict or validate this
+                                        metadata in any way.
+
+                                        These values are copied verbatim into the `spec.unverifiedUserAnnotations` field of
+                                        the PodCertificateRequest objects that Kubelet creates.
+
+                                        Entries are subject to the same validation as object metadata annotations,
+                                        with the addition that all keys must be domain-prefixed. No restrictions
+                                        are placed on values, except an overall size limitation on the entire field.
+
+                                        Signers should document the keys and values they support. Signers should
+                                        deny requests that contain keys they do not recognize.
+                                      type: object
+                                      additionalProperties:
+                                        type: string
                                 secret:
                                   description: secret information about the secret data to project
                                   type: object
@@ -19837,9 +19896,10 @@ spec:
                           operator:
                             description: |-
                               Operator represents a key's relationship to the value.
-                              Valid operators are Exists and Equal. Defaults to Equal.
+                              Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                               Exists is equivalent to wildcard for value, so that a pod can
                               tolerate all taints of a particular category.
+                              Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                             type: string
                           tolerationSeconds:
                             description: |-
@@ -20759,6 +20819,24 @@ spec:
                                     signerName:
                                       description: Kubelet's generated CSRs will be addressed to this signer.
                                       type: string
+                                    userAnnotations:
+                                      description: |-
+                                        userAnnotations allow pod authors to pass additional information to
+                                        the signer implementation.  Kubernetes does not restrict or validate this
+                                        metadata in any way.
+
+                                        These values are copied verbatim into the `spec.unverifiedUserAnnotations` field of
+                                        the PodCertificateRequest objects that Kubelet creates.
+
+                                        Entries are subject to the same validation as object metadata annotations,
+                                        with the addition that all keys must be domain-prefixed. No restrictions
+                                        are placed on values, except an overall size limitation on the entire field.
+
+                                        Signers should document the keys and values they support. Signers should
+                                        deny requests that contain keys they do not recognize.
+                                      type: object
+                                      additionalProperties:
+                                        type: string
                                 secret:
                                   description: secret information about the secret data to project
                                   type: object
@@ -24436,8 +24514,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.10.2"
-    version: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
+    version: "v1.11.0"
 spec:
   group: tekton.dev
   versions:
@@ -24580,7 +24658,7 @@ metadata:
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
 # The data is populated at install time.
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -24591,7 +24669,7 @@ metadata:
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
 webhooks:
   - admissionReviewVersions: ["v1"]
     clientConfig:
@@ -24610,7 +24688,7 @@ metadata:
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
 webhooks:
   - admissionReviewVersions: ["v1"]
     clientConfig:
@@ -24629,7 +24707,7 @@ metadata:
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
 webhooks:
   - admissionReviewVersions: ["v1"]
     clientConfig:
@@ -25116,7 +25194,7 @@ data:
   # this ConfigMap such that even if we don't have access to
   # other resources in the namespace we still can have access to
   # this ConfigMap.
-  version: "v1.10.2"
+  version: "v1.11.0"
 
 ---
 # Copyright 2020 Tekton Authors LLC
@@ -25543,7 +25621,7 @@ data:
     #
     # API endpoint to send the traces to
     # (optional): The default value is given below
-    endpoint: "http://jaeger-collector.jaeger.svc.cluster.local:14268/api/traces"
+    endpoint: "http://jaeger-collector.jaeger.svc.cluster.local:4318/v1/traces"
     # (optional) Name of the k8s secret which contains basic auth credentials
     credentialsSecret: "jaeger-creds"
 
@@ -25605,12 +25683,12 @@ metadata:
     app.kubernetes.io/name: controller
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.10.2"
+    app.kubernetes.io/version: "v1.11.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
     # labels below are related to istio and should not be used for resource lookup
-    version: "v1.10.2"
+    version: "v1.11.0"
 spec:
   replicas: 1
   selector:
@@ -25625,13 +25703,13 @@ spec:
         app.kubernetes.io/name: controller
         app.kubernetes.io/component: controller
         app.kubernetes.io/instance: default
-        app.kubernetes.io/version: "v1.10.2"
+        app.kubernetes.io/version: "v1.11.0"
         app.kubernetes.io/part-of: tekton-pipelines
         # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-        pipeline.tekton.dev/release: "v1.10.2"
+        pipeline.tekton.dev/release: "v1.11.0"
         # labels below are related to istio and should not be used for resource lookup
         app: tekton-pipelines-controller
-        version: "v1.10.2"
+        version: "v1.11.0"
     spec:
       affinity:
         nodeAffinity:
@@ -25656,11 +25734,11 @@ spec:
       serviceAccountName: tekton-pipelines-controller
       containers:
         - name: tekton-pipelines-controller
-          image: ghcr.io/tektoncd/pipeline/controller-10a3e32792f33651396d02b6855a6e36:v1.10.2@sha256:30e30719985fb6bc7d4ccdddfa6a1de94c4e6e0e32c5c8714a2ed4e03f1453f9
+          image: ghcr.io/tektoncd/pipeline/controller-10a3e32792f33651396d02b6855a6e36:v1.11.0@sha256:e42816021c5bbf58733589cf0eff933663b84e56370858bcbb60069335e72c8d
           args: [
             # These images are built on-demand by `ko resolve` and are replaced
             # by image references by digest.
-            "-entrypoint-image", "ghcr.io/tektoncd/pipeline/entrypoint-bff0a22da108bc2f16c818c97641a296:v1.10.2@sha256:bcf235d0a193551e9307a3270d878c5ffa9a4f199c924f39c3fe5a17276c9670", "-nop-image", "ghcr.io/tektoncd/pipeline/nop-8eac7c133edad5df719dc37b36b62482:v1.10.2@sha256:a1bd0d95587a9a8ea7d9f0b4925d7abfaf3dffcbda9be72ee44288bfd68f9506", "-sidecarlogresults-image", "ghcr.io/tektoncd/pipeline/sidecarlogresults-7501c6a20d741631510a448b48ab098f:v1.10.2@sha256:119609ce431a41c30101ad1d8c35393c79b24c6192b3cdf16aa01f3c7725715a", "-workingdirinit-image", "ghcr.io/tektoncd/pipeline/workingdirinit-0c558922ec6a1b739e550e349f2d5fc1:v1.10.2@sha256:2c4f7e78e01d337b4d1710c94ecabf23b460ebd1d5a6c82de5de64bd889ff112",
+            "-entrypoint-image", "ghcr.io/tektoncd/pipeline/entrypoint-bff0a22da108bc2f16c818c97641a296:v1.11.0@sha256:3e43576d2e32c4acd95df9f9d58c9dc794c0f9e4d771446f077aaa822700e3f1", "-nop-image", "ghcr.io/tektoncd/pipeline/nop-8eac7c133edad5df719dc37b36b62482:v1.11.0@sha256:068f8a83b550d9e70f33f1f9f8339f615a0c276f6651436e349643e9d9f7e3b2", "-sidecarlogresults-image", "ghcr.io/tektoncd/pipeline/sidecarlogresults-7501c6a20d741631510a448b48ab098f:v1.11.0@sha256:bf94320c1bf314713119b2e007ebedc41e971ce9b0cd3a15dadaff5725174bbf", "-workingdirinit-image", "ghcr.io/tektoncd/pipeline/workingdirinit-0c558922ec6a1b739e550e349f2d5fc1:v1.11.0@sha256:a8d93e160d53fc899ccdd4f2c9d737d071b5d58bc2b74f49b5f83fcb45acba1a",
             # The shell image must allow root in order to create directories and copy files to PVCs.
             # cgr.dev/chainguard/busybox as of April 14 2022
             # image shall not contains tag, so it will be supported on a runtime like cri-o
@@ -25751,13 +25829,13 @@ metadata:
     app.kubernetes.io/name: controller
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.10.2"
+    app.kubernetes.io/version: "v1.11.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
     # labels below are related to istio and should not be used for resource lookup
     app: tekton-pipelines-controller
-    version: "v1.10.2"
+    version: "v1.11.0"
   name: tekton-pipelines-controller
   namespace: tekton-pipelines
 spec:
@@ -25801,12 +25879,12 @@ metadata:
     app.kubernetes.io/name: events
     app.kubernetes.io/component: events
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.10.2"
+    app.kubernetes.io/version: "v1.11.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
     # labels below are related to istio and should not be used for resource lookup
-    version: "v1.10.2"
+    version: "v1.11.0"
 spec:
   replicas: 1
   selector:
@@ -25821,13 +25899,13 @@ spec:
         app.kubernetes.io/name: events
         app.kubernetes.io/component: events
         app.kubernetes.io/instance: default
-        app.kubernetes.io/version: "v1.10.2"
+        app.kubernetes.io/version: "v1.11.0"
         app.kubernetes.io/part-of: tekton-pipelines
         # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-        pipeline.tekton.dev/release: "v1.10.2"
+        pipeline.tekton.dev/release: "v1.11.0"
         # labels below are related to istio and should not be used for resource lookup
         app: tekton-events-controller
-        version: "v1.10.2"
+        version: "v1.11.0"
     spec:
       affinity:
         nodeAffinity:
@@ -25841,7 +25919,7 @@ spec:
       serviceAccountName: tekton-events-controller
       containers:
         - name: tekton-events-controller
-          image: ghcr.io/tektoncd/pipeline/events-a9042f7efb0cbade2a868a1ee5ddd52c:v1.10.2@sha256:cfac49f9553afe99c1f3c23cc6d01cfc26e001c2257e03467bea1e6d14ccd158
+          image: ghcr.io/tektoncd/pipeline/events-a9042f7efb0cbade2a868a1ee5ddd52c:v1.11.0@sha256:4e566eb682804b43e252dd5f3fba717d880ed35a0b2202b7e28e8e0245a2f667
           args: []
           volumeMounts:
             - name: config-logging
@@ -25920,13 +25998,13 @@ metadata:
     app.kubernetes.io/name: events
     app.kubernetes.io/component: events
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.10.2"
+    app.kubernetes.io/version: "v1.11.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
     # labels below are related to istio and should not be used for resource lookup
     app: tekton-events-controller
-    version: "v1.10.2"
+    version: "v1.11.0"
   name: tekton-events-controller
   namespace: tekton-pipelines
 spec:
@@ -26544,6 +26622,17 @@ data:
   default-kind: "task"
   # the default hub source to pull the resource from.
   default-type: "artifact"
+  # Ordered list of Artifact Hub API URLs to try. First successful response wins.
+  # If not set, the ARTIFACT_HUB_API env var or default (https://artifacthub.io) is used.
+  # URLs must use http or https scheme.
+  # artifact-hub-urls: |
+  #   - https://internal-hub.example.com/
+  #   - https://artifacthub.io/
+  # Ordered list of Tekton Hub API URLs to try. First successful response wins.
+  # If not set, the TEKTON_HUB_API env var is used.
+  # URLs must use http or https scheme.
+  # tekton-hub-urls: |
+  #   - https://api.hub.tekton.dev/
 
 ---
 # Copyright 2025 The Tekton Authors
@@ -26598,12 +26687,12 @@ metadata:
     app.kubernetes.io/name: resolvers
     app.kubernetes.io/component: resolvers
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.10.2"
+    app.kubernetes.io/version: "v1.11.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
     # labels below are related to istio and should not be used for resource lookup
-    version: "v1.10.2"
+    version: "v1.11.0"
 spec:
   replicas: 1
   selector:
@@ -26618,13 +26707,13 @@ spec:
         app.kubernetes.io/name: resolvers
         app.kubernetes.io/component: resolvers
         app.kubernetes.io/instance: default
-        app.kubernetes.io/version: "v1.10.2"
+        app.kubernetes.io/version: "v1.11.0"
         app.kubernetes.io/part-of: tekton-pipelines
         # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-        pipeline.tekton.dev/release: "v1.10.2"
+        pipeline.tekton.dev/release: "v1.11.0"
         # labels below are related to istio and should not be used for resource lookup
         app: tekton-pipelines-resolvers
-        version: "v1.10.2"
+        version: "v1.11.0"
     spec:
       affinity:
         nodeAffinity:
@@ -26649,7 +26738,7 @@ spec:
       serviceAccountName: tekton-pipelines-resolvers
       containers:
         - name: controller
-          image: ghcr.io/tektoncd/pipeline/resolvers-ff86b24f130c42b88983d3c13993056d:v1.10.2@sha256:98d79c1d277a878cb14a3b0388c85441fb2d434f8ddab18a3bbc3308821919f7
+          image: ghcr.io/tektoncd/pipeline/resolvers-ff86b24f130c42b88983d3c13993056d:v1.11.0@sha256:379667b508178aebf8854c42d506a2f65d84a02bcd6788642a6d4bfe0a9712db
           command:
             - /sbin/tini
             - --
@@ -26735,13 +26824,13 @@ metadata:
     app.kubernetes.io/name: resolvers
     app.kubernetes.io/component: resolvers
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.10.2"
+    app.kubernetes.io/version: "v1.11.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
     # labels below are related to istio and should not be used for resource lookup
     app: tekton-pipelines-remote-resolvers
-    version: "v1.10.2"
+    version: "v1.11.0"
   name: tekton-pipelines-remote-resolvers
   namespace: tekton-pipelines-resolvers
 spec:
@@ -26785,12 +26874,12 @@ metadata:
     app.kubernetes.io/name: webhook
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.10.2"
+    app.kubernetes.io/version: "v1.11.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
     # labels below are related to istio and should not be used for resource lookup
-    version: "v1.10.2"
+    version: "v1.11.0"
 spec:
   minReplicas: 1
   maxReplicas: 5
@@ -26833,12 +26922,12 @@ metadata:
     app.kubernetes.io/name: webhook
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.10.2"
+    app.kubernetes.io/version: "v1.11.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
     # labels below are related to istio and should not be used for resource lookup
-    version: "v1.10.2"
+    version: "v1.11.0"
 spec:
   selector:
     matchLabels:
@@ -26852,13 +26941,13 @@ spec:
         app.kubernetes.io/name: webhook
         app.kubernetes.io/component: webhook
         app.kubernetes.io/instance: default
-        app.kubernetes.io/version: "v1.10.2"
+        app.kubernetes.io/version: "v1.11.0"
         app.kubernetes.io/part-of: tekton-pipelines
         # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-        pipeline.tekton.dev/release: "v1.10.2"
+        pipeline.tekton.dev/release: "v1.11.0"
         # labels below are related to istio and should not be used for resource lookup
         app: tekton-pipelines-webhook
-        version: "v1.10.2"
+        version: "v1.11.0"
     spec:
       affinity:
         nodeAffinity:
@@ -26885,7 +26974,7 @@ spec:
         - name: webhook
           # This is the Go import path for the binary that is containerized
           # and substituted here.
-          image: ghcr.io/tektoncd/pipeline/webhook-d4749e605405422fd87700164e31b2d1:v1.10.2@sha256:24a2e41cf41cba08d04ef6c623c7eeab5279145474db28f14dcb059553ea2319
+          image: ghcr.io/tektoncd/pipeline/webhook-d4749e605405422fd87700164e31b2d1:v1.11.0@sha256:6e3c9f0ca64a831e2f0dbca932fe0eec2b187a24e3bcf67b647e74a1156067fb
           # Resource request required for autoscaler to take any action for a metric
           resources:
             requests:
@@ -26982,13 +27071,13 @@ metadata:
     app.kubernetes.io/name: webhook
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.10.2"
+    app.kubernetes.io/version: "v1.11.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.10.2"
+    pipeline.tekton.dev/release: "v1.11.0"
     # labels below are related to istio and should not be used for resource lookup
     app: tekton-pipelines-webhook
-    version: "v1.10.2"
+    version: "v1.11.0"
   name: tekton-pipelines-webhook
   namespace: tekton-pipelines
 spec:
