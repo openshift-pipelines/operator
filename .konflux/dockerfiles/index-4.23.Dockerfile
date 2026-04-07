@@ -9,7 +9,7 @@ RUN ["/bin/opm", "serve", "/configs", "--cache-dir=/tmp/cache", "--cache-only"]
 # Core bundle labels.
 LABEL \
     com.redhat.component="openshift-pipelines-index-4.23-container" \
-    cpe="cpe:/a:redhat:openshift_pipelines:1.22::el9" \
+    cpe="cpe:/a:redhat:openshift_pipelines:1.20::el9" \
     description="Red Hat OpenShift Pipelines operator index-4.23" \
     io.k8s.description="Red Hat OpenShift Pipelines operator index-4.23" \
     io.k8s.display-name="Red Hat OpenShift Pipelines operator index-4.23" \
@@ -26,4 +26,4 @@ LABEL \
     operators.operatorframework.io.metrics.builder="operator-sdk-v1.37.0" \
     operators.operatorframework.io.metrics.mediatype.v1="metrics+v1" \
     summary="Red Hat OpenShift Pipelines operator index-4.23" \
-    version="v1.22.0"
+    version="v1.20.4"
