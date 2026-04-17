@@ -27,6 +27,8 @@ concurrency:
 jobs:
   generate-catalog:
     runs-on: ubuntu-latest
+#    container:
+#      image: fedora:latest
     permissions:
       contents: write
       pull-requests: write
@@ -35,10 +37,35 @@ jobs:
         uses: actions/checkout@v4
       - name: Configure Docker authentication
         env:
-          DOCKER_CONFIG: /home/runner/.docker
           DOCKER_JSON: ${{ secrets.DOCKER_REGISTRY_SECRET }}
         run: |
-          echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json
+          mkdir -p $HOME/.docker
+          echo ${DOCKER_JSON} > $HOME/.docker/config.json
+      - name: Configure registry mirrors
+        run: |
+          set -x
+          CONFIG_DIR=$HOME/.config/containers/registries.conf.d
+          sudo mkdir -p $CONFIG_DIR
+
+          cat <<EOF | sudo tee $CONFIG_DIR/mirror.conf
+          [[registry]]
+          location = "registry.redhat.io/openshift-pipelines"
+
+          [[registry.mirror]]
+          location = "quay.io/openshift-pipeline"
+          EOF
+          cat $CONFIG_DIR/mirror.conf
+      - name: Configure container policy
+        run: |
+          sudo mkdir -p /etc/containers
+          cat <<EOF | sudo tee /etc/containers/policy.json
+          {
+            "default": [
+              { "type": "insecureAcceptAnything" }
+            ]
+          }
+          EOF
+          cat /etc/containers/policy.json
       - name: Generate OLM Bundles
         run: |
           curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
@@ -47,7 +74,15 @@ jobs:
 
       - name: Update OLM catalog
         run: |
+          docker run --platform linux/amd64 --rm \
+          -e REGISTRY_AUTH_FILE=/root/.docker/config.json \
+          -v "$HOME/.config/containers:/root/.config/containers" \
+          -v "$HOME/.docker/config.json:/root/.docker/config.json:ro" \
+          -v "$(pwd):/work" \
+          -w /work \
+          quay.io/openshift-pipeline/ci  \
           ./hack/render-catalog.sh
+
       - name: Commit Changes and Generate PR
         if: github.event_name != 'pull_request'
         run: |
