@@ -441,7 +441,7 @@ func fetchWithMirror(ref name.Reference) (*remote.Descriptor, error) {
 	mirror := strings.Replace(
 		ref.Name(),
 		"registry.redhat.io/openshift-pipelines",
-		"quay.io/prbindal",
+		"quay.io/openshift-pipeline",
 		1,
 	)
 
