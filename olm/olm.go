@@ -385,11 +385,15 @@ func getBundleImage(tag string) string {
 }
 
 func updateBundleImage(b *BundleConfig) {
-	if !strings.Contains(b.Image, "@sha256") {
-		if b.Tag == "" {
-			b.Tag = "v" + b.Version
+	inputImage := b.Image
+	if !strings.Contains(inputImage, "@sha256") {
+		if inputImage == "" {
+			if b.Tag == "" {
+				b.Tag = "v" + b.Version
+			}
+			inputImage = "registry.redhat.io/openshift-pipelines/pipelines-operator-bundle:" + b.Tag
 		}
-		inputImage := "registry.redhat.io/openshift-pipelines/pipelines-operator-bundle:" + b.Tag
+
 		ref, err := name.ParseReference(inputImage)
 		if err != nil {
 			log.Fatalf("failed to parse image name: %v", err)
@@ -397,7 +401,8 @@ func updateBundleImage(b *BundleConfig) {
 
 		// 2. Fetch the descriptor from the remote registry
 		// This uses your local docker/podman credentials automatically
-		desc, err := remote.Get(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+		//desc, err := remote.Get(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+		desc, err := fetchWithMirror(ref)
 		if err != nil {
 			log.Fatalf("failed to fetch image descriptor: %v", err)
 		}
@@ -429,4 +434,24 @@ func createFile(filename string) *os.File {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func fetchWithMirror(ref name.Reference) (*remote.Descriptor, error) {
+	// Try mirror first
+	mirror := strings.Replace(
+		ref.Name(),
+		"registry.redhat.io/openshift-pipelines",
+		"quay.io/prbindal",
+		1,
+	)
+
+	mirrorRef, _ := name.ParseReference(mirror)
+
+	desc, err := remote.Get(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	if err == nil {
+		return desc, nil
+	}
+	log.Printf("failed to fetch %s  , Falling back to mirror: %s", ref.Name(), mirrorRef.Name())
+	// fallback to Mirror
+	return remote.Get(mirrorRef, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 }
