@@ -2,9 +2,17 @@
 
 set -ex
 current_version=$(yq e '.versions.current' project.yaml)
-echo "Current version: $current_version"
+docker_version=$(awk '
+  BEGIN { RS=""; FS="version=\"" }
+  NF>1 { split($2,a,"\""); print a[1] }
+    ' .konflux/dockerfiles/bundle.Dockerfile)
 
-new_version="$current_version"
+if [[ $docker_version == "next" ]]; then
+   new_version=$current_version
+else
+  new_version=${docker_version#v}
+fi
+
 # Only bump if version ends with -<number>
 if [[ "$current_version" =~ ^(.+)-([0-9]+)$ ]]; then
   base="${BASH_REMATCH[1]}"
