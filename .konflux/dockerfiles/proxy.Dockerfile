@@ -1,4 +1,4 @@
-ARG GO_BUILDER=registry.access.redhat.com/ubi9/go-toolset:9.7-1775724628
+ARG GO_BUILDER=registry.access.redhat.com/ubi9/go-toolset:1.25
 ARG RUNTIME=registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:d91be7cea9f03a757d69ad7fcdfcd7849dba820110e7980d5e2a1f46ed06ea3b 
 
 FROM $GO_BUILDER as builder
@@ -22,7 +22,7 @@ COPY head ${KO_DATA_PATH}/HEAD
 
 LABEL \
     com.redhat.component="openshift-pipelines-operator-proxy-rhel9-container" \
-    cpe="cpe:/a:redhat:openshift_pipelines:1.22::el9" \
+    cpe="cpe:/a:redhat:openshift_pipelines:1.24::el9" \
     description="Red Hat OpenShift Pipelines operator proxy" \
     io.k8s.description="Red Hat OpenShift Pipelines operator proxy" \
     io.k8s.display-name="Red Hat OpenShift Pipelines operator proxy" \
@@ -30,7 +30,7 @@ LABEL \
     maintainer="pipelines-extcomm@redhat.com" \
     name="openshift-pipelines/pipelines-operator-proxy-rhel9" \
     summary="Red Hat OpenShift Pipelines operator proxy" \
-    version="v1.22.0"
+    version="v1.24.0"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
