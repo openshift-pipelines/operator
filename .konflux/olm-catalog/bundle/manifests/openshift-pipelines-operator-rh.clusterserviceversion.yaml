@@ -7,6 +7,7 @@ metadata:
     categories: Developer Tools, Integration & Delivery
     certified: 'false'
     console.openshift.io/plugins: '["pipelines-console-plugin"]'
+    containerImage: registry.redhat.io/openshift-pipelines/pipelines-rhel9-operator@
     description: Red Hat OpenShift Pipelines is a cloud-native CI/CD solution for building pipelines using Tekton concepts which run natively on OpenShift and Kubernetes.
     features.operators.openshift.io/cnf: 'false'
     features.operators.openshift.io/cni: 'false'
@@ -414,11 +415,11 @@ spec:
     ### Components
 
 
-    - Tekton Pipelines: v1.10.0
+    - Tekton Pipelines: v1.11.0
 
     - Tekton Triggers: v0.35.0
 
-    - Pipelines as Code: v0.42.0
+    - Pipelines as Code: v0.45.0
 
     - Tekton Chains: v0.26.2
 
@@ -1236,11 +1237,19 @@ spec:
                 - delete
                 - update
                 - patch
+            - apiGroups:
+                - config.openshift.io
+              resources:
+                - apiservers
+              verbs:
+                - get
+                - list
+                - watch
           serviceAccountName: openshift-pipelines-operator
       deployments:
         - label:
-            operator.tekton.dev/release: v0.79.0
-            version: v0.79.0
+            operator.tekton.dev/release: devel
+            version: devel
           name: openshift-pipelines-operator
           spec:
             replicas: 1
@@ -1460,7 +1469,7 @@ spec:
                       - name: PROFILING_PORT
                         value: '9009'
                       - name: VERSION
-                        value: v0.79.0
+                        value: devel
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: CONFIG_LEADERELECTION_NAME
@@ -1483,8 +1492,8 @@ spec:
                     type: RuntimeDefault
                 serviceAccountName: openshift-pipelines-operator
         - label:
-            operator.tekton.dev/release: v0.79.0
-            version: v0.79.0
+            operator.tekton.dev/release: devel
+            version: devel
           name: tekton-operator-webhook
           spec:
             replicas: 1
@@ -1527,7 +1536,10 @@ spec:
                     ports:
                       - containerPort: 8443
                         name: https-webhook
-                    resources: {}
+                    resources:
+                      requests:
+                        cpu: 10m
+                        memory: 64Mi
                     securityContext:
                       allowPrivilegeEscalation: false
                       capabilities:
