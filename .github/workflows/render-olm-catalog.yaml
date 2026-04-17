@@ -27,8 +27,8 @@ concurrency:
 jobs:
   generate-catalog:
     runs-on: ubuntu-latest
-#    container:
-#      image: fedora:latest
+    container:
+      image: quay.io/openshift-pipeline/ci:latest
     permissions:
       contents: write
       pull-requests: write
@@ -74,13 +74,6 @@ jobs:
 
       - name: Update OLM catalog
         run: |
-          docker run --platform linux/amd64 --rm \
-          -e REGISTRY_AUTH_FILE=/root/.docker/config.json \
-          -v "$HOME/.config/containers:/root/.config/containers" \
-          -v "$HOME/.docker/config.json:/root/.docker/config.json:ro" \
-          -v "$(pwd):/work" \
-          -w /work \
-          quay.io/openshift-pipeline/ci  \
           ./hack/render-catalog.sh
 
       - name: Commit Changes and Generate PR
