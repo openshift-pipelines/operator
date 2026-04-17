@@ -19,17 +19,7 @@ on:
       - bundle.yaml
       - olm/**
       - .github/workflows/render-olm-catalog.yaml
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Select Environment'
-        required: true
-        default: 'devel'
-        type: choice
-        options:
-          - devel
-          - staging
-          - production
+  workflow_dispatch: {}
 concurrency:
   group: render-${{ github.ref }}-${{ github.run_id }}
   cancel-in-progress: false
@@ -53,7 +43,7 @@ jobs:
         run: |
           curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
           chmod +x /usr/local/bin/opm
-          ./hack/update-olm-bundle.sh ${{github.event.inputs.environment}}
+          ./hack/update-olm-bundle.sh
 
       - name: Update OLM catalog
         run: |

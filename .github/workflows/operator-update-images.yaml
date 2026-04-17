@@ -8,17 +8,7 @@ on:
       - release-v*
     paths:
       - project.yaml
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Select Environment'
-        required: true
-        default: 'devel'
-        type: choice
-        options:
-          - devel
-          - staging
-          - production
+  workflow_dispatch: {}
 
 jobs:
   update-csv:
@@ -34,7 +24,7 @@ jobs:
       - name: update-image-references
         run: |
           # Update operator's payload and stuff
-          make ENVIRONMENT=${{github.event.inputs.environment}} update-reference  
+          make update-reference  
 
       - name: Commit new changes
         run: |
