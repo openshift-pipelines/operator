@@ -9,7 +9,7 @@ LABEL \
     com.redhat.component="openshift-pipelines-operator-bundle-container" \
     com.redhat.delivery.backport="false " \
     com.redhat.delivery.operator.bundle="true " \
-    cpe="cpe:/a:redhat:openshift_pipelines:1.22::el9" \
+    cpe="cpe:/a:redhat:openshift_pipelines:1.24::el9" \
     description="Red Hat OpenShift Pipelines operator bundle" \
     distribution-scope="public" \
     io.k8s.description="Red Hat OpenShift Pipelines operator bundle" \
@@ -27,7 +27,7 @@ LABEL \
     summary="Red Hat OpenShift Pipelines operator bundle" \
     url="https://access.redhat.com/containers/#/registry.access.redhat.com/ubi9-minimal/images/9.4-1227.1725849298" \
     vendor="Red Hat, Inc." \
-    version="v1.22.0"
+    version="v1.24.0"
 
 
 USER 65532
