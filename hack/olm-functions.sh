@@ -1,5 +1,5 @@
   function update_bundle_image() {
-    environment=${1:-"devel"}
+    environment=${1:-"staging"}
     BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     ROOT_DIR="$(dirname "$BASEDIR")"
 
