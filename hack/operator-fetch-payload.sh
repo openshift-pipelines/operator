@@ -107,9 +107,9 @@ yq --inplace 'del(.properties[] | select(.type == "olm.maxOpenShiftVersion"))' \
 
 # update OCP minimum verson
 sed -i -E 's%LABEL com.redhat.openshift.versions=".*%LABEL com.redhat.openshift.versions="'v${MIN_OPENSHIFT_VERSION}'"%' \
-    .konflux/olm-catalog/bundle/Dockerfile
+    .konflux/dockerfiles/bundle.Dockerfile
 
 # update channels in operator bundle dockerfile
 sed -i -E 's%LABEL operators.operatorframework.io.bundle.channels.v1=".*%LABEL operators.operatorframework.io.bundle.channels.v1="'${CHANNEL_NAME}'"%' \
-    .konflux/olm-catalog/bundle/Dockerfile
+    .konflux/dockerfiles/bundle.Dockerfile
 
