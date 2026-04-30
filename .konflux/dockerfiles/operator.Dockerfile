@@ -24,7 +24,7 @@ COPY head ${KO_DATA_PATH}/HEAD
 
 LABEL \
     com.redhat.component="openshift-pipelines-rhel9-operator-container" \
-    cpe="cpe:/a:redhat:openshift_pipelines:next::el9" \
+    cpe="cpe:/a:redhat:openshift_pipelines:1.23::el9" \
     description="Red Hat OpenShift Pipelines operator operator" \
     io.k8s.description="Red Hat OpenShift Pipelines operator operator" \
     io.k8s.display-name="Red Hat OpenShift Pipelines operator operator" \
@@ -32,7 +32,7 @@ LABEL \
     maintainer="pipelines-extcomm@redhat.com" \
     name="openshift-pipelines/pipelines-rhel9-operator" \
     summary="Red Hat OpenShift Pipelines operator operator" \
-    version="next"
+    version="v1.23.0"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
