@@ -22,14 +22,14 @@ COPY --from=builder /tmp/openshift-pipelines-operator-proxy ${OPERATOR_PROXY}
 COPY head ${KO_DATA_PATH}/HEAD
 
 LABEL \
-    com.redhat.component="openshift-pipelines-operator-proxy-rhel9-container" \
+    com.redhat.component="openshift-pipelines-operator-proxy-rhel8-container" \
     cpe="cpe:/a:redhat:openshift_pipelines:1.15::el9" \
     description="Red Hat OpenShift Pipelines operator proxy" \
     io.k8s.description="Red Hat OpenShift Pipelines operator proxy" \
     io.k8s.display-name="Red Hat OpenShift Pipelines operator proxy" \
     io.openshift.tags="tekton,openshift,operator,proxy" \
     maintainer="pipelines-extcomm@redhat.com" \
-    name="openshift-pipelines/pipelines-operator-proxy-rhel9" \
+    name="openshift-pipelines/pipelines-operator-proxy-rhel8" \
     summary="Red Hat OpenShift Pipelines operator proxy" \
     version="v1.15.5"
 
