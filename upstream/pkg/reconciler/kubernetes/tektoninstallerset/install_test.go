@@ -69,7 +69,7 @@ func TestEnsureResources_CreateResource(t *testing.T) {
 
 	i := NewInstaller(&manifest, fakeClient, k8sClient, logger)
 
-	err = i.EnsureNamespaceScopedResources("test-installerset")
+	err = i.EnsureNamespaceScopedResources()
 	assert.NilError(t, err)
 
 	res, err := fakeClient.Get(&serviceAccount)
@@ -102,7 +102,7 @@ func TestEnsureResources_UpdateResource(t *testing.T) {
 
 	i := NewInstaller(&manifest, fakeClient, k8sClient, logger)
 
-	err = i.EnsureNamespaceScopedResources("test-installerset")
+	err = i.EnsureNamespaceScopedResources()
 	assert.NilError(t, err)
 
 	res, err := fakeClient.Get(&serviceAccount)
@@ -122,14 +122,6 @@ func TestEnsureResources_WaitingDeletion(t *testing.T) {
 
 	serviceAccount := serviceAccount.DeepCopy()
 	serviceAccount.SetDeletionTimestamp(&metav1.Time{Time: time.Now()})
-	// Set owner reference so the resource is owned by this InstallerSet
-	serviceAccount.SetOwnerReferences([]metav1.OwnerReference{
-		{
-			APIVersion: "operator.tekton.dev/v1alpha1",
-			Kind:       "TektonInstallerSet",
-			Name:       "test-installerset",
-		},
-	})
 
 	var saObjectFromInstallerSet unstructured.Unstructured
 	data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(serviceAccount)
@@ -146,7 +138,7 @@ func TestEnsureResources_WaitingDeletion(t *testing.T) {
 	i := NewInstaller(&manifest, fakeClient, k8sClient, logger)
 
 	// waiting for old resource to be deleted
-	err = i.EnsureNamespaceScopedResources("test-installerset")
+	err = i.EnsureNamespaceScopedResources()
 	assert.Error(t, err, v1alpha1.RECONCILE_AGAIN_ERR.Error())
 }
 

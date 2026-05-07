@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -501,7 +502,7 @@ func (c SharedConfig) getCustomCABundle(context.Context) (io.Reader, bool, error
 		return nil, false, nil
 	}
 
-	b, err := os.ReadFile(c.CustomCABundle)
+	b, err := ioutil.ReadFile(c.CustomCABundle)
 	if err != nil {
 		return nil, false, err
 	}

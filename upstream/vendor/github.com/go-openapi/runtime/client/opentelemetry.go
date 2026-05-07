@@ -98,14 +98,12 @@ func newOpenTelemetryTransport(transport runtime.ClientTransport, host string, o
 		host:      host,
 	}
 
-	const baseOptions = 4
-	defaultOpts := make([]OpenTelemetryOpt, 0, len(opts)+baseOptions)
-	defaultOpts = append(defaultOpts,
+	defaultOpts := []OpenTelemetryOpt{
 		WithSpanOptions(trace.WithSpanKind(trace.SpanKindClient)),
 		WithSpanNameFormatter(defaultTransportFormatter),
 		WithPropagators(otel.GetTextMapPropagator()),
 		WithTracerProvider(otel.GetTracerProvider()),
-	)
+	}
 
 	c := newConfig(append(defaultOpts, opts...)...)
 	tr.config = c

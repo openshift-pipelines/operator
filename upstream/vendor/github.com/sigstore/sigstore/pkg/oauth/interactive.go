@@ -16,14 +16,15 @@
 package oauth
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
+	"text/template"
 )
 
 // GetInteractiveSuccessHTML is the page displayed upon success when using a web browser during an interactive Oauth token flow.
 // The page will close automatically if autoclose is true with the timeout specified.
 func GetInteractiveSuccessHTML(autoclose bool, timeout int) (string, error) {
-	const successTemplateHead = `<!DOCTYPE html>
+	const successTemplate = `<!DOCTYPE html>
 <html>
 	<head>
 		<title>Sigstore Authentication</title>
@@ -89,11 +90,10 @@ func GetInteractiveSuccessHTML(autoclose bool, timeout int) (string, error) {
 		<script>
 			document.getElementById("favicon").setAttribute("href", "data:image/svg+xml," + encodeURIComponent(document.getElementById("logo").outerHTML));
 		</script>
-`
 
-	const autocloseScript = `
+		{{ if .Autoclose -}}
 		<script>
-			var timeout = %d;
+			var timeout = {{ .Timeout }};
 			setTimeout(function() { this.close(); }, timeout*1000);
 			setInterval(function() {
 				timeout--;
@@ -102,26 +102,29 @@ func GetInteractiveSuccessHTML(autoclose bool, timeout int) (string, error) {
 					document.getElementsByName("autoclose")[0].innerHTML = "This page will close now, thank you!";
 				}
 			}, 1000);
-
-			</script>
-`
-
-	const successTemplateTail = `
+		</script>
+		{{- end }}
 	</body>
 </html>
 `
-
-	var sb strings.Builder
-
-	sb.WriteString(successTemplateHead)
-
-	if autoclose {
-		fmt.Fprintf(&sb, autocloseScript, timeout)
+	// Parse the template
+	tmpl, err := template.New("success").Parse(successTemplate)
+	if err != nil {
+		return "", fmt.Errorf("error parsing success template: %w", err)
 	}
-
-	sb.WriteString(successTemplateTail)
-
-	return sb.String(), nil
+	// Pass autoclose and timeout to the template
+	data := struct {
+		Autoclose bool
+		Timeout   int
+	}{
+		autoclose,
+		timeout,
+	}
+	var htmlPage bytes.Buffer
+	if err := tmpl.Execute(&htmlPage, data); err != nil {
+		return "", fmt.Errorf("error executing template: %w", err)
+	}
+	return htmlPage.String(), nil
 }
 
 const (

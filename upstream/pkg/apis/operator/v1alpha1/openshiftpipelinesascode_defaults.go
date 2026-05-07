@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
@@ -61,7 +60,7 @@ func (set *PACSettings) setPACDefaults(logger *zap.SugaredLogger) {
 	}
 	defaultPacSettings := pacSettings.Settings{}
 
-	err := pacSettings.SyncConfig(logger, &defaultPacSettings, set.Settings, map[string]func(string) error{}, http.DefaultClient)
+	err := pacSettings.SyncConfig(logger, &defaultPacSettings, set.Settings, map[string]func(string) error{})
 	if err != nil {
 		logger.Error("error on applying default PAC settings", err)
 	}
