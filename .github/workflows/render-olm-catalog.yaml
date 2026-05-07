@@ -52,15 +52,11 @@ jobs:
           ./hack/update-olm-bundle.sh ${{github.event.inputs.environment}}
 
       - name: Update OLM catalog
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: |
-            ./hack/render-catalog.sh
+        run: |
+          ./hack/render-catalog.sh
       - name: Commit Changes and Generate PR
         if: github.event_name != 'pull_request'
-        run:
+        run: |
           git config user.name openshift-pipelines-bot
           git config user.email pipelines-extcomm@redhat.com
           BASE_BRANCH=${GITHUB_REF#refs/heads/}
@@ -70,8 +66,8 @@ jobs:
           git add .konflux/olm-catalog/index/ olm/
           
           if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
-          echo "No change, exiting"
-          exit 0
+            echo "No change, exiting"
+            exit 0
           fi
           
           git commit -F- <<EOF
@@ -80,8 +76,8 @@ jobs:
           
           git push -f origin ${SOURCE_BRANCH}
           if [ "$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json url --jq 'length')" = "0" ]; then
-          echo "creating PR..."
-          gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
+            echo "creating PR..."
+            gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
