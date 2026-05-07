@@ -7,7 +7,6 @@ metadata:
     categories: Developer Tools, Integration & Delivery
     certified: 'false'
     console.openshift.io/plugins: '["pipelines-console-plugin"]'
-    containerImage: registry.redhat.io/openshift-pipelines/pipelines-rhel9-operator@
     description: Red Hat OpenShift Pipelines is a cloud-native CI/CD solution for building pipelines using Tekton concepts which run natively on OpenShift and Kubernetes.
     features.operators.openshift.io/cnf: 'false'
     features.operators.openshift.io/cni: 'false'
@@ -19,7 +18,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.20.0 <5.0.5-815'
+    olm.skipRange: '>=1.20.0 <5.0.5-816'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonschedulers.operator.tekton.dev","tektonmulticlusterproxyaaes.operator.tekton.dev","syncerservices.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
@@ -31,7 +30,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v5.0.5-815
+  name: openshift-pipelines-operator-rh.v5.0.5-816
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -415,15 +414,15 @@ spec:
     ### Components
 
 
-    - Tekton Pipelines: v1.11.0
+    - Tekton Pipelines: v1.9.3
 
     - Tekton Triggers: v0.35.0
 
-    - Pipelines as Code: v0.45.0
+    - Pipelines as Code: v0.42.0
 
-    - Tekton Chains: v0.26.2
+    - Tekton Chains: v0.26.3
 
-    - Tekton Hub (tech-preview): v1.23.9
+    - Tekton Hub (tech-preview): v1.23.10
 
     - Tekton Results (tech-preview): v0.18.0
 
@@ -1241,10 +1240,49 @@ spec:
                 - config.openshift.io
               resources:
                 - apiservers
+                - clusterversions
               verbs:
                 - get
                 - list
                 - watch
+            - apiGroups:
+                - kueue.x-k8s.io
+              resources:
+                - resourceflavors
+                - workloads
+                - workloads/finalizers
+                - workloads/status
+                - workloadpriorityclasses
+              verbs:
+                - get
+                - list
+                - create
+                - update
+                - delete
+                - patch
+                - watch
+            - apiGroups:
+                - scheduling.k8s.io
+              resources:
+                - priorityclasses
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - cert-manager.io
+              resources:
+                - certificates
+                - issuers
+              verbs:
+                - get
+                - create
+                - update
+                - list
+            - nonResourceURLs:
+                - /metrics
+              verbs:
+                - get
           serviceAccountName: openshift-pipelines-operator
       deployments:
         - label:
@@ -1291,7 +1329,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 5.0.5-815
+                        value: 5.0.5-816
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1436,6 +1474,8 @@ spec:
                         value: registry.redhat.io/ubi9/openjdk-17@sha256:d334d3c36867a1eef7daa598af10b5f620394ca0234b12e71b8b7e99bda9224e
                       - name: IMAGE_PIPELINES_CONSOLE_PLUGIN
                         value: quay.io/openshift-pipeline/pipelines-console-plugin-rhel9@sha256:bb058b3de08a97a38b1eb1c65df636dcb0632194c30c4d57569762097f9b6b86
+                      - name: IMAGE_PIPELINES_CONSOLE_PLUGIN_LEGACY
+                        value: registry.redhat.io/openshift-pipelines/pipelines-console-plugin-pf5-rhel9@
                     image: quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:7b563c6c2cdbb0794fa2e7962f418f222bf716f68936f71fc74a56fb52173a18
                     imagePullPolicy: Always
                     name: openshift-pipelines-operator-lifecycle
@@ -1536,10 +1576,7 @@ spec:
                     ports:
                       - containerPort: 8443
                         name: https-webhook
-                    resources:
-                      requests:
-                        cpu: 10m
-                        memory: 64Mi
+                    resources: {}
                     securityContext:
                       allowPrivilegeEscalation: false
                       capabilities:
@@ -1718,5 +1755,7 @@ spec:
       name: IMAGE_ADDONS_MAVEN_GOALS
     - image: quay.io/openshift-pipeline/pipelines-console-plugin-rhel9@sha256:bb058b3de08a97a38b1eb1c65df636dcb0632194c30c4d57569762097f9b6b86
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
-  replaces: openshift-pipelines-operator-rh.v5.0.5-814
-  version: 5.0.5-815
+    - image: registry.redhat.io/openshift-pipelines/pipelines-console-plugin-pf5-rhel9@
+      name: IMAGE_PIPELINES_CONSOLE_PLUGIN_LEGACY
+  replaces: openshift-pipelines-operator-rh.v5.0.5-815
+  version: 5.0.5-816

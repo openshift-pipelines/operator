@@ -117,8 +117,7 @@ func assembleGoFile(w io.Writer, f *File) {
 
 func formatCode(src []byte) ([]byte, error) {
 	// We call goimports because it formats imports better than gofmt, but also
-	// call gofmt because it has the "simplify" logic.  If a gofmt binary is
-	// not found, we will skip it.
+	// call gofmt because it has the "simplify" logic.
 	src, err := importsWrapper(src)
 	if err != nil {
 		return nil, err
@@ -137,14 +136,7 @@ func importsWrapper(src []byte) ([]byte, error) {
 }
 
 func gofmtWrapper(src []byte) ([]byte, error) {
-	const gofmt = "gofmt"
-
-	if _, err := exec.LookPath(gofmt); err != nil {
-		klog.Errorf("WARNING: skipping output simplification: %v", err)
-		return src, nil
-	}
-
-	cmd := exec.Command(gofmt, "-s")
+	cmd := exec.Command("gofmt", "-s")
 	cmd.Stdin = bytes.NewReader(src)
 	stdout := &bytes.Buffer{}
 	cmd.Stdout = stdout
@@ -152,9 +144,8 @@ func gofmtWrapper(src []byte) ([]byte, error) {
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
 		if stderr.Len() > 0 {
-			return nil, fmt.Errorf("%s failed: %v: %s", gofmt, err, strings.TrimSpace(stderr.String()))
+			return nil, fmt.Errorf("gofmt failed: %v: %s", err, strings.TrimSpace(stderr.String()))
 		}
-		return nil, fmt.Errorf("%s failed: %v", gofmt, err)
 	}
 	return stdout.Bytes(), nil
 }

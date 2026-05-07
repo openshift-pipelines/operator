@@ -80,7 +80,6 @@ func transformers(ctx context.Context, obj v1alpha1.TektonComponent) []mf.Transf
 		injectNamespaceClusterRole(obj.GetSpec().GetTargetNamespace()),
 		ReplaceNamespaceInWebhookNamespaceSelector(obj.GetSpec().GetTargetNamespace()),
 		AddDeploymentRestrictedPSA(),
-		DeploymentEnvVarKubernetesMinVersion(),
 	}
 }
 
