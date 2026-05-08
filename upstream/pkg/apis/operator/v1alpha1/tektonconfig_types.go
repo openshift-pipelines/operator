@@ -29,6 +29,12 @@ import (
 // +genreconciler:krshapedlogic=false
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +genclient:nonNamespaced
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=`.status.version`
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].message`
 type TektonConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -130,6 +136,16 @@ type TektonConfigSpec struct {
 	TargetNamespaceMetadata *NamespaceMetadata `json:"targetNamespaceMetadata,omitempty"`
 }
 
+// PipelinesAsCodeForCurrentPlatform returns the PipelinesAsCode block for the operator build
+// (OpenShift vs Kubernetes, see PLATFORM env). TektonConfig.Validate rejects using the other
+// platform's spec.platforms subtree.
+func (s *TektonConfigSpec) PipelinesAsCodeForCurrentPlatform() *PipelinesAsCode {
+	if IsOpenShiftPlatform() {
+		return s.Platforms.OpenShift.PipelinesAsCode
+	}
+	return s.Platforms.Kubernetes.PipelinesAsCode
+}
+
 // TektonConfigStatus defines the observed state of TektonConfig
 type TektonConfigStatus struct {
 	duckv1.Status `json:",inline"`
@@ -173,6 +189,7 @@ func (in *TektonConfigStatus) MarkPostReconcilerFailed(s string) {
 }
 
 // TektonConfigList contains a list of TektonConfig
+// +kubebuilder:object:root=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TektonConfigList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -192,4 +209,7 @@ type Platforms struct {
 	// OpenShift allows configuring openshift specific components and configurations
 	// +optional
 	OpenShift OpenShift `json:"openshift,omitempty"`
+	// Kubernetes allows configuring kubernetes specific components and configurations
+	// +optional
+	Kubernetes Kubernetes `json:"kubernetes,omitempty"`
 }

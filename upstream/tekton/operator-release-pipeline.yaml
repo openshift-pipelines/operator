@@ -37,8 +37,8 @@ spec:
     description: Platforms to publish for the images (e.g. linux/amd64,linux/arm64)
     default: linux/amd64,linux/arm64,linux/s390x,linux/ppc64le
   - name: koExtraArgs
-    description: Extra args to be passed to ko
-    default: "--preserve-import-paths"
+    description: Extra args to be passed to ko (e.g. --preserve-import-paths)
+    default: "" # No default to avoid breaking existing releases
   - name: serviceAccountImagesPath
     description: The path to the service account file or credentials within the release-images-secret workspace
   - name: runTests
@@ -423,12 +423,12 @@ spec:
       - name: namespace
       results:
       - name: rekor-uuid
-        description: Rekor UUID from Chains transparency log
+        description: Rekor UUID (64-char hex) derived from the Chains transparency log URL
       - name: signed
         description: Whether Chains signing succeeded (true, failed, or timeout)
       steps:
       - name: wait-and-extract
-        image: docker.io/library/alpine/k8s:1.32.2
+        image: docker.io/alpine/k8s:1.32.2
         script: |
           #!/bin/sh
           set -e
@@ -476,8 +476,12 @@ spec:
                 -o jsonpath='{.metadata.annotations.chains\.tekton\.dev/transparency}' 2>/dev/null || echo "")
 
               if [ -n "${TRANSPARENCY}" ]; then
-                REKOR_UUID=$(echo "${TRANSPARENCY}" | grep -oE 'logIndex=[0-9]+' | cut -d= -f2)
-                if [ -z "${REKOR_UUID}" ]; then
+                echo "Transparency URL: ${TRANSPARENCY}"
+                # Derive the true Rekor UUID from the transparency log URL.
+                # The API response is a map keyed by the 64-char hex UUID, so keys[0] extracts it.
+                REKOR_UUID=$(curl -s "${TRANSPARENCY}" | jq -r 'keys[0]')
+                if [ -z "${REKOR_UUID}" ] || [ "${REKOR_UUID}" = "null" ]; then
+                  echo "WARNING: Could not extract UUID from transparency URL, falling back to URL"
                   REKOR_UUID="${TRANSPARENCY}"
                 fi
                 echo "Rekor UUID: ${REKOR_UUID}"
@@ -535,7 +539,7 @@ spec:
       - name: workarea
       steps:
       - name: setup
-        image: docker.io/library/alpine:3.21
+        image: docker.io/library/alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
         script: |
           #!/bin/sh
           set -e
@@ -545,17 +549,6 @@ spec:
           VERSION="$(params.versionTag)"
           PREVIOUS="$(params.previousReleaseTag)"
           NAME="$(params.releaseName)"
-
-          # The create-draft-release-oci task expects:
-          #   <workspace>/repo    -> git checkout
-          #   <workspace>/release -> release artifacts
-          # The release pipeline uses:
-          #   <workspace>/git     -> git checkout
-          #   <workspace>/bucket/<versionTag> -> release artifacts
-          ln -sfn "${WORKAREA}/git" "${WORKAREA}/repo"
-          ln -sfn "${WORKAREA}/bucket/${VERSION}" "${WORKAREA}/release"
-          echo "Created workspace symlinks:"
-          ls -la "${WORKAREA}/repo" "${WORKAREA}/release"
 
           # Strip github.com/ prefix from package for the draft release task
           PACKAGE=$(echo "$(params.package)" | sed 's|^github\.com/||')
@@ -603,7 +596,7 @@ spec:
       - name: url
         value: https://github.com/tektoncd/plumbing
       - name: revision
-        value: c6ccd417b39dd9d0c3055795f00cbce051f6bc9e
+        value: 7abffd25eb2e578e6698a9ff13470d04906f79e6
       - name: pathInRepo
         value: tekton/resources/release/base/github_release_oci.yaml
     params:
@@ -619,6 +612,10 @@ spec:
       value: $(tasks.prepare-draft-release.results.previous-tag)
     - name: rekor-uuid
       value: $(tasks.wait-for-chains.results.rekor-uuid)
+    - name: source-subpath
+      value: git
+    - name: release-subpath
+      value: bucket/$(params.versionTag)
     workspaces:
     - name: shared
       workspace: workarea
