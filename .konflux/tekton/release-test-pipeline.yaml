@@ -156,11 +156,19 @@ spec:
       runAfter:
         - provision-cluster
       taskSpec:
+        results:
+          - name: channel
+            type: string
         volumes:
           - name: credentials
             emptyDir: { }
         stepTemplate:
           image: $(params.IMAGE)
+          env:
+            - name: INDEX_IMAGE
+              value: "$(tasks.parse-metadata.results.component-container-image)"
+            - name: RELEASE_BRANCH
+              value: "$(tasks.parse-metadata.results.target-git-branch)"
           volumeMounts:
             - name: credentials
               mountPath: /credentials
@@ -182,10 +190,19 @@ spec:
                 value: "$(tasks.provision-cluster.results.clusterName)"
               - name: credentials
                 value: credentials
+          - name: extract-channel-name
+            script: |
+              #!/usr/bin/env bash
+              set -x
+              if [[ "$RELEASE_BRANCH" == "next" ]]; then
+                CHANNEL="latest"
+              else
+                CHANNEL=$(echo "$RELEASE_BRANCH" | sed -E 's/release-v([0-9]+\.[0-9]+)\.x/pipelines-\1/')
+              fi
+              echo -n "$CHANNEL" | tee $(results.channel.path)
+
           - name: create-catalog
             env:
-              - name: INDEX_IMAGE
-                value: "$(tasks.parse-metadata.results.component-container-image)"
               - name: KUBECONFIG
                 value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
             script: |
@@ -232,6 +249,8 @@ spec:
           value: "install"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
       runAfter:
         - create-catalog-source
     #Release Tests - Chains

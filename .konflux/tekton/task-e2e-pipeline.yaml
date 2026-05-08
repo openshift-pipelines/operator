@@ -14,6 +14,8 @@ spec:
     - name: CATALOG_SOURCE
       description: Provide catalog-source name through which user have to subscribe operator
       default: redhat-operators
+    - name: CHANNEL
+      default: latest
     - name: CHAINS_REPOSITORY
       default: "quay.io/openshift-pipeline/chainstest"
       description: the url of the repository where the test image will be pushed
@@ -111,6 +113,8 @@ spec:
           value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
         - name: CATALOG_SOURCE
           value: "$(params.CATALOG_SOURCE)"
+        - name: CHANNEL
+          value: "$(params.CHANNEL)"
         - name: CHAINS_REPOSITORY
           value: "$(params.CHAINS_REPOSITORY)"
         - name: OCP_VERSION
