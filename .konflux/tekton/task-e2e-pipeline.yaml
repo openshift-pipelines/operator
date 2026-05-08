@@ -96,6 +96,11 @@ spec:
       image: $(params.IMAGE)
       workingDir: /source/repo
       env:
+        - name: CHAINS_DOCKER_CONFIG_JSON
+          valueFrom:
+            secretKeyRef:
+              key: config.json
+              name: quay-io-dockerconfig
         - name: GITHUB_TOKEN
           valueFrom:
             secretKeyRef:
