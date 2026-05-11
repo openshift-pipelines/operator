@@ -43,15 +43,15 @@ release_yaml() {
     case $version in
       nightly)
         dirVersion="0.0.0-nightly"
-        url="https://storage.googleapis.com/tekton-releases-nightly/${comp}/latest/${releaseFileName}.yaml"
+        url="https://infra.tekton.dev/tekton-releases-nightly/${comp}/latest/${releaseFileName}.yaml"
         ;;
       latest)
         dirVersion="0.0.0-latest"
-        url="https://storage.googleapis.com/tekton-releases/${comp}/latest/${releaseFileName}.yaml"
+        url="https://infra.tekton.dev/tekton-releases/${comp}/latest/${releaseFileName}.yaml"
         ;;
       *)
         dirVersion=${version//v}
-        url="https://storage.googleapis.com/tekton-releases/${comp}/previous/${version}/${releaseFileName}.yaml"
+        url="https://infra.tekton.dev/tekton-releases/${comp}/previous/${version}/${releaseFileName}.yaml"
         ;;
     esac
 
@@ -83,7 +83,7 @@ release_yaml() {
     # create a directory
     mkdir -p ${dirPath} || true
 
-    http_response=$(curl -s -o ${dest} -w "%{http_code}" ${url})
+    http_response=$(curl -s -L -o ${dest} -w "%{http_code}" ${url})
     echo url: ${url}
 
     if [[ $http_response != "200" ]]; then
@@ -198,9 +198,9 @@ release_yaml_pac() {
     dirPath=${ko_data}/tekton-addon/pipelines-as-code/${version}
 
     if [[ ${version} == "stable" ||  ${version} == "nightly" ]]; then
-      url="https://raw.githubusercontent.com/openshift-pipelines/pipelines-as-code/${version}/release.yaml"
+      url="https://raw.githubusercontent.com/tektoncd/pipelines-as-code/${version}/release.yaml"
     else
-      url="https://raw.githubusercontent.com/openshift-pipelines/pipelines-as-code/release-${version}/release.yaml"
+      url="https://raw.githubusercontent.com/tektoncd/pipelines-as-code/release-${version}/release.yaml"
     fi
 
     dest=${dirPath}/${fileName}.yaml
@@ -217,7 +217,7 @@ release_yaml_pac() {
          rm -rf ${dirPath} || true
          mkdir -p ${dirPath} || true
 
-         http_response=$(curl -s -o ${dest} -w "%{http_code}" ${url})
+         http_response=$(curl -s -L -o ${dest} -w "%{http_code}" ${url})
          echo url: ${url}
 
          if [[ $http_response != "200" ]]; then
@@ -234,7 +234,7 @@ release_yaml_pac() {
     do
       echo "fetching PipelineRun template for runtime: $run"
 
-      source="https://raw.githubusercontent.com/openshift-pipelines/pipelines-as-code/${version}/pkg/cmd/tknpac/generate/templates/${run}.yaml"
+      source="https://raw.githubusercontent.com/tektoncd/pipelines-as-code/${version}/pkg/cmd/tknpac/generate/templates/${run}.yaml"
       dest_dir="${ko_data}/tekton-addon/pipelines-as-code-templates"
       mkdir -p ${dest_dir} || true
       destination="${dest_dir}/${run}.yaml"
@@ -299,7 +299,7 @@ release_yaml_hub() {
   ko_data=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata
   if [ ${version} == "latest" ]
   then
-    version=$(curl -sL https://api.github.com/repos/tektoncd/hub/releases | jq -r ".[].tag_name" | sort -Vr | head -n1)
+    version=$(curl -sL https://api.github.com/repos/openshift-pipelines/hub/releases | jq -r ".[].tag_name" | sort -Vr | head -n1)
     dirPath=${ko_data}/tekton-hub/0.0.0-latest
   else
     dirPath=${ko_data}/tekton-hub/${version}
@@ -330,7 +330,7 @@ release_yaml_hub() {
 
     [[ ${component} == "api" ]] || [[ ${component} == "ui" ]] && fileName=${component}-${TARGET}.yaml
 
-    url="https://github.com/tektoncd/hub/releases/download/${version}/${fileName}"
+    url="https://github.com/openshift-pipelines/hub/releases/download/${version}/${fileName}"
     echo $url
     http_response=$(curl -s -L -o ${destinationFile} -w "%{http_code}" ${url})
     echo url: ${url}

@@ -19,7 +19,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	github.com/tektoncd/pipeline v1.3.3
+	github.com/tektoncd/pipeline v1.3.4
 	github.com/tektoncd/plumbing v0.0.0-20250630062957-f863d38f433a
 	github.com/tektoncd/triggers v0.33.0
 	go.opencensus.io v0.24.0
@@ -43,6 +43,8 @@ replace (
 	github.com/alibabacloud-go/cr-20160607 => github.com/vdemeester/cr-20160607 v1.0.1
 	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/google/gnostic-models => github.com/google/gnostic-models v0.6.8
+
+	github.com/openshift-pipelines/pipelines-as-code => github.com/tektoncd/pipelines-as-code v0.37.7
 	k8s.io/api => k8s.io/api v0.32.4
 	k8s.io/apimachinery => k8s.io/apimachinery v0.32.4
 	k8s.io/client-go => k8s.io/client-go v0.32.4
