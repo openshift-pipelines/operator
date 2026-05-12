@@ -4,21 +4,22 @@ kind: PipelineRun
 metadata:
   annotations:
     pipelinesascode.tekton.dev/cancel-in-progress: "true" # Cancel in-progress pipelines
+    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/openshift-pipelines/operator/refs/heads/next/.tekton/docker-build-ta.yaml"
     build.appstudio.openshift.io/repo: https://github.com/openshift-pipelines/operator.git?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "next" &&
+      == "nightly" &&
       ("upstream/***".pathChanged() || ".konflux/patches/***".pathChanged() || ".konflux/rpms/***".pathChanged() ||
-      ".konflux/dockerfiles/operator.Dockerfile".pathChanged() || ".tekton/*build*.yaml".pathChanged() ||
-      ".tekton/operator-next-operator-push.yaml".pathChanged())
+      ".konflux/dockerfiles/operator.Dockerfile".pathChanged() ||
+      ".tekton/operator-nightly-operator-push.yaml".pathChanged())
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: openshift-pipelines-core-next
-    appstudio.openshift.io/component: operator-next-operator
+    appstudio.openshift.io/application: openshift-pipelines-core-nightly
+    appstudio.openshift.io/component: operator-nightly-operator
     pipelines.appstudio.openshift.io/type: build
-  name: operator-next-operator-on-push
+  name: operator-nightly-operator-on-push
   namespace: tekton-ecosystem-tenant
 spec:
   params:
@@ -34,14 +35,14 @@ spec:
     value: .konflux/dockerfiles/operator.Dockerfile
   - name: additional-tags
     value:
-      - "next"
+      - "vlatest"
   - name: prefetch-input
     value: |
       {"type": "rpm", "path": ".konflux/rpms"}
   pipelineRef:
     name: docker-build-ta
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator-next-operator
+    serviceAccountName: build-pipeline-operator-nightly-operator
   workspaces:
   - name: git-auth
     secret:
