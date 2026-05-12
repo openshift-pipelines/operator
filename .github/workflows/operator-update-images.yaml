@@ -47,12 +47,7 @@ jobs:
           pip3 install -r requirements.txt
           
           # Update operator's payload and stuff
-          make update-payload-and-reference
-
-      - name: update-image-references
-        run: |
-          # Update operator's payload and stuff
-          make ENVIRONMENT=${{github.event.inputs.environment}} update-reference
+          make update-payload-and-reference ENVIRONMENT=${{github.event.inputs.environment}} 
 
       - name: Commit new changes
         run: |
