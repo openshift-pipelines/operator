@@ -27,7 +27,7 @@ LABEL \
     summary="Red Hat OpenShift Pipelines operator bundle" \
     url="https://access.redhat.com/containers/#/registry.access.redhat.com/ubi9-minimal/images/9.4-1227.1725849298" \
     vendor="Red Hat, Inc." \
-    version="vlatest"
+    version="latest"
 
 
 USER 65532
