@@ -113,16 +113,19 @@ while IFS= read -r -d '' f; do
         "${f}"
 done < <(find .konflux/olm-catalog/bundle/manifests .konflux/olm-catalog/bundle/kodata -type f -name '*.yaml' -print0)
 
-# Step 2: rewrite structural version fields in bundle manifests only.
-# These paths (.spec.install.spec.deployments[].label.version, .data.version) are
-# specific to CSV and ConfigMap resources; only touch entries that are exactly "devel".
+# Step 2: rewrite structural version fields across all manifests, but only if the field
+# already exists and equals "devel" — avoids yq creating these fields in unrelated files.
 for f in .konflux/olm-catalog/bundle/manifests/*.yaml; do
-    env UPSTREAM_VERSION_TAG="${UPSTREAM_VERSION_TAG}" yq e -i \
-        '(.spec.install.spec.deployments[].label.version | select(. == "devel")) = strenv(UPSTREAM_VERSION_TAG)' \
-        "${f}"
-    env UPSTREAM_VERSION_TAG="${UPSTREAM_VERSION_TAG}" yq e -i \
-        '(.data.version | select(. == "devel")) = strenv(UPSTREAM_VERSION_TAG)' \
-        "${f}"
+    if [[ $(yq e '.spec.install.spec.deployments[0].label.version // ""' "${f}") == "devel" ]]; then
+        env UPSTREAM_VERSION_TAG="${UPSTREAM_VERSION_TAG}" yq e -i \
+            '(.spec.install.spec.deployments[].label.version | select(. == "devel")) = strenv(UPSTREAM_VERSION_TAG)' \
+            "${f}"
+    fi
+    if [[ $(yq e '.data.version // ""' "${f}") == "devel" ]]; then
+        env UPSTREAM_VERSION_TAG="${UPSTREAM_VERSION_TAG}" yq e -i \
+            '(.data.version | select(. == "devel")) = strenv(UPSTREAM_VERSION_TAG)' \
+            "${f}"
+    fi
 done
 
 # Remove label matchselector app
@@ -139,7 +142,8 @@ yq e -i '.metadata.annotations["operators.openshift.io/valid-subscription"] = "[
 # Update VERSION env variables that are still set to "devel" in the generated CSV.
 # Upstream PR #3371 changed this value to "devel"; patch only those entries to avoid
 # overwriting any container env that already carries a correct version value.
-yq e -i "(.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name == \"VERSION\" and .value == \"devel\") | .value) = \"${UPSTREAM_VERSION_TAG}\"" \
+# Use CURRENT_VERSION (downstream OSP version) as this is the operator's own version label.
+yq e -i "(.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name == \"VERSION\" and .value == \"devel\") | .value) = \"${CURRENT_VERSION}\"" \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 # FIXME: we *may* need to clean some of those generated files
 
