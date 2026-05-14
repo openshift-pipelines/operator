@@ -1,11 +1,6 @@
 name: operator-update-images
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - project.yaml
   workflow_dispatch:
     inputs:
       environment:
@@ -17,9 +12,6 @@ on:
           - devel
           - staging
           - production
-
-  schedule:
-  - cron: "0 1 * * *" # At 1AM everyday
 
 jobs:
   update-csv:
