@@ -8,6 +8,12 @@ roleRef:
   kind: ClusterRole
   name: tekton-multicluster-proxy-aae-role
 subjects:
-- kind: ServiceAccount
-  name: tekton-operator
-  namespace: tekton-operator
+  - kind: ServiceAccount
+    name: tekton-operator
+    namespace: tekton-operator
+spec:
+  install:
+    spec:
+      deployments: []
+data:
+  version: null

@@ -8,6 +8,12 @@ roleRef:
   kind: ClusterRole
   name: tekton-result-read-role
 subjects:
-- apiGroup: rbac.authorization.k8s.io
-  kind: Group
-  name: system:authenticated
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:authenticated
+spec:
+  install:
+    spec:
+      deployments: []
+data:
+  version: null

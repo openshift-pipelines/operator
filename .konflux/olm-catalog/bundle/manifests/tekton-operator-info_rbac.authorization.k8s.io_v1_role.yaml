@@ -6,12 +6,18 @@ metadata:
     app.kubernetes.io/instance: default
   name: tekton-operator-info
 rules:
-- apiGroups:
-  - ""
-  resourceNames:
-  - tekton-operator-info
-  resources:
-  - configmaps
-  verbs:
-  - get
-  - describe
+  - apiGroups:
+      - ""
+    resourceNames:
+      - tekton-operator-info
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - describe
+spec:
+  install:
+    spec:
+      deployments: []
+data:
+  version: null
