@@ -49,7 +49,7 @@ else
         # Look up the latest release tag for this minor version from tektoncd/operator GitHub releases.
         UPSTREAM_VERSION_TAG=$(curl -fsSL "https://api.github.com/repos/tektoncd/operator/releases" \
             | yq e '.[] | select(.tag_name | test("^v?'"${UPSTREAM_MINOR_VERSION}"'\\.")) | .tag_name' - \
-            | sort -V | tail -n1 | sed 's/^v//' || true)
+            | sort -V | tail -n1 || true)
         if [[ -z "${UPSTREAM_VERSION_TAG}" ]]; then
             echo "WARN: No upstream tag found for minor version ${UPSTREAM_MINOR_VERSION} in tektoncd/operator releases, falling back to 'devel'"
             UPSTREAM_VERSION_TAG="devel"
@@ -113,17 +113,18 @@ while IFS= read -r -d '' f; do
         "${f}"
 done < <(find .konflux/olm-catalog/bundle/manifests .konflux/olm-catalog/bundle/kodata -type f -name '*.yaml' -print0)
 
-# Step 2: rewrite structural version fields in bundle manifests only.
+# Step 2: rewrite structural version fields in the CSV and ConfigMap only.
 # These paths (.spec.install.spec.deployments[].label.version, .data.version) are
-# specific to CSV and ConfigMap resources; only touch entries that are exactly "devel".
-for f in .konflux/olm-catalog/bundle/manifests/*.yaml; do
-    env UPSTREAM_VERSION_TAG="${UPSTREAM_VERSION_TAG}" yq e -i \
-        '(.spec.install.spec.deployments[].label.version | select(. == "devel")) = strenv(UPSTREAM_VERSION_TAG)' \
-        "${f}"
-    env UPSTREAM_VERSION_TAG="${UPSTREAM_VERSION_TAG}" yq e -i \
-        '(.data.version | select(. == "devel")) = strenv(UPSTREAM_VERSION_TAG)' \
-        "${f}"
-done
+# specific to CSV and ConfigMap resources; applying yq to CRDs would materialise
+# null nodes for those non-existent paths, polluting the CRD files.
+CSV=".konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml"
+OPERATOR_INFO_CM=".konflux/olm-catalog/bundle/manifests/tekton-operator-info_v1_configmap.yaml"
+env UPSTREAM_VERSION_TAG="${UPSTREAM_VERSION_TAG}" yq e -i \
+    '(.spec.install.spec.deployments[].label.version | select(. == "devel")) = strenv(UPSTREAM_VERSION_TAG)' \
+    "${CSV}"
+env UPSTREAM_VERSION_TAG="${UPSTREAM_VERSION_TAG}" yq e -i \
+    '(.data.version | select(. == "devel")) = strenv(UPSTREAM_VERSION_TAG)' \
+    "${OPERATOR_INFO_CM}"
 
 # Remove label matchselector app
 yq e -i 'del(.spec.install.spec.deployments[0].spec.selector.matchLabels.app)' \
@@ -136,10 +137,11 @@ yq e -i '.metadata.annotations["operators.openshift.io/valid-subscription"] = "[
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
 
-# Update VERSION env variables that are still set to "devel" in the generated CSV.
-# Upstream PR #3371 changed this value to "devel"; patch only those entries to avoid
-# overwriting any container env that already carries a correct version value.
-yq e -i "(.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name == \"VERSION\" and .value == \"devel\") | .value) = \"${UPSTREAM_VERSION_TAG}\"" \
+# Update VERSION env variables in the generated CSV to the downstream OSP version.
+# The upstream build may generate VERSION as "devel" (unreleased builds) or as the upstream
+# tag (e.g. "0.79.1" for released tags). In both cases we unconditionally override it with
+# CURRENT_VERSION so that the downstream bundle always reports the correct OSP version.
+yq e -i "(.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name == \"VERSION\") | .value) = \"${CURRENT_VERSION}\"" \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 # FIXME: we *may* need to clean some of those generated files
 
