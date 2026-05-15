@@ -1,5 +1,5 @@
   function update_bundle_image() {
-    environment=${1:-"staging"}
+    environment=${1:-"devel"}
     BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     ROOT_DIR="$(dirname "$BASEDIR")"
 
@@ -21,8 +21,29 @@
 
     #Update the bundle image and version in the olm config.yaml file only for 5.0.x versions
     export BUNDLE_IMAGE BUNDLE_VERSION
-    yq -i e '(.bundles[] | select(.version | test("^5\\.0\\..*"))).image = env(BUNDLE_IMAGE)' $ROOT_DIR/olm/config.yaml
-    yq -i e '(.bundles[] | select(.version == env(BUNDLE_VERSION))).image = env(BUNDLE_IMAGE)' $ROOT_DIR/olm/config.yaml
+    FILE=$ROOT_DIR/olm/config.yaml
+    COUNT=$(yq e '.bundles | length' "$FILE")
+
+    if [[ "$COUNT" -gt 0 ]]; then
+      LAST_INDEX=$((COUNT - 1))
+
+      echo "Replacing last bundle entry with $BUNDLE_VERSION"
+
+      yq -i "
+        .bundles[$LAST_INDEX].version = env(BUNDLE_VERSION) |
+        .bundles[$LAST_INDEX].image = env(BUNDLE_IMAGE)
+      " "$FILE"
+
+    else
+      echo "No bundle found, adding first entry"
+
+      yq -i '
+        .bundles += [{
+          "version": env(BUNDLE_VERSION),
+          "image": env(BUNDLE_IMAGE)
+        }]
+      ' "$FILE"
+    fi
 }
 
 function target_registry() {
