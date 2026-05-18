@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - next
+      - main
       - release-v*
     paths:
       - project.yaml
@@ -20,7 +21,7 @@ on:
           - production
 
 jobs:
-  update-bundle-images:
+  update-csv:
     runs-on: ubuntu-latest
     if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
     permissions:
@@ -30,23 +31,10 @@ jobs:
       - name: Checkout the current repo
         uses: actions/checkout@v5
 
-      - name: update-bundle
+      - name: update-image-references
         run: |
-          # Operator SDK
-          export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.37.0/operator-sdk_linux_amd64
-          curl -LO ${OPERATOR_SDK_DL_URL}
-          chmod +x operator-sdk_linux_amd64 && sudo mv operator-sdk_linux_amd64 /usr/local/bin/operator-sdk
-          
-          operator-sdk version
-          
-          # Python with requirements (yaml here)
-          # We could migrate to go...
-          python3 -m venv sync-sources
-          source sync-sources/bin/activate
-          pip3 install -r requirements.txt
-          
           # Update operator's payload and stuff
-          make update-payload-and-reference ENVIRONMENT=${{github.event.inputs.environment}} 
+          make ENVIRONMENT=${{github.event.inputs.environment}} update-reference  
 
       - name: Commit new changes
         run: |
