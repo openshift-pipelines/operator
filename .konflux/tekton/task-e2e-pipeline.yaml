@@ -109,6 +109,18 @@ spec:
               key: github-token
               name: github
               optional: true
+        - name: GITLAB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pac-gitlab
+              key: gitlab-token
+              optional: true
+        - name: GITLAB_WEBHOOK_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pac-gitlab
+              key: gitlab-webhook-token
+              optional: true
         - name: KUBECONFIG
           value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
         - name: CATALOG_SOURCE
