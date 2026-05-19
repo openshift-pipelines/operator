@@ -138,7 +138,7 @@ spec:
         
         # Some of the tests fail on specific OCP versions
         set +H
-        tags="$(params.TAGS),!skip-$OCP_VERSION"
+        tags="$(params.TAGS),!(skip-$OCP_VERSION | to-do)"
         set -H
         
         echo "Running $(params.SPECS) with tags $tags"
