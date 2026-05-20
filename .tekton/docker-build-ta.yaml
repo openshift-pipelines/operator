@@ -86,6 +86,15 @@ spec:
     type: string
     default: .
     description: Target directories to scan with SAST tools. Multiple values should be separated with commas.
+  - name: slack-group-ids
+    type: array
+    default:
+    - "S04NUBJ20RG"
+    description: List of Slack group IDs to mention on build failure notifications
+  - name: konflux-ui-host
+    type: string
+    default: "konflux-ui.apps.kflux-prd-rh02.0fk9.p1.openshiftapps.com"
+    description: Konflux UI hostname for logs URL
   results:
   - description: ""
     name: IMAGE_URL
@@ -545,6 +554,36 @@ spec:
         value: summary
       - name: bundle
         value: quay.io/konflux-ci/tekton-catalog/task-summary:0.2@sha256:e1b8e42962b0c6d9ebe95f3709c34ae5e1569b73941a79654248e0af55eb3ff9
+      - name: kind
+        value: task
+      resolver: bundles
+  - name: notify-slack-on-failure
+    when:
+    - input: $(tasks.status)
+      operator: in
+      values: ["Failed"]
+    params:
+    - name: message
+      value: |
+        :red_circle: *Build Failure*
+        *Repo:* $(params.git-url)
+        *PipelineRun:* $(context.pipelineRun.name)
+        *Logs:* https://$(params.konflux-ui-host)/ns/tekton-ecosystem-tenant/pipelinerun/$(context.pipelineRun.name)
+        Please investigate and fix this failure.
+        Reach out to the release captain if you need assistance.
+    - name: secret-name
+      value: slack-webhook-secret
+    - name: key-name
+      value: webhook-url
+    - name: group-ids
+      value:
+      - $(params.slack-group-ids[*])
+    taskRef:
+      params:
+      - name: name
+        value: slack-webhook-notification
+      - name: bundle
+        value: quay.io/konflux-ci/tekton-catalog/task-slack-webhook-notification:0.1@sha256:14766aebbf6f4739e1b7dde0406dcba2d1e300170d3b084f23df9fb074d87dc3
       - name: kind
         value: task
       resolver: bundles
