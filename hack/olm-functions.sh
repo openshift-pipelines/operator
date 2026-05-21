@@ -66,11 +66,7 @@ function render_catalog() {
     RENDERED_CATALOG_JSON=$3
     NUMERIC_VERSION=${VERSION#v} # Removes "v" prefix
 
-    if (( $(echo "$NUMERIC_VERSION >= 4.17" | bc -l) )); then
-        opm alpha render-template basic $CATALOG_JSON --migrate-level=bundle-object-to-csv-metadata > $RENDERED_CATALOG_JSON
-    else
-      opm alpha render-template basic $CATALOG_JSON > $RENDERED_CATALOG_JSON
-    fi
+    opm alpha render-template basic $CATALOG_JSON --migrate-level=bundle-object-to-csv-metadata > $RENDERED_CATALOG_JSON
     echo "Render template for $VERSION Done"
 
 }
