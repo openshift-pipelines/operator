@@ -58,12 +58,6 @@ jobs:
             git checkout HEAD .
           popd
       
-      - name: Generate patches
-        run: |
-          pushd upstream
-            sed -i "s/go 1.25.10/go 1.25.9/g" go.mod
-
-          popd
       - name: update-rpms
         continue-on-error: true
         run: |
