@@ -95,6 +95,10 @@ spec:
     type: string
     default: "konflux-ui.apps.kflux-prd-rh02.0fk9.p1.openshiftapps.com"
     description: Konflux UI hostname for logs URL
+  - name: repo-name
+    type: string
+    default: "operator"
+    description: Short repository name for Slack notifications
   results:
   - description: ""
     name: IMAGE_URL
@@ -565,8 +569,8 @@ spec:
     params:
     - name: message
       value: |
-        :red_circle: *Build Failure*
-        *Repo:* $(params.git-url)
+        :red_circle: *Build Failure on $(params.repo-name)*
+        *Commit:* $(params.git-url)/commit/$(params.revision)
         *PipelineRun:* $(context.pipelineRun.name)
         *Logs:* https://$(params.konflux-ui-host)/ns/tekton-ecosystem-tenant/pipelinerun/$(context.pipelineRun.name)
         Please investigate and fix this failure.
