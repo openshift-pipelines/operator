@@ -178,6 +178,12 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tc *v1alpha1.TektonConfi
 
 	// Ensure Pipeline CR
 	tektonpipeline := pipeline.GetTektonPipelineCR(tc, r.operatorVersion)
+	if platformData := r.extension.GetPlatformData(); platformData != "" {
+		if tektonpipeline.Annotations == nil {
+			tektonpipeline.Annotations = map[string]string{}
+		}
+		tektonpipeline.Annotations[v1alpha1.PlatformDataHashKey] = platformData
+	}
 	logger.Debug("Ensuring TektonPipeline CR exists")
 	if _, err := pipeline.EnsureTektonPipelineExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonPipelines(), tektonpipeline); err != nil {
 		errMsg := fmt.Sprintf("TektonPipeline: %s", err.Error())
@@ -260,6 +266,12 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tc *v1alpha1.TektonConfi
 	// Ensure Pipeline Trigger
 	if !tc.Spec.Trigger.Disabled && (tc.Spec.Profile == v1alpha1.ProfileAll || tc.Spec.Profile == v1alpha1.ProfileBasic) {
 		tektontrigger := trigger.GetTektonTriggerCR(tc, r.operatorVersion)
+		if platformData := r.extension.GetPlatformData(); platformData != "" {
+			if tektontrigger.Annotations == nil {
+				tektontrigger.Annotations = map[string]string{}
+			}
+			tektontrigger.Annotations[v1alpha1.PlatformDataHashKey] = platformData
+		}
 		logger.Debug("Ensuring TektonTrigger CR exists")
 		if _, err := trigger.EnsureTektonTriggerExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonTriggers(), tektontrigger); err != nil {
 			errMsg := fmt.Sprintf("TektonTrigger: %s", err.Error())
