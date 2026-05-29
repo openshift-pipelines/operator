@@ -39,8 +39,6 @@ case "$ENVIRONMENT" in
     ;;
 esac
 
-echo "Using ENVIRONMENT: $ENVIRONMENT"
-
 function update_image_reference() {
     SOURCE_PATTEN="quay.io/.*/(pipeline-)?(.*@sha256:.+)"
     TARGET_PATTEN="${TARGET_REGISTRY}/\2"
