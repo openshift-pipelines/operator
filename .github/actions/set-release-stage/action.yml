@@ -1,0 +1,49 @@
+name: 'Set and Update Release Stage'
+description: 'Determines the release stage from workflow input or repo file, and updates the file if needed.'
+
+inputs:
+  manual_stage:
+    description: 'Select Environment'
+    required: true
+    default: 'use-file'
+
+outputs:
+  stage:
+    description: 'The finalized release stage'
+    value: ${{ steps.set-env.outputs.STAGE }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Determine and Update Environment
+      id: set-env
+      # In composite actions, specifying the shell is required
+      shell: bash
+      run: |
+        FILE=.github/release-stage.txt
+        
+        # Read environment from input. If environment is provided in input then set this as current stage.
+        INPUT_STAGE="${{ inputs.manual_stage }}"
+        FILE_STAGE=$(cat $FILE | xargs)
+        
+        # 1. Determine which value to use
+        if [[ -n "$INPUT_STAGE" && "$INPUT_STAGE" != "use-file" ]]; then
+          STAGE="$INPUT_STAGE"
+        else
+          STAGE="$FILE_STAGE"
+        fi
+        
+        # 2. Safety check: ensure it matches an expected environment
+        if [[ "$STAGE" != "devel" && "$STAGE" != "staging" && "$STAGE" != "production" ]]; then
+          echo "Error: Invalid environment '$STAGE'"
+          exit 1
+        fi
+        
+        # 3. Update the file and commit if the manual input differs from the file
+        if [[ "$STAGE" != "$FILE_STAGE" ]]; then
+          echo "Updating release-stage.txt to $STAGE"
+          echo "$STAGE" > $FILE                 
+        fi
+        
+        # 4. Pass the final stage to the deployment job
+        echo "STAGE=$STAGE" >> $GITHUB_ENV
