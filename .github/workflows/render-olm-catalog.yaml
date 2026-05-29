@@ -49,11 +49,17 @@ jobs:
           DOCKER_JSON: ${{ secrets.DOCKER_REGISTRY_SECRET }}
         run: |
           echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json
+      - name: Setup Release Stage
+        uses: ./.github/actions/set-release-stage
+        with:
+          # Pass the workflow dispatch input to the action
+          environment: ${{ github.event.inputs.environment }}
+
       - name: Generate OLM Bundles
         run: |
           curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
           chmod +x /usr/local/bin/opm
-          ./hack/update-olm-bundle.sh ${{github.event.inputs.environment}}
+          ./hack/update-olm-bundle.sh $STAGE
 
       - name: Update OLM catalog
         run: |
