@@ -18,7 +18,7 @@ else
   OCP_VERSIONS=("$OCP_VERSIONS")
 fi
 
-OLM_CONFIG="$OLM_DIR/index/olm.yaml"
+OLM_CONFIG="$OLM_DIR/olm.yaml"
 rm -vf $OLM_CONFIG
 
 
