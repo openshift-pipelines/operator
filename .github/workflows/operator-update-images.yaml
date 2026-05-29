@@ -1,6 +1,7 @@
 name: operator-update-images
 
 on:
+  pull_request:
   push:
     branches:
       - next
@@ -10,10 +11,9 @@ on:
       - project.yaml
   workflow_dispatch:
     inputs:
-      environment:
+      release_stage:
         description: 'Select Environment'
-        required: true
-        default: 'devel'
+        required: false
         type: choice
         options:
           - devel
@@ -31,10 +31,17 @@ jobs:
       - name: Checkout the current repo
         uses: actions/checkout@v5
 
+      - name: Setup Release Stage
+        uses: ./.github/actions/set-release-stage
+        with:
+          # Pass the workflow dispatch input to the action
+          manual_stage: ${{ github.event.inputs.release_stage }}
+
       - name: update-image-references
         run: |
+          set -ex  
           # Update operator's payload and stuff
-          make ENVIRONMENT=${{github.event.inputs.environment}} update-reference  
+          make ENVIRONMENT=$STAGE update-reference  
 
       - name: Commit new changes
         run: |
@@ -44,7 +51,7 @@ jobs:
           git config user.email pipelines-extcomm@redhat.com
           git checkout -b ${SOURCE_BRANCH}
           
-          git add -f  head .konflux olm
+          git add -f  head .konflux olm .github
           
           if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
             echo "No change, exiting"
