@@ -1,6 +1,28 @@
 #!/usr/bin/env bash
 # Update images from project.yaml to "generated" files
-ENVIRONMENT=${1:-"staging"}
+BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$BASEDIR")"
+
+FILE=$ROOT_DIR/olm/release-stage.txt
+FILE_STAGE=$(cat $FILE)
+STAGE=${1:-$FILE_STAGE}
+
+case "$STAGE" in
+  "devel"|"staging"|"production")
+    ;;
+  *)
+    echo "Invalid selection!"
+    exit 1
+    ;;
+esac
+
+if [[ "$STAGE" != "$FILE_STAGE" ]]; then
+  echo "Updating release-stage.txt to $STAGE"
+  echo "$STAGE" > $FILE
+fi
+
+ENVIRONMENT=$STAGE
+
 case "$ENVIRONMENT" in
   "devel")
     TARGET_REGISTRY="quay.io/openshift-pipeline"
