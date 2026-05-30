@@ -91,7 +91,9 @@ func main() {
 			if !slices.Contains(channels, channel) {
 				channels = append(channels, channel)
 			}
-			if !slices.Contains(bundles, bundleVersion) {
+			if !slices.ContainsFunc(bundles, func(b BundleVersion) bool {
+				return b.Version == bundleVersion.Version
+			}) {
 				bundles = append(bundles, bundleVersion)
 			}
 		}
