@@ -171,6 +171,22 @@ func (oe openshiftExtension) PreReconcile(ctx context.Context, tc v1alpha1.Tekto
 	}
 	// --------------------
 
+	// Resolve the central TLS profile once per reconcile cycle and cache it in the
+	// console plugin reconciler. PostReconcile consumes the cached value without
+	// re-reading the APIServer. The APIServer watch in controller.go ensures that
+	// a TLS profile change triggers a new reconcile, so the cache is always fresh.
+	if config.Spec.Platforms.OpenShift.EnableCentralTLSConfig != nil &&
+		*config.Spec.Platforms.OpenShift.EnableCentralTLSConfig {
+		tlsConfig, err := occommon.ResolveCentralTLSToEnvVars(ctx, oe.tektonConfigLister)
+		if err != nil {
+			logging.FromContext(ctx).Warnf("failed to resolve central TLS config for console plugin: %v", err)
+		} else {
+			oe.consolePluginReconciler.SetTLSConfig(tlsConfig)
+		}
+	} else {
+		oe.consolePluginReconciler.SetTLSConfig(nil)
+	}
+
 	return r.createResources(ctx)
 }
 
@@ -191,7 +207,7 @@ func (oe openshiftExtension) PostReconcile(ctx context.Context, comp v1alpha1.Te
 
 	pacSpec := configInstance.Spec.PipelinesAsCodeForCurrentPlatform()
 	if pacSpec != nil && pacSpec.Enable != nil && *pacSpec.Enable {
-		if _, err := pac.EnsureOpenShiftPipelinesAsCodeExists(ctx, oe.operatorClientSet.OperatorV1alpha1().OpenShiftPipelinesAsCodes(), configInstance, oe.operatorVersion); err != nil {
+		if _, err := pac.EnsureOpenShiftPipelinesAsCodeExists(ctx, oe.operatorClientSet.OperatorV1alpha1().OpenShiftPipelinesAsCodes(), configInstance, oe.operatorVersion, oe.GetPlatformData()); err != nil {
 			configInstance.Status.MarkComponentNotReady(fmt.Sprintf("OpenShiftPipelinesAsCode: %s", err.Error()))
 			return v1alpha1.REQUEUE_EVENT_AFTER
 		}
@@ -202,6 +218,7 @@ func (oe openshiftExtension) PostReconcile(ctx context.Context, comp v1alpha1.Te
 	}
 
 	// execute console plugin reconciler
+	// TLS config was already resolved and cached in PreReconcile via SetTLSConfig.
 	return oe.consolePluginReconciler.reconcile(ctx, configInstance)
 }
 
