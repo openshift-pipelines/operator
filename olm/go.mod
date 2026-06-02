@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/google/go-containerregistry v0.20.7
+	golang.org/x/mod v0.30.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
