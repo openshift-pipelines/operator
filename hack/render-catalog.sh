@@ -7,32 +7,25 @@ BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source $BASEDIR/olm-functions.sh
 
 ROOT_DIR="$(dirname "$BASEDIR")"
-OLM_DIR="$ROOT_DIR/.konflux/olm-catalog"
+OLM_DIR="$ROOT_DIR/.konflux/olm-catalog/index"
+
+log "INFO" "Generate Catalog Template"
+(cd $ROOT_DIR/olm && go run olm.go config.yaml $OLM_DIR)
 
 if [ "$OCP_VERSIONS" == "ALL_VERSIONS" ]; then
   OCP_VERSIONS=()
-  for d in "$OLM_DIR/index"/*/; do
+  for d in "$OLM_DIR"/*/; do
     [ -d "$d" ] && OCP_VERSIONS+=("$(basename "$d")")
   done
 else
   OCP_VERSIONS=("$OCP_VERSIONS")
 fi
 
-OLM_CONFIG="$OLM_DIR/olm.yaml"
-rm -vf $OLM_CONFIG
-
-
 # Generate the catalog for each version
 for VERSION in ${OCP_VERSIONS[@]}; do
-  echo "Generating catalog for $VERSION"
-  CATALOG_JSON="$OLM_DIR/index/${VERSION}/catalog-template.json"
-  RENDERED_CATALOG_JSON="$OLM_DIR/index/${VERSION}/catalog/openshift-pipelines-operator-rh/catalog.json"
-  echo "generating catalog template $CATALOG_JSON"
-  (cd $ROOT_DIR/olm && go run olm.go config.yaml $CATALOG_JSON $OLM_CONFIG)
+  log "INFO" "Generating catalog for $VERSION"
+  CATALOG_JSON="$OLM_DIR/${VERSION}/catalog-template.json"
+  RENDERED_CATALOG_JSON="$OLM_DIR/${VERSION}/catalog/openshift-pipelines-operator-rh/catalog.json"
+  mkdir -p $(dirname $RENDERED_CATALOG_JSON)
   render_catalog $VERSION $CATALOG_JSON $RENDERED_CATALOG_JSON
 done
-
-
-
-
-
