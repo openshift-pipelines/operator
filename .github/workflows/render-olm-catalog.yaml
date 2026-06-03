@@ -58,6 +58,14 @@ jobs:
       - name: Update OLM catalog
         run: |
           ./hack/render-catalog.sh
+      #Update the current PR with generated artifacts
+      - name: Commit generated catalogs
+        uses: stefanzweifel/git-auto-commit-action@v5
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          commit_message: "chore: auto-generate OCP catalog JSONs"
+          file_pattern: '.konflux/olm-catalog/index/ olm/'
+
       - name: Commit Changes and Generate PR
         if: github.event_name != 'pull_request'
         run: |
