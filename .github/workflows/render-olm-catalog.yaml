@@ -1,21 +1,23 @@
 name: render-olm-catalog
 
 on:
-  pull_request:
-    branches:
-      - release-v*
-      - next
-    paths:
-      - olm/**
-      - .github/workflows/render-olm-catalog.yaml
   push:
     branches:
       - release-v*
       - next
     paths:
       - nightly-bundle.yaml
-      - olm/**
       - bundle.yaml
+      - olm/**
+      - .github/workflows/render-olm-catalog.yaml
+  pull_request:
+    branches:
+      - release-v*
+      - next
+    paths:
+      - nightly-bundle.yaml
+      - bundle.yaml
+      - olm/**
       - .github/workflows/render-olm-catalog.yaml
   workflow_dispatch:
     inputs:
@@ -26,6 +28,8 @@ on:
         type: choice
         options:
           - devel
+          - staging
+          - production
 concurrency:
   group: render-${{ github.ref }}-${{ github.run_id }}
   cancel-in-progress: false
@@ -52,12 +56,16 @@ jobs:
           ./hack/update-olm-bundle.sh ${{github.event.inputs.environment}}
 
       - name: Update OLM catalog
-        uses: nick-fields/retry@v3
+        run: |
+          ./hack/render-catalog.sh
+      #Update the current PR with generated artifacts
+      - name: Commit generated catalogs
+        uses: stefanzweifel/git-auto-commit-action@v5
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: |
-            ./hack/render-catalog.sh
+          commit_message: "chore: auto-generate OCP catalog JSONs"
+          file_pattern: '.konflux/olm-catalog/index/ olm/'
+
       - name: Commit Changes and Generate PR
         if: github.event_name != 'pull_request'
         run: |
@@ -70,8 +78,8 @@ jobs:
           git add .konflux/olm-catalog/index/ olm/
           
           if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
-          echo "No change, exiting"
-          exit 0
+            echo "No change, exiting"
+            exit 0
           fi
           
           git commit -F- <<EOF
@@ -80,8 +88,8 @@ jobs:
           
           git push -f origin ${SOURCE_BRANCH}
           if [ "$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json url --jq 'length')" = "0" ]; then
-          echo "creating PR..."
-          gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
+            echo "creating PR..."
+            gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
