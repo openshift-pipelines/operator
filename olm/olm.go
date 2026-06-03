@@ -56,15 +56,15 @@ func main() {
 
 	for ocpVersion, minVersion := range minVersions {
 
-		var bundles = cfg.BundleVersions
-		var channels = cfg.Channels
-
 		if !strings.HasPrefix(minVersion, "v") {
 			minVersion = "v" + minVersion
 		}
 		log.Printf("Generating OLM template for  OCP version %s, Min OSP Version: %s", ocpVersion, minVersion)
 
 		parsedMinVersion := parseVersion(minVersion)
+		bundles := cfg.BundleImages
+		channels := cfg.Channels
+
 		for _, b := range cfg.Bundles {
 			parsedBundleversion := parseVersion(b.Version)
 			if parsedBundleversion.Compare(parsedMinVersion) < 0 {
@@ -115,20 +115,6 @@ func main() {
 
 		log.Printf("Supported Channels on OCP: %s: %s\n", ocpVersion, strings.Join(channels, ", "))
 
-		cfg.BundleVersions = bundles
-		cfg.Channels = channels
-
-		// Write to olm.yaml
-		olmFile := createFile(filepath.Join(os.TempDir(), ocpVersion, olmFileName))
-		defer olmFile.Close()
-		encoder := yaml.NewEncoder(olmFile)
-		encoder.SetIndent(2)
-
-		err = encoder.Encode(cfg)
-		if err != nil {
-			panic(err)
-		}
-
 		// Build output template
 		out := Template{
 			Schema:  "olm.template.basic",
@@ -165,7 +151,6 @@ func main() {
 		}
 
 		// Output JSON
-		// Open file
 		// Create file
 		f := createFile(filepath.Join(outputDir, ocpVersion, outputFile))
 		log.Println("Writing catalog to output file:", f.Name())
@@ -190,7 +175,7 @@ type Config struct {
 	Base64data     string            `yaml:"base64data"`
 	DefaultChannel string            `yaml:"defaultChannel"`
 	Bundles        []BundleConfig    `yaml:"bundles"`
-	BundleVersions []BundleImage     `yaml:"bundleVersions"`
+	BundleImages   []BundleImage     `yaml:"bundleImages"`
 	Channels       []string          `yaml:"channels"`
 	MinVersion     map[string]string `yaml:"minVersion"`
 }
