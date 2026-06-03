@@ -22,11 +22,15 @@ else
 fi
 
 # Generate the catalog for each version
+pids=()
 for VERSION in ${OCP_VERSIONS[@]}; do
   log "INFO" "Generating catalog for $VERSION"
   CATALOG_JSON="$OLM_DIR/${VERSION}/catalog-template.json"
   RENDERED_CATALOG_JSON="$OLM_DIR/${VERSION}/catalog/openshift-pipelines-operator-rh/catalog.json"
   mkdir -p $(dirname $RENDERED_CATALOG_JSON)
   render_catalog $VERSION $CATALOG_JSON $RENDERED_CATALOG_JSON &
+  pids+=($!)
 done
-wait
+for pid in "${pids[@]}"; do
+  wait "$pid"
+done
