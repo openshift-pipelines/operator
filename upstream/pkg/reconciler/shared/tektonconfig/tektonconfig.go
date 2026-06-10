@@ -67,6 +67,7 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, original *v1alpha1.Tekton
 
 	if err := r.extension.Finalize(ctx, original); err != nil {
 		logger.Error("Failed to finalize platform resources", err)
+		return err
 	}
 
 	if original.Spec.Profile == v1alpha1.ProfileLite {
@@ -178,6 +179,12 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tc *v1alpha1.TektonConfi
 
 	// Ensure Pipeline CR
 	tektonpipeline := pipeline.GetTektonPipelineCR(tc, r.operatorVersion)
+	if platformData := r.extension.GetPlatformData(); platformData != "" {
+		if tektonpipeline.Annotations == nil {
+			tektonpipeline.Annotations = map[string]string{}
+		}
+		tektonpipeline.Annotations[v1alpha1.PlatformDataHashKey] = platformData
+	}
 	logger.Debug("Ensuring TektonPipeline CR exists")
 	if _, err := pipeline.EnsureTektonPipelineExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonPipelines(), tektonpipeline); err != nil {
 		errMsg := fmt.Sprintf("TektonPipeline: %s", err.Error())
@@ -203,8 +210,14 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tc *v1alpha1.TektonConfi
 		tc.Status.MarkComponentNotReady(msg)
 		return v1alpha1.REQUEUE_EVENT_AFTER
 	} else {
-		logger.Infof("TektonPruner is enabled.Creating TektonPipeline CR")
+		logger.Infof("TektonPruner is enabled. Creating TektonPruner CR")
 		tektonPruner := pruner.GetTektonPrunerCR(tc, r.operatorVersion)
+		if platformData := r.extension.GetPlatformData(); platformData != "" {
+			if tektonPruner.Annotations == nil {
+				tektonPruner.Annotations = map[string]string{}
+			}
+			tektonPruner.Annotations[v1alpha1.PlatformDataHashKey] = platformData
+		}
 		if _, err := pruner.EnsureTektonPrunerExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonPruners(), tektonPruner); err != nil {
 			tc.Status.MarkComponentNotReady(fmt.Sprintf("TektonPruner %s", err.Error()))
 			return v1alpha1.REQUEUE_EVENT_AFTER
@@ -260,6 +273,12 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tc *v1alpha1.TektonConfi
 	// Ensure Pipeline Trigger
 	if !tc.Spec.Trigger.Disabled && (tc.Spec.Profile == v1alpha1.ProfileAll || tc.Spec.Profile == v1alpha1.ProfileBasic) {
 		tektontrigger := trigger.GetTektonTriggerCR(tc, r.operatorVersion)
+		if platformData := r.extension.GetPlatformData(); platformData != "" {
+			if tektontrigger.Annotations == nil {
+				tektontrigger.Annotations = map[string]string{}
+			}
+			tektontrigger.Annotations[v1alpha1.PlatformDataHashKey] = platformData
+		}
 		logger.Debug("Ensuring TektonTrigger CR exists")
 		if _, err := trigger.EnsureTektonTriggerExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonTriggers(), tektontrigger); err != nil {
 			errMsg := fmt.Sprintf("TektonTrigger: %s", err.Error())
