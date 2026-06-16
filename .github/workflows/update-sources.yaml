@@ -26,7 +26,7 @@ jobs:
           rm -fR upstream
           git clone https://github.com/tektoncd/operator upstream
           pushd upstream
-          git checkout -B release-v0.79.x origin/release-v0.79.x
+          git checkout -B release-v0.80.x origin/release-v0.80.x
           popd
       - name: fetch-payload
         run: |
@@ -105,7 +105,7 @@ jobs:
           fi
           
           git commit -F- <<EOF
-          [bot] Update release-v1.23.x from tektoncd/operator:release-v0.79.x to ${NEW_COMMIT}
+          [bot] Update release-v1.23.x from tektoncd/operator:release-v0.80.x to ${NEW_COMMIT}
           
               $ git diff --stat ${NEW_COMMIT}..${OLD_COMMIT}
           $(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)
@@ -120,7 +120,7 @@ jobs:
             gh pr create -B release-v1.23.x -H actions/update/sources-release-v1.23.x --label=automated --label=upstream --fill
           else
             echo "a PR already exists, editing..."
-          gh pr edit --title "[bot] Update release-v1.23.x from tektoncd/operator:release-v0.79.x to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)"
+          gh pr edit --title "[bot] Update release-v1.23.x from tektoncd/operator:release-v0.80.x to ${NEW_COMMIT}" --body "$(cat /tmp/diff.txt | sed 's/^/    /' | head -c 55555)"
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
