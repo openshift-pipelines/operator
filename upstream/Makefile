@@ -42,9 +42,17 @@ $(BIN)/kustomize: | $(BIN) ; $(info $(M) getting kustomize)
 	@curl -sSfL https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh | bash
 	@mv ./kustomize $(BIN)/kustomize
 
+CONTROLLER_GEN = $(or ${CONTROLLER_GEN_BIN},$(BIN)/controller-gen)
+$(BIN)/controller-gen: | $(BIN) ; $(info $(M) getting controller-gen)
+	$Q GOBIN=$(BIN) $(GO) install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.18.0
+
 GOLANGCILINT = $(or ${GOLANGCILINT_BIN},${GOLANGCILINT_BIN},$(BIN)/golangci-lint)
 $(BIN)/golangci-lint: | $(BIN) ; $(info $(M) getting golangci-lint $(GOLANGCI_VERSION))
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(BIN) $(GOLANGCI_VERSION)
+	@if [ -f $(BIN)/golangci-lint ] && $(BIN)/golangci-lint --version 2>/dev/null | grep -qF "$(GOLANGCI_VERSION)"; then \
+		echo "golangci-lint $(GOLANGCI_VERSION) already installed"; \
+	else \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(BIN) $(GOLANGCI_VERSION); \
+	fi
 
 ##@ Clean 
 .PHONY: clean-cluster
@@ -69,14 +77,14 @@ ifeq ($(TARGET), openshift)
 	rm -rf ./cmd/$(TARGET)/operator/kodata/manual-approval-gate
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-pruner
 	rm -rf ./cmd/$(TARGET)/operator/kodata/pruner
-	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code
+	rm -rf ./cmd/$(TARGET)/operator/kodata/pipelines-as-code
 	find ./cmd/$(TARGET)/operator/kodata/tekton-addon/addons/06-ecosystem/tasks -type f ! -name "role.yaml" ! -name "rolebinding.yaml" -delete 
 	find ./cmd/$(TARGET)/operator/kodata/tekton-addon/addons/06-ecosystem/stepactions -type f ! -name "role.yaml" ! -name "rolebinding.yaml" -delete
-	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/go.yaml
-	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/java.yaml
-	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/nodejs.yaml
-	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/python.yaml
-	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton-addon/pipelines-as-code-templates/generic.yaml
+	rm -f ./cmd/$(TARGET)/operator/kodata/pipelines-as-code-templates/go.yaml
+	rm -f ./cmd/$(TARGET)/operator/kodata/pipelines-as-code-templates/java.yaml
+	rm -f ./cmd/$(TARGET)/operator/kodata/pipelines-as-code-templates/nodejs.yaml
+	rm -f ./cmd/$(TARGET)/operator/kodata/pipelines-as-code-templates/python.yaml
+	rm -f ./cmd/$(TARGET)/operator/kodata/pipelines-as-code-templates/generic.yaml
 else
 	rm -rf ./cmd/$(TARGET)/operator/kodata/tekton*
 	rm -rf ./cmd/$(TARGET)/operator/kodata/pruner
@@ -116,6 +124,15 @@ resolve: | $(KO) $(KUSTOMIZE) get-releases ; $(info $(M) ko resolve on $(TARGET)
 .PHONY: generated
 generated: | vendor ; $(info $(M) update generated files) ## Update generated files
 	$Q ./hack/update-codegen.sh
+
+##@ CRD Generation
+.PHONY: generate-crds
+generate-crds: | $(CONTROLLER_GEN) ; $(info $(M) generating CRDs from Go types…) ## Generate CRD manifests from Go types
+	$Q $(CONTROLLER_GEN) crd:allowDangerousTypes=true paths="./pkg/apis/operator/v1alpha1/..." output:crd:artifacts:config=config/base/generated-crds
+
+.PHONY: sync-helm-crds
+sync-helm-crds: generate-crds ; $(info $(M) syncing CRDs to config and Helm chart…) ## Sync generated CRDs to config/ and Helm chart
+	$Q ./hack/sync-helm-crds.sh
 
 .PHONY: vendor
 vendor: ; $(info $(M) update vendor folder)  ## Update vendor folder
@@ -192,13 +209,14 @@ test-unit: ## Run unit tests
 .PHONY: lint
 lint: lint-go lint-yaml ## run all linters
 
+PKG ?= ./...
 .PHONY: lint-go
-lint-go: | $(GOLANGCILINT) ## runs go linter on all go files
+lint-go: | $(GOLANGCILINT) ## runs go linter; set PKG=./some/pkg/... to lint a single package
 	@echo "Linting go files..."
-	@$(GOLANGCILINT) run ./... --modules-download-mode=vendor \
-							--max-issues-per-linter=0 \
-							--max-same-issues=0 \
-							--timeout 5m
+	@$(GOLANGCILINT) run $(PKG) --modules-download-mode=vendor \
+						--max-issues-per-linter=0 \
+						--max-same-issues=0 \
+						--timeout 5m
 
 YAML_FILES := $(shell find . -type f -regex ".*y[a]ml" -print)
 .PHONY: lint-yaml

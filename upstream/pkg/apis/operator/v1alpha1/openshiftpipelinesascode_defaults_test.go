@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"net/http"
 	"testing"
 
 	"go.uber.org/zap"
@@ -25,23 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"knative.dev/pkg/ptr"
 )
-
-// mockHTTPClient creates an HTTP client that returns 200 OK for all requests
-func mockHTTPClient() *http.Client {
-	return &http.Client{
-		Transport: &mockTransport{},
-	}
-}
-
-type mockTransport struct{}
-
-func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	return &http.Response{
-		StatusCode: http.StatusOK,
-		Body:       http.NoBody,
-		Header:     make(http.Header),
-	}, nil
-}
 
 func TestSetPACControllerDefaultSettings(t *testing.T) {
 	opacCR := &OpenShiftPipelinesAsCode{
@@ -56,7 +38,7 @@ func TestSetPACControllerDefaultSettings(t *testing.T) {
 		},
 	}
 
-	opacCR.Spec.PACSettings.setPACDefaultsWithClient(zap.NewNop().Sugar(), mockHTTPClient())
+	opacCR.Spec.PACSettings.setPACDefaults(zap.NewNop().Sugar())
 
 	expectedSettings := map[string]string{
 		"application-name":                           "Pipelines as Code CI",
@@ -89,6 +71,9 @@ func TestSetPACControllerDefaultSettings(t *testing.T) {
 		"secret-github-app-scope-extra-repos":        "",
 		"secret-github-app-token-scoped":             "true",
 		"tekton-dashboard-url":                       "",
+		"tracing-label-action":                       "",
+		"tracing-label-application":                  "",
+		"tracing-label-component":                    "",
 	}
 
 	assert.DeepEqual(t, opacCR.Spec.PACSettings.Settings, expectedSettings)
@@ -115,7 +100,7 @@ func TestSetPACControllerLimitedSettings(t *testing.T) {
 		},
 	}
 
-	opacCR.Spec.PACSettings.setPACDefaultsWithClient(zap.NewNop().Sugar(), mockHTTPClient())
+	opacCR.Spec.PACSettings.setPACDefaults(zap.NewNop().Sugar())
 
 	expectedSettings := map[string]string{
 		"application-name":                           "Pipelines as Code CI test name",
@@ -148,6 +133,9 @@ func TestSetPACControllerLimitedSettings(t *testing.T) {
 		"secret-github-app-scope-extra-repos":        "",
 		"secret-github-app-token-scoped":             "true",
 		"tekton-dashboard-url":                       "",
+		"tracing-label-action":                       "",
+		"tracing-label-application":                  "",
+		"tracing-label-component":                    "",
 	}
 
 	assert.DeepEqual(t, opacCR.Spec.PACSettings.Settings, expectedSettings)
@@ -167,13 +155,13 @@ func TestSetPACControllerDefaultSettingsWithMultipleCatalogs(t *testing.T) {
 					"catalog-1-url":  "https://api.other.com/v1",
 					"catalog-5-id":   "anotherhub5",
 					"catalog-5-name": "tekton1",
-					"catalog-5-url":  "https://api.other.com/v2",
+					"catalog-5-url":  "https://artifacthub.io/api/v1",
 				},
 			},
 		},
 	}
 
-	opacCR.Spec.PACSettings.setPACDefaultsWithClient(zap.NewNop().Sugar(), mockHTTPClient())
+	opacCR.Spec.PACSettings.setPACDefaults(zap.NewNop().Sugar())
 
 	expectedSettings := map[string]string{
 		"application-name":                           "Pipelines as Code CI",
@@ -184,12 +172,12 @@ func TestSetPACControllerDefaultSettingsWithMultipleCatalogs(t *testing.T) {
 		"bitbucket-cloud-check-source-ip":            "true",
 		"catalog-1-id":                               "anotherhub",
 		"catalog-1-name":                             "tekton",
-		"catalog-1-type":                             "artifacthub",
+		"catalog-1-type":                             "tektonhub",
 		"catalog-1-url":                              "https://api.other.com/v1",
 		"catalog-5-id":                               "anotherhub5",
 		"catalog-5-name":                             "tekton1",
 		"catalog-5-type":                             "artifacthub",
-		"catalog-5-url":                              "https://api.other.com/v2",
+		"catalog-5-url":                              "https://artifacthub.io/api/v1",
 		"custom-console-name":                        "",
 		"custom-console-url":                         "",
 		"custom-console-url-namespace":               "",
@@ -214,6 +202,9 @@ func TestSetPACControllerDefaultSettingsWithMultipleCatalogs(t *testing.T) {
 		"secret-github-app-scope-extra-repos":        "",
 		"secret-github-app-token-scoped":             "true",
 		"tekton-dashboard-url":                       "",
+		"tracing-label-action":                       "",
+		"tracing-label-application":                  "",
+		"tracing-label-component":                    "",
 	}
 
 	assert.DeepEqual(t, opacCR.Spec.PACSettings.Settings, expectedSettings)
@@ -235,7 +226,7 @@ func TestSetAdditionalPACControllerDefault(t *testing.T) {
 		},
 	}
 
-	opacCR.Spec.PACSettings.setPACDefaultsWithClient(zap.NewNop().Sugar(), mockHTTPClient())
+	opacCR.Spec.PACSettings.setPACDefaults(zap.NewNop().Sugar())
 
 	assert.Equal(t, true, *opacCR.Spec.PACSettings.AdditionalPACControllers["test"].Enable)
 	assert.Equal(t, "test-pipelines-as-code-configmap", opacCR.Spec.PACSettings.AdditionalPACControllers["test"].ConfigMapName)
@@ -267,10 +258,34 @@ func TestSetAdditionalPACControllerDefaultHavingAdditionalPACController(t *testi
 		},
 	}
 
-	opacCR.Spec.PACSettings.setPACDefaultsWithClient(zap.NewNop().Sugar(), mockHTTPClient())
+	opacCR.Spec.PACSettings.setPACDefaults(zap.NewNop().Sugar())
 
 	assert.Equal(t, false, *opacCR.Spec.PACSettings.AdditionalPACControllers["test"].Enable)
 	assert.Equal(t, "Additional PACController CI", opacCR.Spec.PACSettings.AdditionalPACControllers["test"].Settings["application-name"])
 	assert.Equal(t, "custom", opacCR.Spec.PACSettings.AdditionalPACControllers["test"].Settings["custom-console-name"])
 	assert.Equal(t, "https://custom.com", opacCR.Spec.PACSettings.AdditionalPACControllers["test"].Settings["custom-console-url"])
+}
+
+func TestSetPACControllerDefaultWhenNotArtifactHubSetsTektonHub(t *testing.T) {
+	// When default catalog is not artifacthub, operator sets it to tektonhub
+	opacCR := &OpenShiftPipelinesAsCode{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "name",
+			Namespace: "namespace",
+		},
+		Spec: OpenShiftPipelinesAsCodeSpec{
+			PACSettings: PACSettings{
+				Settings: map[string]string{
+					"hub-catalog-type": "tektonhub",
+					"hub-url":          "https://api.hub.tekton.dev/v1",
+				},
+			},
+		},
+	}
+
+	opacCR.Spec.PACSettings.setPACDefaults(zap.NewNop().Sugar())
+
+	// Default catalog should be tektonhub when not artifacthub
+	assert.Equal(t, "tektonhub", opacCR.Spec.PACSettings.Settings["hub-catalog-type"])
+	assert.Equal(t, "https://api.hub.tekton.dev/v1", opacCR.Spec.PACSettings.Settings["hub-url"])
 }

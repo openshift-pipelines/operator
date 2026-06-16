@@ -27,6 +27,12 @@ import (
 // +genreconciler:krshapedlogic=false
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +genclient:nonNamespaced
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=`.status.version`
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].message`
 type TektonPipeline struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -69,6 +75,7 @@ type TektonPipelineStatus struct {
 }
 
 // TektonPipelineList contains a list of TektonPipeline
+// +kubebuilder:object:root=true
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TektonPipelineList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -95,7 +102,13 @@ type PipelineProperties struct {
 	EnableCustomTasks                        *bool  `json:"enable-custom-tasks,omitempty"`
 	EnableApiFields                          string `json:"enable-api-fields,omitempty"`
 	EmbeddedStatus                           string `json:"embedded-status,omitempty"`
-	SendCloudEventsForRuns                   *bool  `json:"send-cloudevents-for-runs,omitempty"`
+	// Deprecated: send-cloudevents-for-runs is deprecated in tektoncd/pipeline v1.12.0
+	// (https://github.com/tektoncd/pipeline/pull/9774) and will be removed in a future release.
+	// CloudEvents for CustomRuns are now enabled by default when a sink is configured in
+	// the config-events ConfigMap. This field only affects CustomRun objects; it has no
+	// effect on TaskRuns or PipelineRuns. Set to false only to suppress duplicate events
+	// when a custom task controller already sends its own CloudEvents.
+	SendCloudEventsForRuns *bool `json:"send-cloudevents-for-runs,omitempty"`
 	// "verification-mode" is deprecated and never used.
 	// This field will be removed, see https://github.com/tektoncd/operator/issues/1497
 	// originally this field was removed in https://github.com/tektoncd/operator/pull/1481
