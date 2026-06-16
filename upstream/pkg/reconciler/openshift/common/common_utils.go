@@ -20,22 +20,17 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver"
-	openshiftconfigclient "github.com/openshift/client-go/config/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-var (
-	openshiftClient openshiftconfigclient.Interface
 )
 
 func GetOCPVersion(ctx context.Context) (*semver.Version, error) {
 
-	if openshiftClient == nil {
-		return nil, fmt.Errorf("OpenShift client not initialized")
+	if sharedConfigClient == nil {
+		return nil, fmt.Errorf("openshift Client is not initialized yet")
 	}
 
 	// Fetch the ClusterVersion object (always named "version")
-	cv, err := openshiftClient.ConfigV1().ClusterVersions().Get(ctx, "version", metav1.GetOptions{})
+	cv, err := sharedConfigClient.ConfigV1().ClusterVersions().Get(ctx, "version", metav1.GetOptions{})
 	if err != nil {
 		// If running on standard Kubernetes, this will return an IsNotFound error.
 		// Handle gracefully if your operator supports both vanilla K8s and OCP.
@@ -51,8 +46,4 @@ func GetOCPVersion(ctx context.Context) (*semver.Version, error) {
 		return nil, fmt.Errorf("failed to parse OpenShift version %q: %w", versionStr, err)
 	}
 	return v, nil
-}
-
-func SetOpenshiftClient(client openshiftconfigclient.Interface) {
-	openshiftClient = client
 }

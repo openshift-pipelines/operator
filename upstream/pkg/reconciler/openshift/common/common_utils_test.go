@@ -35,7 +35,7 @@ func Test_GetOCPVersion(t *testing.T) {
 			},
 		},
 	}
-	openshiftClient = fake.NewSimpleClientset(cv)
+	sharedConfigClient = fake.NewClientset(cv)
 	ocpVersion, err := GetOCPVersion(t.Context())
 	if err != nil {
 		t.Error(err)
