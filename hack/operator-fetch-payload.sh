@@ -160,7 +160,7 @@ env SERVE_REF="$SERVE_REF" yq e -i '
 
 # Mutate pipelines-as-code payload
 for d in controller watcher webhook; do
-    yq e -i "(select (.kind == \"Deployment\") | select (.metadata.name == \"pipelines-as-code-${d}\") | .spec.template.spec.containers[0].command) = [\"/ko-app/pipelines-as-code-${d}\"]" .konflux/olm-catalog/bundle/kodata/tekton-addon/pipelines-as-code/*/release.yaml
+    yq e -i "(select (.kind == \"Deployment\") | select (.metadata.name == \"pipelines-as-code-${d}\") | .spec.template.spec.containers[0].command) = [\"/ko-app/pipelines-as-code-${d}\"]" .konflux/olm-catalog/bundle/kodata/pipelines-as-code/*/release.yaml
 done
 
 # Mutate manual-approval-gate payload

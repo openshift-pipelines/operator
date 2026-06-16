@@ -80,7 +80,6 @@ type Reconciler struct {
 
 	operatorVersion string
 	resultsVersion  string
-	recorder        *Recorder
 }
 
 // Check that our Reconciler implements controller.Reconciler
@@ -125,7 +124,6 @@ func (r *Reconciler) FinalizeKind(ctx context.Context, original *v1alpha1.Tekton
 // converge the two.
 func (r *Reconciler) ReconcileKind(ctx context.Context, tr *v1alpha1.TektonResult) pkgreconciler.Event {
 	logger := logging.FromContext(ctx).With("tektonresult", tr.Name)
-	defer r.recorder.LogMetrics(r.resultsVersion, tr.Spec, logger)
 
 	tr.Status.InitializeConditions()
 	tr.Status.ObservedGeneration = tr.Generation
@@ -322,8 +320,15 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tr *v1alpha1.TektonResul
 		// of TektonResult is changed by checking hash stored as annotation on
 		// TektonInstallerSet with computing new hash of TektonResult Spec
 		logger.Debug("Checking for spec changes in TektonResult")
-		// Hash of TektonResult Spec
-		expectedSpecHash, err := hash.Compute(tr.Spec)
+		// Hash of TektonResult Spec including platform-specific data (e.g., TLS config)
+		hashInput := struct {
+			Spec      v1alpha1.TektonResultSpec
+			ExtraData string
+		}{
+			Spec:      tr.Spec,
+			ExtraData: tr.Annotations[v1alpha1.PlatformDataHashKey],
+		}
+		expectedSpecHash, err := hash.Compute(hashInput)
 		if err != nil {
 			logger.Errorw("Failed to compute spec hash", "error", err)
 			return err

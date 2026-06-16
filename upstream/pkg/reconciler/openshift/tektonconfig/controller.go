@@ -18,13 +18,14 @@ package tektonconfig
 
 import (
 	"context"
+	"os"
 
-	openshiftconfigclient "github.com/openshift/client-go/config/clientset/versioned"
 	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 	openshiftpipelinesascodeinformer "github.com/tektoncd/operator/pkg/client/injection/informers/operator/v1alpha1/openshiftpipelinesascode"
 	tektonAddoninformer "github.com/tektoncd/operator/pkg/client/injection/informers/operator/v1alpha1/tektonaddon"
 	occommon "github.com/tektoncd/operator/pkg/reconciler/openshift/common"
 	"github.com/tektoncd/operator/pkg/reconciler/shared/tektonconfig"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"knative.dev/pkg/configmap"
 	"knative.dev/pkg/controller"
@@ -49,19 +50,29 @@ func NewController(ctx context.Context, cmw configmap.Watcher) *controller.Impl 
 	}); err != nil {
 		logger.Panicf("Couldn't register OpenShiftPipelinesAsCode informer event handler: %w", err)
 	}
-	if err := initOpenshiftClient(ctx); err != nil {
-		logger.Panicf("Failed to initialize OpenShift client: %w", err)
+
+	// Setup APIServer TLS profile watcher
+	// When the cluster's TLS security profile changes, enqueue TektonConfig for reconciliation
+	if err := setupAPIServerTLSWatch(ctx, ctrl); err != nil {
+		// On OpenShift clusters the APIServer resource should always exist.
+		// This env var is an escape hatch for edge cases and must be explicitly enabled.
+		if os.Getenv(occommon.SkipAPIServerTLSWatch) == "true" {
+			logger.Warnf("APIServer TLS profile watch not enabled: %v", err)
+		} else {
+			logger.Panicf("Couldn't setup APIServer TLS profile watch: %v", err)
+		}
 	}
 
 	return ctrl
 }
 
-func initOpenshiftClient(ctx context.Context) error {
-	restConfig := injection.GetConfig(ctx)
-	configClient, err := openshiftconfigclient.NewForConfig(restConfig)
-	if err != nil {
-		return err
-	}
-	occommon.SetOpenshiftClient(configClient)
-	return nil
+// setupAPIServerTLSWatch sets up a watch on the OpenShift APIServer resource to
+// monitor TLS security profile changes. When changes are detected, it enqueues
+// TektonConfig for reconciliation so TLS config can be propagated to components.
+func setupAPIServerTLSWatch(ctx context.Context, impl *controller.Impl) error {
+	logger := logging.FromContext(ctx)
+	return occommon.SetupAPIServerTLSWatch(ctx, injection.GetConfig(ctx), func() {
+		logger.Info("APIServer TLS security profile changed, triggering TektonConfig reconciliation")
+		impl.EnqueueKey(types.NamespacedName{Name: v1alpha1.ConfigResourceName})
+	})
 }

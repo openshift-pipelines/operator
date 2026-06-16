@@ -46,8 +46,6 @@ import (
 )
 
 const (
-	resourceKind = v1alpha1.KindTektonChain
-
 	// Chains ConfigMap
 	ChainsConfig = "chains-config"
 	// Chains Container Name
@@ -80,8 +78,6 @@ type Reconciler struct {
 	// pipelineInformer provides access to a shared informer and lister for
 	// TektonPipelines
 	pipelineInformer pipelineinformer.TektonPipelineInformer
-	// Metrics Recorder
-	recorder *Recorder
 }
 
 // Check that our Reconciler implements controller.Reconciler
@@ -123,8 +119,6 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tc *v1alpha1.TektonChain
 		"generation", tc.Generation,
 		"namespace", tc.GetNamespace(),
 	)
-	defer r.recorder.LogMetricsWithSpec(r.chainVersion, tc.Spec, logger)
-
 	tc.Status.InitializeConditions()
 	tc.Status.ObservedGeneration = tc.Generation
 
