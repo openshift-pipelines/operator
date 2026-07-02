@@ -151,6 +151,11 @@ spec:
                 value: $(params.INSTANCE_TYPE)
               - name: fips
                 value: true
+              - name: imageContentSources
+                value: |
+                  - source: registry.redhat.io/openshift-pipelines/
+                    mirrors:
+                      - quay.io/redhat-user-workloads/tekton-ecosystem-tenant
     # Create Catalog Source to install Operator
     - name: create-catalog-source
       runAfter:
