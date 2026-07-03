@@ -1,23 +1,33 @@
+log() {
+    local level=$1
+    shift
+    local message="$*"
+    local timestamp
+    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+
+    # Format: [YYYY-MM-DD HH:MM:SS] [LEVEL] Message
+    echo "[$timestamp] [$level] $message"
+}
   function update_bundle_image() {
     environment=${1:-"devel"}
     BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     ROOT_DIR="$(dirname "$BASEDIR")"
 
-    echo "Getting bundle image for environment: $environment" >&2
+    log "INFO" "Getting bundle image for environment: $environment" >&2
     TARGET_REGISTRY=$(target_registry $environment)
-    echo "Target registry: $TARGET_REGISTRY" >&2
+    log "INFO" "Target registry: $TARGET_REGISTRY" >&2
     BUNDLE_IMAGE=$(yq '.images[] | select(.name == "IMAGE_OPERATOR_BUNDLE") | .value' bundle.yaml)
-    echo "Original bundle image: $BUNDLE_IMAGE" >&2
+    log "INFO" "Original bundle image: $BUNDLE_IMAGE" >&2
     BUNDLE_JSON=$(opm render --skip-tls-verify -o json ${BUNDLE_IMAGE})
     BUNDLE_NAME=$(echo $BUNDLE_JSON | jq -r '.name')
     BUNDLE_VERSION=$(echo $BUNDLE_NAME | awk -F 'v' '{ print $2 }')
-    echo "BUNDLE_NAME : $BUNDLE_NAME"
-    echo "Bundle Version : $BUNDLE_VERSION"
+    log "INFO" "BUNDLE_NAME : $BUNDLE_NAME"
+    log "INFO" "Bundle Version : $BUNDLE_VERSION"
 
     SOURCE_PATTEN="quay.io/.*/(.*@sha256:.+)"
     TARGET_PATTEN="$TARGET_REGISTRY/\1"
     BUNDLE_IMAGE=$(echo "${BUNDLE_IMAGE}" | sed -E "s|$SOURCE_PATTEN|$TARGET_PATTEN|g")
-    echo "Updated bundle image: $BUNDLE_IMAGE" >&2
+    log "INFO" "Updated bundle image: $BUNDLE_IMAGE" >&2
 
     #Update the bundle image and version in the olm config.yaml file only for 5.0.x versions
     FILE="$ROOT_DIR/olm/config.yaml"
@@ -30,11 +40,11 @@
    export BUNDLE_IMAGE BUNDLE_VERSION BASE_VERSION
    EXISTING=$(yq e '.bundles[] | select(.version | test("^" + env(BASE_VERSION) + "(-.*)?$")) | .version' "$FILE")
    if [[ -n "$EXISTING" ]]; then
-     echo "Updating existing bundle $EXISTING -> $BUNDLE_VERSION"
+     log "INFO" "Updating existing bundle $EXISTING -> $BUNDLE_VERSION"
      yq -i '(.bundles[] | select(.version | test("^" + env(BASE_VERSION) + "(.*)?$"))).version = env(BUNDLE_VERSION)' "$FILE"
      yq -i '(.bundles[] | select(.version == env(BUNDLE_VERSION))).image = env(BUNDLE_IMAGE)' "$FILE"
    else
-     echo "Adding new bundle version $BUNDLE_VERSION"
+     log "INFO" "Adding new bundle version $BUNDLE_VERSION"
      yq -i '.bundles += [{"version": env(BUNDLE_VERSION), "image": env(BUNDLE_IMAGE)}]' "$FILE"
    fi
 
@@ -43,7 +53,7 @@
 
 function target_registry() {
   environment=$1
-  echo "Determining target registry for environment: $environment" >&2
+  log "INFO" "Determining target registry for environment: $environment" >&2
   case "$environment" in
     "staging")
       TARGET_REGISTRY="registry.stage.redhat.io/openshift-pipelines"
@@ -55,7 +65,7 @@ function target_registry() {
       TARGET_REGISTRY="quay.io/openshift-pipeline"
       ;;
   esac
-  echo "Selected target registry: $TARGET_REGISTRY" >&2
+  log "INFO" "Selected target registry: $TARGET_REGISTRY" >&2
   echo $TARGET_REGISTRY
 }
 
@@ -66,7 +76,10 @@ function render_catalog() {
     RENDERED_CATALOG_JSON=$3
     NUMERIC_VERSION=${VERSION#v} # Removes "v" prefix
 
-    opm alpha render-template basic $CATALOG_JSON --migrate-level=bundle-object-to-csv-metadata > $RENDERED_CATALOG_JSON
-    echo "Render template for $VERSION Done"
-
+    if (( $(echo "$NUMERIC_VERSION >= 4.17" | bc -l) )); then
+        opm alpha render-template basic $CATALOG_JSON --migrate-level=bundle-object-to-csv-metadata > $RENDERED_CATALOG_JSON
+    else
+      opm alpha render-template basic $CATALOG_JSON > $RENDERED_CATALOG_JSON
+    fi
+    log "INFO" "Render template for $VERSION Done"
 }
