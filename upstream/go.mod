@@ -4,7 +4,7 @@ go 1.25.11
 
 require (
 	github.com/Masterminds/semver v1.5.0
-	github.com/cert-manager/cert-manager v1.20.2
+	github.com/cert-manager/cert-manager v1.20.3
 	github.com/cli/go-gh/v2 v2.13.0
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/go-cmp v0.7.0
@@ -21,7 +21,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	github.com/tektoncd/pipeline v1.12.1
+	github.com/tektoncd/pipeline v1.12.2
 	github.com/tektoncd/plumbing v0.0.0-20250805154627-25448098dea2
 	github.com/tektoncd/pruner v0.4.0
 	github.com/tektoncd/triggers v0.36.0
