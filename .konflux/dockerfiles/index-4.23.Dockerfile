@@ -3,7 +3,7 @@ FROM registry.redhat.io/openshift4/ose-operator-registry-rhel9:v4.23
 ENTRYPOINT ["/bin/opm"]
 CMD ["serve", "/configs", "--cache-dir=/tmp/cache"]
 
-COPY .konflux/olm-catalog/index/v4/catalog/ /configs
+COPY .konflux/olm-catalog/index/v4.23/catalog/ /configs
 RUN ["/bin/opm", "serve", "/configs", "--cache-dir=/tmp/cache", "--cache-only"]
 
 # Core bundle labels.
