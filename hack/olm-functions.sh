@@ -37,18 +37,10 @@ log() {
         BASE_VERSION="$BUNDLE_VERSION"
     fi
 
-   export BUNDLE_IMAGE BUNDLE_VERSION BASE_VERSION
-   EXISTING=$(yq e '.bundles[] | select(.version | test("^" + env(BASE_VERSION) + "(-.*)?$")) | .version' "$FILE")
-   if [[ -n "$EXISTING" ]]; then
-     log "INFO" "Updating existing bundle $EXISTING -> $BUNDLE_VERSION"
-     yq -i '(.bundles[] | select(.version | test("^" + env(BASE_VERSION) + "(.*)?$"))).version = env(BUNDLE_VERSION)' "$FILE"
-     yq -i '(.bundles[] | select(.version == env(BUNDLE_VERSION))).image = env(BUNDLE_IMAGE)' "$FILE"
-   else
-     log "INFO" "Adding new bundle version $BUNDLE_VERSION"
-     yq -i '.bundles += [{"version": env(BUNDLE_VERSION), "image": env(BUNDLE_IMAGE)}]' "$FILE"
-   fi
-
-
+  export BUNDLE_IMAGE BUNDLE_VERSION
+  log "INFO" "Replacing the last bundle entry with version $BUNDLE_VERSION"
+  # The [-1] index specifically targets the final item in the array
+  yq -i '.bundles[-1].version = env(BUNDLE_VERSION) | .bundles[-1].image = env(BUNDLE_IMAGE)' "$FILE"
 }
 
 function target_registry() {
@@ -76,13 +68,12 @@ function render_catalog() {
     RENDERED_CATALOG_JSON=$3
     NUMERIC_VERSION=${VERSION#v} # Removes "v" prefix
 
-    if [ "$(awk -v ver="$NUMERIC_VERSION" 'BEGIN { print (ver >= 4.17 ? 1 : 0) }')" -eq 1 ]; then
+    if (( $(echo "$NUMERIC_VERSION >= 4.17" | bc -l) )); then
         opm alpha render-template basic $CATALOG_JSON --migrate-level=bundle-object-to-csv-metadata > $RENDERED_CATALOG_JSON
     else
-        opm alpha render-template basic $CATALOG_JSON > $RENDERED_CATALOG_JSON
+      opm alpha render-template basic $CATALOG_JSON > $RENDERED_CATALOG_JSON
     fi
     log "INFO" "Render template for $VERSION Done"
 }
-
 
 
