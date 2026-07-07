@@ -21,15 +21,47 @@ spec:
       - name: kind
         value: task
       resolver: bundles
+  - name: check-cancelled
+    when:
+    - input: $(tasks.status)
+      operator: in
+      values: ["Failed"]
+    taskSpec:
+      results:
+      - name: cancelled
+        description: Whether the PipelineRun was cancelled
+      - name: repo-name
+        description: Repository name extracted from PipelineRun labels
+      steps:
+      - name: check-spec-status
+        image: quay.io/openshift/origin-cli
+        env:
+        - name: PIPELINERUN_NAME
+          value: $(context.pipelineRun.name)
+        - name: NAMESPACE
+          value: $(context.pipelineRun.namespace)
+        script: |
+          #!/usr/bin/env bash
+          SPEC_STATUS=$(oc get pipelinerun "${PIPELINERUN_NAME}" -n "${NAMESPACE}" -o jsonpath='{.spec.status}')
+          REPO_NAME=$(oc get pipelinerun "${PIPELINERUN_NAME}" -n "${NAMESPACE}" -o jsonpath='{.metadata.labels.pipelinesascode\.tekton\.dev/url-repository}')
+          if [[ "$SPEC_STATUS" == *"Cancelled"* ]]; then
+            echo -n "true" > $(results.cancelled.path)
+          else
+            echo -n "false" > $(results.cancelled.path)
+          fi
+          echo -n "${REPO_NAME:-unknown}" > $(results.repo-name.path)
   - name: notify-slack-on-failure
     when:
     - input: $(tasks.status)
       operator: in
       values: ["Failed"]
+    - input: $(tasks.check-cancelled.results.cancelled)
+      operator: notin
+      values: ["true"]
     params:
     - name: message
       value: |
-        :red_circle: *Build Failure on $(params.repo-name)*
+        :red_circle: *Build Failure on $(tasks.check-cancelled.results.repo-name)*
         *Commit:* $(params.git-url)/commit/$(params.revision)
         *PipelineRun:* $(context.pipelineRun.name)
         *Logs:* https://$(params.konflux-ui-host)/ns/tekton-ecosystem-tenant/pipelinerun/$(context.pipelineRun.name)
@@ -126,10 +158,6 @@ spec:
     type: string
     default: "konflux-ui.apps.kflux-prd-rh02.0fk9.p1.openshiftapps.com"
     description: Konflux UI hostname for logs URL
-  - name: repo-name
-    type: string
-    default: "operator"
-    description: Short repository name for Slack notifications
   results:
   - description: ""
     name: IMAGE_URL
