@@ -99,6 +99,9 @@ spec:
     type: string
     default: "operator"
     description: Short repository name for Slack notifications
+  - name: enableSymlinkCheck
+    default: "false"
+    description: Check symlinks in the repo. If they're pointing outside of the repo, the build will fail.
   results:
   - description: ""
     name: IMAGE_URL
@@ -133,6 +136,8 @@ spec:
       value: $(params.output-image).git
     - name: ociArtifactExpiresAfter
       value: $(params.image-expires-after)
+    - name: enableSymlinkCheck
+      value: $(params.enableSymlinkCheck)
     runAfter:
     - init
     taskRef:
