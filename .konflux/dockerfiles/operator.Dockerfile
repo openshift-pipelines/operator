@@ -32,7 +32,7 @@ LABEL \
     maintainer="pipelines-extcomm@redhat.com" \
     name="openshift-pipelines/pipelines-rhel9-operator" \
     summary="Red Hat OpenShift Pipelines operator operator" \
-    version="v1.21.3"
+    version="v1.21.4"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
