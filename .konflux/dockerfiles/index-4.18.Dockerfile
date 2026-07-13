@@ -29,4 +29,3 @@ LABEL \
     summary="Red Hat OpenShift Pipelines operator index-4.18" \
     version="v1.23.0"
 
-
