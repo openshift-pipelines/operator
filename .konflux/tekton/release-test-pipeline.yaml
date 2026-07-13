@@ -152,7 +152,12 @@ spec:
               - name: timeout
                 value: 60m
               - name: fips
-                value: false
+                value: true
+              - name: imageContentSources
+                value: |
+                  - source: registry.redhat.io/openshift-pipelines/
+                    mirrors:
+                      - quay.io/redhat-user-workloads/tekton-ecosystem-tenant
     # Create Catalog Source to install Operator
     - name: create-catalog-source
       runAfter:
