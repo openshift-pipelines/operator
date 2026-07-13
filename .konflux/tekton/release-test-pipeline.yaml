@@ -171,6 +171,8 @@ spec:
               value: "$(tasks.parse-metadata.results.component-container-image)"
             - name: RELEASE_BRANCH
               value: "$(tasks.parse-metadata.results.target-git-branch)"
+            - name: KUBECONFIG
+              value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
           volumeMounts:
             - name: credentials
               mountPath: /credentials
@@ -203,10 +205,42 @@ spec:
               fi
               echo -n "$CHANNEL" | tee $(results.channel.path)
 
+          - name: apply-idms
+            script: |
+              #!/usr/bin/env bash
+              set -ex
+              cat <<EOF | oc apply -f-
+              apiVersion: config.openshift.io/v1
+              kind: ImageDigestMirrorSet
+              metadata:
+                name: openshift-pipelines-mirror
+              spec:
+                imageDigestMirrors:
+                - source: registry.redhat.io/openshift-pipelines
+                  mirrors:
+                  - quay.io/redhat-user-workloads/tekton-ecosystem-tenant
+                  mirrorSourcePolicy: AllowContactingSource
+              EOF
+              # On Hypershift guest clusters, MCP does not manage IDMS rollout —
+              # the NodePool controller handles it. Only wait on MCP if it exists.
+              if oc get mcp worker &>/dev/null; then
+                echo "MachineConfigPool found, waiting for rollout..."
+                if ! oc wait mcp worker --for=condition=Updated=True --timeout=15m; then
+                  echo "WARNING: MCP did not reach Updated=True within 15m"
+                  oc get mcp worker -o jsonpath='{.status.conditions}' | jq .
+                fi
+              else
+                echo "No MachineConfigPool found (Hypershift cluster), skipping MCP wait"
+                sleep 30
+              fi
+              echo "Waiting for all nodes to be Ready..."
+              if ! oc wait nodes --all --for=condition=Ready --timeout=15m; then
+                echo "ERROR: Not all nodes became Ready within 15m after IDMS apply"
+                oc get nodes -o wide
+                exit 1
+              fi
+              echo "All nodes Ready, IDMS applied successfully"
           - name: create-catalog
-            env:
-              - name: KUBECONFIG
-                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
             script: |
               #!/usr/bin/env bash
               cat <<EOF | oc apply -f-
