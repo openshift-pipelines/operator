@@ -28,6 +28,7 @@ function update_image_reference() {
     skopeo inspect --raw docker://${output} > /dev/null 2>&1
      if [ $? -ne 0 ]; then
          echo -e "\e[31m Image ${output} does not exist, skipping update \e[0m" >&2
+          skopeo inspect --raw docker://${output}
          return 1
      fi
     echo "$output"
