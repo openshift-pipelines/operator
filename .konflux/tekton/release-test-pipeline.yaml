@@ -99,14 +99,14 @@ spec:
             script: |
               #!/usr/bin/env bash
               set -e
-              
+
               # Extract OCP version from COMPONENT_NAME
               # Expected format: operator-1-22-index-4-20 -> 4.20
               echo "Component Name: $COMPONENT_NAME"
-              
+
               # Extract version pattern (e.g., "4-19" from "operator-1-22-index-4-20")
               VERSION_PATTERN=$(echo "$COMPONENT_NAME" | grep -oE '[0-9]+-[0-9]+' | tail -1)
-              
+
               if [ -z "$VERSION_PATTERN" ]; then
                 echo "Warning: Could not extract version from application name, will use default"
                 OCP_VERSION="4.20"
@@ -115,20 +115,20 @@ spec:
                 OCP_VERSION=$(echo "$VERSION_PATTERN" | tr '-' '.')
                 echo "Extracted OCP Version: $OCP_VERSION"
               fi
-              
+
               echo -n "$OCP_VERSION" | tee /tekton/results/ocpVersion
-              
+
               # Fetch the latest patch version for this OCP version
               echo "Fetching latest patch version for ${OCP_VERSION}..."
               RELEASE_URL="https://multi.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable-multi/latest?prefix=${OCP_VERSION}."
               echo "GET $RELEASE_URL"
-              
+
               RELEASE_INFO=$(curl -s "$RELEASE_URL")
               echo "$RELEASE_INFO"
-              
+
               VERSION=$(echo "$RELEASE_INFO" | jq -r '.name')
               echo "Selected version: $VERSION"
-              
+
               # Write result for create-cluster step
               mkdir -p /tekton/steps/step-extract-and-pick-version/results
               echo -n "$VERSION" | tee /tekton/steps/step-extract-and-pick-version/results/version
@@ -149,6 +149,8 @@ spec:
                 value: "$(steps.extract-and-pick-version.results.version)"
               - name: instanceType
                 value: $(params.INSTANCE_TYPE)
+              - name: timeout
+                value: 60m
               - name: fips
                 value: true
               - name: imageContentSources
@@ -166,7 +168,7 @@ spec:
             type: string
         volumes:
           - name: credentials
-            emptyDir: { }
+            emptyDir: {}
         stepTemplate:
           image: $(params.IMAGE)
           env:
@@ -545,11 +547,11 @@ spec:
             script: |
               #!/bin/sh
               echo "📋 Aggregate Status: $(params.aggregateStatus)"
-              
+
               if [[ "$(params.aggregateStatus)" != "Succeeded" ]]; then
                 echo "❌ Pipeline contains failed tasks!"
                 echo "💡 Check individual task logs for detailed error information"
                 exit 1
               fi
-              
+
               echo "✅ All tasks succeeded!"
