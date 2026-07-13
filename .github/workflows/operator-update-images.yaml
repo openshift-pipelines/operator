@@ -19,9 +19,6 @@ on:
           - devel
           - staging
           - production
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   update-csv:
@@ -60,12 +57,13 @@ jobs:
           
           git push -f origin ${SOURCE_BRANCH}
           pr_list=$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json number)
+          echo "Waiting for 10s before updating PRs"
+          sleep 10
           if [ "$(echo $pr_list | jq length)" = "0" ]; then
             echo "creating PR..."
             gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
           else
             echo "a PR already exists, editing..."
-            sleep 10
             gh pr edit $(echo $pr_list | jq .[0].number) --add-label=lgtm  --add-label=approved 
           fi
         env:

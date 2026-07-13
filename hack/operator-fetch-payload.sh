@@ -160,7 +160,7 @@ env SERVE_REF="$SERVE_REF" yq e -i '
 
 # Mutate pipelines-as-code payload
 for d in controller watcher webhook; do
-    yq e -i "(select (.kind == \"Deployment\") | select (.metadata.name == \"pipelines-as-code-${d}\") | .spec.template.spec.containers[0].command) = [\"/ko-app/pipelines-as-code-${d}\"]" .konflux/olm-catalog/bundle/kodata/pipelines-as-code/*/release.yaml
+    yq e -i "(select (.kind == \"Deployment\") | select (.metadata.name == \"pipelines-as-code-${d}\") | .spec.template.spec.containers[0].command) = [\"/ko-app/pipelines-as-code-${d}\"]" .konflux/olm-catalog/bundle/kodata/tekton-addon/pipelines-as-code/*/release.yaml
 done
 
 # Mutate manual-approval-gate payload
@@ -187,9 +187,9 @@ yq --inplace 'del(.properties[] | select(.type == "olm.maxOpenShiftVersion"))' \
 
 # update OCP minimum verson
 sed -i -E 's%LABEL com.redhat.openshift.versions=".*%LABEL com.redhat.openshift.versions="'v${MIN_OPENSHIFT_VERSION}'"%' \
-    .konflux/olm-catalog/bundle/Dockerfile
+    .konflux/dockerfiles/bundle.Dockerfile
 
 # update channels in operator bundle dockerfile
 sed -i -E 's%LABEL operators.operatorframework.io.bundle.channels.v1=".*%LABEL operators.operatorframework.io.bundle.channels.v1="'latest,${CHANNEL_NAME}'"%' \
-    .konflux/olm-catalog/bundle/Dockerfile
+    .konflux/dockerfiles/bundle.Dockerfile
 
