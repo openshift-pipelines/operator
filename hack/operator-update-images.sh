@@ -1,6 +1,28 @@
 #!/usr/bin/env bash
 # Update images from project.yaml to "generated" files
-ENVIRONMENT=${1:-"devel"}
+BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$BASEDIR")"
+
+FILE=$ROOT_DIR/olm/release-stage.txt
+FILE_STAGE=$(cat $FILE)
+STAGE=${1:-$FILE_STAGE}
+
+case "$STAGE" in
+  "devel"|"staging"|"production")
+    ;;
+  *)
+    echo "Invalid selection!"
+    exit 1
+    ;;
+esac
+
+if [[ "$STAGE" != "$FILE_STAGE" ]]; then
+  echo "Updating release-stage.txt to $STAGE"
+  echo "$STAGE" > $FILE
+fi
+
+ENVIRONMENT=$STAGE
+
 case "$ENVIRONMENT" in
   "devel")
     TARGET_REGISTRY="quay.io/openshift-pipeline"
@@ -25,11 +47,11 @@ function update_image_reference() {
 
 
      # Check if the image exists in the target registry
-    skopeo inspect --raw docker://${output} > /dev/null 2>&1
-     if [ $? -ne 0 ]; then
-         echo -e "\e[31m Image ${output} does not exist, skipping update \e[0m" >&2
-         return 1
-     fi
+#    skopeo inspect --raw docker://${output} > /dev/null 2>&1
+#     if [ $? -ne 0 ]; then
+#         echo -e "\e[31m Image ${output} does not exist, skipping update \e[0m" >&2
+#         return 1
+#     fi
     echo "$output"
 }
 CSV_FILE=".konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml"
