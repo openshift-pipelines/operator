@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "tekton-operator.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.operator.replicas }}
   selector:
     matchLabels:
       {{- include "tekton-operator.operator.selectorLabels" . | nindent 6 }}
@@ -68,6 +68,8 @@ spec:
               value: tekton-pipelines
               {{- end }}
               {{- end }}
+            - name: CONFIG_LOGGING_NAME
+              value: {{ include "tekton-operator.fullname" . }}-config-logging
             - name: CONFIG_OBSERVABILITY_NAME
               value: {{ include "tekton-operator.fullname" . }}-observability
             {{- include "tekton-operator.kubernetesMinVersionEnv" . | nindent 12 }}
@@ -77,7 +79,7 @@ spec:
             {{- end }}
           args:
             - "-controllers"
-            - {{ .Values.controllers | default "tektonconfig,tektonpipeline,tektontrigger,tektonhub,tektonchain,tektonresult,tektondashboard,manualapprovalgate,tektonpruner,openshiftpipelinesascode" | quote }}
+            - {{ .Values.controllers | default "tektonconfig,tektonpipeline,tektontrigger,tektonchain,tektonresult,tektondashboard,manualapprovalgate,tektonpruner,openshiftpipelinesascode" | quote }}
             - "-unique-process-name"
             - "tekton-operator-lifecycle"
           image: {{ include "tekton-operator.operator-image" . }}
@@ -126,6 +128,8 @@ spec:
               value: tekton-pipelines
               {{- end }}
               {{- end }}
+            - name: CONFIG_LOGGING_NAME
+              value: {{ include "tekton-operator.fullname" . }}-config-logging
             - name: CONFIG_OBSERVABILITY_NAME
               value: {{ include "tekton-operator.fullname" . }}-observability
             {{- include "tekton-operator.kubernetesMinVersionEnv" . | nindent 12 }}
@@ -172,7 +176,7 @@ metadata:
   labels:
     {{- include "tekton-operator.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ max 1 (.Values.webhook.replicas | int) }}
   selector:
     matchLabels:
       {{- include "tekton-operator.webhook.selectorLabels" . | nindent 6 }}

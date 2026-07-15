@@ -99,7 +99,7 @@ spec:
       cp ${DOCKER_CONFIG} /workspace/${KUBE_DISTRO}-docker-config.json
 
   - name: rewrite-devel-in-source
-    image: ghcr.io/tektoncd/plumbing/ko-gcloud:v20240920-6c2a999d36@sha256:1756ca55a09b360028695792e638a7cc366292d7aef44c926a8cb765085664c8
+    image: ghcr.io/tektoncd/plumbing/ko@sha256:7561ceb48cbc9492b855da5560586274c1dd4bab403746db0fe56fb06bb32020
     script: |
       #!/usr/bin/env sh
       set -ex
@@ -120,7 +120,7 @@ spec:
       fi
 
   - name: run-kustomize-ko
-    image: ghcr.io/tektoncd/plumbing/ko-gcloud:v20240920-6c2a999d36@sha256:1756ca55a09b360028695792e638a7cc366292d7aef44c926a8cb765085664c8
+    image: ghcr.io/tektoncd/plumbing/ko@sha256:7561ceb48cbc9492b855da5560586274c1dd4bab403746db0fe56fb06bb32020
     env:
     - name: KO_DOCKER_REPO
       value: $(params.imageRegistry)/$(params.imageRegistryPath)
@@ -147,11 +147,15 @@ spec:
       # probably get it wrong), we'll just targz up the whole vendor tree and
       # include it. As of 9/20/2019, this amounts to about 11MB of additional
       # data in each image.
+      # ko >= v0.19.0 rejects kodata symlinks that resolve outside the
+      # kodata root (ko-build/ko#1619), so the tarball is copied into
+      # each kodata/ directory instead of being symlinked from a
+      # shared tmpdir.
       TMPDIR=$(mktemp -d)
       tar cfz ${TMPDIR}/source.tar.gz vendor/
       for d in cmd/${KUBE_DISTRO}/*; do
         if [ -d ${d}/kodata/ ]; then
-          ln -s ${TMPDIR}/source.tar.gz ${d}/kodata/
+          cp ${TMPDIR}/source.tar.gz ${d}/kodata/
         fi
       done
 
@@ -182,7 +186,7 @@ spec:
       sed -i -E -e 's/(app.kubernetes.io\/version): "?devel"?/\1: "$(params.versionTag)"/g' -e 's/(operator.tekton.dev\/release): "?devel"?/\1: "$(params.versionTag)"/g' -e 's/(version): "?devel"?/\1: "$(params.versionTag)"/g' ${OUTPUT_RELEASE_DIR}/${FILENAME_PREFIX}release.yaml
       sed -i -E -e 's/(app.kubernetes.io\/version): "?devel"?/\1: "$(params.versionTag)"/g' -e 's/(operator.tekton.dev\/release): "?devel"?/\1: "$(params.versionTag)"/g' -e 's/(version): "?devel"?/\1: "$(params.versionTag)"/g' ${OUTPUT_RELEASE_DIR}/${FILENAME_PREFIX}release.notags.yaml
   - name: koparse
-    image: ghcr.io/tektoncd/plumbing/koparse@sha256:194c2ab9dce5f778ed757af13c626d6b85f15452e2c2902c79b0d0f5a0adf4d1
+    image: ghcr.io/tektoncd/plumbing/koparse@sha256:6cf5d09b76e47c1f75f1e00195d6332cb94c467446a3fdf508a686f8aaeae90e
     script: |
       set -ex
 
