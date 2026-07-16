@@ -284,8 +284,8 @@ func (cpr *consolePluginReconciler) transformerNginxTLS() mf.Transformer {
 }
 
 // generateNginxConfWithTLS injects TLS directives into nginx configuration.
-// Directives are always produced (ssl_protocols + ML-KEM ssl_conf_command) so
-// this function never returns the unmodified base configuration.
+// Directives are always produced (at minimum ssl_protocols) so this function
+// never returns the unmodified base configuration.
 func (cpr *consolePluginReconciler) generateNginxConfWithTLS(baseConf string) string {
 	tlsDirectives := cpr.buildNginxTLSDirectives()
 
@@ -308,10 +308,20 @@ func (cpr *consolePluginReconciler) generateNginxConfWithTLS(baseConf string) st
 	return result.String()
 }
 
+// defaultTLS13Ciphersuites is the set of TLS 1.3 ciphersuites used in the
+// ssl_conf_command Ciphersuites directive when no explicit cluster TLS profile
+// is present.  TLS_CHACHA20_POLY1305_SHA256 is intentionally omitted:
+// OpenSSL rejects the entire Ciphersuites directive when it contains a cipher
+// that its active provider does not support (e.g. the FIPS provider), which
+// disables TLS 1.3 on the nginx listener entirely.  TLS_AES_128_CCM_SHA256
+// (nginx's built-in default) is also excluded as it is not part of the
+// OpenShift Intermediate/Default profile.
+const defaultTLS13Ciphersuites = "TLS_AES_256_GCM_SHA384:TLS_AES_128_GCM_SHA256"
+
 // buildNginxTLSDirectives generates nginx TLS directives from the centrally resolved
 // TLS profile. When no explicit profile is configured (cluster uses the "Default"
-// profile), secure Intermediate-equivalent defaults are applied so that PQC
-// directives are always present regardless of cluster configuration.
+// profile), secure Intermediate-equivalent defaults are applied so that nginx never
+// falls back to its built-in cipher and protocol set.
 func (cpr *consolePluginReconciler) buildNginxTLSDirectives() string {
 	var directives strings.Builder
 
@@ -325,33 +335,90 @@ func (cpr *consolePluginReconciler) buildNginxTLSDirectives() string {
 	protocols := convertTLSVersionToNginx(minVersion)
 	directives.WriteString(fmt.Sprintf("    ssl_protocols %s;\n", protocols))
 
-	// Always enable ML-KEM (X25519MLKEM768) hybrid key exchange for PQC readiness.
-	// ssl_conf_command passes OpenSSL configuration directly and is the only nginx
-	// mechanism that supports the post-quantum hybrid groups introduced in OpenSSL 3.x;
-	// ssl_ecdh_curve does not cover these groups.
-	// X25519MLKEM768 is tried first (PQC); X25519 is the classical fallback for
-	// clients that do not yet support ML-KEM.
-	directives.WriteString("    ssl_conf_command Groups X25519MLKEM768:X25519;\n")
-
-	// NOTE: IANA cipher suite names (TLS_ECDHE_RSA_…) cannot be used directly in
-	// nginx's ssl_ciphers directive (which uses OpenSSL names) or ssl_conf_command
-	// (which uses a different format). Relying on nginx's own TLS 1.3 defaults is
-	// simpler and equally secure; we intentionally skip cipher configuration here.
+	// ssl_ciphers – translate IANA cipher names from the cluster profile to the
+	// OpenSSL names required by nginx. Only TLS 1.2 ciphers are emitted here;
+	// TLS 1.3 ciphersuites are controlled separately via ssl_conf_command Ciphersuites.
 	if cpr.tlsConfig != nil && cpr.tlsConfig.CipherSuites != "" {
-		cpr.logger.Debugw("TLS cipher suites provided but not applied to nginx (using nginx defaults)",
-			"reason", "IANA names are not directly usable in nginx ssl_ciphers",
-		)
+		opensslCiphers := ianaToOpenSSLCiphers(cpr.tlsConfig.CipherSuites)
+		if opensslCiphers != "" {
+			directives.WriteString(fmt.Sprintf("    ssl_ciphers %s;\n", opensslCiphers))
+			directives.WriteString("    ssl_prefer_server_ciphers on;\n")
+		}
 	}
 
-	// ssl_ecdh_curve – comma-separated curve names become colon-separated for nginx.
-	// This covers TLS 1.2 classical curves; ML-KEM hybrid groups are handled above
-	// via ssl_conf_command Groups.
-	if cpr.tlsConfig != nil && cpr.tlsConfig.CurvePreferences != "" {
-		curves := strings.ReplaceAll(cpr.tlsConfig.CurvePreferences, ",", ":")
-		directives.WriteString(fmt.Sprintf("    ssl_ecdh_curve %s;\n", curves))
+	// ssl_conf_command Ciphersuites – explicitly restrict TLS 1.3 ciphersuites to
+	// those allowed by the cluster profile. nginx's built-in TLS 1.3 defaults
+	// include TLS_AES_128_CCM_SHA256 which is NOT part of OpenShift's
+	// Intermediate/Default profile, so we must enumerate the allowed set explicitly.
+	// ssl_ciphers only controls TLS 1.2; TLS 1.3 suites require this separate directive.
+	tls13Ciphers := defaultTLS13Ciphersuites
+	if cpr.tlsConfig != nil && cpr.tlsConfig.CipherSuites != "" {
+		if extracted := ianaTLS13Ciphersuites(cpr.tlsConfig.CipherSuites); extracted != "" {
+			tls13Ciphers = extracted
+		}
 	}
+	directives.WriteString(fmt.Sprintf("    ssl_conf_command Ciphersuites %s;\n", tls13Ciphers))
+
+	// ssl_ecdh_curve – advertise TLS key-exchange groups for the nginx listener.
+	//
+	// The OpenShift TLS FAQ mandates that every TLS 1.3 server negotiate ML-KEM
+	// if the client supports it (quantum-safe key encapsulation is a mandatory
+	// requirement).  nginx/OpenSSL requires an explicit ssl_ecdh_curve directive
+	// to advertise post-quantum groups; without it only classical curves are
+	// offered and the TLS scanner reports pqc_capable=false.
+	//
+	// Group list is currently hardcoded because library-go's
+	// ObserveTLSSecurityProfile does not yet expose the groups/curve-preferences
+	// field from the APIServer TLS profile (openshift/library-go#2347, open).
+	// Once that lands we will switch to dynamic propagation from the APIServer
+	// profile and remove this function.
+	//
+	// X25519MLKEM768 is not FIPS-approved: OpenSSL's FIPS provider rejects it
+	// with a fatal error, crashing nginx.  We therefore exclude it on FIPS nodes
+	// while keeping it for all other clusters to satisfy the mandatory ML-KEM
+	// requirement.
+	tlsGroups := tlsECDHGroups()
+	directives.WriteString(fmt.Sprintf("    ssl_ecdh_curve %s;\n", tlsGroups))
 
 	return directives.String()
+}
+
+// tlsECDHGroups returns the colon-separated list of TLS key-exchange groups to
+// emit in the nginx ssl_ecdh_curve directive.
+//
+// On FIPS-enabled nodes X25519MLKEM768 is excluded because it is not
+// FIPS-approved and causes OpenSSL to crash nginx with:
+//
+//	nginx: [emerg] SSL_CONF_cmd("Groups","X25519MLKEM768:…") failed
+//
+// On all other nodes X25519MLKEM768 is included first so that TLS 1.3 clients
+// that support ML-KEM perform a post-quantum key exchange (pqc_capable=true).
+func tlsECDHGroups() string {
+	if isFIPSEnabled() {
+		// On FIPS nodes only NIST-approved curves are permitted by OpenSSL's
+		// FIPS provider. Both X25519MLKEM768 and X25519 are rejected; only the
+		// NIST prime curves (P-256, P-384, P-521) are FIPS 140-approved.
+		// Matches the curve list used by cluster-ingress-operator on FIPS.
+		return "P-256:P-384:P-521"
+	}
+	// Matches cluster-ingress-operator's non-FIPS default.
+	return "X25519MLKEM768:X25519:P-256:P-384:P-521"
+}
+
+// fipsEnabledPath is the kernel file that reports FIPS 140 mode status.
+// Overridable in tests via a temp file.
+var fipsEnabledPath = "/proc/sys/crypto/fips_enabled"
+
+// isFIPSEnabled reports whether the host kernel has FIPS 140 mode active.
+// It reads /proc/sys/crypto/fips_enabled which is provided by the Linux kernel
+// and is accessible from inside containers (containers share the host kernel).
+// The value is "1" when FIPS mode is on, "0" otherwise.
+func isFIPSEnabled() bool {
+	data, err := os.ReadFile(fipsEnabledPath)
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(data)) == "1"
 }
 
 // convertTLSVersionToNginx converts the Go crypto/tls minimum version string
@@ -370,4 +437,86 @@ func convertTLSVersionToNginx(minVersion string) string {
 	default:
 		return "TLSv1.2 TLSv1.3"
 	}
+}
+
+// ianaToOpenSSLCiphers translates a comma-separated list of IANA TLS cipher suite
+// names to the colon-separated OpenSSL names required by nginx's ssl_ciphers
+// directive.
+//
+// The mapping is derived by inverting the openSSLToIANACiphersMap defined in
+// vendor/github.com/openshift/library-go/pkg/crypto/crypto.go, which is the
+// canonical source of truth for OpenShift TLS profile cipher names.
+//
+// TLS 1.3 ciphers (TLS_AES_* / TLS_CHACHA20_*) are omitted here because they
+// must not appear in ssl_ciphers; they are handled separately via
+// ssl_conf_command Ciphersuites in buildNginxTLSDirectives.
+func ianaToOpenSSLCiphers(ianaCiphers string) string {
+	// Inverted from library-go's openSSLToIANACiphersMap (unexported).
+	// Keep in sync with:
+	// vendor/github.com/openshift/library-go/pkg/crypto/crypto.go
+	ianaToOpenSSL := map[string]string{
+		// TLS 1.2 — explicit nginx ssl_ciphers configuration required.
+		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256":       "ECDHE-ECDSA-AES128-GCM-SHA256",
+		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256":         "ECDHE-RSA-AES128-GCM-SHA256",
+		"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384":       "ECDHE-ECDSA-AES256-GCM-SHA384",
+		"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384":         "ECDHE-RSA-AES256-GCM-SHA384",
+		"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256": "ECDHE-ECDSA-CHACHA20-POLY1305",
+		"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256":   "ECDHE-RSA-CHACHA20-POLY1305",
+		"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256":       "ECDHE-ECDSA-AES128-SHA256",
+		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256":         "ECDHE-RSA-AES128-SHA256",
+		"TLS_RSA_WITH_AES_128_GCM_SHA256":               "AES128-GCM-SHA256",
+		"TLS_RSA_WITH_AES_256_GCM_SHA384":               "AES256-GCM-SHA384",
+		"TLS_RSA_WITH_AES_128_CBC_SHA256":               "AES128-SHA256",
+		"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA":          "ECDHE-ECDSA-AES128-SHA",
+		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA":            "ECDHE-RSA-AES128-SHA",
+		"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA":          "ECDHE-ECDSA-AES256-SHA",
+		"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA":            "ECDHE-RSA-AES256-SHA",
+		"TLS_RSA_WITH_AES_128_CBC_SHA":                  "AES128-SHA",
+		"TLS_RSA_WITH_AES_256_CBC_SHA":                  "AES256-SHA",
+		"TLS_RSA_WITH_3DES_EDE_CBC_SHA":                 "DES-CBC3-SHA",
+		"TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA":           "ECDHE-RSA-DES-CBC3-SHA",
+		// TLS 1.3 — handled via ssl_conf_command Ciphersuites, not ssl_ciphers.
+		"TLS_AES_128_GCM_SHA256":       "",
+		"TLS_AES_256_GCM_SHA384":       "",
+		"TLS_CHACHA20_POLY1305_SHA256": "",
+	}
+
+	var opensslNames []string
+	for _, iana := range strings.Split(ianaCiphers, ",") {
+		iana = strings.TrimSpace(iana)
+		if iana == "" {
+			continue
+		}
+		openssl, known := ianaToOpenSSL[iana]
+		if !known {
+			// Unknown cipher — pass through unchanged; nginx will surface any error.
+			opensslNames = append(opensslNames, iana)
+			continue
+		}
+		if openssl != "" {
+			opensslNames = append(opensslNames, openssl)
+		}
+		// empty string → TLS 1.3 cipher, handled by ianaTLS13Ciphersuites.
+	}
+	return strings.Join(opensslNames, ":")
+}
+
+// ianaTLS13Ciphersuites extracts TLS 1.3 AES-GCM ciphersuite names from a
+// comma-separated IANA cipher list and returns them colon-separated for
+// nginx's ssl_conf_command Ciphersuites directive.
+//
+// Only TLS_AES_* ciphers are included.  TLS_CHACHA20_POLY1305_SHA256 is
+// intentionally excluded: OpenSSL rejects the entire ssl_conf_command
+// Ciphersuites directive when it contains a cipher that its active provider
+// does not support, which would silently disable TLS 1.3 on the nginx
+// listener.  AES-GCM suites are universally supported and sufficient.
+func ianaTLS13Ciphersuites(ianaCiphers string) string {
+	var tls13 []string
+	for _, cipher := range strings.Split(ianaCiphers, ",") {
+		cipher = strings.TrimSpace(cipher)
+		if strings.HasPrefix(cipher, "TLS_AES_") {
+			tls13 = append(tls13, cipher)
+		}
+	}
+	return strings.Join(tls13, ":")
 }
