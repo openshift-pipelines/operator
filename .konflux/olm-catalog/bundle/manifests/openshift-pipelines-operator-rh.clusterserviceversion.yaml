@@ -19,7 +19,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.20.0 <5.0.5-832'
+    olm.skipRange: '>=1.20.0 <5.0.5-833'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonschedulers.operator.tekton.dev","tektonmulticlusterproxyaaes.operator.tekton.dev","syncerservices.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
@@ -31,7 +31,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v5.0.5-832
+  name: openshift-pipelines-operator-rh.v5.0.5-833
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -1322,7 +1322,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 5.0.5-832
+                        value: 5.0.5-833
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1461,7 +1461,7 @@ spec:
                         value: registry.redhat.io/openshift-pipelines/pipelines-console-plugin-rhel9@sha256:bb058b3de08a97a38b1eb1c65df636dcb0632194c30c4d57569762097f9b6b86
                       - name: IMAGE_PIPELINES_CONSOLE_PLUGIN_LEGACY
                         value: registry.redhat.io/openshift-pipelines/pipelines-console-plugin-pf5-rhel9@sha256:85fc10a62da7842eb0972f8141a08b000f79501067c3c2fa5decc146d9e7bab2
-                    image: registry.redhat.io/openshift-pipelines/pipelines-rhel9-operator@sha256:e1b023f4f89cc7eed386a89b3773b6bbc17a648fe92a5a1e73d78377b9524c5d
+                    image: registry.redhat.io/openshift-pipelines/pipelines-rhel9-operator@sha256:712f2fdfb5956ec11e68e42af53e44e745250218ee08ab47432c376b911e984d
                     imagePullPolicy: Always
                     name: openshift-pipelines-operator-lifecycle
                     resources: {}
@@ -1494,12 +1494,12 @@ spec:
                       - name: PROFILING_PORT
                         value: '9009'
                       - name: VERSION
-                        value: 5.0.5-832
+                        value: 5.0.5-833
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: CONFIG_LEADERELECTION_NAME
                         value: tekton-operator-controller-config-leader-election
-                    image: registry.redhat.io/openshift-pipelines/pipelines-rhel9-operator@sha256:e1b023f4f89cc7eed386a89b3773b6bbc17a648fe92a5a1e73d78377b9524c5d
+                    image: registry.redhat.io/openshift-pipelines/pipelines-rhel9-operator@sha256:712f2fdfb5956ec11e68e42af53e44e745250218ee08ab47432c376b911e984d
                     imagePullPolicy: Always
                     name: openshift-pipelines-operator-cluster-operations
                     resources: {}
@@ -1605,9 +1605,9 @@ spec:
   provider:
     name: Red Hat
   relatedImages:
-    - image: registry.redhat.io/openshift-pipelines/pipelines-rhel9-operator@sha256:e1b023f4f89cc7eed386a89b3773b6bbc17a648fe92a5a1e73d78377b9524c5d
+    - image: registry.redhat.io/openshift-pipelines/pipelines-rhel9-operator@sha256:712f2fdfb5956ec11e68e42af53e44e745250218ee08ab47432c376b911e984d
       name: OPENSHIFT_PIPELINES_OPERATOR_LIFECYCLE
-    - image: registry.redhat.io/openshift-pipelines/pipelines-rhel9-operator@sha256:e1b023f4f89cc7eed386a89b3773b6bbc17a648fe92a5a1e73d78377b9524c5d
+    - image: registry.redhat.io/openshift-pipelines/pipelines-rhel9-operator@sha256:712f2fdfb5956ec11e68e42af53e44e745250218ee08ab47432c376b911e984d
       name: OPENSHIFT_PIPELINES_OPERATOR_CLUSTER_OPERATIONS
     - image: registry.redhat.io/openshift-pipelines/pipelines-operator-proxy-rhel9@sha256:d474e47f13acae06ec76c0d94e7707c9cd950f66737010f78245c8235b4b3c40
       name: IMAGE_PIPELINES_PROXY
@@ -1737,5 +1737,5 @@ spec:
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
     - image: registry.redhat.io/openshift-pipelines/pipelines-console-plugin-pf5-rhel9@sha256:85fc10a62da7842eb0972f8141a08b000f79501067c3c2fa5decc146d9e7bab2
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN_LEGACY
-  replaces: openshift-pipelines-operator-rh.v5.0.5-831
-  version: 5.0.5-832
+  replaces: openshift-pipelines-operator-rh.v5.0.5-832
+  version: 5.0.5-833
