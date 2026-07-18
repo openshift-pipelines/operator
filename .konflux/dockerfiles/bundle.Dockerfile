@@ -1,4 +1,4 @@
-ARG RUNTIME=registry.access.redhat.com/ubi8/ubi-minimal@sha256:61e4f7716c700562f8e8882913a99677748918aa5a534929990d02c1bae10ca4
+ARG RUNTIME=registry.access.redhat.com/ubi8/ubi-minimal@sha256:7eedea3d199fd9b0e6a06cd1a22537c1b84fab65d6eec8a5049c12e68c57f692
 
 FROM $RUNTIME as base
 FROM scratch
