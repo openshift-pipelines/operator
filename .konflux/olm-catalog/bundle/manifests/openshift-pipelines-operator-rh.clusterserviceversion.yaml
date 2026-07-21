@@ -19,7 +19,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.20.0 <5.0.5-853'
+    olm.skipRange: '>=1.20.0 <5.0.5-854'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonschedulers.operator.tekton.dev","tektonmulticlusterproxyaaes.operator.tekton.dev","syncerservices.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
@@ -31,7 +31,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v5.0.5-853
+  name: openshift-pipelines-operator-rh.v5.0.5-854
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -1316,13 +1316,13 @@ spec:
                       - name: OPERATOR_NAME
                         value: redhat-openshift-pipelines-operator
                       - name: IMAGE_PIPELINES_PROXY
-                        value: quay.io/openshift-pipeline/pipelines-operator-proxy-rhel9@sha256:56b27dca595ecbb917e5290844bbcad36ebae711a0eb4dfd0ba517fb02421cdb
+                        value: quay.io/openshift-pipeline/pipelines-operator-proxy-rhel9@sha256:1e95c75cc4318ee824e62d7ab1d512c9f6c42d6f52447f31902c3e8d5693ef9d
                       - name: IMAGE_JOB_PRUNER_TKN
                         value: quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:9105fbfadc1871c1934424247f3214f9b372c8339b69e1417f1e1d9bb361f7a2
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 5.0.5-853
+                        value: 5.0.5-854
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1354,15 +1354,15 @@ spec:
                       - name: IMAGE_ADDONS_OC
                         value: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
                       - name: IMAGE_PIPELINES_TEKTON_PIPELINES_CONTROLLER
-                        value: quay.io/openshift-pipeline/pipelines-controller-rhel9@sha256:c6a25e7eea796cd4df409d39326426fa7cee0b2d6bb8f080a9a4afdff8d073f5
+                        value: quay.io/openshift-pipeline/pipelines-controller-rhel9@sha256:825e9f059e3e3b69a180a7c12c60a9194852241d51efa344c411c9650472fc37
                       - name: IMAGE_PIPELINES_WEBHOOK
-                        value: quay.io/openshift-pipeline/pipelines-webhook-rhel9@sha256:84c73b9344dc4e5f800f9e3ca841d975bee011bef80e0f5567035e1f3fa57108
+                        value: quay.io/openshift-pipeline/pipelines-webhook-rhel9@sha256:95fdd592e00c7be5e610d4f8e803f78e5a4485a6129f3360d4ac60cb109098ab
                       - name: IMAGE_PIPELINES_CONTROLLER
-                        value: quay.io/openshift-pipeline/pipelines-resolvers-rhel9@sha256:a2d58ec28d9854770853c5ae0628a6af845f551f3b9c2e29d8d4b2a1c7d8ea52
+                        value: quay.io/openshift-pipeline/pipelines-resolvers-rhel9@sha256:c89b7c3e91b8147a441c7d31890a7da45188ce2018f992dab8803129d8ce231b
                       - name: IMAGE_PIPELINES_TEKTON_EVENTS_CONTROLLER
-                        value: quay.io/openshift-pipeline/pipelines-events-rhel9@sha256:77dab823482e5c5cd5076ff066d731668ec211623a56693f4058e14fd09eb814
+                        value: quay.io/openshift-pipeline/pipelines-events-rhel9@sha256:86115256e402a937e775ebd8cd624a47c346e57e178ab923cd30b79c8c6af731
                       - name: IMAGE_PIPELINES_ARG__ENTRYPOINT_IMAGE
-                        value: quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:60406ced11a8297414ac93329df92f81d2447f7997accda95481f2d422f3d1de
+                        value: quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:9b48fc04d881d3ecc258d81763b7e6a41ab23314c5024c10a6273b3a89c33011
                       - name: IMAGE_PIPELINES_ARG__GIT_IMAGE
                         value: quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:fe655a00a6fe9f590272febd7008728dcba1f25d15462f02e51f33edfc748980
                       - name: IMAGE_ADDONS_PARAM_GITINITIMAGE
@@ -1380,13 +1380,13 @@ spec:
                       - name: IMAGE_ADDONS_CACHE_FETCH
                         value: quay.io/openshift-pipeline/pipelines-cache-rhel9@sha256:4f5716cac4eca4c6f197857047708c361257000bbc1bf9b9ab2fff99495be39a
                       - name: IMAGE_PIPELINES_ARG__WORKINGDIRINIT_IMAGE
-                        value: quay.io/openshift-pipeline/pipelines-workingdirinit-rhel9@sha256:90c1c43c33006b697942e43fa11b8afd1306a2523e04aa01a6b3015856189fd2
+                        value: quay.io/openshift-pipeline/pipelines-workingdirinit-rhel9@sha256:2f00cb85f83b42347c6b824b708b3174f2cd5b54433505638d516e058531927e
                       - name: IMAGE_PIPELINES_ARG__SIDECARLOGRESULTS_IMAGE
-                        value: quay.io/openshift-pipeline/pipelines-sidecarlogresults-rhel9@sha256:25661e16753eb8e69a87ccd1d7177601ede3b7442ade2ab0cbc8b20a501404ab
+                        value: quay.io/openshift-pipeline/pipelines-sidecarlogresults-rhel9@sha256:16843d0dea6c8a59e8d446605eda5385ceba9fdf9ea0cd8551fcb3cf92a7ac90
                       - name: IMAGE_PIPELINES_ARG__NOP_IMAGE
-                        value: quay.io/openshift-pipeline/pipelines-nop-rhel9@sha256:eb464202fd1a5554bf253a2af65292be8538e8678106dbbfdd9246d2317d3b2a
+                        value: quay.io/openshift-pipeline/pipelines-nop-rhel9@sha256:c67995c8ff151d7fb8832885682d1b9a473b63c3b4b1bc86dd0a25e25f63ed3d
                       - name: IMAGE_PIPELINES_ARG__SHELL_IMAGE
-                        value: quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:60406ced11a8297414ac93329df92f81d2447f7997accda95481f2d422f3d1de
+                        value: quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:9b48fc04d881d3ecc258d81763b7e6a41ab23314c5024c10a6273b3a89c33011
                       - name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CONTROLLER
                         value: quay.io/openshift-pipeline/pipelines-triggers-controller-rhel9@sha256:e3e8eac8abfb9465377ee6e51e903d7a412b6f130d536ef8283098bd912f2588
                       - name: IMAGE_TRIGGERS_WEBHOOK
@@ -1418,17 +1418,17 @@ spec:
                       - name: IMAGE_ADDONS_TKN
                         value: quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:9105fbfadc1871c1934424247f3214f9b372c8339b69e1417f1e1d9bb361f7a2
                       - name: IMAGE_ADDONS_TKN_CLI_SERVE
-                        value: quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:393d8645d7804c7a3ac53186d6a7d73c06d69c06e532e5698f69130c44fd9f48
+                        value: quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:0c8eeba47687755d19b8f71ce13fc555e36ef2a57db3d4c21ae6873f82b2bfc0
                       - name: IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG
-                        value: quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:393d8645d7804c7a3ac53186d6a7d73c06d69c06e532e5698f69130c44fd9f48
+                        value: quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:0c8eeba47687755d19b8f71ce13fc555e36ef2a57db3d4c21ae6873f82b2bfc0
                       - name: IMAGE_CHAINS_TEKTON_CHAINS_CONTROLLER
-                        value: quay.io/openshift-pipeline/pipelines-chains-controller-rhel9@sha256:0478d50b7a0de615f4c8eb26d13e2dd2ea41edbce3d9e59ace1cbcb8bdaa22ea
+                        value: quay.io/openshift-pipeline/pipelines-chains-controller-rhel9@sha256:0a8408ca84c99d92f29e3be0892f2e9f68b0847bafca2039960c8019d3e4205b
                       - name: IMAGE_RESULTS_POSTGRES
                         value: registry.redhat.io/rhel9/postgresql-15@sha256:9e1ae1b250fa5bd732f573b2c924e503328e61dd341cf6a41c67aeb5f26cbc38
                       - name: IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER
-                        value: quay.io/openshift-pipeline/pipelines-manual-approval-gate-controller-rhel9@sha256:1df9fdf24031726465b0dada7331180c4ad8db2fe3899ac3032c1505c4a51bf8
+                        value: quay.io/openshift-pipeline/pipelines-manual-approval-gate-controller-rhel9@sha256:77730d71054a41a5a107af2ed8d7763259477a35a093674e75dd9864d4ef0158
                       - name: IMAGE_MAG_MANUAL_APPROVAL
-                        value: quay.io/openshift-pipeline/pipelines-manual-approval-gate-webhook-rhel9@sha256:da65bad3e5508dcdd2b8efbab32cf3fc81355815af319f4310c41d23a0977f28
+                        value: quay.io/openshift-pipeline/pipelines-manual-approval-gate-webhook-rhel9@sha256:609287786d9152444bbcd21e531c1e69f7d4e16733ee1b168d802e21ffb85a95
                       - name: IMAGE_PRUNER_CONTROLLER
                         value: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:e3afe1e26aed067f6873fe8ff369d80afc518499714acc91a0399eb4fbd3177d
                       - name: IMAGE_SCHEDULER_MANAGER
@@ -1461,7 +1461,7 @@ spec:
                         value: quay.io/openshift-pipeline/pipelines-console-plugin-rhel9@sha256:bde3ec64b05eba1f5aa81f0980c7cc30443052e4491061c2c62adec4acbaf9b4
                       - name: IMAGE_PIPELINES_CONSOLE_PLUGIN_LEGACY
                         value: quay.io/openshift-pipeline/pipelines-console-plugin-pf5-rhel9@sha256:85fc10a62da7842eb0972f8141a08b000f79501067c3c2fa5decc146d9e7bab2
-                    image: quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:b0433f3aea88838c4f6761bc817c3d9dfeca61347dfbe52e5446f83a58ee35c2
+                    image: quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:4b9fec716bb85c77017537f2095ec29b6b64525a1513733a65d1e1111951ec48
                     imagePullPolicy: Always
                     name: openshift-pipelines-operator-lifecycle
                     resources: {}
@@ -1499,7 +1499,7 @@ spec:
                         value: tekton.dev/operator
                       - name: CONFIG_LEADERELECTION_NAME
                         value: tekton-operator-controller-config-leader-election
-                    image: quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:b0433f3aea88838c4f6761bc817c3d9dfeca61347dfbe52e5446f83a58ee35c2
+                    image: quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:4b9fec716bb85c77017537f2095ec29b6b64525a1513733a65d1e1111951ec48
                     imagePullPolicy: Always
                     name: openshift-pipelines-operator-cluster-operations
                     resources: {}
@@ -1556,7 +1556,7 @@ spec:
                         value: tekton.dev/operator
                       - name: PLATFORM
                         value: openshift
-                    image: quay.io/openshift-pipeline/pipelines-operator-webhook-rhel9@sha256:6680daae86820c3c6a583e5c54b7a98c342634fbed31f22eabd7b4d9f5373bdf
+                    image: quay.io/openshift-pipeline/pipelines-operator-webhook-rhel9@sha256:2156a04e20b331224899d7b4417a7c42f8a94d3d1d9897ebcbc662bdc3b8bc16
                     name: tekton-operator-webhook
                     ports:
                       - containerPort: 8443
@@ -1605,21 +1605,21 @@ spec:
   provider:
     name: Red Hat
   relatedImages:
-    - image: quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:b0433f3aea88838c4f6761bc817c3d9dfeca61347dfbe52e5446f83a58ee35c2
+    - image: quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:4b9fec716bb85c77017537f2095ec29b6b64525a1513733a65d1e1111951ec48
       name: OPENSHIFT_PIPELINES_OPERATOR_LIFECYCLE
-    - image: quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:b0433f3aea88838c4f6761bc817c3d9dfeca61347dfbe52e5446f83a58ee35c2
+    - image: quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:4b9fec716bb85c77017537f2095ec29b6b64525a1513733a65d1e1111951ec48
       name: OPENSHIFT_PIPELINES_OPERATOR_CLUSTER_OPERATIONS
-    - image: quay.io/openshift-pipeline/pipelines-operator-proxy-rhel9@sha256:56b27dca595ecbb917e5290844bbcad36ebae711a0eb4dfd0ba517fb02421cdb
+    - image: quay.io/openshift-pipeline/pipelines-operator-proxy-rhel9@sha256:1e95c75cc4318ee824e62d7ab1d512c9f6c42d6f52447f31902c3e8d5693ef9d
       name: IMAGE_PIPELINES_PROXY
-    - image: quay.io/openshift-pipeline/pipelines-controller-rhel9@sha256:c6a25e7eea796cd4df409d39326426fa7cee0b2d6bb8f080a9a4afdff8d073f5
+    - image: quay.io/openshift-pipeline/pipelines-controller-rhel9@sha256:825e9f059e3e3b69a180a7c12c60a9194852241d51efa344c411c9650472fc37
       name: IMAGE_PIPELINES_TEKTON_PIPELINES_CONTROLLER
-    - image: quay.io/openshift-pipeline/pipelines-webhook-rhel9@sha256:84c73b9344dc4e5f800f9e3ca841d975bee011bef80e0f5567035e1f3fa57108
+    - image: quay.io/openshift-pipeline/pipelines-webhook-rhel9@sha256:95fdd592e00c7be5e610d4f8e803f78e5a4485a6129f3360d4ac60cb109098ab
       name: IMAGE_PIPELINES_WEBHOOK
-    - image: quay.io/openshift-pipeline/pipelines-resolvers-rhel9@sha256:a2d58ec28d9854770853c5ae0628a6af845f551f3b9c2e29d8d4b2a1c7d8ea52
+    - image: quay.io/openshift-pipeline/pipelines-resolvers-rhel9@sha256:c89b7c3e91b8147a441c7d31890a7da45188ce2018f992dab8803129d8ce231b
       name: IMAGE_PIPELINES_CONTROLLER
-    - image: quay.io/openshift-pipeline/pipelines-events-rhel9@sha256:77dab823482e5c5cd5076ff066d731668ec211623a56693f4058e14fd09eb814
+    - image: quay.io/openshift-pipeline/pipelines-events-rhel9@sha256:86115256e402a937e775ebd8cd624a47c346e57e178ab923cd30b79c8c6af731
       name: IMAGE_PIPELINES_TEKTON_EVENTS_CONTROLLER
-    - image: quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:60406ced11a8297414ac93329df92f81d2447f7997accda95481f2d422f3d1de
+    - image: quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:9b48fc04d881d3ecc258d81763b7e6a41ab23314c5024c10a6273b3a89c33011
       name: IMAGE_PIPELINES_ARG__ENTRYPOINT_IMAGE
     - image: quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:fe655a00a6fe9f590272febd7008728dcba1f25d15462f02e51f33edfc748980
       name: IMAGE_PIPELINES_ARG__GIT_IMAGE
@@ -1637,13 +1637,13 @@ spec:
       name: IMAGE_ADDONS_CACHE_UPLOAD
     - image: quay.io/openshift-pipeline/pipelines-cache-rhel9@sha256:4f5716cac4eca4c6f197857047708c361257000bbc1bf9b9ab2fff99495be39a
       name: IMAGE_ADDONS_CACHE_FETCH
-    - image: quay.io/openshift-pipeline/pipelines-workingdirinit-rhel9@sha256:90c1c43c33006b697942e43fa11b8afd1306a2523e04aa01a6b3015856189fd2
+    - image: quay.io/openshift-pipeline/pipelines-workingdirinit-rhel9@sha256:2f00cb85f83b42347c6b824b708b3174f2cd5b54433505638d516e058531927e
       name: IMAGE_PIPELINES_ARG__WORKINGDIRINIT_IMAGE
-    - image: quay.io/openshift-pipeline/pipelines-sidecarlogresults-rhel9@sha256:25661e16753eb8e69a87ccd1d7177601ede3b7442ade2ab0cbc8b20a501404ab
+    - image: quay.io/openshift-pipeline/pipelines-sidecarlogresults-rhel9@sha256:16843d0dea6c8a59e8d446605eda5385ceba9fdf9ea0cd8551fcb3cf92a7ac90
       name: IMAGE_PIPELINES_ARG__SIDECARLOGRESULTS_IMAGE
-    - image: quay.io/openshift-pipeline/pipelines-nop-rhel9@sha256:eb464202fd1a5554bf253a2af65292be8538e8678106dbbfdd9246d2317d3b2a
+    - image: quay.io/openshift-pipeline/pipelines-nop-rhel9@sha256:c67995c8ff151d7fb8832885682d1b9a473b63c3b4b1bc86dd0a25e25f63ed3d
       name: IMAGE_PIPELINES_ARG__NOP_IMAGE
-    - image: quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:60406ced11a8297414ac93329df92f81d2447f7997accda95481f2d422f3d1de
+    - image: quay.io/openshift-pipeline/pipelines-entrypoint-rhel9@sha256:9b48fc04d881d3ecc258d81763b7e6a41ab23314c5024c10a6273b3a89c33011
       name: IMAGE_PIPELINES_ARG__SHELL_IMAGE
     - image: quay.io/openshift-pipeline/pipelines-triggers-controller-rhel9@sha256:e3e8eac8abfb9465377ee6e51e903d7a412b6f130d536ef8283098bd912f2588
       name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CONTROLLER
@@ -1689,19 +1689,19 @@ spec:
       name: IMAGE_ADDONS_PARAM_TKN_IMAGE
     - image: quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:9105fbfadc1871c1934424247f3214f9b372c8339b69e1417f1e1d9bb361f7a2
       name: IMAGE_ADDONS_TKN
-    - image: quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:393d8645d7804c7a3ac53186d6a7d73c06d69c06e532e5698f69130c44fd9f48
+    - image: quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:0c8eeba47687755d19b8f71ce13fc555e36ef2a57db3d4c21ae6873f82b2bfc0
       name: IMAGE_ADDONS_TKN_CLI_SERVE
-    - image: quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:393d8645d7804c7a3ac53186d6a7d73c06d69c06e532e5698f69130c44fd9f48
+    - image: quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:0c8eeba47687755d19b8f71ce13fc555e36ef2a57db3d4c21ae6873f82b2bfc0
       name: IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG
-    - image: quay.io/openshift-pipeline/pipelines-operator-webhook-rhel9@sha256:6680daae86820c3c6a583e5c54b7a98c342634fbed31f22eabd7b4d9f5373bdf
+    - image: quay.io/openshift-pipeline/pipelines-operator-webhook-rhel9@sha256:2156a04e20b331224899d7b4417a7c42f8a94d3d1d9897ebcbc662bdc3b8bc16
       name: TEKTON_OPERATOR_WEBHOOK
-    - image: quay.io/openshift-pipeline/pipelines-chains-controller-rhel9@sha256:0478d50b7a0de615f4c8eb26d13e2dd2ea41edbce3d9e59ace1cbcb8bdaa22ea
+    - image: quay.io/openshift-pipeline/pipelines-chains-controller-rhel9@sha256:0a8408ca84c99d92f29e3be0892f2e9f68b0847bafca2039960c8019d3e4205b
       name: IMAGE_CHAINS_TEKTON_CHAINS_CONTROLLER
     - image: registry.redhat.io/rhel9/postgresql-15@sha256:9e1ae1b250fa5bd732f573b2c924e503328e61dd341cf6a41c67aeb5f26cbc38
       name: IMAGE_RESULTS_POSTGRES
-    - image: quay.io/openshift-pipeline/pipelines-manual-approval-gate-controller-rhel9@sha256:1df9fdf24031726465b0dada7331180c4ad8db2fe3899ac3032c1505c4a51bf8
+    - image: quay.io/openshift-pipeline/pipelines-manual-approval-gate-controller-rhel9@sha256:77730d71054a41a5a107af2ed8d7763259477a35a093674e75dd9864d4ef0158
       name: IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER
-    - image: quay.io/openshift-pipeline/pipelines-manual-approval-gate-webhook-rhel9@sha256:da65bad3e5508dcdd2b8efbab32cf3fc81355815af319f4310c41d23a0977f28
+    - image: quay.io/openshift-pipeline/pipelines-manual-approval-gate-webhook-rhel9@sha256:609287786d9152444bbcd21e531c1e69f7d4e16733ee1b168d802e21ffb85a95
       name: IMAGE_MAG_MANUAL_APPROVAL
     - image: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:e3afe1e26aed067f6873fe8ff369d80afc518499714acc91a0399eb4fbd3177d
       name: IMAGE_PRUNER_CONTROLLER
@@ -1737,5 +1737,5 @@ spec:
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
     - image: quay.io/openshift-pipeline/pipelines-console-plugin-pf5-rhel9@sha256:85fc10a62da7842eb0972f8141a08b000f79501067c3c2fa5decc146d9e7bab2
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN_LEGACY
-  replaces: openshift-pipelines-operator-rh.v5.0.5-852
-  version: 5.0.5-853
+  replaces: openshift-pipelines-operator-rh.v5.0.5-853
+  version: 5.0.5-854
