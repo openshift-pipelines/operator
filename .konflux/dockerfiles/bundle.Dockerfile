@@ -25,7 +25,7 @@ LABEL \
     operators.operatorframework.io.bundle.mediatype.v1="registry+v1" \
     operators.operatorframework.io.bundle.metadata.v1="metadata/" \
     operators.operatorframework.io.bundle.package.v1="openshift-pipelines-operator-rh" \
-    release="Openshift Pipelines 1.15.3" \
+    release="Openshift Pipelines 1.15.5" \
     summary="Red Hat OpenShift Pipelines operator bundle" \
     url="https://access.redhat.com/containers/#/registry.access.redhat.com/ubi9-minimal/images/9.4-1227.1725849298" \
     vendor="Red Hat, Inc." \
