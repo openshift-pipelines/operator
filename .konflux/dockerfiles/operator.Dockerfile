@@ -24,7 +24,7 @@ COPY head ${KO_DATA_PATH}/HEAD
 
 LABEL \
     com.redhat.component="openshift-pipelines-rhel9-operator-container" \
-    cpe="cpe:/a:redhat:openshift_pipelines:next::el9" \
+    cpe="cpe:/a:redhat:openshift_pipelines:next::" \
     description="Red Hat OpenShift Pipelines operator operator" \
     io.k8s.description="Red Hat OpenShift Pipelines operator operator" \
     io.k8s.display-name="Red Hat OpenShift Pipelines operator operator" \
