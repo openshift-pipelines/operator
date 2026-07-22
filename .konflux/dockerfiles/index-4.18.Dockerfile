@@ -9,7 +9,7 @@ RUN ["/bin/opm", "serve", "/configs", "--cache-dir=/tmp/cache", "--cache-only"]
 # Core bundle labels.
 LABEL \
     com.redhat.component="openshift-pipelines-index-4.18-container" \
-    cpe="cpe:/a:redhat:openshift_pipelines:1.15::el9" \
+    cpe="cpe:/a:redhat:openshift_pipelines:1.15::el8" \
     description="Red Hat OpenShift Pipelines operator index-4.18" \
     io.k8s.description="Red Hat OpenShift Pipelines operator index-4.18" \
     io.k8s.display-name="Red Hat OpenShift Pipelines operator index-4.18" \
