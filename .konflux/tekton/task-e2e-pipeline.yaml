@@ -121,6 +121,18 @@ spec:
               name: pac-gitlab
               key: gitlab-webhook-token
               optional: true
+        - name: GITLAB_GROUP_NAMESPACE
+          valueFrom:
+            secretKeyRef:
+              name: pac-gitlab
+              key: gitlab-group-ns
+              optional: true
+        - name: GITLAB_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: pac-gitlab
+              key: gitlab-project-id
+              optional: true
         - name: KUBECONFIG
           value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
         - name: CATALOG_SOURCE
