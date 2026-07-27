@@ -1,0 +1,86 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: configure-loki-logging
+spec:
+  description: |
+    Installs MinIO, Loki operator, and OpenShift Logging operator on an
+    ephemeral EaaS cluster using the install-logging.sh script from the
+    release-tests-infra repository.
+  params:
+    - name: EAAS_SPACE_SECRET_REF
+      type: string
+    - name: CLUSTER_NAME
+      type: string
+      description: Name of the ephemeral EaaS cluster
+    - name: IMAGE
+      description: CI image that contains the oc client
+      default: quay.io/openshift-pipeline/ci:latest
+    - name: INFRA_REPO_URL
+      default: https://github.com/openshift-pipelines/release-tests-infra.git
+    - name: INFRA_REPO_BRANCH
+      default: acceptance-tests-infra
+  volumes:
+    - name: credentials
+      emptyDir: {}
+    - name: source
+      emptyDir: {}
+  stepTemplate:
+    image: $(params.IMAGE)
+    volumeMounts:
+      - name: credentials
+        mountPath: /credentials
+      - name: source
+        mountPath: /source
+  steps:
+    - name: create-repo
+      script: |
+        mkdir -p /source/infra
+        chmod 777 /source/infra
+    - name: fetch-infra-repo
+      ref:
+        resolver: http
+        params:
+          - name: url
+            value: https://raw.githubusercontent.com/openshift-pipelines/tektoncd-catalog/p/stepactions/stepaction-git-clone/0.4.1/stepaction-git-clone.yaml
+      params:
+        - name: OUTPUT_PATH
+          value: /source/infra
+        - name: URL
+          value: $(params.INFRA_REPO_URL)
+        - name: REVISION
+          value: $(params.INFRA_REPO_BRANCH)
+    - name: get-kubeconfig
+      ref:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/build-definitions.git
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+      params:
+        - name: eaasSpaceSecretRef
+          value: "$(params.EAAS_SPACE_SECRET_REF)"
+        - name: clusterName
+          value: "$(params.CLUSTER_NAME)"
+        - name: credentials
+          value: credentials
+    - name: configure-loki-logging
+      env:
+        - name: KUBECONFIG
+          value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+      workingDir: /source/infra
+      script: |
+        #!/usr/bin/env bash
+        set -e -o pipefail
+
+        echo "Running install-logging.sh from release-tests-infra..."
+        echo "Cluster: $(oc whoami --show-server)"
+
+        chmod +x config/operators/install-logging.sh
+        bash config/operators/install-logging.sh
+
+        echo "Loki and Logging operators configured successfully!"
