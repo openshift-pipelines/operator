@@ -299,7 +299,7 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tc *v1alpha1.TektonConfi
 	}
 
 	// Ensure Chain CR
-	if !tc.Spec.Chain.Disabled {
+	if !tc.Spec.Chain.Disabled && (tc.Spec.Profile == v1alpha1.ProfileAll || tc.Spec.Profile == v1alpha1.ProfileBasic) {
 		tektonchain := chain.GetTektonChainCR(tc, r.operatorVersion)
 		logger.Debug("Ensuring TektonChain CR exists")
 		if _, err := chain.EnsureTektonChainExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonChains(), tektonchain); err != nil {
@@ -310,7 +310,7 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tc *v1alpha1.TektonConfi
 		}
 		logger.Debug("TektonChain CR reconciled successfully")
 	} else {
-		logger.Debugw("Ensuring TektonChain CR doesn't exist", "chainDisabled", tc.Spec.Chain.Disabled)
+		logger.Debugw("Ensuring TektonChain CR doesn't exist", "profile", tc.Spec.Profile, "chainDisabled", tc.Spec.Chain.Disabled)
 		if err := chain.EnsureTektonChainCRNotExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonChains()); err != nil {
 			errMsg := fmt.Sprintf("TektonChain: %s", err.Error())
 			logger.Errorw("Failed to ensure TektonChain has been deleted", "error", err)
@@ -321,7 +321,7 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tc *v1alpha1.TektonConfi
 	}
 
 	// Ensure Result CR
-	if !tc.Spec.Result.Disabled {
+	if !tc.Spec.Result.Disabled && (tc.Spec.Profile == v1alpha1.ProfileAll || tc.Spec.Profile == v1alpha1.ProfileBasic) {
 		tektonresult := result.GetTektonResultCR(tc, r.operatorVersion)
 		if platformData := r.extension.GetPlatformData(); platformData != "" {
 			if tektonresult.Annotations == nil {
@@ -338,7 +338,7 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tc *v1alpha1.TektonConfi
 		}
 		logger.Debug("TektonResult CR reconciled successfully")
 	} else {
-		logger.Debugw("Ensuring TektonResult CR doesn't exist", "resultDisabled", tc.Spec.Result.Disabled)
+		logger.Debugw("Ensuring TektonResult CR doesn't exist", "profile", tc.Spec.Profile, "resultDisabled", tc.Spec.Result.Disabled)
 		if err := result.EnsureTektonResultCRNotExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonResults()); err != nil {
 			errMsg := fmt.Sprintf("TektonResult: %s", err.Error())
 			logger.Errorw("Failed to ensure TektonResult has been deleted", "error", err)
