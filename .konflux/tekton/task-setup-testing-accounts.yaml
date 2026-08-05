@@ -1,0 +1,158 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: setup-testing-accounts
+spec:
+  description: |
+    Configures HTPasswd identity provider with standard test user accounts on an
+    ephemeral EaaS cluster.  Adapted from the plumbing repo task for Konflux,
+    where credentials come from the EaaS space secret rather than per-cluster
+    Kubernetes secrets.
+  params:
+    - name: EAAS_SPACE_SECRET_REF
+      type: string
+    - name: CLUSTER_NAME
+      type: string
+      description: Name of the ephemeral EaaS cluster
+    - name: IMAGE
+      description: CI image that contains the oc client
+      default: quay.io/openshift-pipeline/ci:latest
+  volumes:
+    - name: credentials
+      emptyDir: {}
+  stepTemplate:
+    image: $(params.IMAGE)
+    volumeMounts:
+      - name: credentials
+        mountPath: /credentials
+  steps:
+    - name: get-kubeconfig
+      ref:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/build-definitions.git
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+      params:
+        - name: eaasSpaceSecretRef
+          value: "$(params.EAAS_SPACE_SECRET_REF)"
+        - name: clusterName
+          value: "$(params.CLUSTER_NAME)"
+        - name: credentials
+          value: credentials
+    - name: setup-testing-accounts
+      env:
+        - name: KUBECONFIG
+          value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+      script: |
+        #!/usr/bin/env bash
+        set -e -u -o pipefail
+
+        echo "Setting up testing accounts on ephemeral EaaS cluster..."
+        echo "Cluster: $(oc whoami --show-server)"
+
+        # Build htpasswd file
+        USERS=(
+          "consoledeveloper:developer"
+          "pipelinesdeveloper:developer"
+          "user:user"
+        )
+        for i in $(seq 1 9); do
+          USERS+=("user${i}:user${i}")
+        done
+
+        HTPASSWD_FILE=$(mktemp)
+        for entry in "${USERS[@]}"; do
+          username="${entry%%:*}"
+          password="${entry#*:}"
+          if command -v htpasswd &>/dev/null; then
+            if [ ! -s "$HTPASSWD_FILE" ]; then
+              htpasswd -cbB "$HTPASSWD_FILE" "$username" "$password"
+            else
+              htpasswd -bB "$HTPASSWD_FILE" "$username" "$password"
+            fi
+          elif command -v openssl &>/dev/null; then
+            echo "${username}:$(openssl passwd -apr1 "$password")" >> "$HTPASSWD_FILE"
+          else
+            echo "ERROR: neither htpasswd nor openssl found in image" >&2
+            exit 1
+          fi
+        done
+
+        echo "Created htpasswd file with $(wc -l < "$HTPASSWD_FILE") user(s)"
+
+        # Create htpasswd secret
+        oc create secret generic htpass-secret \
+          --from-file=htpasswd="$HTPASSWD_FILE" \
+          -n openshift-config \
+          --dry-run=client -o yaml | oc apply -f-
+
+        # Configure OAuth identity provider
+        cat <<'EOF' | oc apply -f-
+        apiVersion: config.openshift.io/v1
+        kind: OAuth
+        metadata:
+          name: cluster
+        spec:
+          identityProviders:
+          - name: htpasswd-provider
+            mappingMethod: claim
+            type: HTPasswd
+            htpasswd:
+              fileData:
+                name: htpass-secret
+        EOF
+
+        # Wait for OAuth rollout
+        echo "Waiting for OAuth server to reconcile new configuration..."
+        sleep 10
+        oc wait co/authentication --for=condition=Progressing=False --timeout=300s || true
+        oc wait co/authentication --for=condition=Available=True --timeout=300s
+
+        # Assign cluster roles
+        echo "Assigning cluster roles..."
+        oc adm policy add-cluster-role-to-user self-provisioner consoledeveloper
+        oc adm policy add-cluster-role-to-user view consoledeveloper
+        oc adm policy add-cluster-role-to-user basic-user pipelinesdeveloper
+
+        # ── 6. Verify a test user can authenticate ──────────────────────
+        echo "Verifying user authentication (may take a few minutes)..."
+        VERIFY_KUBECONFIG=$(mktemp)
+        API_SERVER=$(oc whoami --show-server)
+        VERIFIED=false
+        for attempt in $(seq 1 30); do
+          if KUBECONFIG="$VERIFY_KUBECONFIG" oc login -u user -p user \
+                "$API_SERVER" --insecure-skip-tls-verify=true &>/dev/null; then
+            echo "User authentication verified on attempt $attempt"
+            VERIFIED=true
+            break
+          fi
+          echo "Attempt $attempt/30: OAuth not ready yet, retrying in 10s..."
+          sleep 10
+        done
+        rm -f "$VERIFY_KUBECONFIG"
+
+        if [ "$VERIFIED" = "false" ]; then
+          echo "ERROR: user authentication verification failed after 5 minutes" >&2
+          exit 1
+        fi
+
+        # Summary
+        echo ""
+        echo "Testing accounts configured successfully!"
+        echo ""
+        echo "Username           | Password                | Cluster roles"
+        echo "-------------------|-----------------------------------------"
+        echo "consoledeveloper   | developer               | self-provisioner, view"
+        echo "pipelinesdeveloper | developer               | basic-user"
+        echo "user               | user                    | default"
+        for i in $(seq 1 9); do
+          printf "user%-14s | user%-20s | default\n" "$i" "$i"
+        done
+        echo "-------------------------------------------------------------"
+
+        rm -f "$HTPASSWD_FILE"
