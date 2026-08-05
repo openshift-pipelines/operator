@@ -135,9 +135,9 @@ type TektonConfigSpec struct {
 	// +optional
 	TargetNamespaceMetadata *NamespaceMetadata `json:"targetNamespaceMetadata,omitempty"`
 	// NetworkPolicy configures NetworkPolicy resources for the operand namespace.
-	// This field is propagated to TektonTrigger and TektonPipeline, which are the
+	// This field is propagated to TektonTrigger, TektonChain and TektonPipeline, which are the
 	// only components with NetworkPolicy reconciliation implemented. Other
-	// components (Chains, Results, Dashboard) do not yet act on this field.
+	// components (Results, Dashboard) do not yet act on this field.
 	// +optional
 	NetworkPolicy NetworkPolicyConfig `json:"networkPolicy,omitempty"`
 }
@@ -225,5 +225,6 @@ type Hub struct {
 	// +optional
 	Params []Param `json:"params,omitempty"`
 	// options holds additions fields and these fields will be updated on the manifests
-	Options AdditionalOptions `json:"options"`
+	// +optional
+	Options AdditionalOptions `json:"options,omitempty"`
 }

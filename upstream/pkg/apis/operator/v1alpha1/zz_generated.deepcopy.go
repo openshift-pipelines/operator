@@ -675,6 +675,7 @@ func (in *OpenShiftPipelinesAsCodeSpec) DeepCopyInto(out *OpenShiftPipelinesAsCo
 	out.CommonSpec = in.CommonSpec
 	in.Config.DeepCopyInto(&out.Config)
 	in.PACSettings.DeepCopyInto(&out.PACSettings)
+	in.NetworkPolicy.DeepCopyInto(&out.NetworkPolicy)
 	return
 }
 
@@ -1639,6 +1640,7 @@ func (in *TektonChainSpec) DeepCopyInto(out *TektonChainSpec) {
 	out.CommonSpec = in.CommonSpec
 	in.Chain.DeepCopyInto(&out.Chain)
 	in.Config.DeepCopyInto(&out.Config)
+	in.NetworkPolicy.DeepCopyInto(&out.NetworkPolicy)
 	return
 }
 
