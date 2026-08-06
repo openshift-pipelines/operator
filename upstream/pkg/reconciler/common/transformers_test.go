@@ -868,6 +868,38 @@ func TestAddConfiguration(t *testing.T) {
 	assert.Equal(t, d.Spec.Template.Spec.PriorityClassName, config.PriorityClassName)
 }
 
+func TestAddConfigurationStatefulSet(t *testing.T) {
+	testData := path.Join("testdata", "test-add-configurations-statefulset.yaml")
+	manifest, err := mf.ManifestFrom(mf.Recursive(testData))
+	assertNoError(t, err)
+
+	config := v1alpha1.Config{
+		NodeSelector: map[string]string{
+			"node-role.kubernetes.io/infra": "",
+		},
+		Tolerations: []corev1.Toleration{
+			{
+				Key:      "node-role.kubernetes.io/infra",
+				Operator: corev1.TolerationOpExists,
+				Effect:   corev1.TaintEffectNoSchedule,
+			},
+		},
+		PriorityClassName: string("system-cluster-critical"),
+	}
+
+	manifest, err = manifest.Transform(AddConfiguration(config))
+	assertNoError(t, err)
+
+	s := &appsv1.StatefulSet{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(manifest.Resources()[0].Object, s)
+	assertNoError(t, err)
+	assert.Equal(t, s.Spec.Template.Spec.NodeSelector["node-role.kubernetes.io/infra"], config.NodeSelector["node-role.kubernetes.io/infra"])
+	assert.Equal(t, s.Spec.Template.Spec.Tolerations[0].Key, config.Tolerations[0].Key)
+	assert.Equal(t, s.Spec.Template.Spec.Tolerations[0].Operator, config.Tolerations[0].Operator)
+	assert.Equal(t, s.Spec.Template.Spec.Tolerations[0].Effect, config.Tolerations[0].Effect)
+	assert.Equal(t, s.Spec.Template.Spec.PriorityClassName, config.PriorityClassName)
+}
+
 func TestAddPSA(t *testing.T) {
 	testData := path.Join("testdata", "test-add-psa.yaml")
 	manifest, err := mf.ManifestFrom(mf.Recursive(testData))
