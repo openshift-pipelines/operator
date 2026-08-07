@@ -374,6 +374,8 @@ spec:
                     type: string
                   storage.grafeas.projectid:
                     type: string
+                  storage.oci.encoding-format:
+                    type: string
                   storage.oci.repository:
                     type: string
                   storage.oci.repository.insecure:
@@ -573,9 +575,10 @@ spec:
               networkPolicy:
                 description: |-
                   NetworkPolicy configures NetworkPolicy resources for the operand namespace.
-                  This field is propagated to TektonTrigger, TektonPipeline, TektonChain,
-                  and TektonPruner, which are the components with NetworkPolicy reconciliation
-                  implemented. Other components (Results, Dashboard) do not yet act on this field.
+                  This field is propagated to TektonPipeline, TektonTrigger, TektonChain,
+                  TektonPruner, TektonResult, Pipelines-as-Code, and MultiCluster components
+                  (TektonScheduler, TektonMulticlusterProxyAAE, SyncerService).
+                  Other components (Dashboard) do not yet act on this field.
                 properties:
                   disabled:
                     description: |-
@@ -1378,6 +1381,15 @@ spec:
                           into Tekton component containers that support TLS configuration.
                           Set to false to opt out and manage TLS settings manually.
                           Default: true (opt-out)
+                        type: boolean
+                      enableMetricsMTLS:
+                        description: |
+                          EnableMetricsMTLS controls whether Prometheus metrics endpoints use mTLS.
+                          When enabled the operator annotates metric Services for TLS certificate
+                          provisioning, renames ports from http-metrics to https-metrics, mounts
+                          the serving-cert Secret and client-CA ConfigMap into pods, and enforces
+                          client certificate verification. Requires the OpenShift Cluster Monitoring
+                          Operator (CMO). Default: false (opt-in).
                         type: boolean
                       pipelinesAsCode:
                         description: PipelinesAsCode allows configuring PipelinesAsCode
