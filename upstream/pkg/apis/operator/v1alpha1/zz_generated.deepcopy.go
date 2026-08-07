@@ -597,6 +597,11 @@ func (in *OpenShift) DeepCopyInto(out *OpenShift) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.EnableMetricsMTLS != nil {
+		in, out := &in.EnableMetricsMTLS, &out.EnableMetricsMTLS
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -1533,6 +1538,7 @@ func (in *SyncerServiceSpec) DeepCopyInto(out *SyncerServiceSpec) {
 	out.CommonSpec = in.CommonSpec
 	in.SyncerServiceOptions.DeepCopyInto(&out.SyncerServiceOptions)
 	in.Config.DeepCopyInto(&out.Config)
+	in.NetworkPolicy.DeepCopyInto(&out.NetworkPolicy)
 	return
 }
 
@@ -2155,6 +2161,7 @@ func (in *TektonMulticlusterProxyAAESpec) DeepCopyInto(out *TektonMulticlusterPr
 	*out = *in
 	out.CommonSpec = in.CommonSpec
 	in.MulticlusterProxyAAEOptions.DeepCopyInto(&out.MulticlusterProxyAAEOptions)
+	in.NetworkPolicy.DeepCopyInto(&out.NetworkPolicy)
 	return
 }
 
@@ -2465,6 +2472,7 @@ func (in *TektonResultSpec) DeepCopyInto(out *TektonResultSpec) {
 	out.CommonSpec = in.CommonSpec
 	in.Result.DeepCopyInto(&out.Result)
 	in.Config.DeepCopyInto(&out.Config)
+	in.NetworkPolicy.DeepCopyInto(&out.NetworkPolicy)
 	return
 }
 
@@ -2561,6 +2569,7 @@ func (in *TektonSchedulerSpec) DeepCopyInto(out *TektonSchedulerSpec) {
 	*out = *in
 	out.CommonSpec = in.CommonSpec
 	in.Scheduler.DeepCopyInto(&out.Scheduler)
+	in.NetworkPolicy.DeepCopyInto(&out.NetworkPolicy)
 	return
 }
 
