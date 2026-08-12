@@ -154,6 +154,27 @@ spec:
               - name: imageContentSources
                 value: |
                   - source: registry.redhat.io/openshift-pipelines/
+    # Configure Loki and OpenShift Logging
+    - name: configure-loki-logging
+      runAfter:
+        - provision-cluster
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-configure-loki-logging.yaml
+      params:
+        - name: EAAS_SPACE_SECRET_REF
+          value: $(tasks.provision-eaas-space.results.secretRef)
+        - name: CLUSTER_NAME
+          value: $(tasks.provision-cluster.results.clusterName)
+        - name: IMAGE
+          value: $(params.IMAGE)
+
     # Create Catalog Source to install Operator
     - name: create-catalog-source
       runAfter:
@@ -256,6 +277,7 @@ spec:
           value: "$(tasks.create-catalog-source.results.channel)"
       runAfter:
         - create-catalog-source
+        - configure-loki-logging
 
     # Setup test user accounts
     - name: setup-testing-accounts
