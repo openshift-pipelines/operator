@@ -301,12 +301,6 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tc *v1alpha1.TektonConfi
 	// Ensure Chain CR
 	if !tc.Spec.Chain.Disabled && (tc.Spec.Profile == v1alpha1.ProfileAll || tc.Spec.Profile == v1alpha1.ProfileBasic) {
 		tektonchain := chain.GetTektonChainCR(tc, r.operatorVersion)
-		if platformData := r.extension.GetPlatformData(); platformData != "" {
-			if tektonchain.Annotations == nil {
-				tektonchain.Annotations = map[string]string{}
-			}
-			tektonchain.Annotations[v1alpha1.PlatformDataHashKey] = platformData
-		}
 		logger.Debug("Ensuring TektonChain CR exists")
 		if _, err := chain.EnsureTektonChainExists(ctx, r.operatorClientSet.OperatorV1alpha1().TektonChains(), tektonchain); err != nil {
 			errMsg := fmt.Sprintf("TektonChain: %s", err.Error())
@@ -408,10 +402,6 @@ func (r *Reconciler) ReconcileKind(ctx context.Context, tc *v1alpha1.TektonConfi
 
 	// Post-reconcile extension hooks
 	if err := r.extension.PostReconcile(ctx, tc); err != nil {
-		if err == v1alpha1.REQUEUE_EVENT_AFTER {
-			logger.Infow("Post-reconcile hook requested requeue", "error", err)
-			return err
-		}
 		logger.Errorw("Post-reconcile hook failed", "error", err)
 		return err
 	}

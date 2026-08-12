@@ -26,7 +26,6 @@ import (
 const StepActionKind = "StepAction"
 
 // +genclient
-// +kubebuilder:object:root=true
 // +genclient:noStatus
 // +genreconciler:krshapedlogic=false
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

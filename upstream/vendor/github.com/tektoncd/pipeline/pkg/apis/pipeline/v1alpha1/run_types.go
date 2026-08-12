@@ -167,7 +167,6 @@ type RunStatusFields = runv1alpha1.RunStatusFields
 type RunResult = runv1alpha1.RunResult
 
 // +genclient
-// +kubebuilder:object:root=true
 // +genreconciler
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

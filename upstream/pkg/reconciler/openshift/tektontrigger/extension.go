@@ -21,24 +21,19 @@ import (
 
 	mf "github.com/manifestival/manifestival"
 	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
-	"github.com/tektoncd/operator/pkg/client/clientset/versioned"
-	operatorclient "github.com/tektoncd/operator/pkg/client/injection/client"
 	tektonConfiginformer "github.com/tektoncd/operator/pkg/client/injection/informers/operator/v1alpha1/tektonconfig"
 	"github.com/tektoncd/operator/pkg/reconciler/common"
 	"github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektontrigger"
 	occommon "github.com/tektoncd/operator/pkg/reconciler/openshift/common"
-	"k8s.io/client-go/kubernetes"
-	kubeclient "knative.dev/pkg/client/injection/kube/client"
 	"knative.dev/pkg/logging"
 	"knative.dev/pkg/ptr"
 )
 
 const (
-	tektonTriggersWebhookDeployment    = "tekton-triggers-webhook"
-	webhookContainerName               = "webhook"
-	tektonTriggersCoreInterceptors     = "tekton-triggers-core-interceptors"
-	coreInterceptorsContainerName      = "tekton-triggers-core-interceptors"
-	tektonTriggersControllerDeployment = "tekton-triggers-controller"
+	tektonTriggersWebhookDeployment = "tekton-triggers-webhook"
+	webhookContainerName            = "webhook"
+	tektonTriggersCoreInterceptors  = "tekton-triggers-core-interceptors"
+	coreInterceptorsContainerName   = "tekton-triggers-core-interceptors"
 )
 
 // triggersProperties holds fields for configuring runAsUser and runAsGroup.
@@ -59,18 +54,13 @@ var triggersData = triggersProperties{
 
 func OpenShiftExtension(ctx context.Context) common.Extension {
 	return &openshiftExtension{
-		kubeClientSet:      kubeclient.Get(ctx),
-		operatorClientSet:  operatorclient.Get(ctx),
 		tektonConfigLister: tektonConfiginformer.Get(ctx).Lister(),
 	}
 }
 
 type openshiftExtension struct {
-	kubeClientSet      kubernetes.Interface
-	operatorClientSet  versioned.Interface
 	tektonConfigLister occommon.TektonConfigLister
 	resolvedTLSConfig  *occommon.TLSEnvVars
-	metricsMTLSReady   bool
 }
 
 func (oe *openshiftExtension) Transformers(comp v1alpha1.TektonComponent) []mf.Transformer {
@@ -80,15 +70,6 @@ func (oe *openshiftExtension) Transformers(comp v1alpha1.TektonComponent) []mf.T
 		occommon.ApplyCABundlesToDeployment,
 		common.AddConfigMapValues(tektontrigger.ConfigDefaults, triggersData),
 		replaceDeploymentArgs("-el-events", "enable"),
-	}
-
-	if oe.metricsMTLSReady {
-		trns = append(trns,
-			occommon.AnnotateMetricsServingCert(tektonTriggersControllerDeployment),
-			occommon.RenameServicePort(tektonTriggersControllerDeployment, occommon.MetricsHTTPPort, occommon.MetricsHTTPSPort),
-			occommon.ApplyMetricsTLS("Deployment", tektonTriggersControllerDeployment,
-				occommon.MetricsServingCertSecretName(tektonTriggersControllerDeployment)),
-		)
 	}
 
 	// Inject APIServer TLS profile env vars into the webhook and core interceptors
@@ -116,12 +97,6 @@ func (oe *openshiftExtension) PreReconcile(ctx context.Context, tc v1alpha1.Tekt
 	if oe.resolvedTLSConfig != nil {
 		logger.Infof("Injecting central TLS config into triggers webhook and core interceptors: MinVersion=%s", oe.resolvedTLSConfig.MinVersion)
 	}
-
-	ready, err := occommon.ResolveMetricsMTLS(ctx, oe.operatorClientSet, oe.kubeClientSet, tc.GetSpec().GetTargetNamespace())
-	if err != nil {
-		return err
-	}
-	oe.metricsMTLSReady = ready
 
 	return nil
 }

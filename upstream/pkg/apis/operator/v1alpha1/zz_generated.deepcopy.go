@@ -597,11 +597,6 @@ func (in *OpenShift) DeepCopyInto(out *OpenShift) {
 		*out = new(bool)
 		**out = **in
 	}
-	if in.EnableMetricsMTLS != nil {
-		in, out := &in.EnableMetricsMTLS, &out.EnableMetricsMTLS
-		*out = new(bool)
-		**out = **in
-	}
 	return
 }
 

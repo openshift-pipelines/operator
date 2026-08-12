@@ -37,7 +37,6 @@ import (
 )
 
 // +genclient
-// +kubebuilder:object:root=true
 // +genreconciler:krshapedlogic=false
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
