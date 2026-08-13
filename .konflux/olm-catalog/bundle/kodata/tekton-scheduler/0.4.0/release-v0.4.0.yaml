@@ -159,6 +159,13 @@ rules:
   - pipelineruns/finalizers
   verbs:
   - update
+- apiGroups:
+  - tekton.dev
+  resources:
+  - pipelineruns/status
+  verbs:
+  - patch
+  - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -351,7 +358,7 @@ spec:
         - --metrics-cert-path=/tmp/k8s-metrics-server/metrics-certs
         command:
         - /manager
-        image: quay.io/openshift-pipeline/kueue-rhel9@sha256:15c12da19c678f2d08c4074d17e121907e0bcc00997d5829a9a5f2bd977ae03f
+        image: quay.io/openshift-pipeline/kueue-rhel9:v0.4.0
         livenessProbe:
           httpGet:
             path: /healthz
@@ -437,7 +444,7 @@ spec:
         - --metrics-cert-path=/tmp/k8s-metrics-server/metrics-certs
         command:
         - /manager
-        image: quay.io/openshift-pipeline/kueue-rhel9@sha256:15c12da19c678f2d08c4074d17e121907e0bcc00997d5829a9a5f2bd977ae03f
+        image: quay.io/openshift-pipeline/kueue-rhel9:v0.4.0
         livenessProbe:
           httpGet:
             path: /healthz
@@ -562,7 +569,7 @@ metadata:
 spec:
   selfSigned: {}
 ---
-apiVersion: kueue.x-k8s.io/v1beta1
+apiVersion: kueue.x-k8s.io/v1beta2
 description: tekton-kueue default priority class
 kind: WorkloadPriorityClass
 metadata:
