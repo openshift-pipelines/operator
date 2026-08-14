@@ -29,4 +29,4 @@ LABEL \
     operators.operatorframework.io.metrics.mediatype.v1="metrics+v1" \
     summary="Red Hat OpenShift Pipelines operator index-4.20" \
     version="v1.15.5"
-# Trigger index rebuild 2026-02-15
+# Trigger index rebuild 2026-08-14
