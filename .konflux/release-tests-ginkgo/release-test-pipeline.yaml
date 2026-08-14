@@ -1,0 +1,48 @@
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: release-test-pipeline-ginkgo
+spec:
+  description: |
+    An integration test which provisions an ephemeral Hypershift cluster and deploys an Operator
+    bundle from a Konflux snapshot.
+  params:
+    - description: Snapshot of the application
+      name: SNAPSHOT
+      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+      type: string
+    - description: Namespace where the the Operator bundle will be deployed.
+      name: NAMESPACE
+      default: openshift-operators
+      type: string
+    - name: IMAGE
+      type: string
+      default: quay.io/openshift-pipeline/ci:latest
+    - name: TAGS
+      default: "(e2e | sanity)"
+    - name: RELEASE_TEST_TASKS_REPO
+      default: https://github.com/openshift-pipelines/operator
+    - name: RELEASE_TEST_TASKS_BRANCH
+      default: main
+    - name: GIT_RELEASE_TESTS_BRANCH
+      default: master
+
+  tasks:
+    - name: provision-ephemeral-cluster
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/openshift/konflux-tasks
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/provision-ephemeral-cluster/0.1/provision-ephemeral-cluster.yaml
+      params:
+        - name: ownerName
+          value: $(context.pipelineRun.name)
+        - name: ownerUid
+          value: $(context.pipelineRun.uid)
+        - name: workflow
+          value: "3scale-ipi-aws"
