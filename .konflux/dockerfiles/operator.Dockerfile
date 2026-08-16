@@ -24,14 +24,14 @@ COPY .konflux/olm-catalog/bundle/kodata /kodata
 COPY head ${KO_DATA_PATH}/HEAD
 
 LABEL \
-    com.redhat.component="openshift-pipelines-operator-rhel8-container" \
+    com.redhat.component="openshift-pipelines-rhel8-operator-container" \
     cpe="cpe:/a:redhat:openshift_pipelines:1.15::el8" \
     description="Red Hat OpenShift Pipelines operator operator" \
     io.k8s.description="Red Hat OpenShift Pipelines operator operator" \
     io.k8s.display-name="Red Hat OpenShift Pipelines operator operator" \
     io.openshift.tags="tekton,openshift,operator,operator" \
     maintainer="pipelines-extcomm@redhat.com" \
-    name="openshift-pipelines/pipelines-operator-rhel8" \
+    name="openshift-pipelines/pipelines-rhel8-operator" \
     summary="Red Hat OpenShift Pipelines operator operator" \
     version="v1.15.5"
 
