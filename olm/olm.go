@@ -21,78 +21,86 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run olm.go config.yaml")
+		log.Println("Usage: go run olm.go config.yaml")
 		return
 	}
 
 	// Read YAML
 	var filePath = os.Args[1]
 
+	var outputDir = ".konflux/olm-catalog/index"
 	var outputFile = "catalog-template.json"
 	if len(os.Args) > 2 {
-		outputFile = os.Args[2]
+		outputDir = os.Args[2]
 	}
-
-	olmFileName := filepath.Join(os.TempDir(), "olm.yaml")
-	if len(os.Args) > 3 {
-		olmFileName = os.Args[3]
-	}
-	reuseBundle := false
 	var cfg Config
-	if fileExists(olmFileName) {
-		log.Println("OLM config file already exists. Parsing", olmFileName)
-		raw, err := ioutil.ReadFile(olmFileName)
-		if err != nil {
-			log.Println("Error reading OLM config file:", err)
-		} else if err := yaml.Unmarshal(raw, &cfg); err != nil {
-			log.Printf("Error parsing %s: %v", olmFileName, err)
-			reuseBundle = false
-		} else {
-			reuseBundle = cfg.Channels != nil && cfg.BundleVersions != nil
-		}
-		if reuseBundle {
-			log.Println("OLM File is valid, Skipping Bundle Creation")
-		}
 
+	raw, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		panic(err)
 	}
-	if !reuseBundle {
-		raw, err := ioutil.ReadFile(filePath)
-		if err != nil {
-			panic(err)
-		}
-		if err := yaml.Unmarshal(raw, &cfg); err != nil {
-			log.Fatalf("Error reading config  %s: %v", olmFileName, err)
-		}
+	if err := yaml.Unmarshal(raw, &cfg); err != nil {
+		log.Fatalf("Error reading config %s: %v", filePath, err)
+	}
 
-		var bundles = cfg.BundleVersions
-		var channels = cfg.Channels
+	var minVersions = cfg.MinVersion
 
-		minVersion := cfg.MinVersion
-		if minVersion == "" {
-			minVersion = "v1.15.0"
-		}
+	bundleTags := findBundleTags("v1.14.0")
+
+	bundleImageMap := make(map[string]BundleImage)
+
+	for ocpVersion, minVersion := range minVersions {
+
 		if !strings.HasPrefix(minVersion, "v") {
 			minVersion = "v" + minVersion
 		}
+		log.Printf("Generating OLM template for  OCP version %s, Min OSP Version: %s", ocpVersion, minVersion)
+
+		parsedMinVersion := parseVersion(minVersion)
+		bundles := cfg.BundleImages
+		channels := cfg.Channels
 
 		for _, b := range cfg.Bundles {
-			updateBundleImage(&b)
-			bundleVersion := BundleVersion{parseVersion(b.Version), b.Image}
-			channel := channelName(bundleVersion)
+			parsedBundleversion := parseVersion(b.Version)
+			if parsedBundleversion.Compare(parsedMinVersion) < 0 {
+				log.Printf("Skipping bundle version %s because it is out of date on OCP : %s", b.Version, ocpVersion)
+				continue
+			}
+			bundleImage, ok := bundleImageMap[parsedBundleversion.Raw]
+			if !ok {
+				bundleImageUrl := b.Image
+				if bundleImageUrl == "" {
+					bundleImageUrl = getBundleImage(b.Tag)
+				}
+				bundleImage = BundleImage{parsedBundleversion, bundleImageUrl}
+				bundleImageMap[parsedBundleversion.Raw] = bundleImage
+			}
+
+			channel := channelName(bundleImage)
 			if !slices.Contains(channels, channel) {
 				channels = append(channels, channel)
 			}
-			bundles = append(bundles, bundleVersion)
+			bundles = append(bundles, bundleImage)
 		}
-		for _, tag := range findBundleTags(minVersion) {
-			bundleImage := getBundleImage(tag)
-			bundleVersion := BundleVersion{parseVersion(strings.Trim(tag, "v")), bundleImage}
-			channel := channelName(bundleVersion)
+		for _, tag := range bundleTags {
+			parsedBundleversion := parseVersion(strings.Trim(tag, "v"))
+			if parsedBundleversion.Compare(parsedMinVersion) < 0 {
+				continue
+			}
+
+			bundleImage, ok := bundleImageMap[parsedBundleversion.Raw]
+			if !ok {
+				bundleImageUrl := getBundleImage(tag)
+				bundleImage = BundleImage{parsedBundleversion, bundleImageUrl}
+				bundleImageMap[parsedBundleversion.Raw] = bundleImage
+			}
+
+			channel := channelName(bundleImage)
 			if !slices.Contains(channels, channel) {
 				channels = append(channels, channel)
 			}
-			if !slices.Contains(bundles, bundleVersion) {
-				bundles = append(bundles, bundleVersion)
+			if !slices.Contains(bundles, bundleImage) {
+				bundles = append(bundles, bundleImage)
 			}
 		}
 
@@ -100,96 +108,71 @@ func main() {
 			return bundles[i].Version.Compare(bundles[j].Version) < 0
 		})
 
-		fmt.Printf("Channels: %s\n", strings.Join(channels, ", "))
-		for _, b := range bundles {
-			fmt.Printf("  %s\n", b.Version.Raw)
+		log.Printf("Supported Channels on OCP: %s: %s\n", ocpVersion, strings.Join(channels, ", "))
+
+		// Build output template
+		out := Template{
+			Schema:  "olm.template.basic",
+			Entries: []interface{}{},
 		}
 
-		cfg.BundleVersions = bundles
-		cfg.Channels = channels
-
-		// Write to olm.yaml
-		olmFile := createFile(olmFileName)
-		defer olmFile.Close()
-		encoder := yaml.NewEncoder(olmFile)
-		encoder.SetIndent(2)
-
-		err = encoder.Encode(cfg)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	var bundles = cfg.BundleVersions
-	var channels = cfg.Channels
-
-	// Build output template
-	out := Template{
-		Schema:  "olm.template.basic",
-		Entries: []interface{}{},
-	}
-
-	// Add package entry
-	out.Entries = append(out.Entries, PackageEntry{
-		Schema:         "olm.package",
-		Name:           cfg.Package,
-		DefaultChannel: cfg.DefaultChannel,
-		Icon: &Icon{
-			Base64Data: cfg.Base64data,
-			MediaType:  "image/png",
-		},
-	})
-
-	// Add latest channel
-	allEntries := buildAllEntries(cfg.Package, bundles)
-
-	out.Entries = append(out.Entries, buildChannel(cfg.Package, "latest", allEntries))
-	// Add each minor channel
-	for _, channelName := range channels {
-		out.Entries = append(out.Entries, buildChannel(cfg.Package, channelName, allEntries))
-	}
-
-	// Add bundle entries
-	for _, b := range bundles {
-		out.Entries = append(out.Entries, Bundle{
-			Schema: "olm.bundle",
-			Name:   fmt.Sprintf("%s.v%s", cfg.Package, b.Version.Raw),
-			Image:  b.Image,
+		// Add package entry
+		out.Entries = append(out.Entries, PackageEntry{
+			Schema:         "olm.package",
+			Name:           cfg.Package,
+			DefaultChannel: cfg.DefaultChannel,
+			Icon: &Icon{
+				Base64Data: cfg.Base64data,
+				MediaType:  "image/png",
+			},
 		})
+
+		// Add latest channel
+		allEntries := buildAllEntries(cfg.Package, bundles)
+
+		out.Entries = append(out.Entries, buildChannel(cfg.Package, "latest", allEntries))
+		// Add each minor channel
+		for _, channelName := range channels {
+			out.Entries = append(out.Entries, buildChannel(cfg.Package, channelName, allEntries))
+		}
+
+		// Add bundle entries
+		for _, b := range bundles {
+			out.Entries = append(out.Entries, Bundle{
+				Schema: "olm.bundle",
+				Name:   fmt.Sprintf("%s.v%s", cfg.Package, b.Version.Raw),
+				Image:  b.Image,
+			})
+		}
+
+		// Output JSON
+		// Create file
+		f := createFile(filepath.Join(outputDir, ocpVersion, outputFile))
+		log.Println("Writing catalog to output file:", f.Name())
+		defer f.Close()
+		enc := json.NewEncoder(f)
+		enc.SetIndent("", "  ")
+		enc.SetEscapeHTML(false)
+		enc.Encode(out)
+
+		log.Println("Catalog Template file written to:", f.Name())
+
+		err := f.Close()
+		if err != nil {
+			log.Fatal("could not close catalog file:"+outputFile, err)
+		}
 	}
-
-	// Output JSON
-	// Open file
-	log.Println("Writing catalog to output file:", outputFile)
-	// Create file
-	f := createFile(outputFile)
-	defer f.Close()
-	enc := json.NewEncoder(f)
-	enc.SetIndent("", "  ")
-	enc.SetEscapeHTML(false)
-	enc.Encode(out)
-
-	log.Println("Catalog Template file written to:", outputFile)
-
-	err := f.Close()
-	if err != nil {
-		log.Fatal("could not close catalog file:"+outputFile, err)
-	}
-}
-
-func generateBundles() {
-
 }
 
 // Input Configuration Struct
 type Config struct {
-	Package        string          `yaml:"package"`
-	Base64data     string          `yaml:"base64data"`
-	DefaultChannel string          `yaml:"defaultChannel"`
-	Bundles        []BundleConfig  `yaml:"bundles"`
-	BundleVersions []BundleVersion `yaml:"bundleVersions"`
-	Channels       []string        `yaml:"channels"`
-	MinVersion     string          `yaml:"minVersion"`
+	Package        string            `yaml:"package"`
+	Base64data     string            `yaml:"base64data"`
+	DefaultChannel string            `yaml:"defaultChannel"`
+	Bundles        []BundleConfig    `yaml:"bundles"`
+	BundleImages   []BundleImage     `yaml:"bundleImages"`
+	Channels       []string          `yaml:"channels"`
+	MinVersion     map[string]string `yaml:"minVersion"`
 }
 
 type BundleConfig struct {
@@ -234,7 +217,7 @@ type Bundle struct {
 	Name   string `json:"name"`
 	Image  string `json:"image"`
 }
-type BundleVersion struct {
+type BundleImage struct {
 	Version Version `json:"version"`
 	Image   string  `json:"image"`
 }
@@ -281,7 +264,7 @@ func (v Version) Compare(other Version) int {
 	return strings.Compare(v.Suffix, other.Suffix)
 }
 
-func buildAllEntries(pkg string, bundles []BundleVersion) map[string][]ChannelEntry {
+func buildAllEntries(pkg string, bundles []BundleImage) map[string][]ChannelEntry {
 	var entries = make(map[string][]ChannelEntry)
 	for i, b := range bundles {
 
@@ -314,7 +297,7 @@ func buildAllEntries(pkg string, bundles []BundleVersion) map[string][]ChannelEn
 
 }
 
-func channelName(b BundleVersion) string {
+func channelName(b BundleImage) string {
 	return fmt.Sprintf("pipelines-%d.%d", b.Version.Major, b.Version.Minor)
 }
 
@@ -359,7 +342,7 @@ func findBundleTags(minVersion string) []string {
 
 		}
 	}
-	fmt.Println("found bundle tags:", result)
+	log.Println("found bundle tags:", result)
 	return result
 }
 
@@ -382,34 +365,6 @@ func getBundleImage(tag string) string {
 	digestImage := fmt.Sprintf("%s@%s", ref.Context().Name(), desc.Digest.String())
 	//log.Printf("fetched image %s:%s", tag, digestImage)
 	return digestImage
-}
-
-func updateBundleImage(b *BundleConfig) {
-	if !strings.Contains(b.Image, "@sha256") {
-		if b.Tag == "" {
-			b.Tag = "v" + b.Version
-		}
-		inputImage := "registry.redhat.io/openshift-pipelines/pipelines-operator-bundle:" + b.Tag
-		ref, err := name.ParseReference(inputImage)
-		if err != nil {
-			log.Fatalf("failed to parse image name: %v", err)
-		}
-
-		// 2. Fetch the descriptor from the remote registry
-		// This uses your local docker/podman credentials automatically
-		desc, err := remote.Get(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
-		if err != nil {
-			log.Fatalf("failed to fetch image descriptor: %v", err)
-		}
-
-		// 3. Construct the new string using the digest
-		// desc.Digest contains the sha256 hash
-		digestImage := fmt.Sprintf("%s@%s", ref.Context().Name(), desc.Digest.String())
-
-		fmt.Printf("Original: %s\n", inputImage)
-		fmt.Printf("Resolved: %s\n", digestImage)
-		b.Image = digestImage
-	}
 }
 
 func createFile(filename string) *os.File {
