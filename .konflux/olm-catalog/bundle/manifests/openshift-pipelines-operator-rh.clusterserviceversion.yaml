@@ -19,7 +19,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.20.0 <5.0.5-848'
+    olm.skipRange: '>=1.20.0 <5.0.5-849'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonschedulers.operator.tekton.dev","tektonmulticlusterproxyaaes.operator.tekton.dev","syncerservices.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
@@ -31,7 +31,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v5.0.5-848
+  name: openshift-pipelines-operator-rh.v5.0.5-849
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -1323,7 +1323,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 5.0.5-848
+                        value: 5.0.5-849
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1389,17 +1389,17 @@ spec:
                       - name: IMAGE_PIPELINES_ARG__SHELL_IMAGE
                         value: registry.redhat.io/openshift-pipelines/pipelines-entrypoint-rhel10@sha256:8208f432940ce5003d9b35dc86ac0149c16bf13f1030de6f43c5afe21aa2b089
                       - name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CONTROLLER
-                        value: registry.redhat.io/openshift-pipelines/pipelines-triggers-controller-rhel10@sha256:f69af1d98c24d2775ddb07812026dbff04b360f9ffa19ed96c32d16125598e5a
+                        value: registry.redhat.io/openshift-pipelines/pipelines-triggers-controller-rhel10@sha256:f355633c45a2251c0131dfd0a54f435f54f8291d12049c6305f1c63d345e1371
                       - name: IMAGE_TRIGGERS_WEBHOOK
                         value: registry.redhat.io/openshift-pipelines/pipelines-triggers-webhook-rhel10@sha256:27a69f84273dd65eab3929ad1e22de74937491a5da03d5d13eca7525a4e26ad0
                       - name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CORE_INTERCEPTORS
                         value: registry.redhat.io/openshift-pipelines/pipelines-triggers-core-interceptors-rhel10@sha256:b75cde69764f8c569b5b3673a347002d6ea548e4b867b6aad6a290f5ce47389b
                       - name: IMAGE_TRIGGERS_ARG__EL_IMAGE
-                        value: registry.redhat.io/openshift-pipelines/pipelines-triggers-eventlistenersink-rhel10@sha256:00c0663a24b94899ae44dcd397db8dd4308ba393a19f8f3130a28066059c9f0a
+                        value: registry.redhat.io/openshift-pipelines/pipelines-triggers-eventlistenersink-rhel10@sha256:93b06c7d04b6401220bf3d0b321a93cc969bd903bf3653a4d46322c466168c9a
                       - name: IMAGE_ADDONS_KN
                         value: registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:aee19896d17a431ba980564fdb73ef08ad1512f586fbdf954cecef6258f7a8df
                       - name: IMAGE_ADDONS_OPC
-                        value: registry.redhat.io/openshift-pipelines/pipelines-opc-rhel10@sha256:daeb442a926738f2ac9c44591dff208700cec902d612553b44cb7e5c63a87a34
+                        value: registry.redhat.io/openshift-pipelines/pipelines-opc-rhel10@sha256:71a96472d7127641aa7e5c9bec8b535b02033a755d4edc7f862c9eb0c9ad02ac
                       - name: IMAGE_ADDONS_SKOPEO_RESULTS
                         value: registry.redhat.io/rhel9/skopeo@sha256:300c5f85ecb9d518a34cc69b7c66621c7ad8712a89e040dd5eb019ecb3d6cadb
                       - name: IMAGE_ADDONS_BUILD
@@ -1495,7 +1495,7 @@ spec:
                       - name: PROFILING_PORT
                         value: '9009'
                       - name: VERSION
-                        value: 5.0.5-848
+                        value: 5.0.5-849
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: CONFIG_LEADERELECTION_NAME
@@ -1557,7 +1557,7 @@ spec:
                         value: tekton.dev/operator
                       - name: PLATFORM
                         value: openshift
-                    image: registry.redhat.io/openshift-pipelines/pipelines-operator-webhook-rhel10@sha256:92e612a2a9df0adcf693645d70846f84d0b4d835e67ad24e543d63f94cab4486
+                    image: registry.redhat.io/openshift-pipelines/pipelines-operator-webhook-rhel10@sha256:4e8b5769f0a197371f49d8391a98dcc295c41f94325f669193b1f36cb191ad3a
                     name: tekton-operator-webhook
                     ports:
                       - containerPort: 8443
@@ -1646,19 +1646,19 @@ spec:
       name: IMAGE_PIPELINES_ARG__NOP_IMAGE
     - image: registry.redhat.io/openshift-pipelines/pipelines-entrypoint-rhel10@sha256:8208f432940ce5003d9b35dc86ac0149c16bf13f1030de6f43c5afe21aa2b089
       name: IMAGE_PIPELINES_ARG__SHELL_IMAGE
-    - image: registry.redhat.io/openshift-pipelines/pipelines-triggers-controller-rhel10@sha256:f69af1d98c24d2775ddb07812026dbff04b360f9ffa19ed96c32d16125598e5a
+    - image: registry.redhat.io/openshift-pipelines/pipelines-triggers-controller-rhel10@sha256:f355633c45a2251c0131dfd0a54f435f54f8291d12049c6305f1c63d345e1371
       name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CONTROLLER
     - image: registry.redhat.io/openshift-pipelines/pipelines-triggers-webhook-rhel10@sha256:27a69f84273dd65eab3929ad1e22de74937491a5da03d5d13eca7525a4e26ad0
       name: IMAGE_TRIGGERS_WEBHOOK
     - image: registry.redhat.io/openshift-pipelines/pipelines-triggers-core-interceptors-rhel10@sha256:b75cde69764f8c569b5b3673a347002d6ea548e4b867b6aad6a290f5ce47389b
       name: IMAGE_TRIGGERS_TEKTON_TRIGGERS_CORE_INTERCEPTORS
-    - image: registry.redhat.io/openshift-pipelines/pipelines-triggers-eventlistenersink-rhel10@sha256:00c0663a24b94899ae44dcd397db8dd4308ba393a19f8f3130a28066059c9f0a
+    - image: registry.redhat.io/openshift-pipelines/pipelines-triggers-eventlistenersink-rhel10@sha256:93b06c7d04b6401220bf3d0b321a93cc969bd903bf3653a4d46322c466168c9a
       name: IMAGE_TRIGGERS_ARG__EL_IMAGE
     - image: registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:aee19896d17a431ba980564fdb73ef08ad1512f586fbdf954cecef6258f7a8df
       name: IMAGE_ADDONS_PARAM_KN_IMAGE
     - image: registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:aee19896d17a431ba980564fdb73ef08ad1512f586fbdf954cecef6258f7a8df
       name: IMAGE_ADDONS_KN
-    - image: registry.redhat.io/openshift-pipelines/pipelines-opc-rhel10@sha256:daeb442a926738f2ac9c44591dff208700cec902d612553b44cb7e5c63a87a34
+    - image: registry.redhat.io/openshift-pipelines/pipelines-opc-rhel10@sha256:71a96472d7127641aa7e5c9bec8b535b02033a755d4edc7f862c9eb0c9ad02ac
       name: IMAGE_ADDONS_OPC
     - image: registry.redhat.io/rhel9/skopeo@sha256:300c5f85ecb9d518a34cc69b7c66621c7ad8712a89e040dd5eb019ecb3d6cadb
       name: IMAGE_ADDONS_SKOPEO_COPY
@@ -1694,7 +1694,7 @@ spec:
       name: IMAGE_ADDONS_TKN_CLI_SERVE
     - image: registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel10@sha256:a7fe54dee0c8ec90a04c6c0dd6a43450c1956fd7dee449c5458277e30577f147
       name: IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG
-    - image: registry.redhat.io/openshift-pipelines/pipelines-operator-webhook-rhel10@sha256:92e612a2a9df0adcf693645d70846f84d0b4d835e67ad24e543d63f94cab4486
+    - image: registry.redhat.io/openshift-pipelines/pipelines-operator-webhook-rhel10@sha256:4e8b5769f0a197371f49d8391a98dcc295c41f94325f669193b1f36cb191ad3a
       name: TEKTON_OPERATOR_WEBHOOK
     - image: registry.redhat.io/openshift-pipelines/pipelines-chains-controller-rhel10@sha256:339f3c02ab482544bb593236655ea3d8c843c35f66f956a3e10ea6b176af7d36
       name: IMAGE_CHAINS_TEKTON_CHAINS_CONTROLLER
@@ -1738,5 +1738,5 @@ spec:
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
     - image: registry.redhat.io/openshift-pipelines/pipelines-console-plugin-pf5-rhel10@sha256:f642ff1796337ab300f5ce5ee53b229f5dd0f53b6a51e798ac8606e906883b2d
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN_LEGACY
-  replaces: openshift-pipelines-operator-rh.v5.0.5-847
-  version: 5.0.5-848
+  replaces: openshift-pipelines-operator-rh.v5.0.5-848
+  version: 5.0.5-849
