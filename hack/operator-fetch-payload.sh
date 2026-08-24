@@ -74,6 +74,12 @@ yq e -i 'del(.metadata.annotations["createdAt"])' \
 yq e -i '.metadata.annotations["operators.openshift.io/valid-subscription"] = "[\"OpenShift Container Platform\", \"OpenShift Platform Plus\"]"' \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
+# Remove TektonDashboard CRD (not shipped in OpenShift Pipelines)
+rm -f .konflux/olm-catalog/bundle/manifests/operator.tekton.dev_tektondashboards.yaml
+# Remove TektonDashboard from CSV owned CRDs
+yq e -i 'del(.spec.customresourcedefinitions.owned[] | select(.kind == "TektonDashboard"))' \
+   .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+
 
 # Update VERSION env variable to use ${VERSION=}
 yq e -i "(.spec.install.spec.deployments[] | select (.name == \"openshift-pipelines-operator\") | .spec.template.spec.containers[0].env[] | select (.name == \"VERSION\") | .value) = \"${CURRENT_VERSION}\"" \
