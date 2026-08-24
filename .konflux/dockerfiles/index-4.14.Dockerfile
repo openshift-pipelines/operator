@@ -18,7 +18,7 @@ LABEL \
     maintainer="pipelines-extcomm@redhat.com" \
     name="openshift-pipelines/pipelines-index-4.14" \
     operators.operatorframework.io.bundle.channel.default.v1="latest" \
-    operators.operatorframework.io.bundle.channels.v1="latest,pipelines-1.21" \
+    operators.operatorframework.io.bundle.channels.v1="latest,pipelines-1.23" \
     operators.operatorframework.io.bundle.manifests.v1="manifests/" \
     operators.operatorframework.io.bundle.mediatype.v1="registry+v1" \
     operators.operatorframework.io.bundle.metadata.v1="metadata/" \
