@@ -391,6 +391,35 @@ spec:
       operator: in
       values:
       - "false"
+  # TODO: Remove clair-scan once https://redhat.atlassian.net/browse/SRVKP-13912 is resolved
+  # clair-scan is added as a workaround for multi-arch builds since roxctl-scan does not support multi-arch at the moment
+  - matrix:
+      params:
+      - name: image-platform
+        value:
+        - $(params.build-platforms)
+    name: clair-scan
+    params:
+    - name: image-digest
+      value: $(tasks.build-image-index.results.IMAGE_DIGEST)
+    - name: image-url
+      value: $(tasks.build-image-index.results.IMAGE_URL)
+    runAfter:
+    - build-image-index
+    taskRef:
+      params:
+      - name: name
+        value: clair-scan
+      - name: bundle
+        value: quay.io/konflux-ci/tekton-catalog/task-clair-scan:0.4.0@sha256:dcc6ca58d3ec03d05ce21c03b4f51b58cac9878caa932ad06a9fdf4bc422aaab
+      - name: kind
+        value: task
+      resolver: bundles
+    when:
+    - input: $(params.skip-checks)
+      operator: in
+      values:
+      - "false"
   - name: sast-snyk-check
     params:
     - name: image-digest
