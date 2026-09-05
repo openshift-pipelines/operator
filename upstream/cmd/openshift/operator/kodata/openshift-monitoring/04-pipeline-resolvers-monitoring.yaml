@@ -1,5 +1,5 @@
 ---
-# Copyright 2025 The Tekton Authors
+# Copyright 2026 The Tekton Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,20 +17,19 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: webhook
+    app: resolvers
   annotations:
     networkoperator.openshift.io/ignore-errors: ""
-  name: openshift-pipelines-webhook-monitor
+  name: openshift-pipelines-resolvers-monitor
   namespace: tekton-pipelines
 spec:
   endpoints:
     - interval: 10s
       port: http-metrics
-      scheme: http
   jobLabel: app
   namespaceSelector:
     matchNames:
       - openshift-pipelines
   selector:
     matchLabels:
-      app: tekton-pipelines-webhook
+      app: tekton-pipelines-remote-resolvers
