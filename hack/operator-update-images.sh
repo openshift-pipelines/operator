@@ -49,6 +49,8 @@ done
 REFERENCE=$(update_image_reference "$(yq e '.images[] | select(.name == "OPENSHIFT_PIPELINES_OPERATOR_LIFECYCLE") | .value' project.yaml)")
 if [ $? -ne 1 ]; then
   yq eval --inplace "(.spec.install.spec.deployments[] | select(.name == \"openshift-pipelines-operator\")| .spec.template.spec.containers[].image) = \"${REFERENCE}\"" $CSV_FILE
+  # Update containerImage annotation with the full SHA
+  yq eval --inplace "(.metadata.annotations.containerImage) = \"${REFERENCE}\"" $CSV_FILE
 fi
 
 REFERENCE=$(update_image_reference "$(yq e '.images[] | select(.name == "TEKTON_OPERATOR_WEBHOOK") | .value' project.yaml)")
