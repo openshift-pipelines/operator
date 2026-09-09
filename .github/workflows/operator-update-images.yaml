@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - next
+      - main
       - release-v*
     paths:
       - project.yaml
@@ -18,12 +19,9 @@ on:
           - devel
           - staging
           - production
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
-  update-bundle-images:
+  update-csv:
     runs-on: ubuntu-latest
     if: github.repository_owner == 'openshift-pipelines' # do not run this elsewhere
     permissions:
@@ -33,23 +31,19 @@ jobs:
       - name: Checkout the current repo
         uses: actions/checkout@v5
 
-      - name: update-bundle
+      # operator-update-images.sh runs `skopeo inspect` against the target
+      # registry, so it needs pull credentials.
+      - name: Configure Docker authentication
+        env:
+          DOCKER_CONFIG: /home/runner/.docker
+          DOCKER_JSON: ${{ secrets.DOCKER_REGISTRY_SECRET }}
         run: |
-          # Operator SDK
-          export OPERATOR_SDK_DL_URL=https://github.com/operator-framework/operator-sdk/releases/download/v1.37.0/operator-sdk_linux_amd64
-          curl -LO ${OPERATOR_SDK_DL_URL}
-          chmod +x operator-sdk_linux_amd64 && sudo mv operator-sdk_linux_amd64 /usr/local/bin/operator-sdk
-          
-          operator-sdk version
-          
-          # Python with requirements (yaml here)
-          # We could migrate to go...
-          python3 -m venv sync-sources
-          source sync-sources/bin/activate
-          pip3 install -r requirements.txt
-          
+          echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json
+
+      - name: update-image-references
+        run: |
           # Update operator's payload and stuff
-          make update-payload-and-reference ENVIRONMENT=${{github.event.inputs.environment}} 
+          make ENVIRONMENT=${{github.event.inputs.environment}} update-reference  
 
       - name: Commit new changes
         run: |
@@ -72,12 +66,13 @@ jobs:
           
           git push -f origin ${SOURCE_BRANCH}
           pr_list=$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json number)
+          echo "Waiting for 10s before updating PRs"
+          sleep 10
           if [ "$(echo $pr_list | jq length)" = "0" ]; then
             echo "creating PR..."
             gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
           else
             echo "a PR already exists, editing..."
-            sleep 10
             gh pr edit $(echo $pr_list | jq .[0].number) --add-label=lgtm  --add-label=approved 
           fi
         env:

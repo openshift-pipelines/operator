@@ -1,31 +1,32 @@
 name: render-olm-catalog
 
 on:
-  pull_request:
-    branches:
-      - release-v*
-      - next
-    paths:
-      - olm/**
-      - .github/workflows/render-olm-catalog.yaml
   push:
     branches:
       - release-v*
       - next
     paths:
-      - nightly-bundle.yaml
-      - olm/**
       - bundle.yaml
+      - olm/**
+      - .github/workflows/render-olm-catalog.yaml
+  pull_request:
+    branches:
+      - release-v*
+      - next
+    paths:
+      - bundle.yaml
+      - olm/**
       - .github/workflows/render-olm-catalog.yaml
   workflow_dispatch:
     inputs:
       environment:
         description: 'Select Environment'
-        required: true
-        default: 'devel'
+        required: false
         type: choice
         options:
           - devel
+          - staging
+          - production
 concurrency:
   group: render-${{ github.ref }}-${{ github.run_id }}
   cancel-in-progress: false
@@ -45,6 +46,28 @@ jobs:
           DOCKER_JSON: ${{ secrets.DOCKER_REGISTRY_SECRET }}
         run: |
           echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json
+      - name: Configure registry mirrors
+        run: |
+          set -x
+          CONFIG_DIR=$HOME/.config/containers/registries.conf.d
+          sudo mkdir -p $CONFIG_DIR
+
+          cat <<EOF | sudo tee $CONFIG_DIR/mirror.conf
+          [[registry]]
+          location = "registry.redhat.io/openshift-pipelines"
+
+          [[registry.mirror]]
+          location = "quay.io/redhat-user-workloads/tekton-ecosystem-tenant"
+
+          [[registry]]
+          location = "registry.stage.redhat.io/openshift-pipelines"
+
+          [[registry.mirror]]
+          location = "quay.io/redhat-user-workloads/tekton-ecosystem-tenant"
+          EOF
+
+          cat $CONFIG_DIR/mirror.conf
+
       - name: Generate OLM Bundles
         run: |
           curl -sSfLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/v1.47.0/linux-amd64-opm"
@@ -57,11 +80,18 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           command: |
-            ./hack/render-catalog.sh
+            docker run --platform linux/amd64 --rm \
+              -e REGISTRY_AUTH_FILE=/root/.docker/config.json \
+              -v "$HOME/.config/containers:/root/.config/containers" \
+              -v "$HOME/.docker/config.json:/root/.docker/config.json:ro" \
+              -v "$(pwd):/work" \
+              -w /work \
+              quay.io/openshift-pipeline/ci \
+              ./hack/render-catalog.sh
       #Update the current PR with generated artifacts
       - name: Commit generated catalogs
         uses: stefanzweifel/git-auto-commit-action@v5
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         with:
           commit_message: "chore: auto-generate OCP catalog JSONs"
           file_pattern: '.konflux/olm-catalog/index/ olm/'
@@ -78,8 +108,8 @@ jobs:
           git add .konflux/olm-catalog/index/ olm/
           
           if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
-          echo "No change, exiting"
-          exit 0
+            echo "No change, exiting"
+            exit 0
           fi
           
           git commit -F- <<EOF
@@ -88,8 +118,8 @@ jobs:
           
           git push -f origin ${SOURCE_BRANCH}
           if [ "$(gh pr list --base ${BASE_BRANCH} --head ${SOURCE_BRANCH} --json url --jq 'length')" = "0" ]; then
-          echo "creating PR..."
-          gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
+            echo "creating PR..."
+            gh pr create -B ${BASE_BRANCH} -H ${SOURCE_BRANCH} --label=automated --label=lgtm --label=approved  --fill
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
