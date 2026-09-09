@@ -1,12 +1,13 @@
-  log() {
-      local level=$1
-      shift
-      local message=$@
-      local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+log() {
+    local level=$1
+    shift
+    local message="$*"
+    local timestamp
+    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
 
-      # Format: [YYYY-MM-DD HH:MM:SS] [LEVEL] Message
-      echo "[$timestamp] [$level] $message" 
-  }
+    # Format: [YYYY-MM-DD HH:MM:SS] [LEVEL] Message
+    echo "[$timestamp] [$level] $message"
+}
   function update_bundle_image() {
     environment=${1:-"devel"}
     BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -47,7 +48,9 @@
      yq -i '.bundles += [{"version": env(BUNDLE_VERSION), "image": env(BUNDLE_IMAGE)}]' "$FILE"
    fi
 
-
+   # Only the bundle we just wrote should carry an image reference. Drop any
+   # older generated entries; historical entries pinned by tag are untouched.
+   yq -i 'del(.bundles[] | select(has("image") and .version != env(BUNDLE_VERSION)))' "$FILE"
 }
 
 function target_registry() {
@@ -75,13 +78,16 @@ function render_catalog() {
     RENDERED_CATALOG_JSON=$3
     NUMERIC_VERSION=${VERSION#v} # Removes "v" prefix
 
-    if (( $(echo "$NUMERIC_VERSION >= 4.17" | bc -l) )); then
-        opm alpha render-template basic $CATALOG_JSON --migrate-level=bundle-object-to-csv-metadata > $RENDERED_CATALOG_JSON
+    if (( $(awk -v ver="$NUMERIC_VERSION" 'BEGIN { print (ver >= 4.17) }') )); then
+        opm alpha render-template basic $CATALOG_JSON --migrate-level=bundle-object-to-csv-metadata > $RENDERED_CATALOG_JSON &
     else
-      opm alpha render-template basic $CATALOG_JSON > $RENDERED_CATALOG_JSON
+      opm alpha render-template basic $CATALOG_JSON > $RENDERED_CATALOG_JSON &
+    fi
+    OPM_PID=$!
+    if ! wait "$OPM_PID"; then
+        log "ERROR" "Render template for $VERSION failed"
+        return 1
     fi
     log "INFO" "Render template for $VERSION Done"
 }
-
-
 
