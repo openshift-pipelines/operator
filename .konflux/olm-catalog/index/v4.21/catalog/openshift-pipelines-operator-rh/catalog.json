@@ -36432,7 +36432,7 @@
     "schema": "olm.bundle",
     "name": "openshift-pipelines-operator-rh.v1.24.0",
     "package": "openshift-pipelines-operator-rh",
-    "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-operator-bundle@sha256:db28fb3fd5390107780364896cc98e4445e783517318a849654226ee3fd27273",
+    "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-operator-bundle@sha256:1b00848f03d7a2e5e60713b3b60ca287141fa8d41c7a96e44f009d0671d829f9",
     "properties": [
         {
             "type": "olm.gvk",
@@ -37160,35 +37160,11 @@
     ],
     "relatedImages": [
         {
-            "name": "IMAGE_ADDONS_GIT_CLONE",
-            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:fe655a00a6fe9f590272febd7008728dcba1f25d15462f02e51f33edfc748980"
-        },
-        {
-            "name": "IMAGE_ADDONS_PREPARE_AND_RUN",
-            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:fe655a00a6fe9f590272febd7008728dcba1f25d15462f02e51f33edfc748980"
-        },
-        {
-            "name": "IMAGE_PIPELINES_ARG__GIT_IMAGE",
-            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:fe655a00a6fe9f590272febd7008728dcba1f25d15462f02e51f33edfc748980"
-        },
-        {
-            "name": "IMAGE_ADDONS_PARAM_GITINITIMAGE",
-            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:fe655a00a6fe9f590272febd7008728dcba1f25d15462f02e51f33edfc748980"
-        },
-        {
-            "name": "IMAGE_ADDONS_GIT_RUN",
-            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:fe655a00a6fe9f590272febd7008728dcba1f25d15462f02e51f33edfc748980"
-        },
-        {
-            "name": "IMAGE_ADDONS_REPORT",
-            "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:fe655a00a6fe9f590272febd7008728dcba1f25d15462f02e51f33edfc748980"
-        },
-        {
-            "name": "IMAGE_ADDONS_KN",
+            "name": "IMAGE_ADDONS_PARAM_KN_IMAGE",
             "image": "registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:aee19896d17a431ba980564fdb73ef08ad1512f586fbdf954cecef6258f7a8df"
         },
         {
-            "name": "IMAGE_ADDONS_PARAM_KN_IMAGE",
+            "name": "IMAGE_ADDONS_KN",
             "image": "registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:aee19896d17a431ba980564fdb73ef08ad1512f586fbdf954cecef6258f7a8df"
         },
         {
@@ -37228,12 +37204,16 @@
             "image": "registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:798e0e860df8e3ca1ff5f8aa796940d6dbd4b739ccfc35c6f4c9bc046d5f0c12"
         },
         {
+            "name": "IMAGE_ADDONS_MAVEN_GOALS",
+            "image": "registry.redhat.io/ubi9/openjdk-17@sha256:b27abdd00b14fd8fa2d96feb39b9903ee5a969c6e060b5471c1d99fc803f803d"
+        },
+        {
             "name": "IMAGE_ADDONS_PARAM_MAVEN_IMAGE",
             "image": "registry.redhat.io/ubi9/openjdk-17@sha256:b27abdd00b14fd8fa2d96feb39b9903ee5a969c6e060b5471c1d99fc803f803d"
         },
         {
-            "name": "IMAGE_ADDONS_MAVEN_GOALS",
-            "image": "registry.redhat.io/ubi9/openjdk-17@sha256:b27abdd00b14fd8fa2d96feb39b9903ee5a969c6e060b5471c1d99fc803f803d"
+            "name": "IMAGE_ADDONS_MAVEN_GENERATE",
+            "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:7fbeae18dc9476399f565e68255f602a3374ea8614ba3d14843565131a13ff93"
         },
         {
             "name": "IMAGE_ADDONS_PREPARE",
@@ -37244,19 +37224,15 @@
             "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:7fbeae18dc9476399f565e68255f602a3374ea8614ba3d14843565131a13ff93"
         },
         {
-            "name": "IMAGE_ADDONS_MAVEN_GENERATE",
-            "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:7fbeae18dc9476399f565e68255f602a3374ea8614ba3d14843565131a13ff93"
-        },
-        {
             "name": "IMAGE_ADDONS_LOAD_SCRIPTS",
             "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:7fbeae18dc9476399f565e68255f602a3374ea8614ba3d14843565131a13ff93"
         },
         {
-            "name": "IMAGE_ADDONS_CACHE_FETCH",
+            "name": "IMAGE_ADDONS_CACHE_UPLOAD",
             "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-cache-rhel9@sha256:9a02f3d6abed82f8b613ddda83ff18c8a46f9791ada6cf0f7a07a57d3e9f0dd8"
         },
         {
-            "name": "IMAGE_ADDONS_CACHE_UPLOAD",
+            "name": "IMAGE_ADDONS_CACHE_FETCH",
             "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-cache-rhel9@sha256:9a02f3d6abed82f8b613ddda83ff18c8a46f9791ada6cf0f7a07a57d3e9f0dd8"
         },
         {
@@ -37288,16 +37264,40 @@
             "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-controller-rhel9@sha256:6ec409e9c5e1d0d841d4c7e595e8477b32ffb585d07c3116f78fec96ad4fbb62"
         },
         {
-            "name": "IMAGE_PIPELINES_ARG__SHELL_IMAGE",
+            "name": "IMAGE_PIPELINES_ARG__ENTRYPOINT_IMAGE",
             "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-entrypoint-rhel9@sha256:5a19f54a57876f69c87e6a5cbd175eb7ce077ce1fe75f8ecd6e6e009fb4c3aaa"
         },
         {
-            "name": "IMAGE_PIPELINES_ARG__ENTRYPOINT_IMAGE",
+            "name": "IMAGE_PIPELINES_ARG__SHELL_IMAGE",
             "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-entrypoint-rhel9@sha256:5a19f54a57876f69c87e6a5cbd175eb7ce077ce1fe75f8ecd6e6e009fb4c3aaa"
         },
         {
             "name": "IMAGE_PIPELINES_TEKTON_EVENTS_CONTROLLER",
             "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-events-rhel9@sha256:47a88a731bc1faa6f359af7082e94ba68f46acf9b33e25b49b71df2bc600f902"
+        },
+        {
+            "name": "IMAGE_ADDONS_GIT_RUN",
+            "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:0ee41f12d8cf1f6f14f5518a4a02ca54a3e32d5c773f674f0f528f5303da7810"
+        },
+        {
+            "name": "IMAGE_PIPELINES_ARG__GIT_IMAGE",
+            "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:0ee41f12d8cf1f6f14f5518a4a02ca54a3e32d5c773f674f0f528f5303da7810"
+        },
+        {
+            "name": "IMAGE_ADDONS_PARAM_GITINITIMAGE",
+            "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:0ee41f12d8cf1f6f14f5518a4a02ca54a3e32d5c773f674f0f528f5303da7810"
+        },
+        {
+            "name": "IMAGE_ADDONS_REPORT",
+            "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:0ee41f12d8cf1f6f14f5518a4a02ca54a3e32d5c773f674f0f528f5303da7810"
+        },
+        {
+            "name": "IMAGE_ADDONS_GIT_CLONE",
+            "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:0ee41f12d8cf1f6f14f5518a4a02ca54a3e32d5c773f674f0f528f5303da7810"
+        },
+        {
+            "name": "IMAGE_ADDONS_PREPARE_AND_RUN",
+            "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-git-init-rhel9@sha256:0ee41f12d8cf1f6f14f5518a4a02ca54a3e32d5c773f674f0f528f5303da7810"
         },
         {
             "name": "IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER",
@@ -37321,7 +37321,7 @@
         },
         {
             "name": "",
-            "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-operator-bundle@sha256:db28fb3fd5390107780364896cc98e4445e783517318a849654226ee3fd27273"
+            "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-operator-bundle@sha256:1b00848f03d7a2e5e60713b3b60ca287141fa8d41c7a96e44f009d0671d829f9"
         },
         {
             "name": "IMAGE_PIPELINES_PROXY",
@@ -37389,11 +37389,11 @@
         },
         {
             "name": "IMAGE_ADDONS_TKN_CLI_SERVE",
-            "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel9@sha256:9b633caea8e62822f1551e71df046ed560813ebde8cc6bd69c82aa304545ae41"
+            "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel9@sha256:308b8d5e79edda9fa5b4227a1a53ebe8c1bddd5f7de7420c75300168d764cfca"
         },
         {
             "name": "IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG",
-            "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel9@sha256:9b633caea8e62822f1551e71df046ed560813ebde8cc6bd69c82aa304545ae41"
+            "image": "registry.stage.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel9@sha256:308b8d5e79edda9fa5b4227a1a53ebe8c1bddd5f7de7420c75300168d764cfca"
         },
         {
             "name": "IMAGE_PIPELINES_ARG__SIDECARLOGRESULTS_IMAGE",
