@@ -79,14 +79,9 @@ function render_catalog() {
     NUMERIC_VERSION=${VERSION#v} # Removes "v" prefix
 
     if (( $(awk -v ver="$NUMERIC_VERSION" 'BEGIN { print (ver >= 4.17) }') )); then
-        opm alpha render-template basic $CATALOG_JSON --migrate-level=bundle-object-to-csv-metadata > $RENDERED_CATALOG_JSON &
+        opm alpha render-template basic $CATALOG_JSON --migrate-level=bundle-object-to-csv-metadata > $RENDERED_CATALOG_JSON
     else
-      opm alpha render-template basic $CATALOG_JSON > $RENDERED_CATALOG_JSON &
-    fi
-    OPM_PID=$!
-    if ! wait "$OPM_PID"; then
-        log "ERROR" "Render template for $VERSION failed"
-        return 1
+      opm alpha render-template basic $CATALOG_JSON > $RENDERED_CATALOG_JSON
     fi
     log "INFO" "Render template for $VERSION Done"
 }
