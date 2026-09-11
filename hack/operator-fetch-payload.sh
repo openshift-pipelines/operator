@@ -129,7 +129,11 @@ env UPSTREAM_VERSION_TAG="${UPSTREAM_VERSION_TAG}" yq e -i \
 # Remove label matchselector app
 yq e -i 'del(.spec.install.spec.deployments[0].spec.selector.matchLabels.app)' \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
-yq e -i 'del(.metadata.annotations["createdAt"])' \
+
+# Update createdAt annotation to current timestamp
+CREATED_AT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+env CREATED_AT_TIMESTAMP="${CREATED_AT_TIMESTAMP}" yq e -i \
+   '.metadata.annotations.createdAt = strenv(CREATED_AT_TIMESTAMP)' \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
 # Add valid-subscription annotation
@@ -149,12 +153,12 @@ yq e -i "(.spec.install.spec.deployments[].spec.template.spec.containers[].env[]
 SERVE_REF=$(yq e '.images[] | select(.name == "IMAGE_ADDONS_TKN_CLI_SERVE") | .value' project.yaml)
 
 env SERVE_REF="$SERVE_REF" yq e -i '
-(.spec.install.spec.deployments[].spec.template.spec.containers[].env[] 
+(.spec.install.spec.deployments[].spec.template.spec.containers[].env[]
   | select(.name == "IMAGE_ADDONS_TKN_CLI_SERVE")).value = strenv(SERVE_REF)' \
   .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
 env SERVE_REF="$SERVE_REF" yq e -i '
-(.spec.relatedImages[] 
+(.spec.relatedImages[]
   | select(.name == "IMAGE_ADDONS_TKN_CLI_SERVE")).image = strenv(SERVE_REF)' \
   .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
@@ -192,4 +196,3 @@ sed -i -E 's%LABEL com.redhat.openshift.versions=".*%LABEL com.redhat.openshift.
 # update channels in operator bundle dockerfile
 sed -i -E 's%LABEL operators.operatorframework.io.bundle.channels.v1=".*%LABEL operators.operatorframework.io.bundle.channels.v1="'latest,${CHANNEL_NAME}'"%' \
     .konflux/dockerfiles/bundle.Dockerfile
-
