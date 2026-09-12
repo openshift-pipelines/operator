@@ -19,16 +19,17 @@ package openshiftplatform
 import (
 	k8sInstallerSet "github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektoninstallerset"
 	openshiftManualApprovalGate "github.com/tektoncd/operator/pkg/reconciler/openshift/manualapprovalgate"
+	"github.com/tektoncd/operator/pkg/reconciler/openshift/namespacesync"
 	"github.com/tektoncd/operator/pkg/reconciler/openshift/openshiftpipelinesascode"
 	openshiftSyncerService "github.com/tektoncd/operator/pkg/reconciler/openshift/syncerservice"
 	openshiftAddon "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonaddon"
 	openshiftChain "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonchain"
 	openshiftConfig "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonconfig"
+	openshiftKueue "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonkueue"
 	openshiftMulticlusterProxyAAE "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonmulticlusterproxyaae"
 	openshiftPipeline "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonpipeline"
 	openshiftPruner "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonpruner"
 	openshiftResult "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonresult"
-	openshiftScheduler "github.com/tektoncd/operator/pkg/reconciler/openshift/tektonscheduler"
 	openshiftTrigger "github.com/tektoncd/operator/pkg/reconciler/openshift/tektontrigger"
 	"github.com/tektoncd/operator/pkg/reconciler/platform"
 	"knative.dev/pkg/injection"
@@ -84,9 +85,9 @@ var (
 			Name:                  string(platform.ControllerTektonPruner),
 			ControllerConstructor: openshiftPruner.NewController,
 		},
-		platform.ControllerTektonScheduler: injection.NamedControllerConstructor{
-			Name:                  string(platform.ControllerTektonScheduler),
-			ControllerConstructor: openshiftScheduler.NewController,
+		platform.ControllerTektonKueue: injection.NamedControllerConstructor{
+			Name:                  string(platform.ControllerTektonKueue),
+			ControllerConstructor: openshiftKueue.NewController,
 		},
 		platform.ControllerMulticlusterProxyAAE: injection.NamedControllerConstructor{
 			Name:                  string(platform.ControllerMulticlusterProxyAAE),
@@ -95,6 +96,10 @@ var (
 		platform.ControllerSyncerService: injection.NamedControllerConstructor{
 			Name:                  string(platform.ControllerSyncerService),
 			ControllerConstructor: openshiftSyncerService.NewController,
+		},
+		platform.ControllerNamespaceSync: injection.NamedControllerConstructor{
+			Name:                  string(platform.ControllerNamespaceSync),
+			ControllerConstructor: namespacesync.NewController,
 		},
 	}
 )

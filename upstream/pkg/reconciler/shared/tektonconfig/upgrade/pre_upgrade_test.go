@@ -23,11 +23,14 @@ import (
 
 	"github.com/tektoncd/operator/pkg/reconciler/kubernetes/tektonpruner"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	k8sFake "k8s.io/client-go/kubernetes/fake"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 	operatorFake "github.com/tektoncd/operator/pkg/client/clientset/versioned/fake"
+	"github.com/tektoncd/tekton-kueue/pkg/config"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	duckv1 "knative.dev/pkg/apis/duck/v1"
 	"knative.dev/pkg/logging"
@@ -68,6 +71,141 @@ func TestResetTektonConfigConditions(t *testing.T) {
 	_tc, err := operatorClient.OperatorV1alpha1().TektonConfigs().Get(ctx, v1alpha1.ConfigResourceName, metav1.GetOptions{})
 	assert.NoError(t, err)
 	assert.Empty(t, _tc.Status.Conditions)
+}
+
+func TestMigrateTektonSchedulerToTektonKueue(t *testing.T) {
+	ctx := context.TODO()
+	k8sClient := k8sFake.NewSimpleClientset(
+		&rbacv1.ClusterRole{ObjectMeta: metav1.ObjectMeta{Name: deprecatedTektonSchedulerClusterRole}},
+		&rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: deprecatedTektonSchedulerClusterRoleBinding}},
+	)
+	operatorClient := operatorFake.NewSimpleClientset(
+		&v1alpha1.TektonConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: v1alpha1.ConfigResourceName},
+			Spec: v1alpha1.TektonConfigSpec{
+				Scheduler: v1alpha1.Scheduler{
+					Disabled: ptr.Bool(false),
+					SchedulerConfig: v1alpha1.SchedulerConfig{Config: config.Config{
+						QueueName: "migration-test-queue",
+					}},
+					MultiClusterConfig: v1alpha1.MultiClusterConfig{
+						MultiClusterDisabled: true,
+					},
+				},
+			},
+		},
+		&v1alpha1.TektonScheduler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       v1alpha1.TektonSchedulerResourceName,
+				Finalizers: []string{deprecatedTektonSchedulerFinalizer, "example.dev/preserve"},
+			},
+			Spec: v1alpha1.TektonSchedulerSpec{
+				CommonSpec: v1alpha1.CommonSpec{TargetNamespace: "tekton-pipelines"},
+				Scheduler: v1alpha1.Scheduler{
+					Disabled: ptr.Bool(false),
+					SchedulerConfig: v1alpha1.SchedulerConfig{Config: config.Config{
+						QueueName: "migration-test-queue",
+					}},
+					MultiClusterConfig: v1alpha1.MultiClusterConfig{
+						MultiClusterDisabled: true,
+					},
+				},
+				NetworkPolicy: v1alpha1.NetworkPolicyConfig{Disabled: true},
+			},
+		},
+		&v1alpha1.TektonInstallerSet{ObjectMeta: metav1.ObjectMeta{
+			Name: "scheduler-main",
+			Labels: map[string]string{
+				v1alpha1.CreatedByKey: v1alpha1.SchedulerCreatedByValue,
+			},
+		}},
+	)
+	logger := logging.FromContext(ctx).Named("unit-test")
+
+	// The migration advances one durable API operation per scheduled reconciliation.
+	for range 5 {
+		err := migrateTektonSchedulerToTektonKueue(ctx, logger, k8sClient, operatorClient, nil)
+		assert.ErrorIs(t, err, v1alpha1.REQUEUE_EVENT_AFTER)
+	}
+	legacy, err := operatorClient.OperatorV1alpha1().TektonSchedulers().Get(ctx, v1alpha1.TektonSchedulerResourceName, metav1.GetOptions{})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"example.dev/preserve"}, legacy.Finalizers)
+
+	// Deletion schedules a final reconciliation so pre-upgrade does not complete
+	// while a legacy resource is still terminating on a preserved finalizer.
+	assert.ErrorIs(t, migrateTektonSchedulerToTektonKueue(ctx, logger, k8sClient, operatorClient, nil), v1alpha1.REQUEUE_EVENT_AFTER)
+	assert.NoError(t, migrateTektonSchedulerToTektonKueue(ctx, logger, k8sClient, operatorClient, nil))
+
+	tc, err := operatorClient.OperatorV1alpha1().TektonConfigs().Get(ctx, v1alpha1.ConfigResourceName, metav1.GetOptions{})
+	assert.NoError(t, err)
+	assert.Equal(t, false, tc.Spec.Kueue.IsDisabled())
+	assert.Equal(t, "migration-test-queue", tc.Spec.Kueue.QueueName)
+	assert.Equal(t, v1alpha1.Scheduler{}, tc.Spec.Scheduler)
+
+	installerSets, err := operatorClient.OperatorV1alpha1().TektonInstallerSets().List(ctx, metav1.ListOptions{})
+	assert.NoError(t, err)
+	assert.Empty(t, installerSets.Items)
+
+	kueue, err := operatorClient.OperatorV1alpha1().TektonKueues().Get(ctx, v1alpha1.TektonKueueResourceName, metav1.GetOptions{})
+	assert.NoError(t, err)
+	assert.Equal(t, "tekton-pipelines", kueue.Spec.TargetNamespace)
+	assert.Equal(t, false, kueue.Spec.Kueue.IsDisabled())
+	assert.Equal(t, "migration-test-queue", kueue.Spec.Kueue.QueueName)
+	assert.True(t, kueue.Spec.NetworkPolicy.Disabled)
+
+	_, err = operatorClient.OperatorV1alpha1().TektonSchedulers().Get(ctx, v1alpha1.TektonSchedulerResourceName, metav1.GetOptions{})
+	assert.True(t, apierrs.IsNotFound(err))
+	_, err = k8sClient.RbacV1().ClusterRoles().Get(ctx, deprecatedTektonSchedulerClusterRole, metav1.GetOptions{})
+	assert.True(t, apierrs.IsNotFound(err))
+	_, err = k8sClient.RbacV1().ClusterRoleBindings().Get(ctx, deprecatedTektonSchedulerClusterRoleBinding, metav1.GetOptions{})
+	assert.True(t, apierrs.IsNotFound(err))
+}
+
+func TestMigrateTektonSchedulerToTektonKueueDisabled(t *testing.T) {
+	ctx := context.TODO()
+	operatorClient := operatorFake.NewSimpleClientset(&v1alpha1.TektonConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: v1alpha1.ConfigResourceName},
+		Spec: v1alpha1.TektonConfigSpec{Scheduler: v1alpha1.Scheduler{
+			Disabled: ptr.Bool(true),
+		}},
+	})
+	logger := logging.FromContext(ctx).Named("unit-test")
+
+	assert.ErrorIs(t, migrateTektonSchedulerToTektonKueue(ctx, logger, nil, operatorClient, nil), v1alpha1.REQUEUE_EVENT_AFTER)
+	assert.NoError(t, migrateTektonSchedulerToTektonKueue(ctx, logger, nil, operatorClient, nil))
+
+	tc, err := operatorClient.OperatorV1alpha1().TektonConfigs().Get(ctx, v1alpha1.ConfigResourceName, metav1.GetOptions{})
+	assert.NoError(t, err)
+	assert.True(t, tc.Spec.Kueue.IsDisabled())
+	assert.Equal(t, v1alpha1.Scheduler{}, tc.Spec.Scheduler)
+
+	_, err = operatorClient.OperatorV1alpha1().TektonKueues().Get(ctx, v1alpha1.TektonKueueResourceName, metav1.GetOptions{})
+	assert.True(t, apierrs.IsNotFound(err))
+}
+
+func TestMigrateTektonSchedulerToTektonKueueKueueTakesPrecedence(t *testing.T) {
+	ctx := context.TODO()
+	operatorClient := operatorFake.NewSimpleClientset(&v1alpha1.TektonConfig{
+		ObjectMeta: metav1.ObjectMeta{Name: v1alpha1.ConfigResourceName},
+		Spec: v1alpha1.TektonConfigSpec{
+			Scheduler: v1alpha1.Scheduler{
+				Disabled: ptr.Bool(false),
+				SchedulerConfig: v1alpha1.SchedulerConfig{Config: config.Config{
+					QueueName: "legacy-queue",
+				}},
+			},
+			Kueue: v1alpha1.Kueue{Disabled: ptr.Bool(true)},
+		},
+	})
+	logger := logging.FromContext(ctx).Named("unit-test")
+
+	assert.ErrorIs(t, migrateTektonSchedulerToTektonKueue(ctx, logger, nil, operatorClient, nil), v1alpha1.REQUEUE_EVENT_AFTER)
+
+	tc, err := operatorClient.OperatorV1alpha1().TektonConfigs().Get(ctx, v1alpha1.ConfigResourceName, metav1.GetOptions{})
+	assert.NoError(t, err)
+	assert.Equal(t, ptr.Bool(true), tc.Spec.Kueue.Disabled)
+	assert.Empty(t, tc.Spec.Kueue.QueueName)
+	assert.Equal(t, v1alpha1.Scheduler{}, tc.Spec.Scheduler)
 }
 
 func TestUpgradePipelineProperties(t *testing.T) {
@@ -926,4 +1064,65 @@ func TestRemoveDeprecatedDisableAffinityAssistant(t *testing.T) {
 			assert.False(t, exists, "disable-affinity-assistant field should not exist")
 		}
 	}
+}
+
+func TestMigrateLegacyNamespaceSyncParams(t *testing.T) {
+	ctx := context.TODO()
+	logger := logging.FromContext(ctx).Named("unit-test")
+
+	t.Run("non-openshift platform: no-op", func(t *testing.T) {
+		operatorClient := operatorFake.NewSimpleClientset()
+		err := migrateLegacyNamespaceSyncParams(ctx, logger, nil, operatorClient, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("no TektonConfig CR: no-op", func(t *testing.T) {
+		t.Setenv("PLATFORM", "openshift")
+		operatorClient := operatorFake.NewSimpleClientset()
+		err := migrateLegacyNamespaceSyncParams(ctx, logger, nil, operatorClient, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("no legacy params: no update issued", func(t *testing.T) {
+		t.Setenv("PLATFORM", "openshift")
+		operatorClient := operatorFake.NewSimpleClientset()
+		tc := &v1alpha1.TektonConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: v1alpha1.ConfigResourceName},
+		}
+		_, err := operatorClient.OperatorV1alpha1().TektonConfigs().Create(ctx, tc, metav1.CreateOptions{})
+		assert.NoError(t, err)
+
+		err = migrateLegacyNamespaceSyncParams(ctx, logger, nil, operatorClient, nil)
+		assert.NoError(t, err)
+
+		got, err := operatorClient.OperatorV1alpha1().TektonConfigs().Get(ctx, v1alpha1.ConfigResourceName, metav1.GetOptions{})
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(got.Spec.Params))
+	})
+
+	t.Run("legacy params are migrated and persisted", func(t *testing.T) {
+		t.Setenv("PLATFORM", "openshift")
+		operatorClient := operatorFake.NewSimpleClientset()
+		tc := &v1alpha1.TektonConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: v1alpha1.ConfigResourceName},
+			Spec: v1alpha1.TektonConfigSpec{
+				Params: []v1alpha1.Param{
+					{Name: "createRbacResource", Value: "false"},
+				},
+			},
+		}
+		_, err := operatorClient.OperatorV1alpha1().TektonConfigs().Create(ctx, tc, metav1.CreateOptions{})
+		assert.NoError(t, err)
+
+		err = migrateLegacyNamespaceSyncParams(ctx, logger, nil, operatorClient, nil)
+		assert.NoError(t, err)
+
+		got, err := operatorClient.OperatorV1alpha1().TektonConfigs().Get(ctx, v1alpha1.ConfigResourceName, metav1.GetOptions{})
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(got.Spec.Params))
+		ns := got.Spec.Platforms.OpenShift.NamespaceSync
+		if ns == nil || ns.CreatePipelineSA == nil || *ns.CreatePipelineSA {
+			t.Fatalf("expected namespaceSync.createPipelineSA=false, got %+v", ns)
+		}
+	})
 }
