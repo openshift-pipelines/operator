@@ -36432,7 +36432,7 @@
     "schema": "olm.bundle",
     "name": "openshift-pipelines-operator-rh.v5.0.5-903",
     "package": "openshift-pipelines-operator-rh",
-    "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:ba00c34fd27a458e3d86515fd55b84bba2a905c714771dc66b9d0d09dd537f50",
+    "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:8ca90060e7f955e00cc43e28a2a20b4703a8eae0691af37fc690c199c1796f54",
     "properties": [
         {
             "type": "olm.gvk",
@@ -36487,6 +36487,14 @@
             "value": {
                 "group": "operator.tekton.dev",
                 "kind": "TektonInstallerSet",
+                "version": "v1alpha1"
+            }
+        },
+        {
+            "type": "olm.gvk",
+            "value": {
+                "group": "operator.tekton.dev",
+                "kind": "TektonKueue",
                 "version": "v1alpha1"
             }
         },
@@ -36570,7 +36578,7 @@
                     "operators.openshift.io/infrastructure-features": "[\"disconnected\",\"proxy-aware\"]",
                     "operators.openshift.io/valid-subscription": "[\"OpenShift Container Platform\", \"OpenShift Platform Plus\"]",
                     "operators.operatorframework.io/builder": "operator-sdk-v1.37.0",
-                    "operators.operatorframework.io/internal-objects": "[\"tektoninstallersets.operator.tekton.dev\", \"tektonconfigs.operator.tekton.dev\",\"tektonpipelines.operator.tekton.dev\",\"tektontriggers.operator.tekton.dev\",\"tektonaddons.operator.tekton.dev\", \"tektonresults.operator.tekton.dev\", \"tektonchains.operator.tekton.dev\", \"openshiftpipelinesascodes.operator.tekton.dev\", \"manualapprovalgates.operator.tekton.dev\",\"tektonpruners.operator.tekton.dev\",\"tektonschedulers.operator.tekton.dev\",\"tektonmulticlusterproxyaaes.operator.tekton.dev\",\"syncerservices.operator.tekton.dev\",\"tektondashboards.operator.tekton.dev\"]",
+                    "operators.operatorframework.io/internal-objects": "[\"tektoninstallersets.operator.tekton.dev\", \"tektonconfigs.operator.tekton.dev\",\"tektonpipelines.operator.tekton.dev\",\"tektontriggers.operator.tekton.dev\",\"tektonaddons.operator.tekton.dev\", \"tektonresults.operator.tekton.dev\", \"tektonchains.operator.tekton.dev\", \"openshiftpipelinesascodes.operator.tekton.dev\", \"manualapprovalgates.operator.tekton.dev\",\"tektonpruners.operator.tekton.dev\",\"tektonkueues.operator.tekton.dev\",\"tektonschedulers.operator.tekton.dev\",\"tektonmulticlusterproxyaaes.operator.tekton.dev\",\"syncerservices.operator.tekton.dev\",\"tektondashboards.operator.tekton.dev\"]",
                     "operators.operatorframework.io/project_layout": "unknown",
                     "repository": "https://github.com/tektoncd/operator",
                     "support": "Red Hat"
@@ -36890,6 +36898,40 @@
                             ]
                         },
                         {
+                            "name": "tektonkueues.operator.tekton.dev",
+                            "version": "v1alpha1",
+                            "kind": "TektonKueue",
+                            "displayName": "Tekton Kueue",
+                            "description": "Represents an installation of latest version of Tekton Kueue",
+                            "resources": [
+                                {
+                                    "name": "",
+                                    "kind": "tektoninstallersets",
+                                    "version": "v1alpha1"
+                                }
+                            ],
+                            "statusDescriptors": [
+                                {
+                                    "path": "version",
+                                    "displayName": "Version",
+                                    "description": "The version of Tekton Kueue installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ],
+                            "specDescriptors": [
+                                {
+                                    "path": "targetNamespace",
+                                    "displayName": "Target Namespace",
+                                    "description": "Namespace where Tekton Kueue installed",
+                                    "x-descriptors": [
+                                        "urn:alm:descriptor:com.tectonic.ui:label"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
                             "name": "tektonmulticlusterproxyaaes.operator.tekton.dev",
                             "version": "v1alpha1",
                             "kind": "TektonMulticlusterProxyAAE",
@@ -37029,8 +37071,8 @@
                             "name": "tektonschedulers.operator.tekton.dev",
                             "version": "v1alpha1",
                             "kind": "TektonScheduler",
-                            "displayName": "Tekton Scheduler",
-                            "description": "Represents an installation of latest version of Tekton Scheduler",
+                            "displayName": "Tekton Scheduler (deprecated)",
+                            "description": "Deprecated compatibility API; configuration is migrated to TektonKueue",
                             "resources": [
                                 {
                                     "name": "",
@@ -37042,7 +37084,7 @@
                                 {
                                     "path": "version",
                                     "displayName": "Version",
-                                    "description": "The version of Tekton Scheduler installed",
+                                    "description": "The version of Tekton Scheduler previously installed",
                                     "x-descriptors": [
                                         "urn:alm:descriptor:com.tectonic.ui:label"
                                     ]
@@ -37052,7 +37094,7 @@
                                 {
                                     "path": "targetNamespace",
                                     "displayName": "Target Namespace",
-                                    "description": "Namespace where Tekton Scheduler installed",
+                                    "description": "Namespace where Tekton Scheduler was installed",
                                     "x-descriptors": [
                                         "urn:alm:descriptor:com.tectonic.ui:label"
                                     ]
@@ -37095,7 +37137,7 @@
                         }
                     ]
                 },
-                "description": "Red Hat OpenShift Pipelines is a cloud-native continuous integration and delivery\n(CI/CD) solution for building pipelines using [Tekton](https://tekton.dev).\nTekton is a flexible Kubernetes-native open-source CI/CD framework, which\nenables automating deployments across multiple platforms (Kubernetes,\nserverless, VMs, etc) by abstracting away the underlying details.\n\n## Features\n\n* Standard CI/CD pipelines definition\n* Build images with Kubernetes tools such as S2I, Buildah, Buildpacks, Kaniko, etc\n* Deploy applications to multiple platforms such as Kubernetes, serverless and VMs\n* Easy to extend and integrate with existing tools\n* Scale pipelines on-demand\n* Portable across any Kubernetes platform\n* Designed for microservices and decentralized team\n* Integrated with OpenShift Developer Console\n\n## Installation\n\n_Red Hat OpenShift Pipelines Operator_ gets installed into a single namespace (openshift-operators) which would then install _Red Hat OpenShift Pipelines_ into the openshift-pipelines namespace. _Red Hat OpenShift Pipelines_ is however cluster-wide and can run pipelines created in any namespace.\n\n### Components\n\n- Tekton Pipelines: v1.16.0\n- Tekton Triggers: v0.37.0\n- Pipelines as Code: v0.50.0\n- Tekton Chains: v0.29.3\n- Tekton Results (tech-preview): v0.20.0\n- Manual Approval Gate (tech-preview): v0.9.0\n- Tekton Pruner: v0.4.3\n- Tekton Scheduler (tech-preview): v0.4.0\n- Multicluster Proxy AAE (tech-preview): v0.1.1\n\n## Getting Started\n\nIn order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/pipelines/5.0/create/creating-applications-with-cicd-pipelines.html).\n\n## CLI (tkn)\n\nTekton Pipelines cli project provides a CLI (tkn) for interacting with OpenShift Pipelines.\n\n[Download tkn](/command-line-tools) (links will be available on `command line tools` page after this operator is installed).\n",
+                "description": "Red Hat OpenShift Pipelines is a cloud-native continuous integration and delivery\n(CI/CD) solution for building pipelines using [Tekton](https://tekton.dev).\nTekton is a flexible Kubernetes-native open-source CI/CD framework, which\nenables automating deployments across multiple platforms (Kubernetes,\nserverless, VMs, etc) by abstracting away the underlying details.\n\n## Features\n\n* Standard CI/CD pipelines definition\n* Build images with Kubernetes tools such as S2I, Buildah, Buildpacks, Kaniko, etc\n* Deploy applications to multiple platforms such as Kubernetes, serverless and VMs\n* Easy to extend and integrate with existing tools\n* Scale pipelines on-demand\n* Portable across any Kubernetes platform\n* Designed for microservices and decentralized team\n* Integrated with OpenShift Developer Console\n\n## Installation\n\n_Red Hat OpenShift Pipelines Operator_ gets installed into a single namespace (openshift-operators) which would then install _Red Hat OpenShift Pipelines_ into the openshift-pipelines namespace. _Red Hat OpenShift Pipelines_ is however cluster-wide and can run pipelines created in any namespace.\n\n### Components\n\n- Tekton Pipelines: v1.16.0\n- Tekton Triggers: v0.37.0\n- Pipelines as Code: v0.50.0\n- Tekton Chains: v0.29.3\n- Tekton Results (tech-preview): v0.20.0\n- Manual Approval Gate (tech-preview): v0.9.0\n- Tekton Pruner: v0.4.3\n- Tekton Kueue (tech-preview): v0.4.0\n- Multicluster Proxy AAE (tech-preview): v0.1.1\n\n## Getting Started\n\nIn order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/pipelines/5.0/create/creating-applications-with-cicd-pipelines.html).\n\n## CLI (tkn)\n\nTekton Pipelines cli project provides a CLI (tkn) for interacting with OpenShift Pipelines.\n\n[Download tkn](/command-line-tools) (links will be available on `command line tools` page after this operator is installed).\n",
                 "displayName": "Red Hat OpenShift Pipelines",
                 "installModes": [
                     {
@@ -37164,15 +37206,15 @@
             "image": "quay.io/openshift-pipeline/pipelines-chains-controller-rhel9@sha256:817ddb1d96eb952d8bd1849d9bbf46956f5dbe6b8159c8fc549f269da8fb6e7f"
         },
         {
+            "name": "IMAGE_JOB_PRUNER_TKN",
+            "image": "quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:5440d942bec31dba15468612f1a66993b082483d6a4623dc65da527156292e18"
+        },
+        {
             "name": "IMAGE_ADDONS_TKN",
             "image": "quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:5440d942bec31dba15468612f1a66993b082483d6a4623dc65da527156292e18"
         },
         {
             "name": "IMAGE_ADDONS_PARAM_TKN_IMAGE",
-            "image": "quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:5440d942bec31dba15468612f1a66993b082483d6a4623dc65da527156292e18"
-        },
-        {
-            "name": "IMAGE_JOB_PRUNER_TKN",
             "image": "quay.io/openshift-pipeline/pipelines-cli-tkn-rhel9@sha256:5440d942bec31dba15468612f1a66993b082483d6a4623dc65da527156292e18"
         },
         {
@@ -37204,7 +37246,7 @@
             "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:fe655a00a6fe9f590272febd7008728dcba1f25d15462f02e51f33edfc748980"
         },
         {
-            "name": "IMAGE_ADDONS_PARAM_GITINITIMAGE",
+            "name": "IMAGE_PIPELINES_ARG__GIT_IMAGE",
             "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:fe655a00a6fe9f590272febd7008728dcba1f25d15462f02e51f33edfc748980"
         },
         {
@@ -37216,11 +37258,11 @@
             "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:fe655a00a6fe9f590272febd7008728dcba1f25d15462f02e51f33edfc748980"
         },
         {
-            "name": "IMAGE_ADDONS_PREPARE_AND_RUN",
+            "name": "IMAGE_ADDONS_PARAM_GITINITIMAGE",
             "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:fe655a00a6fe9f590272febd7008728dcba1f25d15462f02e51f33edfc748980"
         },
         {
-            "name": "IMAGE_PIPELINES_ARG__GIT_IMAGE",
+            "name": "IMAGE_ADDONS_PREPARE_AND_RUN",
             "image": "quay.io/openshift-pipeline/pipelines-git-init-rhel9@sha256:fe655a00a6fe9f590272febd7008728dcba1f25d15462f02e51f33edfc748980"
         },
         {
@@ -37245,7 +37287,7 @@
         },
         {
             "name": "",
-            "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:ba00c34fd27a458e3d86515fd55b84bba2a905c714771dc66b9d0d09dd537f50"
+            "image": "quay.io/openshift-pipeline/pipelines-operator-bundle@sha256:8ca90060e7f955e00cc43e28a2a20b4703a8eae0691af37fc690c199c1796f54"
         },
         {
             "name": "IMAGE_PIPELINES_PROXY",
@@ -37304,19 +37346,11 @@
             "image": "quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:ce93187cb51175669da26db4a7135b24a6d210c42952565a8a2689e95b610bb8"
         },
         {
-            "name": "IMAGE_SCHEDULER_WEBHOOK",
-            "image": "quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:c488dc00d04843cb2665c4e4ce843c9565879fcefd4a1c1182243bc0d78f26cc"
-        },
-        {
-            "name": "IMAGE_SCHEDULER_MANAGER",
-            "image": "quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:c488dc00d04843cb2665c4e4ce843c9565879fcefd4a1c1182243bc0d78f26cc"
-        },
-        {
-            "name": "IMAGE_ADDONS_TKN_CLI_SERVE",
+            "name": "IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG",
             "image": "quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:e03bd8081d17231fc456aa6421824e8fa26a9cf91bc3be62bdb96e57974c7427"
         },
         {
-            "name": "IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG",
+            "name": "IMAGE_ADDONS_TKN_CLI_SERVE",
             "image": "quay.io/openshift-pipeline/pipelines-serve-tkn-cli-rhel9@sha256:e03bd8081d17231fc456aa6421824e8fa26a9cf91bc3be62bdb96e57974c7427"
         },
         {
@@ -37352,6 +37386,14 @@
             "image": "quay.io/openshift-pipeline/pipelines-workingdirinit-rhel9@sha256:1e9bc7bd05086bd9b3180e3ff3edc60d3821870cdd4142efcd0828d400f2e001"
         },
         {
+            "name": "IMAGE_KUEUE_MANAGER",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-scheduler-controller-rhel9@"
+        },
+        {
+            "name": "IMAGE_KUEUE_WEBHOOK",
+            "image": "registry.redhat.io/openshift-pipelines/pipelines-scheduler-controller-rhel9@"
+        },
+        {
             "name": "IMAGE_ADDONS_KN",
             "image": "registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:aee19896d17a431ba980564fdb73ef08ad1512f586fbdf954cecef6258f7a8df"
         },
@@ -37360,11 +37402,11 @@
             "image": "registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:aee19896d17a431ba980564fdb73ef08ad1512f586fbdf954cecef6258f7a8df"
         },
         {
-            "name": "IMAGE_ADDONS_BUILD",
+            "name": "IMAGE_ADDONS_S2I_BUILD",
             "image": "registry.redhat.io/rhel9/buildah@sha256:38b73ee2f3dea7404e6456be988f3f65897a7f29dcafc1c36a0edd709b98f141"
         },
         {
-            "name": "IMAGE_ADDONS_S2I_BUILD",
+            "name": "IMAGE_ADDONS_BUILD",
             "image": "registry.redhat.io/rhel9/buildah@sha256:38b73ee2f3dea7404e6456be988f3f65897a7f29dcafc1c36a0edd709b98f141"
         },
         {
@@ -37384,15 +37426,15 @@
             "image": "registry.redhat.io/rhel9/skopeo@sha256:d75fce32774b5d2ddfc840c76af374ddfe0c9ef611f1a5b15b2fe34e46548f9d"
         },
         {
+            "name": "IMAGE_ADDONS_S2I_GENERATE",
+            "image": "registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:798e0e860df8e3ca1ff5f8aa796940d6dbd4b739ccfc35c6f4c9bc046d5f0c12"
+        },
+        {
             "name": "IMAGE_ADDONS_GENERATE",
             "image": "registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:798e0e860df8e3ca1ff5f8aa796940d6dbd4b739ccfc35c6f4c9bc046d5f0c12"
         },
         {
             "name": "IMAGE_ADDONS_GEN_ENV_FILE",
-            "image": "registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:798e0e860df8e3ca1ff5f8aa796940d6dbd4b739ccfc35c6f4c9bc046d5f0c12"
-        },
-        {
-            "name": "IMAGE_ADDONS_S2I_GENERATE",
             "image": "registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:798e0e860df8e3ca1ff5f8aa796940d6dbd4b739ccfc35c6f4c9bc046d5f0c12"
         },
         {
@@ -37408,11 +37450,11 @@
             "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:7fbeae18dc9476399f565e68255f602a3374ea8614ba3d14843565131a13ff93"
         },
         {
-            "name": "IMAGE_ADDONS_MVN_SETTINGS",
+            "name": "IMAGE_ADDONS_LOAD_SCRIPTS",
             "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:7fbeae18dc9476399f565e68255f602a3374ea8614ba3d14843565131a13ff93"
         },
         {
-            "name": "IMAGE_ADDONS_LOAD_SCRIPTS",
+            "name": "IMAGE_ADDONS_MVN_SETTINGS",
             "image": "registry.redhat.io/ubi9/ubi-minimal@sha256:7fbeae18dc9476399f565e68255f602a3374ea8614ba3d14843565131a13ff93"
         },
         {
