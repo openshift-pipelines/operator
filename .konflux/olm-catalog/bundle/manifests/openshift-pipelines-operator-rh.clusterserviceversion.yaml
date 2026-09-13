@@ -22,7 +22,7 @@ metadata:
     olm.skipRange: '>=1.20.0 <5.0.5-903'
     operators.openshift.io/infrastructure-features: '["disconnected","proxy-aware"]'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
-    operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonschedulers.operator.tekton.dev","tektonmulticlusterproxyaaes.operator.tekton.dev","syncerservices.operator.tekton.dev","tektondashboards.operator.tekton.dev"]'
+    operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonkueues.operator.tekton.dev","tektonschedulers.operator.tekton.dev","tektonmulticlusterproxyaaes.operator.tekton.dev","syncerservices.operator.tekton.dev","tektondashboards.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
     repository: https://github.com/tektoncd/operator
     support: Red Hat
@@ -229,6 +229,27 @@ spec:
             x-descriptors:
               - urn:alm:descriptor:com.tectonic.ui:label
         version: v1alpha1
+      - description: Represents an installation of latest version of Tekton Kueue
+        displayName: Tekton Kueue
+        kind: TektonKueue
+        name: tektonkueues.operator.tekton.dev
+        resources:
+          - kind: tektoninstallersets
+            name: ''
+            version: v1alpha1
+        specDescriptors:
+          - description: Namespace where Tekton Kueue installed
+            displayName: Target Namespace
+            path: targetNamespace
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:label
+        statusDescriptors:
+          - description: The version of Tekton Kueue installed
+            displayName: Version
+            path: version
+            x-descriptors:
+              - urn:alm:descriptor:com.tectonic.ui:label
+        version: v1alpha1
       - description: Represents an installation of the multicluster-proxy-aae component for multi-cluster
         displayName: Tekton Multicluster Proxy AAE
         kind: TektonMulticlusterProxyAAE
@@ -313,8 +334,8 @@ spec:
             x-descriptors:
               - urn:alm:descriptor:com.tectonic.ui:label
         version: v1alpha1
-      - description: Represents an installation of latest version of Tekton Scheduler
-        displayName: Tekton Scheduler
+      - description: Deprecated compatibility API; configuration is migrated to TektonKueue
+        displayName: Tekton Scheduler (deprecated)
         kind: TektonScheduler
         name: tektonschedulers.operator.tekton.dev
         resources:
@@ -322,13 +343,13 @@ spec:
             name: ''
             version: v1alpha1
         specDescriptors:
-          - description: Namespace where Tekton Scheduler installed
+          - description: Namespace where Tekton Scheduler was installed
             displayName: Target Namespace
             path: targetNamespace
             x-descriptors:
               - urn:alm:descriptor:com.tectonic.ui:label
         statusDescriptors:
-          - description: The version of Tekton Scheduler installed
+          - description: The version of Tekton Scheduler previously installed
             displayName: Version
             path: version
             x-descriptors:
@@ -409,7 +430,7 @@ spec:
 
     - Tekton Pruner: v0.4.3
 
-    - Tekton Scheduler (tech-preview): v0.4.0
+    - Tekton Kueue (tech-preview): v0.4.0
 
     - Multicluster Proxy AAE (tech-preview): v0.1.1
 
@@ -840,6 +861,46 @@ spec:
       clusterPermissions:
         - rules:
             - apiGroups:
+                - kueue.x-k8s.io
+              resources:
+                - resourceflavors
+                - workloads
+                - workloads/finalizers
+                - workloads/status
+                - workloadpriorityclasses
+                - multikueueclusters
+              verbs:
+                - get
+                - list
+                - create
+                - update
+                - delete
+                - patch
+                - watch
+            - apiGroups:
+                - scheduling.k8s.io
+              resources:
+                - priorityclasses
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - cert-manager.io
+              resources:
+                - certificates
+                - issuers
+              verbs:
+                - get
+                - create
+                - update
+                - delete
+                - list
+            - nonResourceURLs:
+                - /metrics
+              verbs:
+                - get
+            - apiGroups:
                 - ''
               resources:
                 - nodes
@@ -1236,45 +1297,6 @@ spec:
                 - get
                 - list
                 - watch
-            - apiGroups:
-                - kueue.x-k8s.io
-              resources:
-                - resourceflavors
-                - workloads
-                - workloads/finalizers
-                - workloads/status
-                - workloadpriorityclasses
-                - multikueueclusters
-              verbs:
-                - get
-                - list
-                - create
-                - update
-                - delete
-                - patch
-                - watch
-            - apiGroups:
-                - scheduling.k8s.io
-              resources:
-                - priorityclasses
-              verbs:
-                - get
-                - list
-                - watch
-            - apiGroups:
-                - cert-manager.io
-              resources:
-                - certificates
-                - issuers
-              verbs:
-                - get
-                - create
-                - update
-                - list
-            - nonResourceURLs:
-                - /metrics
-              verbs:
-                - get
           serviceAccountName: openshift-pipelines-operator
       deployments:
         - label:
@@ -1296,7 +1318,7 @@ spec:
                 containers:
                   - args:
                       - -controllers
-                      - tektonconfig,tektonpipeline,tektontrigger,tektonchain,tektonaddon,tektonresult,openshiftpipelinesascode,manualapprovalgate,tektonpruner,tektonscheduler,tektonmulticlusterproxyaae,syncerservice
+                      - tektonconfig,tektonpipeline,tektontrigger,tektonchain,tektonaddon,tektonresult,openshiftpipelinesascode,manualapprovalgate,tektonpruner,tektonkueue,tektonmulticlusterproxyaae,syncerservice,namespacesync
                       - -unique-process-name
                       - tekton-operator-lifecycle
                     env:
@@ -1430,10 +1452,10 @@ spec:
                         value: quay.io/openshift-pipeline/pipelines-manual-approval-gate-webhook-rhel9@sha256:04b6476aa7a273e3a813b2aced304fd02ff86bf759ea2bf057c69c2a0f8e587a
                       - name: IMAGE_PRUNER_CONTROLLER
                         value: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:b4f8d72adbf859f65edf29f3a7cadf8eabe6585e62d9739e036a848dad1901a5
-                      - name: IMAGE_SCHEDULER_MANAGER
-                        value: quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:c488dc00d04843cb2665c4e4ce843c9565879fcefd4a1c1182243bc0d78f26cc
-                      - name: IMAGE_SCHEDULER_WEBHOOK
-                        value: quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:c488dc00d04843cb2665c4e4ce843c9565879fcefd4a1c1182243bc0d78f26cc
+                      - name: IMAGE_KUEUE_MANAGER
+                        value: registry.redhat.io/openshift-pipelines/pipelines-scheduler-controller-rhel9@
+                      - name: IMAGE_KUEUE_WEBHOOK
+                        value: registry.redhat.io/openshift-pipelines/pipelines-scheduler-controller-rhel9@
                       - name: IMAGE_MULTICLUSTERPROXYAAE_PROXY_AAE
                         value: quay.io/openshift-pipeline/pipelines-multicluster-proxy-aae-rhel9@sha256:b469236490134702547bc7dcffd10bb4c9f49cddc8d84c3e4b8f689f1330badb
                       - name: IMAGE_SYNCER_SERVICE_WORKLOAD_CONTROLLER
@@ -1704,10 +1726,10 @@ spec:
       name: IMAGE_MAG_MANUAL_APPROVAL
     - image: quay.io/openshift-pipeline/pipelines-pruner-controller-rhel9@sha256:b4f8d72adbf859f65edf29f3a7cadf8eabe6585e62d9739e036a848dad1901a5
       name: IMAGE_PRUNER_CONTROLLER
-    - image: quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:c488dc00d04843cb2665c4e4ce843c9565879fcefd4a1c1182243bc0d78f26cc
-      name: IMAGE_SCHEDULER_MANAGER
-    - image: quay.io/openshift-pipeline/pipelines-scheduler-rhel9@sha256:c488dc00d04843cb2665c4e4ce843c9565879fcefd4a1c1182243bc0d78f26cc
-      name: IMAGE_SCHEDULER_WEBHOOK
+    - image: registry.redhat.io/openshift-pipelines/pipelines-scheduler-controller-rhel9@
+      name: IMAGE_KUEUE_MANAGER
+    - image: registry.redhat.io/openshift-pipelines/pipelines-scheduler-controller-rhel9@
+      name: IMAGE_KUEUE_WEBHOOK
     - image: quay.io/openshift-pipeline/pipelines-multicluster-proxy-aae-rhel9@sha256:b469236490134702547bc7dcffd10bb4c9f49cddc8d84c3e4b8f689f1330badb
       name: IMAGE_MULTICLUSTERPROXYAAE_PROXY_AAE
     - image: quay.io/openshift-pipeline/pipelines-syncer-service-rhel9@sha256:ccbd6ea060415c009245813daf4dfc6de36b9cc4ea3e7c0afeec36a7d54c99ed
