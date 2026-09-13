@@ -18,6 +18,7 @@ package upgrade
 
 import (
 	"context"
+	"errors"
 
 	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
 	"github.com/tektoncd/operator/pkg/client/clientset/versioned"
@@ -32,8 +33,9 @@ import (
 var (
 	// pre upgrade functions
 	preUpgradeFunctions = []upgradeFunc{
-		resetTektonConfigConditions, // upgrade #1: removes conditions from TektonConfig CR, clears outdated conditions
-		upgradePipelineProperties,   // upgrade #2: update default value of enable-step-actions from false to true
+		resetTektonConfigConditions,         // upgrade #1: removes conditions from TektonConfig CR, clears outdated conditions
+		migrateTektonSchedulerToTektonKueue, // upgrade #2: migrates the deprecated scheduler API and TektonConfig field
+		upgradePipelineProperties,           // upgrade #3: update default value of enable-step-actions from false to true
 		// Todo: Remove the deleteTektonResultsTLSSecret upgrade function in next operator release
 		deleteTektonResultsTLSSecret, // upgrade #5: deletes default tekton results tls certificate
 		// TODO: Remove the preUpgradeTektonPruner upgrade function in next operator release
@@ -41,6 +43,7 @@ var (
 		removeDeprecatedDisableAffinityAssistant, // upgrade #6: remove deprecated DisableAffinityAssistant field from pipeline config
 		removeHubFromTektonConfig,                // upgrade #7: clear deprecated hub field
 		preUpgradeManualApprovalGate,             // upgrade #8: adopt standalone MAG config into TektonConfig
+		migrateLegacyNamespaceSyncParams,         // upgrade #9: persist createRbacResource/createCABundleConfigMaps/legacyPipelineRbac migration to namespaceSync
 	}
 
 	// post upgrade functions
@@ -107,6 +110,10 @@ func (ug *Upgrade) executeUpgrade(ctx context.Context, upgradeFunctions []upgrad
 	// execute upgrade functions
 	for _, _upgradeFunc := range upgradeFunctions {
 		if err := _upgradeFunc(ctx, ug.logger, ug.k8sClient, ug.operatorClient, ug.restConfig); err != nil {
+			if errors.Is(err, v1alpha1.REQUEUE_EVENT_AFTER) {
+				ug.logger.Debugw("upgrade requested requeue", "error", err)
+				return err
+			}
 			ug.logger.Error("error on upgrade", err)
 			return err
 		}

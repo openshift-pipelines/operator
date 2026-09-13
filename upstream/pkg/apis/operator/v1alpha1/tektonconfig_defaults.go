@@ -18,11 +18,103 @@ package v1alpha1
 
 import (
 	"context"
+	"reflect"
 	"strings"
 
 	"knative.dev/pkg/logging"
 	"knative.dev/pkg/ptr"
 )
+
+// MigrateScheduler copies the deprecated scheduler configuration to kueue.
+// An explicitly configured kueue field takes precedence.
+func (spec *TektonConfigSpec) MigrateScheduler() bool {
+	if reflect.DeepEqual(spec.Scheduler, Scheduler{}) {
+		return false
+	}
+	if reflect.DeepEqual(spec.Kueue, Kueue{}) {
+		spec.Kueue = spec.Scheduler.ToKueue()
+	}
+	spec.Scheduler = Scheduler{}
+	return true
+}
+
+// migrateNamespaceSyncParams reads the legacy stringly-typed spec.params entries
+// (createRbacResource, createCABundleConfigMaps, legacyPipelineRbac) and populates
+// the equivalent typed fields in spec.platforms.openshift.namespaceSync, then removes
+// the migrated params from the slice. Params that are already absent are left at their
+// typed-field defaults (true). This runs only on OpenShift.
+//
+// Original semantics (preserved here):
+//   - createRbacResource=false  → master RBAC switch off; disables SA, SCC RoleBinding,
+//     AND edit RoleBinding, regardless of legacyPipelineRbac.
+//   - createCABundleConfigMaps=false → disables CA bundle ConfigMaps only.
+//   - legacyPipelineRbac=false → disables edit RoleBinding, but only when
+//     createRbacResource is true (or absent).
+func migrateNamespaceSyncParams(tc *TektonConfig) {
+	ns := tc.Spec.Platforms.OpenShift.NamespaceSync
+
+	// First pass: resolve the master RBAC switch so that its precedence over
+	// legacyPipelineRbac is respected regardless of param ordering in the slice.
+	masterRBACEnabled := true
+	for _, p := range tc.Spec.Params {
+		if p.Name == "createRbacResource" && p.Value == "false" {
+			masterRBACEnabled = false
+			break
+		}
+	}
+
+	remaining := tc.Spec.Params[:0]
+	for _, p := range tc.Spec.Params {
+		switch p.Name {
+		case "createRbacResource":
+			if ns.CreatePipelineSA == nil {
+				ns.CreatePipelineSA = ptr.Bool(masterRBACEnabled)
+			}
+			if !masterRBACEnabled {
+				// createRbacResource=false disabled all per-namespace RBAC in the
+				// old implementation. Carry that forward to the typed fields.
+				if ns.CreateSCCRoleBinding == nil {
+					ns.CreateSCCRoleBinding = ptr.Bool(false)
+				}
+				if ns.CreateEditRoleBinding == nil {
+					ns.CreateEditRoleBinding = ptr.Bool(false)
+				}
+			}
+		case "createCABundleConfigMaps":
+			if ns.CreateCABundles == nil {
+				ns.CreateCABundles = ptr.Bool(p.Value != "false")
+			}
+		case "legacyPipelineRbac":
+			// legacyPipelineRbac only had effect when createRbacResource was
+			// enabled; the master switch took precedence when it was false.
+			if masterRBACEnabled && ns.CreateEditRoleBinding == nil {
+				ns.CreateEditRoleBinding = ptr.Bool(p.Value != "false")
+			}
+		default:
+			remaining = append(remaining, p)
+		}
+	}
+	tc.Spec.Params = remaining
+}
+
+// MigrateLegacyNamespaceSyncParams is the exported entry point used by the
+// pre-upgrade job (pkg/reconciler/shared/tektonconfig/upgrade) to persist the
+// same createRbacResource/createCABundleConfigMaps/legacyPipelineRbac →
+// namespaceSync migration that SetDefaults already applies in-memory on every
+// reconcile. SetDefaults never writes back to the stored CR, so without this,
+// the deprecated params would remain in spec.params forever. It reports
+// whether tc was actually changed, so the caller only issues an Update when
+// there is something to persist.
+// TODO: Remove this function once createRbacResource/createCABundleConfigMaps/
+// legacyPipelineRbac are no longer supported.
+func MigrateLegacyNamespaceSyncParams(tc *TektonConfig) bool {
+	before := len(tc.Spec.Params)
+	if tc.Spec.Platforms.OpenShift.NamespaceSync == nil {
+		tc.Spec.Platforms.OpenShift.NamespaceSync = &NamespaceSyncConfig{}
+	}
+	migrateNamespaceSyncParams(tc)
+	return len(tc.Spec.Params) != before
+}
 
 func (tc *TektonConfig) SetDefaults(ctx context.Context) {
 	if tc.Spec.Profile == "" {
@@ -33,7 +125,8 @@ func (tc *TektonConfig) SetDefaults(ctx context.Context) {
 	tc.Spec.Chain.setDefaults()
 	tc.Spec.Result.setDefaults()
 	tc.Spec.TektonPruner.SetDefaults()
-	tc.Spec.Scheduler.SetDefaults()
+	tc.Spec.MigrateScheduler()
+	tc.Spec.Kueue.SetDefaults()
 	tc.Spec.ManualApproval.setDefaults()
 
 	if IsOpenShiftPlatform() {
@@ -89,6 +182,26 @@ func (tc *TektonConfig) SetDefaults(ctx context.Context) {
 		// via namespace annotations. Empty maxAllowed previously allowed ANY SCC.
 		if tc.Spec.Platforms.OpenShift.SCC.MaxAllowed == "" {
 			tc.Spec.Platforms.OpenShift.SCC.MaxAllowed = tc.Spec.Platforms.OpenShift.SCC.Default
+		}
+
+		// NamespaceSync defaulting: initialise the block if absent, then apply
+		// per-field defaults (all true) and migrate any legacy spec.params entries.
+		if tc.Spec.Platforms.OpenShift.NamespaceSync == nil {
+			tc.Spec.Platforms.OpenShift.NamespaceSync = &NamespaceSyncConfig{}
+		}
+		ns := tc.Spec.Platforms.OpenShift.NamespaceSync
+		migrateNamespaceSyncParams(tc)
+		if ns.CreatePipelineSA == nil {
+			ns.CreatePipelineSA = ptr.Bool(true)
+		}
+		if ns.CreateCABundles == nil {
+			ns.CreateCABundles = ptr.Bool(true)
+		}
+		if ns.CreateEditRoleBinding == nil {
+			ns.CreateEditRoleBinding = ptr.Bool(true)
+		}
+		if ns.CreateSCCRoleBinding == nil {
+			ns.CreateSCCRoleBinding = ptr.Bool(true)
 		}
 
 		setAddonDefaults(&tc.Spec.Addon)

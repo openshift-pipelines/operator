@@ -26,7 +26,7 @@ Other than the above components depending on the platform operator also provides
 - On OpenShift
   - [TektonAddon](./TektonAddon.md)
   - [OpenShiftPipelinesAsCode](./OpenShiftPipelinesAsCode.md)
-- When scheduler multi-cluster is enabled with Hub role (both Kubernetes and OpenShift)
+- When Tekton Kueue multi-cluster is enabled with Hub role (both Kubernetes and OpenShift)
   - [TektonMulticlusterProxyAAE](./TektonMulticlusterProxyAAE.md)
 
 The TektonConfig CR provides the following features
@@ -486,33 +486,39 @@ By default pruner job will be created from the global pruner config (`spec.prune
 >
 > if a global value is not present the following values will be consider as default value <br> > `resources: pipelinerun` <br> > `keep: 100` <br>
 
-### Scheduler
+### Tekton Kueue
 
-Scheduler section allows you to install and manage the [Tekton Scheduler](./TektonScheduler.md) through TektonConfig. The Scheduler component uses [Kueue](https://kueue.sigs.k8s.io) and [cert-manager](https://github.com/cert-manager/cert-manager); you must install Kueue and cert-manager CRDs before enabling the scheduler. For full pre-requisites and multi-cluster configuration details, see [Tekton Scheduler](./TektonScheduler.md).
+The `spec.kueue` section allows you to install and manage the [Tekton Kueue](./TektonKueue.md) through TektonConfig. The Tekton Kueue component uses [Kueue](https://kueue.sigs.k8s.io) and [cert-manager](https://github.com/cert-manager/cert-manager); you must install Kueue and cert-manager CRDs before enabling Tekton Kueue. For full pre-requisites and multi-cluster configuration details, see [Tekton Kueue](./TektonKueue.md).
 
-Scheduler can be enabled by setting `disabled` to `false` in the scheduler section. If you are working with multi-cluster pipelines, you can enable multi-cluster from the scheduler config. In a multi-cluster environment a cluster can play the role of **Hub** or **Spoke**. The TektonConfig settings for Scheduler for Hub and Spoke are defined below.
+The deprecated `spec.scheduler` field is migrated automatically to `spec.kueue` during pre-upgrade reconciliation. If both fields are configured, `spec.kueue` takes precedence.
+
+Tekton Kueue can be enabled by setting `disabled` to `false` in the kueue section. If you are working with multi-cluster pipelines, you can enable multi-cluster from the kueue config. In a multi-cluster environment a cluster can play the role of **Hub** or **Spoke**. The TektonConfig settings for Tekton Kueue for Hub and Spoke are defined below.
 
 #### Hub cluster
 
 ```yaml
-scheduler:
+kueue:
   disabled: false
   multi-cluster-disabled: false
   multi-cluster-role: Hub
+  config.yaml:
+    queueName: pipelines-queue
   options: {}
 ```
 
 #### Spoke cluster
 
 ```yaml
-scheduler:
+kueue:
   disabled: false
   multi-cluster-disabled: false
   multi-cluster-role: Spoke
+  config.yaml:
+    queueName: pipelines-queue
   options: {}
 ```
 
-- `disabled`: set to `false` to enable the Scheduler component (default is `true`).
+- `disabled`: set to `false` to enable the Tekton Kueue component (default is `true`).
 - `multi-cluster-disabled`: when `false`, multi-cluster features are enabled (default is `true`).
 - `multi-cluster-role`: `Hub` or `Spoke`. When set to **Hub**, TektonConfig also creates and manages the [TektonMulticlusterProxyAAE](./TektonMulticlusterProxyAAE.md) component automatically (the proxy is used to communicate with spoke clusters, e.g. for [Kueue MultiKueue](https://kueue.sigs.k8s.io/docs/concepts/multikueue/)). On spoke clusters use `Spoke`; the proxy is not installed there.
 
@@ -625,6 +631,137 @@ In the deployment the environment name will be converted as follows,
 
 - `tekton-hub-api` => `TEKTON_HUB_API`
 - `artifact-hub-api` => `ARTIFACT_HUB_API`
+
+### NamespaceSync (OpenShift only)
+
+The `namespaceSync` block under `spec.platforms.openshift` controls the **NamespaceSyncController**, which watches every user namespace and ensures Tekton-required resources are present and up to date. It replaces the legacy per-namespace batch loop that was part of the RBAC reconciler.
+
+#### Resources managed per namespace
+
+| Resource | Kind | Purpose |
+|---|---|---|
+| `pipeline` | `ServiceAccount` | Identity for PipelineRun pods |
+| `pipelines-scc-rolebinding` | `RoleBinding` → `pipelines-scc-clusterrole` | Grants the pipeline SA permission to use the default SCC |
+| `openshift-pipelines-edit` | `RoleBinding` → `ClusterRole/edit` | Gives the pipeline SA edit access within its namespace |
+| `config-trusted-cabundle` | `ConfigMap` | CA bundle for custom/internal PKI trust |
+| `config-service-cabundle` | `ConfigMap` | OpenShift service CA bundle |
+| `openshift-pipelines-clusterinterceptors` | `ClusterRoleBinding` subject | Lets the pipeline SA call ClusterInterceptors |
+
+#### Configuration fields
+
+```yaml
+spec:
+  platforms:
+    openshift:
+      namespaceSync:
+        createPipelineSA: true          # create/maintain the pipeline SA
+        createSCCRoleBinding: true      # create/maintain pipelines-scc-rolebinding
+        createEditRoleBinding: true     # create/maintain openshift-pipelines-edit
+        createCABundles: true           # inject CA bundle ConfigMaps
+
+        # Optional: restrict which namespaces are synced.
+        # Omit entirely (or set to {}) to sync all non-system namespaces (default).
+        # Use matchLabels/matchExpressions to restrict to a subset.
+        namespaceSelector:
+          matchLabels:
+            pipelines.openshift.io/sync: "true"
+
+        # Optional: automatically bind secrets to the pipeline SA.
+        # Use secretName for an exact name, or labelSelector to match by label.
+        secretBindings:
+          - secretName: pipeline-quay-openshift     # Quay Bridge robot account secret
+          - labelSelector:
+              matchLabels:
+                quay-integration: my-quay            # all secrets with this label
+```
+
+All boolean fields default to `true` when the `namespaceSync` block is present.
+
+#### Disabling individual features
+
+Set the flag to `false` to stop managing that resource class. Existing resources
+are **not deleted** — the controller simply stops reconciling them:
+
+```yaml
+spec:
+  platforms:
+    openshift:
+      namespaceSync:
+        createEditRoleBinding: false   # do not create openshift-pipelines-edit
+```
+
+#### Restricting sync to specific namespaces
+
+Use `namespaceSelector` to limit which namespaces the controller acts on.
+Label namespaces you want synced, then configure the selector to match:
+
+```bash
+# Label a namespace to opt in
+oc label namespace my-project pipelines.openshift.io/sync=true
+```
+
+```yaml
+spec:
+  platforms:
+    openshift:
+      namespaceSync:
+        namespaceSelector:
+          matchLabels:
+            pipelines.openshift.io/sync: "true"
+```
+
+To disable sync for **all** namespaces while keeping the feature flags intact,
+set all individual flags to `false`:
+
+```yaml
+namespaceSync:
+  createPipelineSA: false
+  createCABundles: false
+  createEditRoleBinding: false
+  createSCCRoleBinding: false
+```
+
+Or remove the `namespaceSync` field entirely to fall back to operator defaults.
+
+#### Quay Bridge secret auto-binding
+
+When the [Quay Bridge Operator](https://github.com/quay/quay-bridge-operator) is
+installed, it creates a robot-account secret named `pipeline-quay-openshift` in
+each namespace. Declare a `secretBinding` to have the NamespaceSyncController
+automatically bind that secret to the `pipeline` SA as an image pull secret:
+
+```yaml
+spec:
+  platforms:
+    openshift:
+      namespaceSync:
+        secretBindings:
+          - secretName: pipeline-quay-openshift
+```
+
+Once configured:
+- When the secret appears in a namespace it is added to both `imagePullSecrets`
+  and `secrets` on the `pipeline` SA within seconds.
+- When the secret is deleted the reference is removed automatically.
+
+#### Migration from legacy `spec.params`
+
+Older releases controlled this behaviour through `spec.params` entries. These
+are deprecated: the operator continues to honor them for backward
+compatibility, but they should be migrated to the typed fields below. The
+operator automatically migrates and persists them during the first
+reconcile after an upgrade:
+
+| Legacy `spec.params` | Typed field |
+|---|---|
+| `createRbacResource: "false"` | `createPipelineSA`, `createSCCRoleBinding`, `createEditRoleBinding` all set to `false` |
+| `createCABundleConfigMaps: "false"` | `createCABundles: false` |
+| `legacyPipelineRbac: "false"` | `createEditRoleBinding: false` |
+
+After migration the legacy params are removed from `spec.params` and the typed
+fields take effect. There is no need to manually update the TektonConfig CR.
+
+---
 
 ### OpenShiftPipelinesAsCode
 
