@@ -6,14 +6,12 @@ metadata:
 spec:
   description: |
     Installs MinIO, Loki operator, and OpenShift Logging operator on an
-    ephemeral EaaS cluster using the install-logging.sh script from the
+    ephemeral OpenShift-CI cluster using the install-logging.sh script from the
     release-tests-infra repository.
   params:
-    - name: EAAS_SPACE_SECRET_REF
+    - name: CLUSTER_SECRET_REF
       type: string
-    - name: CLUSTER_NAME
-      type: string
-      description: Name of the ephemeral EaaS cluster
+      description: "Name of the Secret containing the cluster kubeconfig (key: kubeconfig)"
     - name: IMAGE
       description: CI image that contains the oc client
       default: quay.io/openshift-pipeline/ci:latest
@@ -23,7 +21,8 @@ spec:
       default: acceptance-tests-infra
   volumes:
     - name: credentials
-      emptyDir: {}
+      secret:
+        secretName: $(params.CLUSTER_SECRET_REF)
     - name: source
       emptyDir: {}
   stepTemplate:
@@ -51,27 +50,10 @@ spec:
           value: $(params.INFRA_REPO_URL)
         - name: REVISION
           value: $(params.INFRA_REPO_BRANCH)
-    - name: get-kubeconfig
-      ref:
-        resolver: git
-        params:
-          - name: url
-            value: https://github.com/konflux-ci/build-definitions.git
-          - name: revision
-            value: main
-          - name: pathInRepo
-            value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
-      params:
-        - name: eaasSpaceSecretRef
-          value: "$(params.EAAS_SPACE_SECRET_REF)"
-        - name: clusterName
-          value: "$(params.CLUSTER_NAME)"
-        - name: credentials
-          value: credentials
     - name: configure-loki-logging
       env:
         - name: KUBECONFIG
-          value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+          value: "/credentials/kubeconfig"
       workingDir: /source/infra
       script: |
         #!/usr/bin/env bash

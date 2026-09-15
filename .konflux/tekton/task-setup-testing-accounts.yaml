@@ -6,48 +6,29 @@ metadata:
 spec:
   description: |
     Configures HTPasswd identity provider with standard test user accounts on an
-    ephemeral EaaS cluster.  Adapted from the plumbing repo task for Konflux,
-    where credentials come from the EaaS space secret rather than per-cluster
-    Kubernetes secrets.
+    ephemeral OpenShift-CI cluster. Credentials are provided via the Secret
+    returned by the provision-ephemeral-cluster task.
   params:
-    - name: EAAS_SPACE_SECRET_REF
+    - name: CLUSTER_SECRET_REF
       type: string
-    - name: CLUSTER_NAME
-      type: string
-      description: Name of the ephemeral EaaS cluster
+      description: "Name of the Secret containing the cluster kubeconfig (key: kubeconfig)"
     - name: IMAGE
       description: CI image that contains the oc client
       default: quay.io/openshift-pipeline/ci:latest
   volumes:
     - name: credentials
-      emptyDir: {}
+      secret:
+        secretName: $(params.CLUSTER_SECRET_REF)
   stepTemplate:
     image: $(params.IMAGE)
     volumeMounts:
       - name: credentials
         mountPath: /credentials
   steps:
-    - name: get-kubeconfig
-      ref:
-        resolver: git
-        params:
-          - name: url
-            value: https://github.com/konflux-ci/build-definitions.git
-          - name: revision
-            value: main
-          - name: pathInRepo
-            value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
-      params:
-        - name: eaasSpaceSecretRef
-          value: "$(params.EAAS_SPACE_SECRET_REF)"
-        - name: clusterName
-          value: "$(params.CLUSTER_NAME)"
-        - name: credentials
-          value: credentials
     - name: setup-testing-accounts
       env:
         - name: KUBECONFIG
-          value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+          value: "/credentials/kubeconfig"
       script: |
         #!/usr/bin/env bash
         set -e -u -o pipefail
