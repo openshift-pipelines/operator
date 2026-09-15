@@ -18,7 +18,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.21.0 <1.22.5'
+    olm.skipRange: '>=1.21.0 <1.22.6'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonhubs.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonschedulers.operator.tekton.dev","tektonmulticlusterproxyaaes.operator.tekton.dev","syncerservices.operator.tekton.dev"]'
     operators.operatorframework.io/project_layout: unknown
@@ -31,7 +31,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v1.22.5
+  name: openshift-pipelines-operator-rh.v1.22.6
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -427,7 +427,7 @@ spec:
 
     - Tekton Results: v0.18.0
 
-    - Manual Approval Gate (tech-preview): v0.8.0
+    - Manual Approval Gate (tech-preview): v0.8.1
 
     - Tekton Pruner: v0.3.6
 
@@ -1331,7 +1331,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 1.22.5
+                        value: 1.22.6
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1511,7 +1511,7 @@ spec:
                       - name: PROFILING_PORT
                         value: '9009'
                       - name: VERSION
-                        value: 1.22.5
+                        value: 1.22.6
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: CONFIG_LEADERELECTION_NAME
@@ -1759,5 +1759,5 @@ spec:
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
     - image: registry.stage.redhat.io/openshift-pipelines/pipelines-console-plugin-pf5-rhel9@sha256:a9761f85d2ab0a864c6ca873ecc8734b0e98822834d26d4c22393af9326df05e
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN_LEGACY
-  replaces: openshift-pipelines-operator-rh.v1.22.4
-  version: 1.22.5
+  replaces: openshift-pipelines-operator-rh.v1.22.5
+  version: 1.22.6
