@@ -161,7 +161,7 @@ spec:
             script: |
               #!/usr/bin/env bash
               set -x
-              if [[ "$RELEASE_BRANCH" == "next" ]]; then
+              if [[ "$RELEASE_BRANCH" == "next" || "$RELEASE_BRANCH" == "nightly" || "$RELEASE_BRANCH" == "main" ]]; then
                 CHANNEL="latest"
               else
                 CHANNEL=$(echo "$RELEASE_BRANCH" | sed -E 's/release-v([0-9]+\.[0-9]+)\.x/pipelines-\1/')
