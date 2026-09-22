@@ -28,11 +28,12 @@ spec:
     - name: setup-testing-accounts
       env:
         - name: KUBECONFIG
-          value: "/credentials/kubeconfig"
+          value: "/tmp/kubeconfig"
       script: |
         #!/usr/bin/env bash
         set -e -u -o pipefail
 
+        cp /credentials/kubeconfig /tmp/kubeconfig
         echo "Setting up testing accounts on ephemeral EaaS cluster..."
         echo "Cluster: $(oc whoami --show-server)"
 

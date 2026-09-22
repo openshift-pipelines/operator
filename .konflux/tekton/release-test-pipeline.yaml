@@ -171,9 +171,10 @@ spec:
           - name: create-catalog
             env:
               - name: KUBECONFIG
-                value: "/credentials/kubeconfig"
+                value: "/tmp/kubeconfig"
             script: |
               #!/usr/bin/env bash
+              cp /credentials/kubeconfig /tmp/kubeconfig
               cat <<EOF | oc apply -f-
                 apiVersion: operators.coreos.com/v1alpha1
                 kind: CatalogSource

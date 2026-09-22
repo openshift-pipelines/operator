@@ -53,12 +53,13 @@ spec:
     - name: configure-loki-logging
       env:
         - name: KUBECONFIG
-          value: "/credentials/kubeconfig"
+          value: "/tmp/kubeconfig"
       workingDir: /source/infra
       script: |
         #!/usr/bin/env bash
         set -e -o pipefail
 
+        cp /credentials/kubeconfig /tmp/kubeconfig
         echo "Running install-logging.sh from release-tests-infra..."
         echo "Cluster: $(oc whoami --show-server)"
 

@@ -117,7 +117,7 @@ spec:
               key: gitlab-project-id
               optional: true
         - name: KUBECONFIG
-          value: "/credentials/kubeconfig"
+          value: "/tmp/kubeconfig"
         - name: CATALOG_SOURCE
           value: "$(params.CATALOG_SOURCE)"
         - name: CHANNEL
@@ -127,6 +127,7 @@ spec:
         - name: OCP_VERSION
           value: "$(params.OCP_VERSION)"
       script: |
+        cp /credentials/kubeconfig /tmp/kubeconfig
         go mod download
         go build -p 1 ./...
         gauge config check_updates false
