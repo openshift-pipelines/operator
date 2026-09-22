@@ -19,7 +19,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.20.0 <5.0.5-873'
+    olm.skipRange: '>=1.20.0 <5.0.5-874'
     operators.openshift.io/infrastructure-features: '["disconnected","proxy-aware"]'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonkueues.operator.tekton.dev","tektonschedulers.operator.tekton.dev","tektonmulticlusterproxyaaes.operator.tekton.dev","syncerservices.operator.tekton.dev","tektondashboards.operator.tekton.dev"]'
@@ -32,7 +32,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v5.0.5-873
+  name: openshift-pipelines-operator-rh.v5.0.5-874
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -1343,7 +1343,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 5.0.5-873
+                        value: 5.0.5-874
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
                           configMapKeyRef:
@@ -1443,7 +1443,7 @@ spec:
                       - name: IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG
                         value: registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel10@sha256:c65f3377724dcf81a65be1b18aa1e5fc1dcafb26560d466fdfffa2fff5a7e17e
                       - name: IMAGE_CHAINS_TEKTON_CHAINS_CONTROLLER
-                        value: registry.redhat.io/openshift-pipelines/pipelines-chains-controller-rhel10@sha256:776dee284028b7f321de2670e7fa114fff38abdcb6392136ad58f6d2ae74a88f
+                        value: registry.redhat.io/openshift-pipelines/pipelines-chains-controller-rhel10@sha256:3cefa47c5ad75248dd5681ae84061e043e84a3e7a05fa207586e3aeab6f715f9
                       - name: IMAGE_RESULTS_POSTGRES
                         value: registry.redhat.io/rhel9/postgresql-15@sha256:1837a1638e3e5b0d4b3efb9b1568982cab3ccac8ce6842ebf3e6f83e1905278c
                       - name: IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER
@@ -1451,7 +1451,7 @@ spec:
                       - name: IMAGE_MAG_MANUAL_APPROVAL
                         value: registry.redhat.io/openshift-pipelines/pipelines-manual-approval-gate-webhook-rhel10@sha256:0fa3f90ce1693df5c6b0cbe077d4586618f7a08b03bff0ee6f5d8f7cabdf0d38
                       - name: IMAGE_PRUNER_CONTROLLER
-                        value: registry.redhat.io/openshift-pipelines/pipelines-pruner-controller-rhel10@sha256:59bbfd7c7b28ec9a11663eaf8bac8791c822404cc0331aacf213553e614fab62
+                        value: registry.redhat.io/openshift-pipelines/pipelines-pruner-controller-rhel10@sha256:53d919f02305ea686afc7d3b83d60a7eaa5efdb3f6978b0f1bf18dae8ae26612
                       - name: IMAGE_KUEUE_MANAGER
                         value: registry.redhat.io/openshift-pipelines/pipelines-scheduler-rhel10@sha256:739d70cb67a4fac7278d74d77d5c8fd6835d08ea63fe1476a2e8f27de20fc6d5
                       - name: IMAGE_KUEUE_WEBHOOK
@@ -1461,7 +1461,7 @@ spec:
                       - name: IMAGE_SYNCER_SERVICE_WORKLOAD_CONTROLLER
                         value: registry.redhat.io/openshift-pipelines/pipelines-syncer-service-rhel10@sha256:e82acb266427991fa092e5ea54841c18b666123fa536528736c8c17bf0211c36
                       - name: IMAGE_PRUNER_WEBHOOK
-                        value: registry.redhat.io/openshift-pipelines/pipelines-pruner-webhook-rhel10@sha256:b11f083931e6ce0bb0521c2226b5064e0e21771b805e56125370f84f83c527ec
+                        value: registry.redhat.io/openshift-pipelines/pipelines-pruner-webhook-rhel10@sha256:2ff456c2ec8f012fcd2bfc0fa71f7bf954ce7a1e242f5cafb8748d7a6289dea5
                       - name: IMAGE_PAC_PAC_CONTROLLER
                         value: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-controller-rhel10@sha256:d57e0ad0da5e4ba0ae3a83437e059c2afc44a8427ebce4c8ed9bbd470e360756
                       - name: IMAGE_PAC_PAC_WEBHOOK
@@ -1515,7 +1515,7 @@ spec:
                       - name: PROFILING_PORT
                         value: '9009'
                       - name: VERSION
-                        value: 5.0.5-873
+                        value: 5.0.5-874
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: CONFIG_LEADERELECTION_NAME
@@ -1716,7 +1716,7 @@ spec:
       name: IMAGE_ADDONS_TKN_CLI_SERVE_INIT_CONFIG
     - image: registry.redhat.io/openshift-pipelines/pipelines-operator-webhook-rhel10@sha256:bf7632d2ef2d30817fe7bc12992ef54e66f85bbc8d3e40b84bb1dc7d3b002747
       name: TEKTON_OPERATOR_WEBHOOK
-    - image: registry.redhat.io/openshift-pipelines/pipelines-chains-controller-rhel10@sha256:776dee284028b7f321de2670e7fa114fff38abdcb6392136ad58f6d2ae74a88f
+    - image: registry.redhat.io/openshift-pipelines/pipelines-chains-controller-rhel10@sha256:3cefa47c5ad75248dd5681ae84061e043e84a3e7a05fa207586e3aeab6f715f9
       name: IMAGE_CHAINS_TEKTON_CHAINS_CONTROLLER
     - image: registry.redhat.io/rhel9/postgresql-15@sha256:1837a1638e3e5b0d4b3efb9b1568982cab3ccac8ce6842ebf3e6f83e1905278c
       name: IMAGE_RESULTS_POSTGRES
@@ -1724,7 +1724,7 @@ spec:
       name: IMAGE_MAG_TEKTON_TASKGROUP_CONTROLLER
     - image: registry.redhat.io/openshift-pipelines/pipelines-manual-approval-gate-webhook-rhel10@sha256:0fa3f90ce1693df5c6b0cbe077d4586618f7a08b03bff0ee6f5d8f7cabdf0d38
       name: IMAGE_MAG_MANUAL_APPROVAL
-    - image: registry.redhat.io/openshift-pipelines/pipelines-pruner-controller-rhel10@sha256:59bbfd7c7b28ec9a11663eaf8bac8791c822404cc0331aacf213553e614fab62
+    - image: registry.redhat.io/openshift-pipelines/pipelines-pruner-controller-rhel10@sha256:53d919f02305ea686afc7d3b83d60a7eaa5efdb3f6978b0f1bf18dae8ae26612
       name: IMAGE_PRUNER_CONTROLLER
     - image: registry.redhat.io/openshift-pipelines/pipelines-scheduler-rhel10@sha256:739d70cb67a4fac7278d74d77d5c8fd6835d08ea63fe1476a2e8f27de20fc6d5
       name: IMAGE_KUEUE_MANAGER
@@ -1734,7 +1734,7 @@ spec:
       name: IMAGE_MULTICLUSTERPROXYAAE_PROXY_AAE
     - image: registry.redhat.io/openshift-pipelines/pipelines-syncer-service-rhel10@sha256:e82acb266427991fa092e5ea54841c18b666123fa536528736c8c17bf0211c36
       name: IMAGE_SYNCER_SERVICE_WORKLOAD_CONTROLLER
-    - image: registry.redhat.io/openshift-pipelines/pipelines-pruner-webhook-rhel10@sha256:b11f083931e6ce0bb0521c2226b5064e0e21771b805e56125370f84f83c527ec
+    - image: registry.redhat.io/openshift-pipelines/pipelines-pruner-webhook-rhel10@sha256:2ff456c2ec8f012fcd2bfc0fa71f7bf954ce7a1e242f5cafb8748d7a6289dea5
       name: IMAGE_PRUNER_WEBHOOK
     - image: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-controller-rhel10@sha256:d57e0ad0da5e4ba0ae3a83437e059c2afc44a8427ebce4c8ed9bbd470e360756
       name: IMAGE_PAC_PAC_CONTROLLER
@@ -1758,5 +1758,5 @@ spec:
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
     - image: registry.redhat.io/openshift-pipelines/pipelines-console-plugin-pf5-rhel10@sha256:9f9edebbc82cf37eae45bf2b77fb1473a3bc7950e63fcd09325b2c8f9b98816d
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN_LEGACY
-  replaces: openshift-pipelines-operator-rh.v5.0.5-872
-  version: 5.0.5-873
+  replaces: openshift-pipelines-operator-rh.v5.0.5-873
+  version: 5.0.5-874
