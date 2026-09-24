@@ -57,8 +57,31 @@ spec:
         oc adm policy add-cluster-role-to-user view consoledeveloper || true
         oc adm policy add-cluster-role-to-user basic-user pipelinesdeveloper || true
 
+        # Grant MAG approver RBAC to all test users cluster-wide.
+        # After openshift-pipelines/manual-approval-gate@dc388bb the
+        # system:authenticated binding was removed, so approvers need an
+        # explicit grant of manual-approval-gate-approver ClusterRole.
+        # Test namespaces are created dynamically (releasetest-xxxxx) so
+        # a ClusterRoleBinding is simpler than per-namespace RoleBindings.
+        for u in "${USERS[@]}"; do
+          cat <<EOF | oc apply -f-
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: mag-approver-${u}
+        subjects:
+        - kind: User
+          name: ${u}
+          apiGroup: rbac.authorization.k8s.io
+        roleRef:
+          kind: ClusterRole
+          name: manual-approval-gate-approver
+          apiGroup: rbac.authorization.k8s.io
+        EOF
+          echo "ClusterRoleBinding 'mag-approver-${u}' created"
+        done
+
         # Verify impersonation works
-        API_SERVER=$(oc whoami --show-server)
         WHOAMI=$(oc --as=user1 whoami 2>&1) || true
         echo "Impersonation test (--as=user1): $WHOAMI"
 
