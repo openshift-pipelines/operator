@@ -217,8 +217,9 @@ spec:
           value: "custom-osp-nightly"
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
+        # TODO: update branch per release (e.g. release-v1.25, master for nightly)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: release-v1.24
       runAfter:
         - create-catalog-source
         - configure-loki-logging
