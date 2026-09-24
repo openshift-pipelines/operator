@@ -224,24 +224,26 @@ spec:
         - create-catalog-source
         - configure-loki-logging
 
-    # Setup test user accounts
-    - name: setup-testing-accounts
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: $(params.RELEASE_TEST_TASKS_REPO)
-          - name: revision
-            value: $(params.RELEASE_TEST_TASKS_BRANCH)
-          - name: pathInRepo
-            value: .konflux/tekton/task-setup-testing-accounts.yaml
-      params:
-        - name: CLUSTER_SECRET_REF
-          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
-        - name: IMAGE
-          value: $(params.IMAGE)
-      runAfter:
-        - install-pipelines-operator
+    # TODO: HTPasswd IDP cannot be configured on HyperShift hosted clusters.
+    # OAuth must be set via HostedCluster CR on the management cluster, which tenants don't have access to.
+    # Re-enable once kubeAdminPassword is available and SA-based user setup is implemented.
+    # - name: setup-testing-accounts
+    #   taskRef:
+    #     resolver: git
+    #     params:
+    #       - name: url
+    #         value: $(params.RELEASE_TEST_TASKS_REPO)
+    #       - name: revision
+    #         value: $(params.RELEASE_TEST_TASKS_BRANCH)
+    #       - name: pathInRepo
+    #         value: .konflux/tekton/task-setup-testing-accounts.yaml
+    #   params:
+    #     - name: CLUSTER_SECRET_REF
+    #       value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+    #     - name: IMAGE
+    #       value: $(params.IMAGE)
+    #   runAfter:
+    #     - install-pipelines-operator
 
     #Release Tests - Chains
     - name: release-tests-chains
@@ -269,7 +271,7 @@ spec:
         - name: GIT_RELEASE_TESTS_BRANCH
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
       runAfter:
-        - setup-testing-accounts
+        - install-pipelines-operator
 
     #Release Tests - Manual Approval Gate
     - name: release-tests-manual-approval
@@ -297,7 +299,7 @@ spec:
         - name: GIT_RELEASE_TESTS_BRANCH
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
       runAfter:
-        - setup-testing-accounts
+        - install-pipelines-operator
 
     #Release Tests - Metrics
     - name: release-tests-metrics
@@ -325,7 +327,7 @@ spec:
         - name: GIT_RELEASE_TESTS_BRANCH
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
       runAfter:
-        - setup-testing-accounts
+        - install-pipelines-operator
 
     #Release Tests - Pipelines as Code
     - name: release-tests-pac
@@ -353,7 +355,7 @@ spec:
         - name: GIT_RELEASE_TESTS_BRANCH
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
       runAfter:
-        - setup-testing-accounts
+        - install-pipelines-operator
 
     #Release Tests - Versions
     - name: release-tests-versions
@@ -381,121 +383,123 @@ spec:
         - name: GIT_RELEASE_TESTS_BRANCH
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
       runAfter:
-        - setup-testing-accounts
+        - install-pipelines-operator
 
-    #Release Tests - Pipelines
-    - name: release-tests-pipelines
-      onError: continue
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: $(params.RELEASE_TEST_TASKS_REPO)
-          - name: revision
-            value: $(params.RELEASE_TEST_TASKS_BRANCH)
-          - name: pathInRepo
-            value: .konflux/tekton/task-e2e-pipeline.yaml
-      params:
-        - name: CLUSTER_SECRET_REF
-          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
-        - name: IMAGE
-          value: $(params.IMAGE)
-        - name: RUN_AS
-          value: "non-admin"
-        - name: SPECS
-          value: "specs/pipelines/"
-        - name: TAGS
-          value: "$(params.TAGS)"
-        - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
-      runAfter:
-        - setup-testing-accounts
+    # TODO: non-admin tests require HTPasswd IDP which cannot be configured on HyperShift.
+    # Re-enable once SA-based non-admin user setup is implemented.
+    # #Release Tests - Pipelines
+    # - name: release-tests-pipelines
+    #   onError: continue
+    #   taskRef:
+    #     resolver: git
+    #     params:
+    #       - name: url
+    #         value: $(params.RELEASE_TEST_TASKS_REPO)
+    #       - name: revision
+    #         value: $(params.RELEASE_TEST_TASKS_BRANCH)
+    #       - name: pathInRepo
+    #         value: .konflux/tekton/task-e2e-pipeline.yaml
+    #   params:
+    #     - name: CLUSTER_SECRET_REF
+    #       value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+    #     - name: IMAGE
+    #       value: $(params.IMAGE)
+    #     - name: RUN_AS
+    #       value: "non-admin"
+    #     - name: SPECS
+    #       value: "specs/pipelines/"
+    #     - name: TAGS
+    #       value: "$(params.TAGS)"
+    #     - name: GIT_RELEASE_TESTS_BRANCH
+    #       value: $(params.GIT_RELEASE_TESTS_BRANCH)
+    #   runAfter:
+    #     - install-pipelines-operator
 
-    #Release Tests - Triggers
-    - name: release-tests-triggers
-      onError: continue
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: $(params.RELEASE_TEST_TASKS_REPO)
-          - name: revision
-            value: $(params.RELEASE_TEST_TASKS_BRANCH)
-          - name: pathInRepo
-            value: .konflux/tekton/task-e2e-pipeline.yaml
-      params:
-        - name: CLUSTER_SECRET_REF
-          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
-        - name: IMAGE
-          value: $(params.IMAGE)
-        - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
-        - name: RUN_AS
-          value: "non-admin"
-        - name: SPECS
-          value: "specs/triggers/"
-        - name: TAGS
-          value: "$(params.TAGS) && !tls"
-        - name: OCP_VERSION
-          value: "$(tasks.extract-ocp-version.results.ocpVersion)"
-      runAfter:
-        - setup-testing-accounts
+    # #Release Tests - Triggers
+    # - name: release-tests-triggers
+    #   onError: continue
+    #   taskRef:
+    #     resolver: git
+    #     params:
+    #       - name: url
+    #         value: $(params.RELEASE_TEST_TASKS_REPO)
+    #       - name: revision
+    #         value: $(params.RELEASE_TEST_TASKS_BRANCH)
+    #       - name: pathInRepo
+    #         value: .konflux/tekton/task-e2e-pipeline.yaml
+    #   params:
+    #     - name: CLUSTER_SECRET_REF
+    #       value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+    #     - name: IMAGE
+    #       value: $(params.IMAGE)
+    #     - name: GIT_RELEASE_TESTS_BRANCH
+    #       value: $(params.GIT_RELEASE_TESTS_BRANCH)
+    #     - name: RUN_AS
+    #       value: "non-admin"
+    #     - name: SPECS
+    #       value: "specs/triggers/"
+    #     - name: TAGS
+    #       value: "$(params.TAGS) && !tls"
+    #     - name: OCP_VERSION
+    #       value: "$(tasks.extract-ocp-version.results.ocpVersion)"
+    #   runAfter:
+    #     - install-pipelines-operator
 
-    #Release Tests - Results
-    - name: release-tests-results
-      onError: continue
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: $(params.RELEASE_TEST_TASKS_REPO)
-          - name: revision
-            value: $(params.RELEASE_TEST_TASKS_BRANCH)
-          - name: pathInRepo
-            value: .konflux/tekton/task-e2e-pipeline.yaml
-      params:
-        - name: CLUSTER_SECRET_REF
-          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
-        - name: IMAGE
-          value: $(params.IMAGE)
-        - name: RUN_AS
-          value: "non-admin"
-        - name: SPECS
-          value: "specs/results/"
-        - name: TAGS
-          value: "$(params.TAGS)"
-        - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
-      runAfter:
-        - setup-testing-accounts
+    # #Release Tests - Results
+    # - name: release-tests-results
+    #   onError: continue
+    #   taskRef:
+    #     resolver: git
+    #     params:
+    #       - name: url
+    #         value: $(params.RELEASE_TEST_TASKS_REPO)
+    #       - name: revision
+    #         value: $(params.RELEASE_TEST_TASKS_BRANCH)
+    #       - name: pathInRepo
+    #         value: .konflux/tekton/task-e2e-pipeline.yaml
+    #   params:
+    #     - name: CLUSTER_SECRET_REF
+    #       value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+    #     - name: IMAGE
+    #       value: $(params.IMAGE)
+    #     - name: RUN_AS
+    #       value: "non-admin"
+    #     - name: SPECS
+    #       value: "specs/results/"
+    #     - name: TAGS
+    #       value: "$(params.TAGS)"
+    #     - name: GIT_RELEASE_TESTS_BRANCH
+    #       value: $(params.GIT_RELEASE_TESTS_BRANCH)
+    #   runAfter:
+    #     - install-pipelines-operator
 
-    #Release Tests - Triggers TLS
-    - name: release-tests-triggers-tls
-      onError: continue
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: $(params.RELEASE_TEST_TASKS_REPO)
-          - name: revision
-            value: $(params.RELEASE_TEST_TASKS_BRANCH)
-          - name: pathInRepo
-            value: .konflux/tekton/task-e2e-pipeline.yaml
-      params:
-        - name: CLUSTER_SECRET_REF
-          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
-        - name: IMAGE
-          value: $(params.IMAGE)
-        - name: RUN_AS
-          value: "non-admin"
-        - name: SPECS
-          value: "specs/triggers/eventlistener.spec"
-        - name: TAGS
-          value: "tls & $(params.TAGS)"
-        - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
-      runAfter:
-        - setup-testing-accounts
+    # #Release Tests - Triggers TLS
+    # - name: release-tests-triggers-tls
+    #   onError: continue
+    #   taskRef:
+    #     resolver: git
+    #     params:
+    #       - name: url
+    #         value: $(params.RELEASE_TEST_TASKS_REPO)
+    #       - name: revision
+    #         value: $(params.RELEASE_TEST_TASKS_BRANCH)
+    #       - name: pathInRepo
+    #         value: .konflux/tekton/task-e2e-pipeline.yaml
+    #   params:
+    #     - name: CLUSTER_SECRET_REF
+    #       value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+    #     - name: IMAGE
+    #       value: $(params.IMAGE)
+    #     - name: RUN_AS
+    #       value: "non-admin"
+    #     - name: SPECS
+    #       value: "specs/triggers/eventlistener.spec"
+    #     - name: TAGS
+    #       value: "tls & $(params.TAGS)"
+    #     - name: GIT_RELEASE_TESTS_BRANCH
+    #       value: $(params.GIT_RELEASE_TESTS_BRANCH)
+    #   runAfter:
+    #     - install-pipelines-operator
 
   finally:
     - name: deprovision-ephemeral-cluster
