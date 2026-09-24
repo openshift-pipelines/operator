@@ -5,11 +5,10 @@ metadata:
   name: setup-testing-accounts
 spec:
   description: |
-    Sets up non-admin test users on an ephemeral HyperShift cluster using
-    ServiceAccount-based credentials. kubeAdminPassword (now available in the
-    credentials secret after DPTP-5306) is used to verify admin access.
-    HTPasswd IDP cannot be configured on HyperShift — oauth/cluster is blocked
-    by ValidatingAdmissionPolicy — so SAs are used instead of htpasswd users.
+    Creates OpenShift User objects for non-admin test identities on a HyperShift
+    cluster. HTPasswd IDP cannot be configured (oauth/cluster is blocked by
+    ValidatingAdmissionPolicy), so tests use kubeadmin with --as=<user>
+    impersonation instead of password-based login.
   params:
     - name: CLUSTER_SECRET_REF
       type: string
@@ -39,52 +38,38 @@ spec:
         echo "Setting up testing accounts on ephemeral HyperShift cluster..."
         echo "Cluster: $(oc whoami --show-server)"
 
-        # Read kubeAdminPassword from the credentials secret (available after DPTP-5306)
-        KUBE_ADMIN_PASSWORD=$(cat /credentials/kubeAdminPassword)
-        echo "kubeAdminPassword retrieved from credentials secret"
+        echo "Credentials secret keys:"
+        ls -la /credentials/
 
-        # Verify kubeadmin password works
+        # Create OpenShift User objects for test identities.
+        # These are needed so that:
+        #  - kubeadmin can impersonate them with --as=<user>
+        #  - they can be added to OpenShift Groups for MAG tests
+        USERS=(user user1 user2 user3 user4 user5 user6 user7 user8 user9 consoledeveloper pipelinesdeveloper)
+
+        for u in "${USERS[@]}"; do
+          oc create user "$u" --dry-run=client -o yaml | oc apply -f-
+          echo "User '$u' created"
+        done
+
+        # Assign cluster roles matching what htpasswd users had
+        oc adm policy add-cluster-role-to-user self-provisioner consoledeveloper || true
+        oc adm policy add-cluster-role-to-user view consoledeveloper || true
+        oc adm policy add-cluster-role-to-user basic-user pipelinesdeveloper || true
+
+        # Verify impersonation works
         API_SERVER=$(oc whoami --show-server)
-        oc login -u kubeadmin -p "$KUBE_ADMIN_PASSWORD" \
-          "$API_SERVER" --insecure-skip-tls-verify=true
-        echo "kubeadmin login verified with kubeAdminPassword"
-
-        # Create namespace for test service accounts
-        TEST_NS="test-users"
-        oc create namespace "$TEST_NS" --dry-run=client -o yaml | oc apply -f-
-
-        # Create service accounts to act as non-admin test users
-        # and bind cluster roles matching what htpasswd users had
-        declare -A SA_ROLES=(
-          ["consoledeveloper"]="self-provisioner view"
-          ["pipelinesdeveloper"]="basic-user"
-          ["user"]=""
-        )
-
-        for sa in "${!SA_ROLES[@]}"; do
-          oc create sa "$sa" -n "$TEST_NS" --dry-run=client -o yaml | oc apply -f-
-          for role in ${SA_ROLES[$sa]}; do
-            oc adm policy add-cluster-role-to-user "$role" \
-              "system:serviceaccount:${TEST_NS}:${sa}" || true
-          done
-          echo "ServiceAccount '$sa' created in namespace '$TEST_NS'"
-        done
-
-        # user1..user9 as plain SAs (no extra cluster roles)
-        for i in $(seq 1 9); do
-          oc create sa "user${i}" -n "$TEST_NS" --dry-run=client -o yaml | oc apply -f-
-          echo "ServiceAccount 'user${i}' created"
-        done
+        WHOAMI=$(oc --as=user1 whoami 2>&1) || true
+        echo "Impersonation test (--as=user1): $WHOAMI"
 
         echo ""
-        echo "Testing accounts (SA-based) configured successfully!"
-        echo "Namespace: $TEST_NS"
+        echo "Testing accounts configured successfully (impersonation mode)!"
         echo ""
-        echo "ServiceAccount    | Cluster roles"
-        echo "------------------|-----------------------------"
-        echo "consoledeveloper  | self-provisioner, view"
-        echo "pipelinesdeveloper| basic-user"
-        echo "user              | default"
+        echo "User               | Cluster roles"
+        echo "-------------------|-----------------------------"
+        echo "consoledeveloper   | self-provisioner, view"
+        echo "pipelinesdeveloper | basic-user"
+        echo "user               | (none)"
         for i in $(seq 1 9); do
-          printf "user%-12s | default\n" "$i"
+          printf "user%-14s | (none)\n" "$i"
         done

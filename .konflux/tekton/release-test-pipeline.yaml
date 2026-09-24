@@ -225,26 +225,23 @@ spec:
         - create-catalog-source
         - configure-loki-logging
 
-    # TODO: HTPasswd IDP cannot be configured on HyperShift hosted clusters.
-    # OAuth must be set via HostedCluster CR on the management cluster, which tenants don't have access to.
-    # Re-enable once kubeAdminPassword is available and SA-based user setup is implemented.
-    # - name: setup-testing-accounts
-    #   taskRef:
-    #     resolver: git
-    #     params:
-    #       - name: url
-    #         value: $(params.RELEASE_TEST_TASKS_REPO)
-    #       - name: revision
-    #         value: $(params.RELEASE_TEST_TASKS_BRANCH)
-    #       - name: pathInRepo
-    #         value: .konflux/tekton/task-setup-testing-accounts.yaml
-    #   params:
-    #     - name: CLUSTER_SECRET_REF
-    #       value: $(tasks.provision-ephemeral-cluster.results.secretRef)
-    #     - name: IMAGE
-    #       value: $(params.IMAGE)
-    #   runAfter:
-    #     - install-pipelines-operator
+    - name: setup-testing-accounts
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-setup-testing-accounts.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+      runAfter:
+        - install-pipelines-operator
 
     #Release Tests - Chains
     - name: release-tests-chains
@@ -299,10 +296,15 @@ spec:
         - name: TAGS
           value: "$(params.TAGS)"
         # TODO: update branch per release (e.g. release-v1.25, master for nightly)
+        # Using fork branch with impersonation support for HyperShift
+        - name: GIT_RELEASE_TESTS_URI
+          value: https://github.com/divyansh42/release-tests.git
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: release-v1.24
+          value: sa-auth-hypershift
+        - name: MAG_USE_IMPERSONATION
+          value: "true"
       runAfter:
-        - install-pipelines-operator
+        - setup-testing-accounts
 
     #Release Tests - Metrics
     - name: release-tests-metrics

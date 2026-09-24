@@ -12,7 +12,7 @@ spec:
       default: https://github.com/openshift-pipelines/release-tests.git
     - name: GIT_RELEASE_TESTS_BRANCH
       default: master
-    - name: CATALOG_SOURCE
+    - name: CATALOG_SOURCEwha
       description: Provide catalog-source name through which user have to subscribe operator
       default: redhat-operators
     - name: CHANNEL
@@ -35,6 +35,9 @@ spec:
       default: "e2e,non-admin"
     - name: OCP_VERSION
       default: ""
+    - name: MAG_USE_IMPERSONATION
+      description: "Set to 'true' to use --as=<user> impersonation for MAG tests (required on HyperShift)"
+      default: "false"
 
   volumes:
     - name: credentials
@@ -126,16 +129,18 @@ spec:
           value: "$(params.CHAINS_REPOSITORY)"
         - name: OCP_VERSION
           value: "$(params.OCP_VERSION)"
+        - name: MAG_USE_IMPERSONATION
+          value: "$(params.MAG_USE_IMPERSONATION)"
       script: |
         cp /credentials/kubeconfig /tmp/kubeconfig
         go mod download
         go build -p 1 ./...
         gauge config check_updates false
-        
+
         # Some of the tests fail on specific OCP versions
         set +H
         tags="$(params.TAGS),!(skip-$OCP_VERSION | to-do)"
         set -H
-        
+
         echo "Running $(params.SPECS) with tags $tags"
         gauge run --tags="$tags" --log-level=debug --verbose $(params.SPECS)
