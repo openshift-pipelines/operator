@@ -134,9 +134,11 @@ spec:
       script: |
         cp /credentials/kubeconfig /tmp/kubeconfig
 
-        # Pin to version matching go.mod (v2.33.0 removed --fail-on-focused)
         go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.1
         export PATH="$(go env GOPATH)/bin:$PATH"
+
+        # --fail-on-focused does not exist in ginkgo v2 (always-on); patch the script
+        sed -i 's/ --fail-on-focused//g' ./scripts/run-tests.sh
 
         MODE="$(params.MODE)"
         TEST_PATH="$(params.TEST_PATH)"
