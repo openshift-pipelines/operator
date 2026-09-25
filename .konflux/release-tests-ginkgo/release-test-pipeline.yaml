@@ -5,8 +5,8 @@ metadata:
   name: release-test-pipeline-ginkgo
 spec:
   description: |
-    An integration test which provisions an ephemeral Hypershift cluster and deploys an Operator
-    bundle from a Konflux snapshot.
+    An integration test which provisions an ephemeral Hypershift cluster via OpenShift-CI
+    and runs Ginkgo-based release tests against an Operator bundle from a Konflux snapshot.
   params:
     - description: Snapshot of the application
       name: SNAPSHOT
@@ -19,17 +19,68 @@ spec:
     - name: IMAGE
       type: string
       default: quay.io/openshift-pipeline/ci:latest
-    - name: TAGS
-      default: "(e2e | sanity)"
     - name: RELEASE_TEST_TASKS_REPO
       default: https://github.com/openshift-pipelines/operator
     - name: RELEASE_TEST_TASKS_BRANCH
-      default: main
+      default: SRVKP-13194-ginkgo-openshift-ci
     - name: GIT_RELEASE_TESTS_BRANCH
-      default: master
+      default: main
 
   tasks:
+    - name: parse-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/integration-examples
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/test_metadata.yaml
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+
+    - name: extract-ocp-version
+      runAfter:
+        - parse-metadata
+      params:
+        - name: componentName
+          value: "$(tasks.parse-metadata.results.component-name)"
+      taskSpec:
+        params:
+          - name: componentName
+            type: string
+        results:
+          - name: ocpVersion
+            description: The OCP minor version extracted from component name (e.g. 4.20)
+        steps:
+          - name: extract-version
+            image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+            env:
+              - name: COMPONENT_NAME
+                value: "$(params.componentName)"
+            script: |
+              #!/usr/bin/env bash
+              set -e
+
+              echo "Component Name: $COMPONENT_NAME"
+
+              VERSION_PATTERN=$(echo "$COMPONENT_NAME" | grep -oE '[0-9]+-[0-9]+' | tail -1)
+
+              if [ -z "$VERSION_PATTERN" ]; then
+                echo "Warning: Could not extract version from component name, using default"
+                OCP_VERSION="4.20"
+              else
+                OCP_VERSION=$(echo "$VERSION_PATTERN" | tr '-' '.')
+                echo "Extracted OCP Version: $OCP_VERSION"
+              fi
+
+              echo -n "$OCP_VERSION" | tee $(results.ocpVersion.path)
+
     - name: provision-ephemeral-cluster
+      runAfter:
+        - extract-ocp-version
       taskRef:
         resolver: git
         params:
@@ -45,4 +96,416 @@ spec:
         - name: ownerUid
           value: $(context.pipelineRun.uid)
         - name: workflow
-          value: "3scale-ipi-aws"
+          value: hypershift-hostedcluster-workflow
+        - name: clusterProfile
+          value: aws-konflux-prod
+        - name: releases
+          value: '{"latest":{"release":{"channel":"stable","version":"$(tasks.extract-ocp-version.results.ocpVersion)","architecture":"multi"}}}'
+        - name: env
+          value: '{"COMPUTE_NODE_TYPE": "m5.2xlarge", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines"}'
+
+    # Configure Loki and OpenShift Logging
+    - name: configure-loki-logging
+      runAfter:
+        - provision-ephemeral-cluster
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-configure-loki-logging.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+
+    # Create Catalog Source to install Operator
+    - name: create-catalog-source
+      runAfter:
+        - provision-ephemeral-cluster
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+      taskSpec:
+        params:
+          - name: CLUSTER_SECRET_REF
+            type: string
+        results:
+          - name: channel
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.CLUSTER_SECRET_REF)
+        stepTemplate:
+          image: $(params.IMAGE)
+          env:
+            - name: INDEX_IMAGE
+              value: "$(tasks.parse-metadata.results.component-container-image)"
+            - name: RELEASE_BRANCH
+              value: "$(tasks.parse-metadata.results.target-git-branch)"
+          volumeMounts:
+            - name: credentials
+              mountPath: /credentials
+              readOnly: true
+        steps:
+          - name: extract-channel-name
+            script: |
+              #!/usr/bin/env bash
+              set -x
+              if [[ "$RELEASE_BRANCH" == "next" || "$RELEASE_BRANCH" == "nightly" || "$RELEASE_BRANCH" == "main" ]]; then
+                CHANNEL="latest"
+              else
+                CHANNEL=$(echo "$RELEASE_BRANCH" | sed -E 's/release-v([0-9]+\.[0-9]+)\.x/pipelines-\1/')
+              fi
+              echo -n "$CHANNEL" | tee $(results.channel.path)
+
+          - name: create-catalog
+            env:
+              - name: KUBECONFIG
+                value: "/tmp/kubeconfig"
+            script: |
+              #!/usr/bin/env bash
+              cp /credentials/kubeconfig /tmp/kubeconfig
+              cat <<EOF | oc apply -f-
+                apiVersion: operators.coreos.com/v1alpha1
+                kind: CatalogSource
+                metadata:
+                  name: "custom-osp-nightly"
+                  namespace: openshift-marketplace
+                spec:
+                  sourceType: grpc
+                  image: $INDEX_IMAGE
+                  displayName: "Custom OSP Nightly"
+                  publisher: Red Hat Local
+                  updateStrategy:
+                  registryPoll:
+                  interval: 30m
+              EOF
+
+    # Install Pipelines Operator (uses ginkgo install mode)
+    - name: install-pipelines-operator
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/release-tests-ginkgo/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: MODE
+          value: "install"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+      runAfter:
+        - create-catalog-source
+        - configure-loki-logging
+
+    # Setup testing accounts for impersonation (HyperShift)
+    - name: setup-testing-accounts
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-setup-testing-accounts.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+      runAfter:
+        - install-pipelines-operator
+
+    # Ginkgo Release Tests - Chains
+    - name: release-tests-chains
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/release-tests-ginkgo/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: MODE
+          value: "e2e"
+        - name: TEST_PATH
+          value: "./tests/chains/"
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+      runAfter:
+        - install-pipelines-operator
+
+    # Ginkgo Release Tests - Manual Approval Gate
+    - name: release-tests-manual-approval
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/release-tests-ginkgo/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: MODE
+          value: "e2e"
+        - name: TEST_PATH
+          value: "./tests/mag/"
+        - name: MAG_USE_IMPERSONATION
+          value: "true"
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+      runAfter:
+        - setup-testing-accounts
+
+    # Ginkgo Release Tests - Metrics
+    - name: release-tests-metrics
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/release-tests-ginkgo/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: MODE
+          value: "e2e"
+        - name: TEST_PATH
+          value: "./tests/metrics/"
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+      runAfter:
+        - install-pipelines-operator
+
+    # Ginkgo Release Tests - Pipelines as Code
+    - name: release-tests-pac
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/release-tests-ginkgo/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: MODE
+          value: "e2e"
+        - name: TEST_PATH
+          value: "./tests/pac/"
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+      runAfter:
+        - install-pipelines-operator
+
+    # Ginkgo Release Tests - Versions
+    - name: release-tests-versions
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/release-tests-ginkgo/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: MODE
+          value: "e2e"
+        - name: TEST_PATH
+          value: "./tests/versions/"
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+      runAfter:
+        - install-pipelines-operator
+
+    # Ginkgo Release Tests - Operator
+    - name: release-tests-operator
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/release-tests-ginkgo/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: MODE
+          value: "e2e"
+        - name: TEST_PATH
+          value: "./tests/operator/"
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+      runAfter:
+        - install-pipelines-operator
+
+    # Ginkgo Release Tests - Pipelines
+    - name: release-tests-pipelines
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/release-tests-ginkgo/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: MODE
+          value: "e2e"
+        - name: TEST_PATH
+          value: "./tests/pipelines/"
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+      runAfter:
+        - install-pipelines-operator
+
+    # Ginkgo Release Tests - Triggers
+    - name: release-tests-triggers
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/release-tests-ginkgo/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: MODE
+          value: "e2e"
+        - name: TEST_PATH
+          value: "./tests/triggers/"
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+      runAfter:
+        - install-pipelines-operator
+
+    # Ginkgo Release Tests - Results
+    - name: release-tests-results
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/release-tests-ginkgo/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: MODE
+          value: "e2e"
+        - name: TEST_PATH
+          value: "./tests/results/"
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+      runAfter:
+        - install-pipelines-operator
+
+  finally:
+    - name: deprovision-ephemeral-cluster
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/openshift/konflux-tasks
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/deprovision-ephemeral-cluster/0.1/deprovision-ephemeral-cluster.yaml
+      params:
+        - name: testPlatformClusterClaimName
+          value: $(tasks.provision-ephemeral-cluster.results.testPlatformClusterClaimName)
+        - name: testPlatformClusterClaimNamespace
+          value: $(tasks.provision-ephemeral-cluster.results.testPlatformClusterClaimNamespace)
+
+    # Verify aggregate status and fail pipeline if any e2e task failed
+    - name: verify-e2e-tests-status
+      params:
+        - name: aggregateStatus
+          value: "$(tasks.status)"
+      taskSpec:
+        params:
+          - name: aggregateStatus
+        steps:
+          - image: $(params.IMAGE)
+            name: verify-aggregate-status
+            script: |
+              #!/bin/sh
+              echo "Aggregate Status: $(params.aggregateStatus)"
+
+              if [[ "$(params.aggregateStatus)" != "Succeeded" ]]; then
+                echo "Pipeline contains failed tasks!"
+                echo "Check individual task logs for detailed error information"
+                exit 1
+              fi
+
+              echo "All tasks succeeded!"
