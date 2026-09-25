@@ -134,6 +134,9 @@ spec:
       script: |
         cp /credentials/kubeconfig /tmp/kubeconfig
 
+        go install github.com/onsi/ginkgo/v2/ginkgo@latest
+        export PATH="$(go env GOPATH)/bin:$PATH"
+
         MODE="$(params.MODE)"
         TEST_PATH="$(params.TEST_PATH)"
 
