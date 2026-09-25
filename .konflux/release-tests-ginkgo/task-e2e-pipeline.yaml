@@ -134,6 +134,8 @@ spec:
       script: |
         cp /credentials/kubeconfig /tmp/kubeconfig
 
+        # Allow go to download the toolchain version required by go.mod
+        export GOTOOLCHAIN=auto
         go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.1
         export PATH="$(go env GOPATH)/bin:$PATH"
 
