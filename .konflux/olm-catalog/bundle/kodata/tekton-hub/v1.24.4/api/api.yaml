@@ -44,6 +44,7 @@ stringData:
   ACCESS_JWT_EXPIRES_IN: ''
   REFRESH_JWT_EXPIRES_IN: ''
   AUTH_BASE_URL: ''
+  REDIRECT_URI: ''
 
 ---
 # Copyright © 2020 The Tekton Authors.
@@ -168,7 +169,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: tekton-hub-api
-          image: quay.io/tekton-hub/api:v1.24.2
+          image: quay.io/tekton-hub/api:v1.24.4
           resources:
             requests:
               cpu: 100m
@@ -304,6 +305,11 @@ spec:
                 secretKeyRef:
                   name: tekton-hub-api
                   key: AUTH_BASE_URL
+            - name: REDIRECT_URI
+              valueFrom:
+                secretKeyRef:
+                  name: tekton-hub-api
+                  key: REDIRECT_URI
 
 ---
 # Copyright © 2020 The Tekton Authors.
