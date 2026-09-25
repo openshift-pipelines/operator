@@ -261,6 +261,7 @@ spec:
         - install-pipelines-operator
 
     # Ginkgo Release Tests - Manual Approval Gate
+    # Uses fork branch with impersonation support for HyperShift
     - name: release-tests-manual-approval
       onError: continue
       taskRef:
@@ -283,8 +284,10 @@ spec:
           value: "./tests/mag/"
         - name: MAG_USE_IMPERSONATION
           value: "true"
+        - name: GIT_RELEASE_TESTS_URI
+          value: https://github.com/divyansh42/release-tests-ginkgo.git
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: sa-auth-hypershift
       runAfter:
         - setup-testing-accounts
 
