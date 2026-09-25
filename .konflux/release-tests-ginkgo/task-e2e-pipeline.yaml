@@ -134,7 +134,8 @@ spec:
       script: |
         cp /credentials/kubeconfig /tmp/kubeconfig
 
-        go install github.com/onsi/ginkgo/v2/ginkgo@latest
+        # Pin to version matching go.mod (v2.33.0 removed --fail-on-focused)
+        go install github.com/onsi/ginkgo/v2/ginkgo@v2.32.1
         export PATH="$(go env GOPATH)/bin:$PATH"
 
         MODE="$(params.MODE)"
