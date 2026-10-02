@@ -53,6 +53,11 @@ on the shared Tekton infrastructure cluster.
 
 1. Update Helm charts with the new version:
 
+   `hack/release-setup-branch.sh` already sets `version` and `appVersion` in
+   `charts/tekton-operator/Chart.yaml` on the branch it prepares, so on that
+   branch these commands change nothing. They are kept as a manual reference,
+   for example for a branch prepared without the script.
+
    ```bash
    # Update labels in YAML files under templates directory
    find charts/tekton-operator/templates -type f -name '*.yaml' -exec sed -i \
