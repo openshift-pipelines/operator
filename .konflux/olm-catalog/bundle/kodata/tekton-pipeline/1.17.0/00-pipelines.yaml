@@ -87,10 +87,11 @@ rules:
   - apiGroups: [""]
     resources: ["pods", "persistentvolumeclaims"]
     verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
-  # Write permissions to publish events.
+  # Read/write permissions for events: create/update/patch to publish events,
+  # list to surface Pod warning events onto TaskRun status (surface-pod-events flag).
   - apiGroups: [""]
     resources: ["events"]
-    verbs: ["create", "update", "patch"]
+    verbs: ["list", "create", "update", "patch"]
   # Read-only access to these.
   - apiGroups: [""]
     resources: ["configmaps", "limitranges", "secrets", "serviceaccounts"]
@@ -590,8 +591,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.16.0"
-    version: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
+    version: "v1.17.0"
 spec:
   group: tekton.dev
   preserveUnknownFields: false
@@ -1474,8 +1475,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.16.0"
-    version: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
+    version: "v1.17.0"
 spec:
   group: tekton.dev
   preserveUnknownFields: false
@@ -2914,8 +2915,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.16.0"
-    version: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
+    version: "v1.17.0"
 spec:
   group: tekton.dev
   preserveUnknownFields: false
@@ -5346,6 +5347,8 @@ spec:
                           description: EnableStepActions is a no-op flag since StepActions
                             are stable
                           type: boolean
+                        enableSurfacePodEvents:
+                          type: boolean
                         enableTektonOCIBundles:
                           description: |-
                             DeprecatedEnableTektonOCIBundles is maintained for backward compatibility
@@ -5360,6 +5363,8 @@ spec:
                           type: boolean
                         enforceNonfalsifiability:
                           type: string
+                        keepStatusSpecDescriptions:
+                          type: boolean
                         maxResultSize:
                           type: integer
                         requireGitSSHSecretKnownHosts:
@@ -5737,6 +5742,8 @@ spec:
                                     description: EnableStepActions is a no-op flag
                                       since StepActions are stable
                                     type: boolean
+                                  enableSurfacePodEvents:
+                                    type: boolean
                                   enableTektonOCIBundles:
                                     description: |-
                                       DeprecatedEnableTektonOCIBundles is maintained for backward compatibility
@@ -5751,6 +5758,8 @@ spec:
                                     type: boolean
                                   enforceNonfalsifiability:
                                     type: string
+                                  keepStatusSpecDescriptions:
+                                    type: boolean
                                   maxResultSize:
                                     type: integer
                                   requireGitSSHSecretKnownHosts:
@@ -6020,6 +6029,8 @@ spec:
                                           description: EnableStepActions is a no-op
                                             flag since StepActions are stable
                                           type: boolean
+                                        enableSurfacePodEvents:
+                                          type: boolean
                                         enableTektonOCIBundles:
                                           description: |-
                                             DeprecatedEnableTektonOCIBundles is maintained for backward compatibility
@@ -6034,6 +6045,8 @@ spec:
                                           type: boolean
                                         enforceNonfalsifiability:
                                           type: string
+                                        keepStatusSpecDescriptions:
+                                          type: boolean
                                         maxResultSize:
                                           type: integer
                                         requireGitSSHSecretKnownHosts:
@@ -8588,6 +8601,8 @@ spec:
                           description: EnableStepActions is a no-op flag since StepActions
                             are stable
                           type: boolean
+                        enableSurfacePodEvents:
+                          type: boolean
                         enableTektonOCIBundles:
                           description: |-
                             DeprecatedEnableTektonOCIBundles is maintained for backward compatibility
@@ -8602,6 +8617,8 @@ spec:
                           type: boolean
                         enforceNonfalsifiability:
                           type: string
+                        keepStatusSpecDescriptions:
+                          type: boolean
                         maxResultSize:
                           type: integer
                         requireGitSSHSecretKnownHosts:
@@ -9115,8 +9132,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.16.0"
-    version: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
+    version: "v1.17.0"
 spec:
   group: tekton.dev
   preserveUnknownFields: false
@@ -10317,8 +10334,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.16.0"
-    version: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
+    version: "v1.17.0"
 spec:
   group: tekton.dev
   preserveUnknownFields: false
@@ -17860,8 +17877,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.16.0"
-    version: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
+    version: "v1.17.0"
 spec:
   group: tekton.dev
   preserveUnknownFields: false
@@ -19784,6 +19801,8 @@ spec:
                           description: EnableStepActions is a no-op flag since StepActions
                             are stable
                           type: boolean
+                        enableSurfacePodEvents:
+                          type: boolean
                         enableTektonOCIBundles:
                           description: |-
                             DeprecatedEnableTektonOCIBundles is maintained for backward compatibility
@@ -19798,6 +19817,8 @@ spec:
                           type: boolean
                         enforceNonfalsifiability:
                           type: string
+                        keepStatusSpecDescriptions:
+                          type: boolean
                         maxResultSize:
                           type: integer
                         requireGitSSHSecretKnownHosts:
@@ -20063,6 +20084,8 @@ spec:
                                 description: EnableStepActions is a no-op flag since
                                   StepActions are stable
                                 type: boolean
+                              enableSurfacePodEvents:
+                                type: boolean
                               enableTektonOCIBundles:
                                 description: |-
                                   DeprecatedEnableTektonOCIBundles is maintained for backward compatibility
@@ -20077,6 +20100,8 @@ spec:
                                 type: boolean
                               enforceNonfalsifiability:
                                 type: string
+                              keepStatusSpecDescriptions:
+                                type: boolean
                               maxResultSize:
                                 type: integer
                               requireGitSSHSecretKnownHosts:
@@ -22030,6 +22055,8 @@ spec:
                           description: EnableStepActions is a no-op flag since StepActions
                             are stable
                           type: boolean
+                        enableSurfacePodEvents:
+                          type: boolean
                         enableTektonOCIBundles:
                           description: |-
                             DeprecatedEnableTektonOCIBundles is maintained for backward compatibility
@@ -22044,6 +22071,8 @@ spec:
                           type: boolean
                         enforceNonfalsifiability:
                           type: string
+                        keepStatusSpecDescriptions:
+                          type: boolean
                         maxResultSize:
                           type: integer
                         requireGitSSHSecretKnownHosts:
@@ -22310,6 +22339,8 @@ spec:
                                 description: EnableStepActions is a no-op flag since
                                   StepActions are stable
                                 type: boolean
+                              enableSurfacePodEvents:
+                                type: boolean
                               enableTektonOCIBundles:
                                 description: |-
                                   DeprecatedEnableTektonOCIBundles is maintained for backward compatibility
@@ -22324,6 +22355,8 @@ spec:
                                 type: boolean
                               enforceNonfalsifiability:
                                 type: string
+                              keepStatusSpecDescriptions:
+                                type: boolean
                               maxResultSize:
                                 type: integer
                               requireGitSSHSecretKnownHosts:
@@ -25570,8 +25603,8 @@ metadata:
   labels:
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.16.0"
-    version: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
+    version: "v1.17.0"
 spec:
   group: tekton.dev
   versions:
@@ -25720,7 +25753,7 @@ metadata:
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
 # The data is populated at install time.
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -25731,7 +25764,7 @@ metadata:
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
 webhooks:
   - admissionReviewVersions: ["v1"]
     clientConfig:
@@ -25750,7 +25783,7 @@ metadata:
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
 webhooks:
   - admissionReviewVersions: ["v1"]
     clientConfig:
@@ -25769,7 +25802,7 @@ metadata:
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-pipelines
-    pipeline.tekton.dev/release: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
 webhooks:
   - admissionReviewVersions: ["v1"]
     clientConfig:
@@ -26245,6 +26278,13 @@ data:
   # Alpha feature — this is a short-term measure. External result storage
   # (TEP-0164) will address the underlying 4KB limitation.
   enable-termination-message-compression: "false"
+  # Setting this flag to "true" surfaces a Pod Warning Event in TaskRun status
+  # when a Pending Pod has no useful current diagnosis. The controller Lists
+  # Events immediately and retries an empty result twice, for at most three
+  # Lists per eligible Pod UID per controller process. It does not watch Events.
+  # Events are best-effort and a warning that appears after the final retry can
+  # be missed.
+  surface-pod-events: "false"
   # Controls whether informer cache transforms are enabled. When enabled (default),
   # the controller strips large, unnecessary metadata fields (managedFields and the
   # kubectl last-applied-configuration annotation) from PipelineRuns, TaskRuns,
@@ -26255,6 +26295,10 @@ data:
   #
   # See https://github.com/tektoncd/pipeline/issues/7691 for more info.
   enable-informer-cache-transforms: "true"
+  # Documentation-only description fields are stripped from the
+  # status.taskSpec/status.pipelineSpec snapshots by default to reduce etcd usage.
+  # Set this flag to "true" to keep those descriptions during a migration window.
+  keep-status-spec-descriptions: "false"
 
 ---
 # Copyright 2021 The Tekton Authors
@@ -26285,7 +26329,7 @@ data:
   # this ConfigMap such that even if we don't have access to
   # other resources in the namespace we still can have access to
   # this ConfigMap.
-  version: "v1.16.0"
+  version: "v1.17.0"
 
 ---
 # Copyright 2020 Tekton Authors LLC
@@ -26557,6 +26601,13 @@ data:
     metrics-export-interval: ""
 
     # OpenTelemetry Tracing Configuration
+    #
+    # NOTE: these keys configure the global OpenTelemetry tracer provider used by the
+    # notification and cloud event reconcilers only. The TaskRun and PipelineRun
+    # reconcilers instead use their own tracer, configured separately via config-tracing
+    # (see docs/developers/tracing.md). Setting these keys does not affect TaskRun/PipelineRun
+    # tracing, and vice versa.
+    #
     # Protocol for tracing export (grpc, http/protobuf, none, stdout)
     # Default: none
     tracing-protocol: none
@@ -26686,6 +26737,11 @@ data:
 # NOTE: Exported traces may include Kubernetes resource identifiers (e.g. TaskRun/PipelineRun
 # names and namespaces) as span attributes. Treat the trace backend as a trusted observability
 # system. See docs/developers/tracing.md for details.
+#
+# NOTE: This only configures tracing for the TaskRun and PipelineRun reconcilers. It is
+# independent of the tracing-protocol/tracing-endpoint/tracing-sampling-rate keys in
+# config-observability, which configure a separate tracer used by the notification and
+# cloud event reconcilers. Enabling one does not enable the other.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -26777,12 +26833,12 @@ metadata:
     app.kubernetes.io/name: controller
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.16.0"
+    app.kubernetes.io/version: "v1.17.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
     # labels below are related to istio and should not be used for resource lookup
-    version: "v1.16.0"
+    version: "v1.17.0"
 spec:
   replicas: 1
   selector:
@@ -26797,13 +26853,13 @@ spec:
         app.kubernetes.io/name: controller
         app.kubernetes.io/component: controller
         app.kubernetes.io/instance: default
-        app.kubernetes.io/version: "v1.16.0"
+        app.kubernetes.io/version: "v1.17.0"
         app.kubernetes.io/part-of: tekton-pipelines
         # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-        pipeline.tekton.dev/release: "v1.16.0"
+        pipeline.tekton.dev/release: "v1.17.0"
         # labels below are related to istio and should not be used for resource lookup
         app: tekton-pipelines-controller
-        version: "v1.16.0"
+        version: "v1.17.0"
     spec:
       affinity:
         nodeAffinity:
@@ -26828,14 +26884,14 @@ spec:
       serviceAccountName: tekton-pipelines-controller
       containers:
         - name: tekton-pipelines-controller
-          image: ghcr.io/tektoncd/pipeline/controller-10a3e32792f33651396d02b6855a6e36:v1.16.0@sha256:27458f2073bb6f826cbe7a97324ca5553d8d97e60f91f2b8dd37fea72c43fdf2
+          image: ghcr.io/tektoncd/pipeline/controller-10a3e32792f33651396d02b6855a6e36:v1.17.0@sha256:33255ed915552016fa68d1eb4455d2d48699141e79f6c1a73bab2e983fe3637b
           args: [
             # These images are built on-demand by `ko resolve` and are replaced
             # by image references by digest.
-            "-entrypoint-image", "ghcr.io/tektoncd/pipeline/entrypoint-bff0a22da108bc2f16c818c97641a296:v1.16.0@sha256:d1f53cfb9005ebf271487777caa9836efa0ce6498438eecc62ad6de4e5884818",
-            "-nop-image", "ghcr.io/tektoncd/pipeline/nop-8eac7c133edad5df719dc37b36b62482:v1.16.0@sha256:5746b90085fcfa4c3e2d8de29a63443637e2b5d58d3f8f76745948c8a4907f2b",
-            "-sidecarlogresults-image", "ghcr.io/tektoncd/pipeline/sidecarlogresults-7501c6a20d741631510a448b48ab098f:v1.16.0@sha256:6d6bb29f673534afbca03784c31c26c8a7f7aaf3f8cd382b37fe1c8f500928be",
-            "-workingdirinit-image", "ghcr.io/tektoncd/pipeline/workingdirinit-0c558922ec6a1b739e550e349f2d5fc1:v1.16.0@sha256:ca55898b6bfbf62c1494b1cc9b292b1296837f40ff8c0830d723046ab8604c4d",
+            "-entrypoint-image", "ghcr.io/tektoncd/pipeline/entrypoint-bff0a22da108bc2f16c818c97641a296:v1.17.0@sha256:a4d868728f2a3f0e405f2f4a2f387e226ddf382e49d32f160db690533810dd89",
+            "-nop-image", "ghcr.io/tektoncd/pipeline/nop-8eac7c133edad5df719dc37b36b62482:v1.17.0@sha256:3eef313fc09139d70c6cad6433a4f0bd455f2d19112f7b01536b4c749cb75dc3",
+            "-sidecarlogresults-image", "ghcr.io/tektoncd/pipeline/sidecarlogresults-7501c6a20d741631510a448b48ab098f:v1.17.0@sha256:38e5ef3efd146614bc2066177b93e3bd127511c8346111d8d65560209fdc6cfa",
+            "-workingdirinit-image", "ghcr.io/tektoncd/pipeline/workingdirinit-0c558922ec6a1b739e550e349f2d5fc1:v1.17.0@sha256:57397686a0d27e28316b40a5f079580f29dd2b235a30883be101202299eeb034",
             # The shell image must allow root in order to create directories and copy files to PVCs.
             # cgr.dev/chainguard/busybox as of April 14 2022
             # image shall not contains tag, so it will be supported on a runtime like cri-o
@@ -26926,13 +26982,13 @@ metadata:
     app.kubernetes.io/name: controller
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.16.0"
+    app.kubernetes.io/version: "v1.17.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
     # labels below are related to istio and should not be used for resource lookup
     app: tekton-pipelines-controller
-    version: "v1.16.0"
+    version: "v1.17.0"
   name: tekton-pipelines-controller
   namespace: tekton-pipelines
 spec:
@@ -26976,12 +27032,12 @@ metadata:
     app.kubernetes.io/name: events
     app.kubernetes.io/component: events
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.16.0"
+    app.kubernetes.io/version: "v1.17.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
     # labels below are related to istio and should not be used for resource lookup
-    version: "v1.16.0"
+    version: "v1.17.0"
 spec:
   replicas: 1
   selector:
@@ -26996,13 +27052,13 @@ spec:
         app.kubernetes.io/name: events
         app.kubernetes.io/component: events
         app.kubernetes.io/instance: default
-        app.kubernetes.io/version: "v1.16.0"
+        app.kubernetes.io/version: "v1.17.0"
         app.kubernetes.io/part-of: tekton-pipelines
         # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-        pipeline.tekton.dev/release: "v1.16.0"
+        pipeline.tekton.dev/release: "v1.17.0"
         # labels below are related to istio and should not be used for resource lookup
         app: tekton-events-controller
-        version: "v1.16.0"
+        version: "v1.17.0"
     spec:
       affinity:
         nodeAffinity:
@@ -27016,7 +27072,7 @@ spec:
       serviceAccountName: tekton-events-controller
       containers:
         - name: tekton-events-controller
-          image: ghcr.io/tektoncd/pipeline/events-a9042f7efb0cbade2a868a1ee5ddd52c:v1.16.0@sha256:3b4777e52b0fcf98c3a24d1227eedf2984a222c1af18ea0d5f56da0f4832b6d1
+          image: ghcr.io/tektoncd/pipeline/events-a9042f7efb0cbade2a868a1ee5ddd52c:v1.17.0@sha256:fe7c89c5a06c83a107527543fa62164c0e037404a52e2c71ea2552803806875a
           args: []
           volumeMounts:
             - name: config-logging
@@ -27095,13 +27151,13 @@ metadata:
     app.kubernetes.io/name: events
     app.kubernetes.io/component: events
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.16.0"
+    app.kubernetes.io/version: "v1.17.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
     # labels below are related to istio and should not be used for resource lookup
     app: tekton-events-controller
-    version: "v1.16.0"
+    version: "v1.17.0"
   name: tekton-events-controller
   namespace: tekton-pipelines
 spec:
@@ -27791,12 +27847,12 @@ metadata:
     app.kubernetes.io/name: resolvers
     app.kubernetes.io/component: resolvers
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.16.0"
+    app.kubernetes.io/version: "v1.17.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
     # labels below are related to istio and should not be used for resource lookup
-    version: "v1.16.0"
+    version: "v1.17.0"
 spec:
   replicas: 1
   selector:
@@ -27811,13 +27867,13 @@ spec:
         app.kubernetes.io/name: resolvers
         app.kubernetes.io/component: resolvers
         app.kubernetes.io/instance: default
-        app.kubernetes.io/version: "v1.16.0"
+        app.kubernetes.io/version: "v1.17.0"
         app.kubernetes.io/part-of: tekton-pipelines
         # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-        pipeline.tekton.dev/release: "v1.16.0"
+        pipeline.tekton.dev/release: "v1.17.0"
         # labels below are related to istio and should not be used for resource lookup
         app: tekton-pipelines-resolvers
-        version: "v1.16.0"
+        version: "v1.17.0"
     spec:
       affinity:
         nodeAffinity:
@@ -27842,7 +27898,7 @@ spec:
       serviceAccountName: tekton-pipelines-resolvers
       containers:
         - name: controller
-          image: ghcr.io/tektoncd/pipeline/resolvers-ff86b24f130c42b88983d3c13993056d:v1.16.0@sha256:318c3caf89aec173b4c4bb69da60d09e1a1f8d8ffb4b9255982832d9c63b70c5
+          image: ghcr.io/tektoncd/pipeline/resolvers-ff86b24f130c42b88983d3c13993056d:v1.17.0@sha256:62e7933fa3697361496215c70b74380389cab9a86701d2e58455b7f9826f11c0
           command:
             - /sbin/tini
             - --
@@ -27928,13 +27984,13 @@ metadata:
     app.kubernetes.io/name: resolvers
     app.kubernetes.io/component: resolvers
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.16.0"
+    app.kubernetes.io/version: "v1.17.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
     # labels below are related to istio and should not be used for resource lookup
     app: tekton-pipelines-remote-resolvers
-    version: "v1.16.0"
+    version: "v1.17.0"
   name: tekton-pipelines-remote-resolvers
   namespace: tekton-pipelines-resolvers
 spec:
@@ -27978,12 +28034,12 @@ metadata:
     app.kubernetes.io/name: webhook
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.16.0"
+    app.kubernetes.io/version: "v1.17.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
     # labels below are related to istio and should not be used for resource lookup
-    version: "v1.16.0"
+    version: "v1.17.0"
 spec:
   minReplicas: 1
   maxReplicas: 5
@@ -28026,12 +28082,12 @@ metadata:
     app.kubernetes.io/name: webhook
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.16.0"
+    app.kubernetes.io/version: "v1.17.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
     # labels below are related to istio and should not be used for resource lookup
-    version: "v1.16.0"
+    version: "v1.17.0"
 spec:
   selector:
     matchLabels:
@@ -28045,13 +28101,13 @@ spec:
         app.kubernetes.io/name: webhook
         app.kubernetes.io/component: webhook
         app.kubernetes.io/instance: default
-        app.kubernetes.io/version: "v1.16.0"
+        app.kubernetes.io/version: "v1.17.0"
         app.kubernetes.io/part-of: tekton-pipelines
         # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-        pipeline.tekton.dev/release: "v1.16.0"
+        pipeline.tekton.dev/release: "v1.17.0"
         # labels below are related to istio and should not be used for resource lookup
         app: tekton-pipelines-webhook
-        version: "v1.16.0"
+        version: "v1.17.0"
     spec:
       affinity:
         nodeAffinity:
@@ -28078,7 +28134,7 @@ spec:
         - name: webhook
           # This is the Go import path for the binary that is containerized
           # and substituted here.
-          image: ghcr.io/tektoncd/pipeline/webhook-d4749e605405422fd87700164e31b2d1:v1.16.0@sha256:cc0f3620092c91d8a2eb18a155fd0504dae7043a1fae9851dc7b5b9ed1ea3626
+          image: ghcr.io/tektoncd/pipeline/webhook-d4749e605405422fd87700164e31b2d1:v1.17.0@sha256:198176fc8f38d240fb0cf5cce08b978de73f9e74c758feeb558d731bf6cf3e28
           # Resource request required for autoscaler to take any action for a metric
           resources:
             requests:
@@ -28175,13 +28231,13 @@ metadata:
     app.kubernetes.io/name: webhook
     app.kubernetes.io/component: webhook
     app.kubernetes.io/instance: default
-    app.kubernetes.io/version: "v1.16.0"
+    app.kubernetes.io/version: "v1.17.0"
     app.kubernetes.io/part-of: tekton-pipelines
     # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-    pipeline.tekton.dev/release: "v1.16.0"
+    pipeline.tekton.dev/release: "v1.17.0"
     # labels below are related to istio and should not be used for resource lookup
     app: tekton-pipelines-webhook
-    version: "v1.16.0"
+    version: "v1.17.0"
   name: tekton-pipelines-webhook
   namespace: tekton-pipelines
 spec:
