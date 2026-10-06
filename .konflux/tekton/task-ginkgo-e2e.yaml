@@ -6,18 +6,15 @@ metadata:
 spec:
   description: |
     Runs a Ginkgo suite from openshift-pipelines/release-tests-ginkgo against an
-    ephemeral EaaS cluster.
+    ephemeral cluster provisioned through OpenShift-CI.
 
     Operator installation and test execution are both driven by the release-tests
     repository itself through its `scripts/run-tests.sh` wrapper, so this task only
-    has to clone the repo, fetch the cluster credentials and invoke the wrapper.
+    has to clone the repo, mount the cluster credentials and invoke the wrapper.
   params:
-    - name: EAAS_SPACE_SECRET_REF
+    - name: CLUSTER_SECRET_REF
       type: string
-      description: Secret reference of the EaaS space owning the ephemeral cluster.
-    - name: CLUSTER_NAME
-      type: string
-      description: Name of the ephemeral EaaS cluster to run against.
+      description: "Name of the Secret containing the cluster kubeconfig (key: kubeconfig)"
     - name: IMAGE
       type: string
       description: CI image providing go, ginkgo, oc and the remaining test tooling.
@@ -72,7 +69,8 @@ spec:
 
   volumes:
     - name: credentials
-      emptyDir: {}
+      secret:
+        secretName: $(params.CLUSTER_SECRET_REF)
     - name: source
       emptyDir: {}
     - name: go-cache
@@ -85,6 +83,7 @@ spec:
         mountPath: /source
       - name: credentials
         mountPath: /credentials
+        readOnly: true
       - name: go-cache
         mountPath: /go-cache
 
@@ -108,29 +107,12 @@ spec:
         - name: REVISION
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
 
-    - name: get-kubeconfig
-      ref:
-        resolver: git
-        params:
-          - name: url
-            value: https://github.com/konflux-ci/build-definitions.git
-          - name: revision
-            value: main
-          - name: pathInRepo
-            value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
-      params:
-        - name: eaasSpaceSecretRef
-          value: "$(params.EAAS_SPACE_SECRET_REF)"
-        - name: clusterName
-          value: "$(params.CLUSTER_NAME)"
-        - name: credentials
-          value: credentials
-
     - name: run-ginkgo-suite
       workingDir: /source/repo
       env:
+        # Writable copy: the suites shell out to oc, which may rewrite the kubeconfig.
         - name: KUBECONFIG
-          value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+          value: "/source/kubeconfig"
         - name: MODE
           value: "$(params.MODE)"
         - name: TEST_PATH
@@ -198,7 +180,9 @@ spec:
         #!/usr/bin/env bash
         set -u -o pipefail
 
-        echo "Cluster     : ${KUBECONFIG}"
+        cp /credentials/kubeconfig "${KUBECONFIG}"
+
+        echo "Cluster     : $(oc whoami --show-server 2>/dev/null || echo unknown)"
         echo "Mode        : ${MODE}"
         echo "Test path   : ${TEST_PATH}"
         echo "Channel     : ${CHANNEL}"

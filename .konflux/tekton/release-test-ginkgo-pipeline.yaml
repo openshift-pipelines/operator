@@ -7,9 +7,10 @@ spec:
   description: |
     Release tests driven by the Ginkgo suite in openshift-pipelines/release-tests-ginkgo.
 
-    Provisions an ephemeral Hypershift cluster, points a CatalogSource at the Operator
-    index image from the Konflux snapshot, then hands over to the release-tests repo:
-    its `olm` suite installs the operator and the component suites run afterwards.
+    Provisions an ephemeral Hypershift cluster via OpenShift-CI, points a CatalogSource
+    at the Operator index image from the Konflux snapshot, then hands over to the
+    release-tests repo: its `olm` suite installs the operator and the component suites
+    run afterwards.
 
     Component suites carry no dependency on each other so Tekton runs them all in
     parallel, and each suite additionally fans out over GINKGO_PROCS Ginkgo processes.
@@ -25,7 +26,7 @@ spec:
       default: openshift-operators
     - name: IMAGE
       type: string
-      description: Image used by the inline helper steps (needs oc, curl, jq).
+      description: Image used by the inline helper steps (needs oc).
       default: quay.io/openshift-pipeline/ci:latest
     - name: GINKGO_IMAGE
       type: string
@@ -54,9 +55,6 @@ spec:
       type: string
       description: Ginkgo parallel processes used per component suite.
       default: "4"
-    - name: INSTANCE_TYPE
-      type: string
-      default: m5.2xlarge
 
   tasks:
     - name: parse-metadata
@@ -73,27 +71,9 @@ spec:
         - name: SNAPSHOT
           value: $(params.SNAPSHOT)
 
-    - name: provision-eaas-space
+    - name: extract-ocp-version
       runAfter:
         - parse-metadata
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: https://github.com/konflux-ci/build-definitions.git
-          - name: revision
-            value: main
-          - name: pathInRepo
-            value: task/eaas-provision-space/0.1/eaas-provision-space.yaml
-      params:
-        - name: ownerName
-          value: $(context.pipelineRun.name)
-        - name: ownerUid
-          value: $(context.pipelineRun.uid)
-
-    - name: provision-cluster
-      runAfter:
-        - provision-eaas-space
       params:
         - name: componentName
           value: "$(tasks.parse-metadata.results.component-name)"
@@ -102,27 +82,11 @@ spec:
           - name: componentName
             type: string
         results:
-          - name: clusterName
-            value: "$(steps.create-cluster.results.clusterName)"
           - name: ocpVersion
-            description: The OCP version extracted from application name
-            type: string
+            description: The OCP minor version extracted from component name (e.g. 4.20)
         steps:
-          - name: get-supported-versions
-            ref:
-              resolver: git
-              params:
-                - name: url
-                  value: https://github.com/konflux-ci/build-definitions.git
-                - name: revision
-                  value: main
-                - name: pathInRepo
-                  value: stepactions/eaas-get-supported-ephemeral-cluster-versions/0.1/eaas-get-supported-ephemeral-cluster-versions.yaml
-            params:
-              - name: eaasSpaceSecretRef
-                value: $(tasks.provision-eaas-space.results.secretRef)
-          - name: extract-and-pick-version
-            image: $(params.IMAGE)
+          - name: extract-version
+            image: registry.access.redhat.com/ubi9/ubi-minimal:latest
             env:
               - name: COMPONENT_NAME
                 value: "$(params.componentName)"
@@ -130,66 +94,53 @@ spec:
               #!/usr/bin/env bash
               set -e
 
-              # Extract OCP version from COMPONENT_NAME
+              # Extract OCP minor version from COMPONENT_NAME
               # Expected format: operator-1-22-index-4-20 -> 4.20
               echo "Component Name: $COMPONENT_NAME"
 
-              # Extract version pattern (e.g., "4-19" from "operator-1-22-index-4-20")
               VERSION_PATTERN=$(echo "$COMPONENT_NAME" | grep -oE '[0-9]+-[0-9]+' | tail -1)
 
               if [ -z "$VERSION_PATTERN" ]; then
-                echo "Warning: Could not extract version from application name, will use default"
+                echo "Warning: Could not extract version from component name, using default"
                 OCP_VERSION="4.20"
               else
-                # Convert "4-20" to "4.20"
                 OCP_VERSION=$(echo "$VERSION_PATTERN" | tr '-' '.')
                 echo "Extracted OCP Version: $OCP_VERSION"
               fi
 
-              echo -n "$OCP_VERSION" | tee /tekton/results/ocpVersion
+              echo -n "$OCP_VERSION" | tee $(results.ocpVersion.path)
 
-              # Fetch the latest patch version for this OCP version
-              echo "Fetching latest patch version for ${OCP_VERSION}..."
-              RELEASE_URL="https://multi.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable-multi/latest?prefix=${OCP_VERSION}."
-              echo "GET $RELEASE_URL"
-
-              RELEASE_INFO=$(curl -s "$RELEASE_URL")
-              echo "$RELEASE_INFO"
-
-              VERSION=$(echo "$RELEASE_INFO" | jq -r '.name')
-              echo "Selected version: $VERSION"
-
-              # Write result for create-cluster step
-              mkdir -p /tekton/steps/step-extract-and-pick-version/results
-              echo -n "$VERSION" | tee /tekton/steps/step-extract-and-pick-version/results/version
-          - name: create-cluster
-            ref:
-              resolver: git
-              params:
-                - name: url
-                  value: https://github.com/konflux-ci/build-definitions.git
-                - name: revision
-                  value: main
-                - name: pathInRepo
-                  value: stepactions/eaas-create-ephemeral-cluster-hypershift-aws/0.1/eaas-create-ephemeral-cluster-hypershift-aws.yaml
-            params:
-              - name: eaasSpaceSecretRef
-                value: $(tasks.provision-eaas-space.results.secretRef)
-              - name: version
-                value: "$(steps.extract-and-pick-version.results.version)"
-              - name: instanceType
-                value: $(params.INSTANCE_TYPE)
-              - name: fips
-                value: true
-              - name: imageContentSources
-                value: |
-                  - source: registry.redhat.io/openshift-pipelines/
+    - name: provision-ephemeral-cluster
+      runAfter:
+        - extract-ocp-version
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/openshift/konflux-tasks
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/provision-ephemeral-cluster/0.1/provision-ephemeral-cluster.yaml
+      params:
+        - name: ownerName
+          value: $(context.pipelineRun.name)
+        - name: ownerUid
+          value: $(context.pipelineRun.uid)
+        - name: workflow
+          value: hypershift-hostedcluster-workflow
+        - name: clusterProfile
+          value: aws-konflux-prod
+        - name: releases
+          value: '{"latest":{"release":{"channel":"stable","version":"$(tasks.extract-ocp-version.results.ocpVersion)","architecture":"multi"}}}'
+        - name: env
+          value: '{"COMPUTE_NODE_TYPE": "m5.2xlarge", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines"}'
 
     # Configure Loki and OpenShift Logging, required by the Results configuration
     # applied during the Ginkgo install suite.
     - name: configure-loki-logging
       runAfter:
-        - provision-cluster
+        - provision-ephemeral-cluster
       taskRef:
         resolver: git
         params:
@@ -200,10 +151,8 @@ spec:
           - name: pathInRepo
             value: .konflux/tekton/task-configure-loki-logging.yaml
       params:
-        - name: EAAS_SPACE_SECRET_REF
-          value: $(tasks.provision-eaas-space.results.secretRef)
-        - name: CLUSTER_NAME
-          value: $(tasks.provision-cluster.results.clusterName)
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
         - name: IMAGE
           value: $(params.IMAGE)
 
@@ -211,14 +160,21 @@ spec:
     # derive the channel from the release branch of the snapshot.
     - name: create-catalog-source
       runAfter:
-        - provision-cluster
+        - provision-ephemeral-cluster
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
       taskSpec:
+        params:
+          - name: CLUSTER_SECRET_REF
+            type: string
         results:
           - name: channel
             type: string
         volumes:
           - name: credentials
-            emptyDir: {}
+            secret:
+              secretName: $(params.CLUSTER_SECRET_REF)
         stepTemplate:
           image: $(params.IMAGE)
           env:
@@ -229,29 +185,13 @@ spec:
           volumeMounts:
             - name: credentials
               mountPath: /credentials
+              readOnly: true
         steps:
-          - name: get-kubeconfig
-            ref:
-              resolver: git
-              params:
-                - name: url
-                  value: https://github.com/konflux-ci/build-definitions.git
-                - name: revision
-                  value: main
-                - name: pathInRepo
-                  value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
-            params:
-              - name: eaasSpaceSecretRef
-                value: $(tasks.provision-eaas-space.results.secretRef)
-              - name: clusterName
-                value: "$(tasks.provision-cluster.results.clusterName)"
-              - name: credentials
-                value: credentials
           - name: extract-channel-name
             script: |
               #!/usr/bin/env bash
               set -x
-              if [[ "$RELEASE_BRANCH" == "next" ]]; then
+              if [[ "$RELEASE_BRANCH" == "next" || "$RELEASE_BRANCH" == "nightly" || "$RELEASE_BRANCH" == "main" ]]; then
                 CHANNEL="latest"
               else
                 CHANNEL=$(echo "$RELEASE_BRANCH" | sed -E 's/release-v([0-9]+\.[0-9]+)\.x/pipelines-\1/')
@@ -261,9 +201,10 @@ spec:
           - name: create-catalog
             env:
               - name: KUBECONFIG
-                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+                value: "/tmp/kubeconfig"
             script: |
               #!/usr/bin/env bash
+              cp /credentials/kubeconfig /tmp/kubeconfig
               cat <<EOF | oc apply -f-
                 apiVersion: operators.coreos.com/v1alpha1
                 kind: CatalogSource
@@ -297,10 +238,8 @@ spec:
           - name: pathInRepo
             value: .konflux/tekton/task-ginkgo-e2e.yaml
       params:
-        - name: EAAS_SPACE_SECRET_REF
-          value: $(tasks.provision-eaas-space.results.secretRef)
-        - name: CLUSTER_NAME
-          value: $(tasks.provision-cluster.results.clusterName)
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
         - name: IMAGE
           value: $(params.GINKGO_IMAGE)
         - name: GIT_RELEASE_TESTS_URI
@@ -335,10 +274,8 @@ spec:
           - name: pathInRepo
             value: .konflux/tekton/task-ginkgo-e2e.yaml
       params:
-        - name: EAAS_SPACE_SECRET_REF
-          value: $(tasks.provision-eaas-space.results.secretRef)
-        - name: CLUSTER_NAME
-          value: $(tasks.provision-cluster.results.clusterName)
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
         - name: IMAGE
           value: $(params.GINKGO_IMAGE)
         - name: GIT_RELEASE_TESTS_URI
@@ -346,7 +283,7 @@ spec:
         - name: GIT_RELEASE_TESTS_BRANCH
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
         - name: MODE
-          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.provision-cluster.results.ocpVersion)"
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: TEST_PATH
           value: "./tests/pipelines/"
         - name: PARALLEL
