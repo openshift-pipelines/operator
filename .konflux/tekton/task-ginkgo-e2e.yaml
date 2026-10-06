@@ -133,8 +133,13 @@ spec:
           value: "$(params.CHAINS_REPOSITORY)"
         - name: ARTIFACTS_DIR
           value: /source/artifacts
+        # Do not enable the script's CI mode: it passes --fail-on-focused, a flag
+        # Ginkgo does not have. Ginkgo already exits 197 on focused specs, and
+        # GINKGO_NO_COLOR covers the rest.
         - name: CI
-          value: "true"
+          value: "false"
+        - name: GINKGO_NO_COLOR
+          value: "TRUE"
         # Reuse the module cache baked into the CI image, keep the build cache local.
         - name: GOCACHE
           value: /go-cache/build
@@ -203,7 +208,7 @@ spec:
 
         go mod download || exit 1
 
-        args=("${MODE}" "--path=${TEST_PATH}" "--ci")
+        args=("${MODE}" "--path=${TEST_PATH}")
         if [[ "${PARALLEL}" == "true" ]]; then
           args+=("--parallel")
         fi
