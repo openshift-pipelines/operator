@@ -1,4 +1,4 @@
-ARG GO_BUILDER=registry.access.redhat.com/ubi9/go-toolset:1.25
+ARG GO_BUILDER=registry.access.redhat.com/ubi9/go-toolset:latest@sha256:5e68f09a652ac6627a83c57655e42e24575efb278b54336039c9308607fc6b21
 ARG RUNTIME=registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:7b8e25a1b56ca4d00219198f3b5b51a3e1693a5c4f5369c5e190d7d6cb3f980e
 
 FROM $GO_BUILDER AS builder
@@ -32,7 +32,7 @@ LABEL \
     maintainer="pipelines-extcomm@redhat.com" \
     name="openshift-pipelines/pipelines-operator-webhook-rhel9" \
     summary="Red Hat OpenShift Pipelines operator webhook" \
-    version="v1.21.1"
+    version="v1.21.4"
 
 RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
 USER 65532
