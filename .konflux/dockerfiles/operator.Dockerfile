@@ -1,4 +1,4 @@
-ARG GO_BUILDER=registry.access.redhat.com/ubi9/go-toolset:1.25
+ARG GO_BUILDER=registry.access.redhat.com/ubi8/go-toolset:latest@sha256:7b04f42022fe4b89a08e5737fe8b289e329209d2c69a43188d6b9c76de92b558
 ARG RUNTIME=registry.access.redhat.com/ubi8/ubi:latest
 
 FROM $GO_BUILDER AS builder
@@ -24,14 +24,14 @@ COPY .konflux/olm-catalog/bundle/kodata /kodata
 COPY head ${KO_DATA_PATH}/HEAD
 
 LABEL \
-    com.redhat.component="openshift-pipelines-rhel9-operator-container" \
-    cpe="cpe:/a:redhat:openshift_pipelines:1.15::el9" \
+    com.redhat.component="openshift-pipelines-rhel8-operator-container" \
+    cpe="cpe:/a:redhat:openshift_pipelines:1.15::el8" \
     description="Red Hat OpenShift Pipelines operator operator" \
     io.k8s.description="Red Hat OpenShift Pipelines operator operator" \
     io.k8s.display-name="Red Hat OpenShift Pipelines operator operator" \
     io.openshift.tags="tekton,openshift,operator,operator" \
     maintainer="pipelines-extcomm@redhat.com" \
-    name="openshift-pipelines/pipelines-rhel9-operator" \
+    name="openshift-pipelines/pipelines-rhel8-operator" \
     summary="Red Hat OpenShift Pipelines operator operator" \
     version="v1.15.5"
 
