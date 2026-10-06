@@ -1,0 +1,384 @@
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: release-test-ginkgo-pipeline
+spec:
+  description: |
+    Release tests driven by the Ginkgo suite in openshift-pipelines/release-tests-ginkgo.
+
+    Provisions an ephemeral Hypershift cluster, points a CatalogSource at the Operator
+    index image from the Konflux snapshot, then hands over to the release-tests repo:
+    its `olm` suite installs the operator and the component suites run afterwards.
+
+    Component suites carry no dependency on each other so Tekton runs them all in
+    parallel, and each suite additionally fans out over GINKGO_PROCS Ginkgo processes.
+    This matters because the ephemeral cluster only lives for about two hours.
+  params:
+    - name: SNAPSHOT
+      type: string
+      description: Snapshot of the application
+      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+    - name: NAMESPACE
+      type: string
+      description: Namespace where the Operator bundle will be deployed.
+      default: openshift-operators
+    - name: IMAGE
+      type: string
+      description: Image used by the inline helper steps (needs oc, curl, jq).
+      default: quay.io/openshift-pipeline/ci:latest
+    - name: GINKGO_IMAGE
+      type: string
+      description: Image used to build and run the Ginkgo suites.
+      default: quay.io/openshift-pipeline/release-tests-ginkgo:latest
+    - name: RELEASE_TEST_TASKS_REPO
+      type: string
+      description: Repository the Tekton task definitions are resolved from.
+      default: https://github.com/openshift-pipelines/operator
+    - name: RELEASE_TEST_TASKS_BRANCH
+      type: string
+      default: main
+    - name: GIT_RELEASE_TESTS_URI
+      type: string
+      description: Ginkgo release-tests repository.
+      default: https://github.com/openshift-pipelines/release-tests-ginkgo.git
+    - name: GIT_RELEASE_TESTS_BRANCH
+      type: string
+      default: main
+    - name: LABEL_FILTER
+      type: string
+      description: Base Ginkgo label filter applied to every component suite.
+      default: "e2e && !disconnected"
+    - name: GINKGO_PROCS
+      type: string
+      description: Ginkgo parallel processes used per component suite.
+      default: "4"
+    - name: INSTANCE_TYPE
+      type: string
+      default: m5.2xlarge
+
+  tasks:
+    - name: parse-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/integration-examples
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/test_metadata.yaml
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+
+    - name: provision-eaas-space
+      runAfter:
+        - parse-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/build-definitions.git
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: task/eaas-provision-space/0.1/eaas-provision-space.yaml
+      params:
+        - name: ownerName
+          value: $(context.pipelineRun.name)
+        - name: ownerUid
+          value: $(context.pipelineRun.uid)
+
+    - name: provision-cluster
+      runAfter:
+        - provision-eaas-space
+      params:
+        - name: componentName
+          value: "$(tasks.parse-metadata.results.component-name)"
+      taskSpec:
+        params:
+          - name: componentName
+            type: string
+        results:
+          - name: clusterName
+            value: "$(steps.create-cluster.results.clusterName)"
+          - name: ocpVersion
+            description: The OCP version extracted from application name
+            type: string
+        steps:
+          - name: get-supported-versions
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-get-supported-ephemeral-cluster-versions/0.1/eaas-get-supported-ephemeral-cluster-versions.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+          - name: extract-and-pick-version
+            image: $(params.IMAGE)
+            env:
+              - name: COMPONENT_NAME
+                value: "$(params.componentName)"
+            script: |
+              #!/usr/bin/env bash
+              set -e
+
+              # Extract OCP version from COMPONENT_NAME
+              # Expected format: operator-1-22-index-4-20 -> 4.20
+              echo "Component Name: $COMPONENT_NAME"
+
+              # Extract version pattern (e.g., "4-19" from "operator-1-22-index-4-20")
+              VERSION_PATTERN=$(echo "$COMPONENT_NAME" | grep -oE '[0-9]+-[0-9]+' | tail -1)
+
+              if [ -z "$VERSION_PATTERN" ]; then
+                echo "Warning: Could not extract version from application name, will use default"
+                OCP_VERSION="4.20"
+              else
+                # Convert "4-20" to "4.20"
+                OCP_VERSION=$(echo "$VERSION_PATTERN" | tr '-' '.')
+                echo "Extracted OCP Version: $OCP_VERSION"
+              fi
+
+              echo -n "$OCP_VERSION" | tee /tekton/results/ocpVersion
+
+              # Fetch the latest patch version for this OCP version
+              echo "Fetching latest patch version for ${OCP_VERSION}..."
+              RELEASE_URL="https://multi.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable-multi/latest?prefix=${OCP_VERSION}."
+              echo "GET $RELEASE_URL"
+
+              RELEASE_INFO=$(curl -s "$RELEASE_URL")
+              echo "$RELEASE_INFO"
+
+              VERSION=$(echo "$RELEASE_INFO" | jq -r '.name')
+              echo "Selected version: $VERSION"
+
+              # Write result for create-cluster step
+              mkdir -p /tekton/steps/step-extract-and-pick-version/results
+              echo -n "$VERSION" | tee /tekton/steps/step-extract-and-pick-version/results/version
+          - name: create-cluster
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-create-ephemeral-cluster-hypershift-aws/0.1/eaas-create-ephemeral-cluster-hypershift-aws.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+              - name: version
+                value: "$(steps.extract-and-pick-version.results.version)"
+              - name: instanceType
+                value: $(params.INSTANCE_TYPE)
+              - name: fips
+                value: true
+              - name: imageContentSources
+                value: |
+                  - source: registry.redhat.io/openshift-pipelines/
+
+    # Configure Loki and OpenShift Logging, required by the Results configuration
+    # applied during the Ginkgo install suite.
+    - name: configure-loki-logging
+      runAfter:
+        - provision-cluster
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-configure-loki-logging.yaml
+      params:
+        - name: EAAS_SPACE_SECRET_REF
+          value: $(tasks.provision-eaas-space.results.secretRef)
+        - name: CLUSTER_NAME
+          value: $(tasks.provision-cluster.results.clusterName)
+        - name: IMAGE
+          value: $(params.IMAGE)
+
+    # Create the CatalogSource the operator subscription is installed from and
+    # derive the channel from the release branch of the snapshot.
+    - name: create-catalog-source
+      runAfter:
+        - provision-cluster
+      taskSpec:
+        results:
+          - name: channel
+            type: string
+        volumes:
+          - name: credentials
+            emptyDir: {}
+        stepTemplate:
+          image: $(params.IMAGE)
+          env:
+            - name: INDEX_IMAGE
+              value: "$(tasks.parse-metadata.results.component-container-image)"
+            - name: RELEASE_BRANCH
+              value: "$(tasks.parse-metadata.results.target-git-branch)"
+          volumeMounts:
+            - name: credentials
+              mountPath: /credentials
+        steps:
+          - name: get-kubeconfig
+            ref:
+              resolver: git
+              params:
+                - name: url
+                  value: https://github.com/konflux-ci/build-definitions.git
+                - name: revision
+                  value: main
+                - name: pathInRepo
+                  value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+            params:
+              - name: eaasSpaceSecretRef
+                value: $(tasks.provision-eaas-space.results.secretRef)
+              - name: clusterName
+                value: "$(tasks.provision-cluster.results.clusterName)"
+              - name: credentials
+                value: credentials
+          - name: extract-channel-name
+            script: |
+              #!/usr/bin/env bash
+              set -x
+              if [[ "$RELEASE_BRANCH" == "next" ]]; then
+                CHANNEL="latest"
+              else
+                CHANNEL=$(echo "$RELEASE_BRANCH" | sed -E 's/release-v([0-9]+\.[0-9]+)\.x/pipelines-\1/')
+              fi
+              echo -n "$CHANNEL" | tee $(results.channel.path)
+
+          - name: create-catalog
+            env:
+              - name: KUBECONFIG
+                value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+            script: |
+              #!/usr/bin/env bash
+              cat <<EOF | oc apply -f-
+                apiVersion: operators.coreos.com/v1alpha1
+                kind: CatalogSource
+                metadata:
+                  name: "custom-osp-nightly"
+                  namespace: openshift-marketplace
+                spec:
+                  sourceType: grpc
+                  image: $INDEX_IMAGE
+                  displayName: "Custom OSP Nightly"
+                  publisher: Red Hat Local
+                  updateStrategy:
+                  registryPoll:
+                  interval: 30m
+              EOF
+
+    # Install the operator by running the Ginkgo olm suite from the release-tests repo.
+    # Serial on purpose: the install spec is a single Ordered container.
+    - name: install-pipelines-operator
+      runAfter:
+        - create-catalog-source
+        - configure-loki-logging
+      timeout: "40m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: EAAS_SPACE_SECRET_REF
+          value: $(tasks.provision-eaas-space.results.secretRef)
+        - name: CLUSTER_NAME
+          value: $(tasks.provision-cluster.results.clusterName)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "install"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "30m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # Component suites. Every suite only depends on install-pipelines-operator, so
+    # adding another entry here widens the parallel fan-out. Keep it that way.
+    - name: release-tests-pipelines
+      onError: continue
+      runAfter:
+        - install-pipelines-operator
+      timeout: "50m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: EAAS_SPACE_SECRET_REF
+          value: $(tasks.provision-eaas-space.results.secretRef)
+        - name: CLUSTER_NAME
+          value: $(tasks.provision-cluster.results.clusterName)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.provision-cluster.results.ocpVersion)"
+        - name: TEST_PATH
+          value: "./tests/pipelines/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "45m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+  finally:
+    # Verify aggregate status and fail pipeline if any test task failed
+    - name: verify-e2e-tests-status
+      params:
+        - name: aggregateStatus
+          value: "$(tasks.status)"
+      taskSpec:
+        params:
+          - name: aggregateStatus
+        steps:
+          - name: verify-aggregate-status
+            image: $(params.IMAGE)
+            script: |
+              #!/usr/bin/env bash
+              echo "📋 Aggregate Status: $(params.aggregateStatus)"
+
+              if [[ "$(params.aggregateStatus)" != "Succeeded" ]]; then
+                echo "❌ Pipeline contains failed tasks!"
+                echo "💡 Check individual task logs for detailed error information"
+                exit 1
+              fi
+
+              echo "✅ All tasks succeeded!"

@@ -1,0 +1,263 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ginkgo-e2e-tests
+spec:
+  description: |
+    Runs a Ginkgo suite from openshift-pipelines/release-tests-ginkgo against an
+    ephemeral EaaS cluster.
+
+    Operator installation and test execution are both driven by the release-tests
+    repository itself through its `scripts/run-tests.sh` wrapper, so this task only
+    has to clone the repo, fetch the cluster credentials and invoke the wrapper.
+  params:
+    - name: EAAS_SPACE_SECRET_REF
+      type: string
+      description: Secret reference of the EaaS space owning the ephemeral cluster.
+    - name: CLUSTER_NAME
+      type: string
+      description: Name of the ephemeral EaaS cluster to run against.
+    - name: IMAGE
+      type: string
+      description: CI image providing go, ginkgo, oc and the remaining test tooling.
+      default: quay.io/openshift-pipeline/release-tests-ginkgo:latest
+    - name: GIT_RELEASE_TESTS_URI
+      type: string
+      default: https://github.com/openshift-pipelines/release-tests-ginkgo.git
+    - name: GIT_RELEASE_TESTS_BRANCH
+      type: string
+      default: main
+    - name: MODE
+      type: string
+      description: |
+        First positional argument handed to scripts/run-tests.sh. Either one of the
+        named modes (install, upgrade, uninstall, sanity, smoke, e2e, e2e-connected,
+        disconnected, all) or a raw Ginkgo --label-filter expression such as
+        "e2e && !disconnected".
+      default: e2e
+    - name: TEST_PATH
+      type: string
+      description: |
+        Package path(s) to run, e.g. ./tests/pipelines/. Ignored by the install,
+        upgrade and uninstall modes which always target ./tests/olm/.
+      default: ./tests/...
+    - name: PARALLEL
+      type: string
+      description: Run the suite with Ginkgo parallel processes ("true" or "false").
+      default: "true"
+    - name: GINKGO_PROCS
+      type: string
+      description: Number of Ginkgo parallel processes when PARALLEL is "true".
+      default: "4"
+    - name: GINKGO_TIMEOUT
+      type: string
+      description: Ginkgo suite timeout.
+      default: 45m
+    - name: CATALOG_SOURCE
+      type: string
+      description: Catalog source the operator subscription is created from.
+      default: redhat-operators
+    - name: CHANNEL
+      type: string
+      description: Channel the operator subscription subscribes to.
+      default: latest
+    - name: SUBSCRIPTION_NAME
+      type: string
+      default: openshift-pipelines-operator-rh
+    - name: CHAINS_REPOSITORY
+      type: string
+      description: OCI repository the Chains suite pushes signed images to.
+      default: quay.io/openshift-pipeline/chainstest
+
+  volumes:
+    - name: credentials
+      emptyDir: {}
+    - name: source
+      emptyDir: {}
+    - name: go-cache
+      emptyDir: {}
+
+  stepTemplate:
+    image: $(params.IMAGE)
+    volumeMounts:
+      - name: source
+        mountPath: /source
+      - name: credentials
+        mountPath: /credentials
+      - name: go-cache
+        mountPath: /go-cache
+
+  steps:
+    - name: create-repo
+      script: |
+        mkdir -p /source/repo /source/artifacts
+        chmod 777 /source/repo /source/artifacts
+
+    - name: fetch-repo
+      ref:
+        resolver: http
+        params:
+          - name: url
+            value: https://raw.githubusercontent.com/openshift-pipelines/tektoncd-catalog/p/stepactions/stepaction-git-clone/0.4.1/stepaction-git-clone.yaml
+      params:
+        - name: OUTPUT_PATH
+          value: /source/repo
+        - name: URL
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: REVISION
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+
+    - name: get-kubeconfig
+      ref:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/build-definitions.git
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: stepactions/eaas-get-ephemeral-cluster-credentials/0.1/eaas-get-ephemeral-cluster-credentials.yaml
+      params:
+        - name: eaasSpaceSecretRef
+          value: "$(params.EAAS_SPACE_SECRET_REF)"
+        - name: clusterName
+          value: "$(params.CLUSTER_NAME)"
+        - name: credentials
+          value: credentials
+
+    - name: run-ginkgo-suite
+      workingDir: /source/repo
+      env:
+        - name: KUBECONFIG
+          value: "/credentials/$(steps.get-kubeconfig.results.kubeconfig)"
+        - name: MODE
+          value: "$(params.MODE)"
+        - name: TEST_PATH
+          value: "$(params.TEST_PATH)"
+        - name: PARALLEL
+          value: "$(params.PARALLEL)"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "$(params.GINKGO_TIMEOUT)"
+        - name: CATALOG_SOURCE
+          value: "$(params.CATALOG_SOURCE)"
+        - name: CHANNEL
+          value: "$(params.CHANNEL)"
+        - name: SUBSCRIPTION_NAME
+          value: "$(params.SUBSCRIPTION_NAME)"
+        - name: CHAINS_REPOSITORY
+          value: "$(params.CHAINS_REPOSITORY)"
+        - name: ARTIFACTS_DIR
+          value: /source/artifacts
+        - name: CI
+          value: "true"
+        # Reuse the module cache baked into the CI image, keep the build cache local.
+        - name: GOCACHE
+          value: /go-cache/build
+        - name: GOFLAGS
+          value: "-mod=mod"
+        - name: CHAINS_DOCKER_CONFIG_JSON
+          valueFrom:
+            secretKeyRef:
+              name: quay-io-dockerconfig
+              key: config.json
+              optional: true
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github
+              key: github-token
+              optional: true
+        - name: GITLAB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pac-gitlab
+              key: gitlab-token
+              optional: true
+        - name: GITLAB_WEBHOOK_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pac-gitlab
+              key: gitlab-webhook-token
+              optional: true
+        - name: GITLAB_GROUP_NAMESPACE
+          valueFrom:
+            secretKeyRef:
+              name: pac-gitlab
+              key: gitlab-group-ns
+              optional: true
+        - name: GITLAB_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: pac-gitlab
+              key: gitlab-project-id
+              optional: true
+      script: |
+        #!/usr/bin/env bash
+        set -u -o pipefail
+
+        echo "Cluster     : ${KUBECONFIG}"
+        echo "Mode        : ${MODE}"
+        echo "Test path   : ${TEST_PATH}"
+        echo "Channel     : ${CHANNEL}"
+        echo "Catalog     : ${CATALOG_SOURCE}"
+        echo "Parallel    : ${PARALLEL} (procs=${GINKGO_PROCS})"
+
+        oc version || true
+
+        # The CI image ships a prewarmed module cache. Arbitrary UIDs cannot always
+        # write to it, so fall back to the local scratch volume when that happens.
+        modcache="$(go env GOMODCACHE)"
+        if ! mkdir -p "${modcache}" 2>/dev/null || ! touch "${modcache}/.writable" 2>/dev/null; then
+          export GOMODCACHE=/go-cache/mod
+          echo "Prewarmed module cache is read-only, falling back to ${GOMODCACHE}"
+        else
+          rm -f "${modcache}/.writable"
+        fi
+
+        go mod download || exit 1
+
+        args=("${MODE}" "--path=${TEST_PATH}" "--ci")
+        if [[ "${PARALLEL}" == "true" ]]; then
+          args+=("--parallel")
+        fi
+
+        ./scripts/run-tests.sh "${args[@]}"
+        rc=$?
+
+        python3 - "${ARTIFACTS_DIR}" <<'PY'
+        import glob, os, sys, xml.etree.ElementTree as ET
+
+        reports = sorted(glob.glob(os.path.join(sys.argv[1], "*junit*.xml")))
+        if not reports:
+            print("No JUnit report produced.")
+            raise SystemExit(0)
+
+        print("=== JUnit summary ===")
+        for report in reports:
+            try:
+                root = ET.parse(report).getroot()
+            except ET.ParseError as err:
+                print(f"{os.path.basename(report)}: unparsable ({err})")
+                continue
+            suites = root.iter("testsuite") if root.tag == "testsuites" else [root]
+            for suite in suites:
+                print(
+                    "{name}: tests={tests} failures={failures} errors={errors} skipped={skipped} time={time}s".format(
+                        name=suite.get("name", os.path.basename(report)),
+                        tests=suite.get("tests", "?"),
+                        failures=suite.get("failures", "?"),
+                        errors=suite.get("errors", "?"),
+                        skipped=suite.get("skipped", "?"),
+                        time=suite.get("time", "?"),
+                    )
+                )
+                for case in suite.iter("testcase"):
+                    for outcome in list(case.findall("failure")) + list(case.findall("error")):
+                        print(f"  FAILED: {case.get('name')}")
+                        print(f"          {(outcome.get('message') or '').strip()[:500]}")
+        PY
+
+        exit $rc
