@@ -544,6 +544,8 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
+    # Longest suite of the phase: its S2I specs start one build per imagestream
+    # tag and then only wait, so it gets more processes than the others.
     - name: release-tests-ecosystem
       onError: continue
       runAfter:
@@ -574,7 +576,7 @@ spec:
         - name: PARALLEL
           value: "true"
         - name: GINKGO_PROCS
-          value: "$(params.GINKGO_PROCS)"
+          value: "8"
         - name: GINKGO_TIMEOUT
           value: "45m"
         - name: CATALOG_SOURCE
@@ -752,13 +754,17 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
-    # All containers are Serial; the upgrade specs only make sense in an
-    # upgrade pipeline, so they are filtered out here.
+    # All containers are Serial and each one rewrites the cluster-wide
+    # TektonConfig (pruner cron, tekton-pruner TTLs, add-on params, RBAC,
+    # network policies, TLS profile), so the suite cannot be spread over
+    # ginkgo processes or tasks on a single cluster. The auto-prune and
+    # tekton-pruner specs dominate the ~90 min run time. The upgrade specs
+    # only make sense in an upgrade pipeline, so they are filtered out here.
     - name: release-tests-operator
       onError: continue
       runAfter:
         - release-tests-metrics
-      timeout: "50m"
+      timeout: "100m"
       taskRef:
         resolver: git
         params:
@@ -784,7 +790,7 @@ spec:
         - name: PARALLEL
           value: "false"
         - name: GINKGO_TIMEOUT
-          value: "40m"
+          value: "90m"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
