@@ -8,9 +8,9 @@ spec:
     Runs a Ginkgo suite from openshift-pipelines/release-tests-ginkgo against an
     ephemeral cluster provisioned through OpenShift-CI.
 
-    Operator installation and test execution are both driven by the release-tests
-    repository itself through its `scripts/run-tests.sh` wrapper, so this task only
-    has to clone the repo, mount the cluster credentials and invoke the wrapper.
+    Operator installation and test execution are both driven by the Ginkgo suites
+    in the release-tests repository, so this task only has to clone the repo,
+    mount the cluster credentials and invoke `ginkgo` on the requested suite.
   params:
     - name: CLUSTER_SECRET_REF
       type: string
@@ -28,10 +28,10 @@ spec:
     - name: MODE
       type: string
       description: |
-        First positional argument handed to scripts/run-tests.sh. Either one of the
-        named modes (install, upgrade, uninstall, sanity, smoke, e2e, e2e-connected,
-        disconnected, all) or a raw Ginkgo --label-filter expression such as
-        "e2e && !disconnected".
+        Test selection, mirroring the modes of scripts/run-tests.sh. Either one of
+        the named modes (install, upgrade, uninstall, sanity, smoke, e2e,
+        e2e-connected, disconnected, all) or a raw Ginkgo --label-filter
+        expression such as "e2e && !disconnected".
       default: e2e
     - name: TEST_PATH
       type: string
@@ -109,6 +109,18 @@ spec:
 
     - name: run-ginkgo-suite
       workingDir: /source/repo
+      # Without explicit resources the step inherits the namespace LimitRange
+      # defaults: a 2Gi memory limit and NO cpu limit. Go then sizes GOMAXPROCS
+      # (and `go build -p`) to the whole node (16-32 cores), and compiling the
+      # suite blows past 2Gi and gets OOM-killed (exit 137) within a minute.
+      # The cpu limit caps the compile parallelism; peak is ~1Gi at 2 cores.
+      computeResources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+        limits:
+          cpu: "4"
+          memory: 4Gi
       env:
         # Writable copy: the suites shell out to oc, which may rewrite the kubeconfig.
         - name: KUBECONFIG
@@ -133,11 +145,6 @@ spec:
           value: "$(params.CHAINS_REPOSITORY)"
         - name: ARTIFACTS_DIR
           value: /source/artifacts
-        # Do not enable the script's CI mode: it passes --fail-on-focused, a flag
-        # Ginkgo does not have. Ginkgo already exits 197 on focused specs, and
-        # GINKGO_NO_COLOR covers the rest.
-        - name: CI
-          value: "false"
         - name: GINKGO_NO_COLOR
           value: "TRUE"
         # Reuse the module cache baked into the CI image, keep the build cache local.
@@ -208,12 +215,41 @@ spec:
 
         go mod download || exit 1
 
-        args=("${MODE}" "--path=${TEST_PATH}")
-        if [[ "${PARALLEL}" == "true" ]]; then
-          args+=("--parallel")
-        fi
+        # Same mode handling as scripts/run-tests.sh: install/upgrade/uninstall
+        # are labels on the dedicated olm suite, the named modes are plain
+        # labels, anything else is used verbatim as the label filter.
+        test_path="${TEST_PATH}"
+        case "${MODE}" in
+          install|upgrade|uninstall) label_filter="${MODE}"; test_path="./tests/olm/" ;;
+          e2e-connected) label_filter="e2e && !disconnected" ;;
+          all) label_filter="" ;;
+          *) label_filter="${MODE}" ;;
+        esac
 
-        ./scripts/run-tests.sh "${args[@]}"
+        # Compile separately so the log shows how long the build takes; the run
+        # below then only re-links from the warm cache.
+        SECONDS=0
+        echo "==> $(date -u '+%H:%M:%S') compiling ${test_path}"
+        ginkgo build "${test_path}" || exit 1
+        echo "==> $(date -u '+%H:%M:%S') compiled in ${SECONDS}s"
+
+        mkdir -p "${ARTIFACTS_DIR}"
+        ginkgo_args=(
+          "--junit-report=junit-report.xml"
+          "--output-dir=${ARTIFACTS_DIR}"
+          "--timeout=${GINKGO_TIMEOUT}"
+          "-v"
+        )
+        if [[ -n "${label_filter}" ]]; then
+          ginkgo_args+=("--label-filter=${label_filter}")
+        fi
+        if [[ "${PARALLEL}" == "true" ]]; then
+          ginkgo_args+=("--procs=${GINKGO_PROCS}")
+        fi
+        ginkgo_args+=("${test_path}")
+
+        echo "==> $(date -u '+%H:%M:%S') Executing: ginkgo ${ginkgo_args[*]}"
+        ginkgo "${ginkgo_args[@]}"
         rc=$?
 
         python3 - "${ARTIFACTS_DIR}" <<'PY'

@@ -223,11 +223,12 @@ spec:
 
     # Install the operator by running the Ginkgo olm suite from the release-tests repo.
     # Serial on purpose: the install spec is a single Ordered container.
+    # Task timeouts leave ~15m over GINKGO_TIMEOUT for image pull, clone and compile.
     - name: install-pipelines-operator
       runAfter:
         - create-catalog-source
         - configure-loki-logging
-      timeout: "40m"
+      timeout: "45m"
       taskRef:
         resolver: git
         params:
@@ -263,7 +264,7 @@ spec:
       onError: continue
       runAfter:
         - install-pipelines-operator
-      timeout: "50m"
+      timeout: "60m"
       taskRef:
         resolver: git
         params:
