@@ -146,6 +146,8 @@ spec:
           value: "$(params.CHAINS_REPOSITORY)"
         - name: ARTIFACTS_DIR
           value: /source/artifacts
+        - name: GINKGO_NO_COLOR
+          value: "TRUE"
         # Reuse the module cache baked into the CI image, keep the build cache local.
         - name: GOCACHE
           value: /go-cache/build
@@ -241,7 +243,9 @@ spec:
         # The invocation itself belongs to the release-tests repo: its
         # scripts/run-tests.sh maps the mode to a label filter and suite path and
         # reads ARTIFACTS_DIR, GINKGO_TIMEOUT and GINKGO_PROCS from the environment.
-        run_args=("${MODE}" "--ci" "--path=${TEST_PATH}")
+        # Its --ci option is not used: it passes --fail-on-focused, which the
+        # ginkgo CLI rejects. Colour is disabled through GINKGO_NO_COLOR instead.
+        run_args=("${MODE}" "--path=${TEST_PATH}")
         if [[ "${PARALLEL}" == "true" ]]; then
           run_args+=("--parallel")
         fi
