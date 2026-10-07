@@ -331,8 +331,13 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
-    # Component suites. Every suite only depends on install-pipelines-operator, so
-    # adding another entry here widens the parallel fan-out. Keep it that way.
+    # Component suites run in two phases so the cluster-mutating suites cannot
+    # disturb the others while the ephemeral cluster (2h lifetime) is shared.
+    #
+    # Phase 1 - independent suites, fanned out right after the install. None of
+    # them touches TektonConfig, so adding a suite here only widens the fan-out.
+    # Suites with no e2e-labelled specs (hub) or external cluster requirements
+    # (tektonkueue) are intentionally absent.
     - name: release-tests-pipelines
       onError: continue
       runAfter:
@@ -366,6 +371,401 @@ spec:
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
           value: "45m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-triggers
+      onError: continue
+      runAfter:
+        - install-pipelines-operator
+      timeout: "60m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: TEST_PATH
+          value: "./tests/triggers/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "45m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-results
+      onError: continue
+      runAfter:
+        - install-pipelines-operator
+      timeout: "60m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: TEST_PATH
+          value: "./tests/results/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "45m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-versions
+      onError: continue
+      runAfter:
+        - install-pipelines-operator
+      timeout: "60m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: TEST_PATH
+          value: "./tests/versions/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "45m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-tls
+      onError: continue
+      runAfter:
+        - install-pipelines-operator
+      timeout: "60m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: TEST_PATH
+          value: "./tests/tls/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "45m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-ecosystem
+      onError: continue
+      runAfter:
+        - install-pipelines-operator
+      timeout: "60m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: TEST_PATH
+          value: "./tests/ecosystem/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "45m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-pac
+      onError: continue
+      runAfter:
+        - install-pipelines-operator
+      timeout: "60m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: TEST_PATH
+          value: "./tests/pac/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "45m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # The group-user specs log in as htpasswd users, which HyperShift clusters
+    # cannot provide (oauth/cluster is admission-blocked), so only the
+    # kubeadmin-driven approval specs run until the suite supports --as.
+    - name: release-tests-mag
+      onError: continue
+      runAfter:
+        - install-pipelines-operator
+      timeout: "60m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !mag-group-user"
+        - name: TEST_PATH
+          value: "./tests/mag/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "45m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # Phase 2 - suites that rewrite TektonConfig (chains signing config, metrics
+    # mTLS/pruner toggles, operator add-on/HPA/pruner/TLS profile settings).
+    # Each change rolls controllers and webhooks, so they wait for phase 1 and
+    # then run one after another. onError: continue keeps the chain going when
+    # one of them fails; the finally task still fails the PipelineRun.
+
+    # Not Serial-marked but every spec rewrites the chains config, so run single-proc.
+    - name: release-tests-chains
+      onError: continue
+      runAfter:
+        - release-tests-pipelines
+        - release-tests-triggers
+        - release-tests-results
+        - release-tests-versions
+        - release-tests-tls
+        - release-tests-ecosystem
+        - release-tests-pac
+        - release-tests-mag
+      timeout: "30m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: TEST_PATH
+          value: "./tests/chains/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "20m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-metrics
+      onError: continue
+      runAfter:
+        - release-tests-chains
+      timeout: "40m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: TEST_PATH
+          value: "./tests/metrics/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "30m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # All containers are Serial; the upgrade specs only make sense in an
+    # upgrade pipeline, so they are filtered out here.
+    - name: release-tests-operator
+      onError: continue
+      runAfter:
+        - release-tests-metrics
+      timeout: "50m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
+        - name: TEST_PATH
+          value: "./tests/operator/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "40m"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
