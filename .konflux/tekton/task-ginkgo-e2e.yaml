@@ -122,7 +122,8 @@ spec:
           cpu: "4"
           memory: 4Gi
       env:
-        # Writable copy: the suites shell out to oc, which may rewrite the kubeconfig.
+        # Copy read by the Go clients of the suite. CLIs (oc, tkn, opc) get their
+        # own per-process copies through the shims set up in the script below.
         - name: KUBECONFIG
           value: "/source/kubeconfig"
         - name: MODE
@@ -192,7 +193,36 @@ spec:
         #!/usr/bin/env bash
         set -u -o pipefail
 
+        # Never let a client fall back to this pod's in-cluster (Konflux) identity:
+        # without these variables an unusable kubeconfig fails loudly instead of
+        # silently sending requests to the wrong cluster.
+        unset KUBERNETES_SERVICE_HOST KUBERNETES_SERVICE_PORT
+
         cp /credentials/kubeconfig "${KUBECONFIG}"
+
+        # `oc new-project` rewrites the kubeconfig it uses, so parallel Ginkgo
+        # processes sharing a single file corrupt it for each other. Shim the CLIs
+        # so that every calling process ($PPID) works on its own copy, seeded from
+        # the pristine read-only credentials on first use.
+        mkdir -p /source/bin /source/kubeconfigs
+        chmod 700 /source/kubeconfigs
+        cat > /source/bin/.kubeconfig-shim <<'EOF'
+        #!/usr/bin/env bash
+        real="$1"; shift
+        kc="/source/kubeconfigs/kubeconfig.${PPID}"
+        if [[ ! -s "${kc}" ]]; then
+          cp /credentials/kubeconfig "${kc}.$$" && mv -n "${kc}.$$" "${kc}"
+          rm -f "${kc}.$$"
+        fi
+        KUBECONFIG="${kc}" exec "${real}" "$@"
+        EOF
+        chmod +x /source/bin/.kubeconfig-shim
+        for cli in oc kubectl tkn tkn-pac opc; do
+          real="$(command -v "${cli}")" || continue
+          printf '#!/usr/bin/env bash\nexec /source/bin/.kubeconfig-shim %q "$@"\n' "${real}" > "/source/bin/${cli}"
+          chmod +x "/source/bin/${cli}"
+        done
+        export PATH="/source/bin:${PATH}"
 
         echo "Cluster     : $(oc whoami --show-server 2>/dev/null || echo unknown)"
         echo "Mode        : ${MODE}"
