@@ -195,10 +195,31 @@ spec:
 
         cp /credentials/kubeconfig "${KUBECONFIG}"
 
+        # Prefer the CLIs served by the cluster (tkn, tkn-pac, opc of the release
+        # under test) over the ones baked into the test image, which may be a
+        # release behind. The download only exists once the operator is installed,
+        # so the install suite keeps using the image's binaries.
+        cli_url="$(oc get consoleclidownloads tkn \
+          -o jsonpath='{.spec.links[?(@.text=="Download tkn and tkn-pac for Linux x86_64")].href}' 2>/dev/null || true)"
+        if [[ -n "${cli_url}" ]]; then
+          mkdir -p /source/cli
+          if curl -sSfkL --retry 3 -o /source/cli/tkn.tar.gz "${cli_url}" \
+              && tar -xzf /source/cli/tkn.tar.gz -C /source/cli; then
+            rm -f /source/cli/tkn.tar.gz
+            export PATH="/source/cli:${PATH}"
+            echo "Using CLIs from ${cli_url}"
+          else
+            echo "WARNING: could not fetch ${cli_url}, using the CLIs of the test image"
+          fi
+        fi
+
         # `oc new-project` rewrites the kubeconfig it uses, so parallel Ginkgo
         # processes sharing a single file corrupt it for each other. Shim the CLIs
         # so that every calling process ($PPID) works on its own copy, seeded from
         # the pristine read-only credentials on first use.
+        # `opc results` is the one client ignoring KUBECONFIG (it reads
+        # ~/.kube/config; fixed upstream in tektoncd/results@517a1a873 but not
+        # released yet), so it is pointed at the copy explicitly.
         mkdir -p /source/bin /source/kubeconfigs
         chmod 700 /source/kubeconfigs
         cat > /source/bin/.kubeconfig-shim <<'EOF'
@@ -208,6 +229,9 @@ spec:
         if [[ ! -s "${kc}" ]]; then
           cp /credentials/kubeconfig "${kc}.$$" && mv -n "${kc}.$$" "${kc}"
           rm -f "${kc}.$$"
+        fi
+        if [[ "${real##*/}" == "opc" && "${1:-}" == "results" ]]; then
+          set -- "$@" --kubeconfig="${kc}"
         fi
         KUBECONFIG="${kc}" exec "${real}" "$@"
         EOF
@@ -219,6 +243,19 @@ spec:
         done
         export PATH="/source/bin:${PATH}"
 
+        # Tekton merges every pull secret of the service account into
+        # ~/.docker/config.json. Registry clients match those entries by host, so
+        # cosign would present a random Konflux robot to quay.io. Give it a config
+        # of its own holding only the Chains registry credentials, if any.
+        export DOCKER_CONFIG=/source/docker
+        mkdir -p "${DOCKER_CONFIG}"
+        chmod 700 "${DOCKER_CONFIG}"
+        if [[ -n "${CHAINS_DOCKER_CONFIG_JSON:-}" ]]; then
+          printf '%s' "${CHAINS_DOCKER_CONFIG_JSON}" > "${DOCKER_CONFIG}/config.json"
+        else
+          echo '{"auths":{}}' > "${DOCKER_CONFIG}/config.json"
+        fi
+
         echo "Cluster     : $(oc whoami --show-server 2>/dev/null || echo unknown)"
         echo "Mode        : ${MODE}"
         echo "Test path   : ${TEST_PATH}"
@@ -227,6 +264,8 @@ spec:
         echo "Parallel    : ${PARALLEL} (procs=${GINKGO_PROCS})"
 
         oc version || true
+        echo "tkn client  : $(tkn version --component client 2>/dev/null || echo unknown)"
+        opc version || true
 
         # The CI image ships a prewarmed module cache. Arbitrary UIDs cannot always
         # write to it, so fall back to the local scratch volume when that happens.

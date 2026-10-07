@@ -227,8 +227,9 @@ spec:
     # the worker nodes are amd64. Every test step that uses
     # image-registry.openshift-image-registry.svc:5000/openshift/golang then dies
     # with "exec format error". Take the imagestreams the suites use away from
-    # the samples operator and re-import them preserving the manifest list, so
-    # each node pulls the manifest for its own architecture.
+    # the samples operator and re-import every tag preserving the manifest list,
+    # so each node pulls the manifest for its own architecture. All tags matter:
+    # the ecosystem S2I specs build once per tag of each language stream.
     - name: fix-sample-imagestreams
       runAfter:
         - provision-ephemeral-cluster
@@ -256,7 +257,7 @@ spec:
                 value: "/tmp/kubeconfig"
               # Imagestreams in the openshift namespace referenced by the test fixtures.
               - name: IMAGESTREAMS
-                value: "golang python"
+                value: "dotnet golang java nodejs perl php python ruby"
             script: |
               #!/usr/bin/env bash
               set -u -o pipefail
@@ -265,9 +266,13 @@ spec:
               node_arch="$(oc get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}')"
               echo "Node architecture: ${node_arch}"
 
-              arch_of() {  # <imagestream>: architectures available behind the latest tag
-                oc get istag "$1:latest" -n openshift \
-                  -o jsonpath='{.image.dockerImageMetadata.Architecture} {.image.dockerImageManifests[*].architecture}' 2>/dev/null
+              missing_tags() {  # <imagestream>: tags whose image provides no ${node_arch}
+                local tag archs
+                for tag in $(oc get is "$1" -n openshift -o jsonpath='{.status.tags[*].tag}'); do
+                  archs="$(oc get istag "$1:${tag}" -n openshift \
+                    -o jsonpath='{.image.dockerImageMetadata.Architecture} {.image.dockerImageManifests[*].architecture}' 2>/dev/null)"
+                  [[ " ${archs} " == *" ${node_arch} "* ]] || echo "${tag}"
+                done
               }
 
               # Stop the samples operator from managing (and reverting) these imagestreams.
@@ -279,16 +284,26 @@ spec:
 
               rc=0
               for is in ${IMAGESTREAMS}; do
-                echo "==> ${is}:latest before: $(arch_of "${is}")"
-                # Follows :latest to the tag it tracks and re-imports that tag from its
-                # source keeping the manifest list; :latest is updated along with it.
-                oc import-image "${is}" -n openshift --import-mode=PreserveOriginal >/dev/null || true
-                after="$(arch_of "${is}")"
-                echo "==> ${is}:latest after : ${after}"
-                if [[ " ${after} " != *" ${node_arch} "* ]]; then
+                echo "==> ${is}: $(oc get is "${is}" -n openshift -o jsonpath='{.status.tags[*].tag}')"
+                # Re-imports every tag from its source keeping the manifest list.
+                # Reference tags such as :latest follow the tag they track.
+                for attempt in 1 2 3; do
+                  oc import-image "${is}" -n openshift --all --import-mode=PreserveOriginal >/dev/null || true
+                  missing="$(missing_tags "${is}")"
+                  [[ -z "${missing}" ]] && break
+                  echo "    attempt ${attempt}: no ${node_arch} image for: $(echo ${missing})"
+                  sleep 10
+                done
+                if [[ -z "${missing}" ]]; then
+                  echo "    all tags provide ${node_arch}"
+                elif grep -qx latest <<<"${missing}"; then
                   echo "ERROR: ${is}:latest provides no ${node_arch} image; test steps using it will fail"
                   oc get is "${is}" -n openshift -o yaml | sed -n '/^status:/,$p' | head -60
                   rc=1
+                else
+                  # Typically a tag whose source image no longer exists upstream:
+                  # only the S2I spec for that tag fails, so do not block the run.
+                  echo "WARNING: ${is}: no ${node_arch} image for $(echo ${missing}); S2I specs for these tags will fail"
                 fi
               done
               exit ${rc}
