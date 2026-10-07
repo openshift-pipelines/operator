@@ -350,7 +350,8 @@ spec:
     # disturb the others while the ephemeral cluster (2h lifetime) is shared.
     #
     # Phase 1 - independent suites, fanned out right after the install. None of
-    # them touches TektonConfig, so adding a suite here only widens the fan-out.
+    # them changes settings another suite depends on, so adding a suite here
+    # only widens the fan-out.
     # Suites with no e2e-labelled specs (hub) or external cluster requirements
     # (tektonkueue) are intentionally absent.
     - name: release-tests-pipelines
@@ -660,24 +661,13 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
-    # Phase 2 - suites that rewrite TektonConfig (chains signing config, metrics
-    # mTLS/pruner toggles, operator add-on/HPA/pruner/TLS profile settings).
-    # Each change rolls controllers and webhooks, so they wait for phase 1 and
-    # then run one after another. onError: continue keeps the chain going when
-    # one of them fails; the finally task still fails the PipelineRun.
-
-    # Not Serial-marked but every spec rewrites the chains config, so run single-proc.
+    # The chains specs rewrite TektonConfig spec.chain, which only rolls the
+    # chains controller; no other phase 1 suite depends on it. Not Serial-marked
+    # but every spec changes that config, so the suite itself runs single-proc.
     - name: release-tests-chains
       onError: continue
       runAfter:
-        - release-tests-pipelines
-        - release-tests-triggers
-        - release-tests-results
-        - release-tests-versions
-        - release-tests-tls
-        - release-tests-ecosystem
-        - release-tests-pac
-        - release-tests-mag
+        - install-pipelines-operator
       timeout: "30m"
       taskRef:
         resolver: git
@@ -710,9 +700,23 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
+    # Phase 2 - suites that rewrite TektonConfig settings shared by every
+    # component (metrics mTLS/pruner toggles, operator add-on/HPA/pruner/TLS
+    # profile settings). Each change rolls all controllers and webhooks, so they
+    # wait for phase 1 and then run one after another. onError: continue keeps
+    # the chain going when one of them fails; the finally task still fails the
+    # PipelineRun.
     - name: release-tests-metrics
       onError: continue
       runAfter:
+        - release-tests-pipelines
+        - release-tests-triggers
+        - release-tests-results
+        - release-tests-versions
+        - release-tests-tls
+        - release-tests-ecosystem
+        - release-tests-pac
+        - release-tests-mag
         - release-tests-chains
       timeout: "40m"
       taskRef:
