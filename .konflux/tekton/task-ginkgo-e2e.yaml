@@ -28,10 +28,10 @@ spec:
     - name: MODE
       type: string
       description: |
-        Test selection, mirroring the modes of scripts/run-tests.sh. Either one of
-        the named modes (install, upgrade, uninstall, sanity, smoke, e2e,
-        e2e-connected, disconnected, all) or a raw Ginkgo --label-filter
-        expression such as "e2e && !disconnected".
+        MODE argument of the repo's scripts/run-tests.sh: one of its named modes
+        (install, upgrade, uninstall, sanity, smoke, e2e, e2e-connected,
+        disconnected, all) or a raw Ginkgo --label-filter expression such as
+        "e2e && !disconnected".
       default: e2e
     - name: TEST_PATH
       type: string
@@ -146,8 +146,6 @@ spec:
           value: "$(params.CHAINS_REPOSITORY)"
         - name: ARTIFACTS_DIR
           value: /source/artifacts
-        - name: GINKGO_NO_COLOR
-          value: "TRUE"
         # Reuse the module cache baked into the CI image, keep the build cache local.
         - name: GOCACHE
           value: /go-cache/build
@@ -192,11 +190,6 @@ spec:
       script: |
         #!/usr/bin/env bash
         set -u -o pipefail
-
-        # Never let a client fall back to this pod's in-cluster (Konflux) identity:
-        # without these variables an unusable kubeconfig fails loudly instead of
-        # silently sending requests to the wrong cluster.
-        unset KUBERNETES_SERVICE_HOST KUBERNETES_SERVICE_PORT
 
         cp /credentials/kubeconfig "${KUBECONFIG}"
 
@@ -245,42 +238,19 @@ spec:
 
         go mod download || exit 1
 
-        # Same mode handling as scripts/run-tests.sh: install/upgrade/uninstall
-        # are labels on the dedicated olm suite, the named modes are plain
-        # labels, anything else is used verbatim as the label filter.
-        test_path="${TEST_PATH}"
-        case "${MODE}" in
-          install|upgrade|uninstall) label_filter="${MODE}"; test_path="./tests/olm/" ;;
-          e2e-connected) label_filter="e2e && !disconnected" ;;
-          all) label_filter="" ;;
-          *) label_filter="${MODE}" ;;
-        esac
-
-        # Compile separately so the log shows how long the build takes; the run
-        # below then only re-links from the warm cache.
-        SECONDS=0
-        echo "==> $(date -u '+%H:%M:%S') compiling ${test_path}"
-        ginkgo build "${test_path}" || exit 1
-        echo "==> $(date -u '+%H:%M:%S') compiled in ${SECONDS}s"
-
-        mkdir -p "${ARTIFACTS_DIR}"
-        ginkgo_args=(
-          "--junit-report=junit-report.xml"
-          "--output-dir=${ARTIFACTS_DIR}"
-          "--timeout=${GINKGO_TIMEOUT}"
-          "-v"
-        )
-        if [[ -n "${label_filter}" ]]; then
-          ginkgo_args+=("--label-filter=${label_filter}")
-        fi
+        # The invocation itself belongs to the release-tests repo: its
+        # scripts/run-tests.sh maps the mode to a label filter and suite path and
+        # reads ARTIFACTS_DIR, GINKGO_TIMEOUT and GINKGO_PROCS from the environment.
+        run_args=("${MODE}" "--ci" "--path=${TEST_PATH}")
         if [[ "${PARALLEL}" == "true" ]]; then
-          ginkgo_args+=("--procs=${GINKGO_PROCS}")
+          run_args+=("--parallel")
         fi
-        ginkgo_args+=("${test_path}")
 
-        echo "==> $(date -u '+%H:%M:%S') Executing: ginkgo ${ginkgo_args[*]}"
-        ginkgo "${ginkgo_args[@]}"
+        SECONDS=0
+        echo "==> $(date -u '+%H:%M:%S') scripts/run-tests.sh ${run_args[*]}"
+        ./scripts/run-tests.sh "${run_args[@]}"
         rc=$?
+        echo "==> $(date -u '+%H:%M:%S') finished in ${SECONDS}s (exit ${rc})"
 
         python3 - "${ARTIFACTS_DIR}" <<'PY'
         import glob, os, sys, xml.etree.ElementTree as ET
