@@ -221,6 +221,78 @@ spec:
                   interval: 30m
               EOF
 
+    # Workaround for OCPBUGS-74567: on multi-arch HyperShift clusters the samples
+    # operator imports its imagestreams with importMode=Legacy, which resolves
+    # every tag to the control-plane architecture (arm64 on hosted-mgmt2) while
+    # the worker nodes are amd64. Every test step that uses
+    # image-registry.openshift-image-registry.svc:5000/openshift/golang then dies
+    # with "exec format error". Take the imagestreams the suites use away from
+    # the samples operator and re-import them preserving the manifest list, so
+    # each node pulls the manifest for its own architecture.
+    - name: fix-sample-imagestreams
+      runAfter:
+        - provision-ephemeral-cluster
+      timeout: "10m"
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+      taskSpec:
+        params:
+          - name: CLUSTER_SECRET_REF
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.CLUSTER_SECRET_REF)
+        steps:
+          - name: reimport
+            image: $(params.IMAGE)
+            volumeMounts:
+              - name: credentials
+                mountPath: /credentials
+                readOnly: true
+            env:
+              - name: KUBECONFIG
+                value: "/tmp/kubeconfig"
+              # Imagestreams in the openshift namespace referenced by the test fixtures.
+              - name: IMAGESTREAMS
+                value: "golang python"
+            script: |
+              #!/usr/bin/env bash
+              set -u -o pipefail
+              cp /credentials/kubeconfig "${KUBECONFIG}"
+
+              node_arch="$(oc get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}')"
+              echo "Node architecture: ${node_arch}"
+
+              arch_of() {  # <imagestream>: architectures available behind the latest tag
+                oc get istag "$1:latest" -n openshift \
+                  -o jsonpath='{.image.dockerImageMetadata.Architecture} {.image.dockerImageManifests[*].architecture}' 2>/dev/null
+              }
+
+              # Stop the samples operator from managing (and reverting) these imagestreams.
+              current="$(oc get configs.samples.operator.openshift.io cluster -o jsonpath='{.spec.skippedImagestreams[*]}' 2>/dev/null)"
+              skipped="$(printf '%s\n' ${current} ${IMAGESTREAMS} | sort -u | sed 's/.*/"&"/' | paste -sd, -)"
+              oc patch configs.samples.operator.openshift.io cluster --type=merge \
+                -p "{\"spec\":{\"skippedImagestreams\":[${skipped}]}}" \
+                || echo "WARNING: could not update the samples operator config, it may revert the re-import"
+
+              rc=0
+              for is in ${IMAGESTREAMS}; do
+                echo "==> ${is}:latest before: $(arch_of "${is}")"
+                # Follows :latest to the tag it tracks and re-imports that tag from its
+                # source keeping the manifest list; :latest is updated along with it.
+                oc import-image "${is}" -n openshift --import-mode=PreserveOriginal >/dev/null || true
+                after="$(arch_of "${is}")"
+                echo "==> ${is}:latest after : ${after}"
+                if [[ " ${after} " != *" ${node_arch} "* ]]; then
+                  echo "ERROR: ${is}:latest provides no ${node_arch} image; test steps using it will fail"
+                  oc get is "${is}" -n openshift -o yaml | sed -n '/^status:/,$p' | head -60
+                  rc=1
+                fi
+              done
+              exit ${rc}
+
     # Install the operator by running the Ginkgo olm suite from the release-tests repo.
     # Serial on purpose: the install spec is a single Ordered container.
     # Task timeouts leave ~15m over GINKGO_TIMEOUT for image pull, clone and compile.
@@ -228,6 +300,7 @@ spec:
       runAfter:
         - create-catalog-source
         - configure-loki-logging
+        - fix-sample-imagestreams
       timeout: "45m"
       taskRef:
         resolver: git
