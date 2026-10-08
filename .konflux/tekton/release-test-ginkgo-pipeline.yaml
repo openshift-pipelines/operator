@@ -702,8 +702,50 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
+    # The operator containers that leave the install usable by the other suites:
+    # roles only reads the openshift-pipelines RBAC and networkpolicy toggles
+    # the NetworkPolicies, which at worst loosens traffic. Running them here
+    # instead of in phase 2 takes ~12 min off the critical path, which the 2h
+    # ephemeral cluster lifetime needs. Both containers are Serial, so the task
+    # runs single-proc.
+    - name: release-tests-operator-nondisruptive
+      onError: continue
+      runAfter:
+        - install-pipelines-operator
+      timeout: "30m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && (roles || networkpolicy)"
+        - name: TEST_PATH
+          value: "./tests/operator/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "20m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
     # Phase 2 - suites that rewrite TektonConfig settings shared by every
-    # component (metrics mTLS/pruner toggles, operator add-on/HPA/pruner/TLS
+    # component (metrics mTLS/pruner toggles, operator add-on/RBAC/pruner/TLS
     # profile settings). Each change rolls all controllers and webhooks, so they
     # wait for phase 1 and then run one after another. onError: continue keeps
     # the chain going when one of them fails; the finally task still fails the
@@ -720,6 +762,7 @@ spec:
         - release-tests-pac
         - release-tests-mag
         - release-tests-chains
+        - release-tests-operator-nondisruptive
       timeout: "40m"
       taskRef:
         resolver: git
@@ -754,17 +797,20 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
-    # All containers are Serial and each one rewrites the cluster-wide
-    # TektonConfig (pruner cron, tekton-pruner TTLs, add-on params, RBAC,
-    # network policies, TLS profile), so the suite cannot be spread over
-    # ginkgo processes or tasks on a single cluster. The auto-prune and
-    # tekton-pruner specs dominate the ~90 min run time. The upgrade specs
-    # only make sense in an upgrade pipeline, so they are filtered out here.
+    # The remaining containers are Serial and each one rewrites cluster-wide
+    # settings the other suites rely on (pruner cron and tekton-pruner TTLs
+    # prune their runs, add-on params remove resolver tasks, RBAC creation is
+    # switched off, the TLS profile rolls every deployment), so they cannot be
+    # spread over ginkgo processes or run next to anything else on a single
+    # cluster. The auto-prune and tekton-pruner specs make up ~37 of the ~60
+    # min. The upgrade specs only make sense in an upgrade pipeline and the
+    # roles/networkpolicy ones already ran in phase 1, so they are filtered
+    # out here.
     - name: release-tests-operator
       onError: continue
       runAfter:
         - release-tests-metrics
-      timeout: "100m"
+      timeout: "85m"
       taskRef:
         resolver: git
         params:
@@ -784,13 +830,13 @@ spec:
         - name: GIT_RELEASE_TESTS_BRANCH
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
         - name: MODE
-          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade && !roles && !networkpolicy"
         - name: TEST_PATH
           value: "./tests/operator/"
         - name: PARALLEL
           value: "false"
         - name: GINKGO_TIMEOUT
-          value: "90m"
+          value: "75m"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
