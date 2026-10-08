@@ -624,9 +624,11 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
-    # The group-user specs log in as htpasswd users, which HyperShift clusters
-    # cannot provide (oauth/cluster is admission-blocked), so only the
-    # kubeadmin-driven approval specs run until the suite supports --as.
+    # TEMPORARY (validation of release-tests-ginkgo#99): the group-user specs
+    # need htpasswd users, which HyperShift clusters cannot provide; #99 makes
+    # the suite impersonate them instead. Until it merges, this task clones the
+    # PR branch from the fork and runs the full mag suite. Restore the shared
+    # GIT_RELEASE_TESTS_* params once #99 is merged (and backported).
     - name: release-tests-mag
       onError: continue
       runAfter:
@@ -647,17 +649,19 @@ spec:
         - name: IMAGE
           value: $(params.GINKGO_IMAGE)
         - name: GIT_RELEASE_TESTS_URI
-          value: $(params.GIT_RELEASE_TESTS_URI)
+          value: "https://github.com/divyansh42/release-tests-ginkgo.git"
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: "mag-impersonation"
         - name: MODE
-          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !mag-group-user"
+          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: TEST_PATH
           value: "./tests/mag/"
         - name: PARALLEL
           value: "true"
+        # 21 Ordered containers (20 group-user TCs + PIPELINES-28); each runs
+        # on one proc, so 8 procs keeps the suite well under 10 minutes.
         - name: GINKGO_PROCS
-          value: "$(params.GINKGO_PROCS)"
+          value: "8"
         - name: GINKGO_TIMEOUT
           value: "45m"
         - name: CATALOG_SOURCE
