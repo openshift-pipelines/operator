@@ -189,6 +189,18 @@ spec:
               name: pac-gitlab
               key: gitlab-project-id
               optional: true
+        # GitHub PAC specs (PIPELINES-35) skip themselves when this is unset.
+        # The token needs admin, contents, pull-request and webhook rights on
+        # the org below, where the suite creates and deletes release-tests-pac-*
+        # repositories. The webhook secret is generated per repository.
+        - name: PAC_GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pac-github
+              key: github-token
+              optional: true
+        - name: PAC_GITHUB_ORG
+          value: "pipelinesascodetests"
       script: |
         #!/usr/bin/env bash
         set -u -o pipefail
