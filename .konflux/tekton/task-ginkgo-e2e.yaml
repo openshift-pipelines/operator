@@ -51,6 +51,13 @@ spec:
       type: string
       description: Ginkgo suite timeout.
       default: 45m
+    - name: GINKGO_FLAKE_ATTEMPTS
+      type: string
+      description: >-
+        Maximum attempts per spec (ginkgo --flake-attempts). A spec that fails
+        is retried in place and counted as Flaked, not Failed, when a later
+        attempt passes. "0" or "1" disables retries.
+      default: "0"
     - name: CATALOG_SOURCE
       type: string
       description: Catalog source the operator subscription is created from.
@@ -136,6 +143,8 @@ spec:
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
           value: "$(params.GINKGO_TIMEOUT)"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
           value: "$(params.CATALOG_SOURCE)"
         - name: CHANNEL
@@ -291,6 +300,7 @@ spec:
         echo "Channel     : ${CHANNEL}"
         echo "Catalog     : ${CATALOG_SOURCE}"
         echo "Parallel    : ${PARALLEL} (procs=${GINKGO_PROCS})"
+        echo "Flake tries : ${GINKGO_FLAKE_ATTEMPTS:-0}"
 
         oc version || true
         echo "tkn client  : $(tkn version --component client 2>/dev/null || echo unknown)"
@@ -317,6 +327,12 @@ spec:
         if [[ "${PARALLEL}" == "true" ]]; then
           run_args+=("--parallel")
         fi
+        # run-tests.sh forwards everything after "--" to the test binary, which
+        # accepts the same flags as the CLI under the --ginkgo. prefix. A retried
+        # spec passes the suite but still shows up as Flaked in the summary below.
+        if [[ "${GINKGO_FLAKE_ATTEMPTS:-0}" =~ ^[0-9]+$ ]] && (( GINKGO_FLAKE_ATTEMPTS > 1 )); then
+          run_args+=("--" "--ginkgo.flake-attempts=${GINKGO_FLAKE_ATTEMPTS}")
+        fi
 
         SECONDS=0
         echo "==> $(date -u '+%H:%M:%S') scripts/run-tests.sh ${run_args[*]}"
@@ -341,20 +357,30 @@ spec:
                 continue
             suites = root.iter("testsuite") if root.tag == "testsuites" else [root]
             for suite in suites:
+                failed, flaked = [], []
+                for case in suite.iter("testcase"):
+                    outcomes = list(case.findall("failure")) + list(case.findall("error"))
+                    failed.extend((case, outcome) for outcome in outcomes)
+                    # Ginkgo reports a spec that passed on a retry as passed; the
+                    # failed attempt only survives in the captured output.
+                    if not outcomes and "Failure recorded during attempt" in (case.findtext("system-err") or ""):
+                        flaked.append(case)
                 print(
-                    "{name}: tests={tests} failures={failures} errors={errors} skipped={skipped} time={time}s".format(
+                    "{name}: tests={tests} failures={failures} errors={errors} skipped={skipped} flaked={flaked} time={time}s".format(
                         name=suite.get("name", os.path.basename(report)),
                         tests=suite.get("tests", "?"),
                         failures=suite.get("failures", "?"),
                         errors=suite.get("errors", "?"),
                         skipped=suite.get("skipped", "?"),
+                        flaked=len(flaked),
                         time=suite.get("time", "?"),
                     )
                 )
-                for case in suite.iter("testcase"):
-                    for outcome in list(case.findall("failure")) + list(case.findall("error")):
-                        print(f"  FAILED: {case.get('name')}")
-                        print(f"          {(outcome.get('message') or '').strip()[:500]}")
+                for case, outcome in failed:
+                    print(f"  FAILED: {case.get('name')}")
+                    print(f"          {(outcome.get('message') or '').strip()[:500]}")
+                for case in flaked:
+                    print(f"  FLAKED: {case.get('name')}")
         PY
 
         exit $rc

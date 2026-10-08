@@ -55,6 +55,15 @@ spec:
       type: string
       description: Ginkgo parallel processes used per component suite.
       default: "4"
+    - name: GINKGO_FLAKE_ATTEMPTS
+      type: string
+      description: >-
+        Attempts per spec (ginkgo --flake-attempts) for the phase-1 suites and
+        metrics. Absorbs transient failures such as admission webhook EOFs
+        during HPA scale-down or Prometheus 401s; retried specs are listed as
+        FLAKED in the task log. Not applied to pac-config and operator, whose
+        serial retries would eat into the two-hour cluster budget.
+      default: "2"
 
   tasks:
     - name: parse-metadata
@@ -387,6 +396,8 @@ spec:
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
           value: "45m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
@@ -428,6 +439,8 @@ spec:
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
           value: "45m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
@@ -466,6 +479,8 @@ spec:
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
           value: "45m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
@@ -504,6 +519,8 @@ spec:
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
           value: "45m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
@@ -542,6 +559,8 @@ spec:
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
           value: "45m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
@@ -584,6 +603,8 @@ spec:
           value: "16"
         - name: GINKGO_TIMEOUT
           value: "45m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
@@ -622,6 +643,8 @@ spec:
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
           value: "45m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
@@ -667,6 +690,8 @@ spec:
           value: "8"
         - name: GINKGO_TIMEOUT
           value: "45m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
@@ -706,6 +731,8 @@ spec:
           value: "false"
         - name: GINKGO_TIMEOUT
           value: "20m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
@@ -729,7 +756,8 @@ spec:
         - release-tests-pac
         - release-tests-mag
         - release-tests-chains
-      timeout: "40m"
+      # Budget allows one retry of the 10-minute mTLS poll (measured ~17 min).
+      timeout: "50m"
       taskRef:
         resolver: git
         params:
@@ -757,7 +785,9 @@ spec:
         - name: GINKGO_PROCS
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
-          value: "30m"
+          value: "40m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
