@@ -217,6 +217,9 @@ spec:
         # processes sharing a single file corrupt it for each other. Shim the CLIs
         # so that every calling process ($PPID) works on its own copy, seeded from
         # the pristine read-only credentials on first use.
+        # Only the shared admin kubeconfig is swapped: when the suite points a
+        # CLI at another file (the MAG suite runs opc with a per-user
+        # impersonation kubeconfig), that file is used as is.
         # `opc results` is the one client ignoring KUBECONFIG (it reads
         # ~/.kube/config; fixed upstream in tektoncd/results@517a1a873 but not
         # released yet), so it is pointed at the copy explicitly.
@@ -225,10 +228,13 @@ spec:
         cat > /source/bin/.kubeconfig-shim <<'EOF'
         #!/usr/bin/env bash
         real="$1"; shift
-        kc="/source/kubeconfigs/kubeconfig.${PPID}"
-        if [[ ! -s "${kc}" ]]; then
-          cp /credentials/kubeconfig "${kc}.$$" && mv -n "${kc}.$$" "${kc}"
-          rm -f "${kc}.$$"
+        kc="${KUBECONFIG:-}"
+        if [[ -z "${kc}" || "${kc}" == "/source/kubeconfig" ]]; then
+          kc="/source/kubeconfigs/kubeconfig.${PPID}"
+          if [[ ! -s "${kc}" ]]; then
+            cp /credentials/kubeconfig "${kc}.$$" && mv -n "${kc}.$$" "${kc}"
+            rm -f "${kc}.$$"
+          fi
         fi
         if [[ "${real##*/}" == "opc" && "${1:-}" == "results" ]]; then
           set -- "$@" --kubeconfig="${kc}"
