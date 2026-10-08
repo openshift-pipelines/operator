@@ -392,6 +392,9 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
+    # TEMPORARY (validation of release-tests-ginkgo#100): the full triggers
+    # suite runs from the PR branch on the fork; restore the shared
+    # GIT_RELEASE_TESTS_* params once #100 is merged and backported.
     - name: release-tests-triggers
       onError: continue
       runAfter:
@@ -412,9 +415,9 @@ spec:
         - name: IMAGE
           value: $(params.GINKGO_IMAGE)
         - name: GIT_RELEASE_TESTS_URI
-          value: $(params.GIT_RELEASE_TESTS_URI)
+          value: "https://github.com/divyansh42/release-tests-ginkgo.git"
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: "triggers-tls-certs-per-process"
         - name: MODE
           value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: TEST_PATH
@@ -425,6 +428,87 @@ spec:
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
           value: "45m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # TEMPORARY (validation of release-tests-ginkgo#100): only the two TLS
+    # specs of the triggers suite (PIPELINES-05-TC07/TC16) on 2 procs, so they
+    # are guaranteed to overlap and exercise the shared-cert race. Expected to
+    # pass from the PR branch and to lose a Ginkgo proc from the unfixed
+    # release branch (control). Remove both tasks after the validation run.
+    - name: release-tests-triggers-tls-race
+      onError: continue
+      runAfter:
+        - install-pipelines-operator
+      timeout: "20m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: "https://github.com/divyansh42/release-tests-ginkgo.git"
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: "triggers-tls-certs-per-process"
+        - name: MODE
+          value: "tls && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: TEST_PATH
+          value: "./tests/triggers/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "2"
+        - name: GINKGO_TIMEOUT
+          value: "15m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-triggers-tls-race-control
+      onError: continue
+      runAfter:
+        - install-pipelines-operator
+      timeout: "20m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "tls && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: TEST_PATH
+          value: "./tests/triggers/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "2"
+        - name: GINKGO_TIMEOUT
+          value: "15m"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
@@ -764,6 +848,8 @@ spec:
       runAfter:
         - release-tests-pipelines
         - release-tests-triggers
+        - release-tests-triggers-tls-race          # TEMPORARY, see above
+        - release-tests-triggers-tls-race-control  # TEMPORARY, see above
         - release-tests-results
         - release-tests-versions
         - release-tests-tls
