@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/markbates/inflect"
-	security "github.com/openshift/client-go/security/clientset/versioned"
 	"github.com/tektoncd/operator/pkg/client/listers/operator/v1alpha1"
 	"github.com/tektoncd/operator/pkg/common"
 	"github.com/tektoncd/operator/pkg/reconciler/openshift"
@@ -64,9 +63,6 @@ type reconciler struct {
 	vwhlister          admissionlisters.ValidatingWebhookConfigurationLister
 	secretlister       corelisters.SecretLister
 	tektonConfigLister v1alpha1.TektonConfigLister
-
-	// securityClient is optional and only used for testing to inject a fake client
-	securityClient security.Interface
 
 	disallowUnknownFields bool
 	secretName            string
@@ -180,10 +176,7 @@ func (ac *reconciler) admissionAllowed(ctx context.Context, req *admissionv1.Adm
 
 	logger.Infof("Trying to admit namespace: %s with SCC: %s", namespaceObject.Name, nsSCC)
 
-	securityClient := ac.securityClient
-	if securityClient == nil {
-		securityClient = common.GetSecurityClient(ctx)
-	}
+	securityClient := common.GetSecurityClient(ctx)
 
 	// verify SCC exists on the cluster
 	_, err := securityClient.SecurityV1().SecurityContextConstraints().Get(ctx, nsSCC, metav1.GetOptions{})
@@ -198,21 +191,10 @@ func (ac *reconciler) admissionAllowed(ctx context.Context, req *admissionv1.Adm
 
 	// Check if the SCC requested in namespace is in line with the maxAllowed SCC in TektonConfig
 	maxAllowedSCC := tc.Spec.Platforms.OpenShift.SCC.MaxAllowed
-	defaultSCC := tc.Spec.Platforms.OpenShift.SCC.Default
 
-	// Security: Treat empty maxAllowed as "only default SCC allowed" to prevent privilege
-	// escalation. Empty maxAllowed previously allowed ANY SCC.
+	// If no maxAllowed is set, no problem
 	if maxAllowedSCC == "" {
-		if nsSCC != defaultSCC {
-			prioErr := fmt.Sprintf("namespace %s requested SCC %s, but maxAllowed is not configured. Only the default SCC %s is permitted", namespaceObject.Name, nsSCC, defaultSCC)
-			logger.Warnf("Namespace %s validation failed: %s", namespaceObject.Name, prioErr)
-			return false, &metav1.Status{
-				Status:  "Failure",
-				Message: prioErr,
-			}, nil
-		}
-		// Requesting default SCC when maxAllowed is empty is allowed
-		logger.Infof("Namespace %s validation: maxAllowed not set, allowing default SCC %s", namespaceObject.Name, defaultSCC)
+		logger.Infof("Namespace %s validation: no maxAllowed SCC set in TektonConfig", namespaceObject.Name)
 		return true, nil, nil
 	}
 

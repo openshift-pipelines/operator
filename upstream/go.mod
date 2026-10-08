@@ -1,6 +1,6 @@
 module github.com/tektoncd/operator
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/Masterminds/semver v1.5.0
@@ -20,9 +20,9 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
-	github.com/tektoncd/pipeline v1.9.8
+	github.com/tektoncd/pipeline v1.9.7
 	github.com/tektoncd/plumbing v0.0.0-20250805154627-25448098dea2
-	github.com/tektoncd/pruner v0.3.7
+	github.com/tektoncd/pruner v0.3.6
 	github.com/tektoncd/triggers v0.35.0
 	go.opencensus.io v0.24.0
 	go.uber.org/zap v1.28.0

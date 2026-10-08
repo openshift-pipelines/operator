@@ -24,22 +24,3 @@ spec:
           args: [
             "-git", "git"
           ]
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: postgres
-spec:
-  replicas: 1
-  serviceName: postgres
-  selector:
-    matchLabels:
-      run: test-statefulset
-  template:
-    metadata:
-      labels:
-        run: test-statefulset
-    spec:
-      containers:
-        - image: busybox
-          name: postgres
