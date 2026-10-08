@@ -712,11 +712,11 @@ spec:
           value: "$(tasks.create-catalog-source.results.channel)"
 
     # Phase 2 - suites that rewrite TektonConfig settings shared by every
-    # component (metrics mTLS/pruner toggles, operator add-on/RBAC/pruner/TLS
-    # profile settings). Each change rolls all controllers and webhooks, so they
-    # wait for phase 1 and then run one after another. onError: continue keeps
-    # the chain going when one of them fails; the finally task still fails the
-    # PipelineRun.
+    # component (metrics mTLS/pruner toggles, the PAC enable/disable toggle,
+    # operator add-on/RBAC/pruner/TLS profile settings). Each change rolls all
+    # controllers and webhooks, so they wait for phase 1 and then run one after
+    # another. onError: continue keeps the chain going when one of them fails;
+    # the finally task still fails the PipelineRun.
     - name: release-tests-metrics
       onError: continue
       runAfter:
@@ -763,6 +763,46 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
+    # PIPELINES-20-TC01 disables and re-enables PAC through TektonConfig, which
+    # removes the PAC controller cluster-wide for a few minutes, so it cannot
+    # share the cluster with the webhook-driven pac suite in phase 1. Its
+    # container is labelled sanity without e2e, hence the inverted filter.
+    - name: release-tests-pac-config
+      onError: continue
+      runAfter:
+        - release-tests-metrics
+      timeout: "25m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "sanity && !e2e && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: TEST_PATH
+          value: "./tests/pac/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "15m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
     # The operator containers are Serial and most of them rewrite cluster-wide
     # settings the other suites rely on (pruner cron and tekton-pruner TTLs
     # prune their runs, add-on params remove resolver tasks, RBAC creation is
@@ -771,11 +811,12 @@ spec:
     # are re-applied), so they cannot be spread over ginkgo processes or run
     # next to anything else on a single cluster. The auto-prune and
     # tekton-pruner specs make up ~37 of the ~60 min. The upgrade specs only
-    # make sense in an upgrade pipeline, so they are filtered out here.
+    # make sense in an upgrade pipeline, so they are filtered out here; the
+    # HPA check (PIPELINES-13) is labelled without e2e and is added explicitly.
     - name: release-tests-operator
       onError: continue
       runAfter:
-        - release-tests-metrics
+        - release-tests-pac-config
       timeout: "85m"
       taskRef:
         resolver: git
@@ -796,7 +837,7 @@ spec:
         - name: GIT_RELEASE_TESTS_BRANCH
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
         - name: MODE
-          value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
+          value: "(($(params.LABEL_FILTER)) || hpa) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
         - name: TEST_PATH
           value: "./tests/operator/"
         - name: PARALLEL

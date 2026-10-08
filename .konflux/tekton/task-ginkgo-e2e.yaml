@@ -159,6 +159,17 @@ spec:
               name: quay-io-dockerconfig
               key: config.json
               optional: true
+        # The jib-maven spec (PIPELINES-32-TC01) skips unless both are set. The
+        # built image goes to the internal registry; the dockerconfig only becomes
+        # the registry secret linked to the pipeline SA, so the Chains one is reused.
+        - name: JIB_MAVEN_REPOSITORY
+          value: quay.io/openshift-pipeline/jib-maven
+        - name: JIB_MAVEN_DOCKER_CONFIG_JSON
+          valueFrom:
+            secretKeyRef:
+              name: quay-io-dockerconfig
+              key: config.json
+              optional: true
         - name: GITHUB_TOKEN
           valueFrom:
             secretKeyRef:
