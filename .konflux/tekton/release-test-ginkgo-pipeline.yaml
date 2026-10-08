@@ -545,7 +545,9 @@ spec:
           value: "$(tasks.create-catalog-source.results.channel)"
 
     # Longest suite of the phase: its S2I specs start one build per imagestream
-    # tag and then only wait, so it gets more processes than the others.
+    # tag and then only wait, so it gets more processes than the others. With
+    # 8 procs the last S2I spec only got a slot ~10 min in; 16 lets all of them
+    # start at once, so the suite runs in about the time of its longest spec.
     - name: release-tests-ecosystem
       onError: continue
       runAfter:
@@ -576,7 +578,7 @@ spec:
         - name: PARALLEL
           value: "true"
         - name: GINKGO_PROCS
-          value: "8"
+          value: "16"
         - name: GINKGO_TIMEOUT
           value: "45m"
         - name: CATALOG_SOURCE
@@ -702,9 +704,12 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
-    # The operator containers that leave the install usable by the other suites:
-    # roles only reads the openshift-pipelines RBAC and networkpolicy toggles
-    # the NetworkPolicies, which at worst loosens traffic. Running them here
+    # The operator containers that leave the install usable by the other suites.
+    # roles only reads the openshift-pipelines RBAC. networkpolicy toggles the
+    # NetworkPolicies (at worst loosening traffic) and, if needed, enables
+    # tekton-pruner and deploys manual-approval-gate for the duration of the
+    # container, restoring both in its cleanup; the default pruner historyLimit
+    # of 100 means neighbouring suites' runs are not pruned. Running them here
     # instead of in phase 2 takes ~12 min off the critical path, which the 2h
     # ephemeral cluster lifetime needs. Both containers are Serial, so the task
     # runs single-proc.
