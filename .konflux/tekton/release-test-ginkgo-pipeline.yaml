@@ -751,9 +751,9 @@ spec:
     - name: release-tests-metrics
       onError: continue
       # Metrics is the most flaky suite (Prometheus scrape timing, pruner mTLS
-      # re-enable). A single automatic retry recovers transient failures without a
-      # full rerun; QE relies on the same retry-on-flake approach.
-      retries: 1
+      # re-enable). Transient failures are absorbed per-spec via GINKGO_FLAKE_ATTEMPTS
+      # (default 2); a task-level retry cannot be used here because Tekton forbids it
+      # together with onError: continue.
       runAfter:
         - release-tests-pipelines
         - release-tests-triggers
@@ -764,7 +764,7 @@ spec:
         - release-tests-pac
         - release-tests-mag
         - release-tests-chains
-      # Budget allows one retry of the 10-minute mTLS poll (measured ~17 min).
+      # Budget covers the ~17 min mTLS poll plus per-spec flake reruns.
       timeout: "40m"
       taskRef:
         resolver: git
