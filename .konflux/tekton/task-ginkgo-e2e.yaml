@@ -66,6 +66,12 @@ spec:
       type: string
       description: Channel the operator subscription subscribes to.
       default: latest
+    - name: UPGRADE_CHANNEL
+      type: string
+      description: >-
+        Target channel for the olm upgrade suite (MODE=upgrade). The upgrade spec
+        switches the existing subscription to this channel. Empty skips the upgrade.
+      default: ""
     - name: SUBSCRIPTION_NAME
       type: string
       default: openshift-pipelines-operator-rh
@@ -149,6 +155,8 @@ spec:
           value: "$(params.CATALOG_SOURCE)"
         - name: CHANNEL
           value: "$(params.CHANNEL)"
+        - name: UPGRADE_CHANNEL
+          value: "$(params.UPGRADE_CHANNEL)"
         - name: SUBSCRIPTION_NAME
           value: "$(params.SUBSCRIPTION_NAME)"
         - name: CHAINS_REPOSITORY
@@ -298,6 +306,7 @@ spec:
         echo "Mode        : ${MODE}"
         echo "Test path   : ${TEST_PATH}"
         echo "Channel     : ${CHANNEL}"
+        echo "Upg channel : ${UPGRADE_CHANNEL:-<none>}"
         echo "Catalog     : ${CATALOG_SOURCE}"
         echo "Parallel    : ${PARALLEL} (procs=${GINKGO_PROCS})"
         echo "Flake tries : ${GINKGO_FLAKE_ATTEMPTS:-0}"
