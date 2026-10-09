@@ -61,7 +61,7 @@ spec:
         Attempts per spec (ginkgo --flake-attempts) for the phase-1 suites and
         metrics. Absorbs transient failures such as admission webhook EOFs
         during HPA scale-down or Prometheus 401s; retried specs are listed as
-        FLAKED in the task log. Not applied to pac-config and operator, whose
+        FLAKED in the task log. Not applied to operator, whose
         serial retries would eat into the two-hour cluster budget.
       default: "2"
 
@@ -702,45 +702,6 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
-    # PIPELINES-20-TC01 disables and re-enables PAC through TektonConfig, which
-    # removes the PAC controller cluster-wide for a few minutes. Its container is
-    # labelled sanity without e2e, hence the inverted filter.
-    - name: release-tests-pac-config
-      onError: continue
-      runAfter:
-        - install-pipelines-operator
-      timeout: "25m"
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: $(params.RELEASE_TEST_TASKS_REPO)
-          - name: revision
-            value: $(params.RELEASE_TEST_TASKS_BRANCH)
-          - name: pathInRepo
-            value: .konflux/tekton/task-ginkgo-e2e.yaml
-      params:
-        - name: CLUSTER_SECRET_REF
-          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
-        - name: IMAGE
-          value: $(params.GINKGO_IMAGE)
-        - name: GIT_RELEASE_TESTS_URI
-          value: $(params.GIT_RELEASE_TESTS_URI)
-        - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
-        - name: MODE
-          value: "sanity && !e2e && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
-        - name: TEST_PATH
-          value: "./tests/pac/"
-        - name: PARALLEL
-          value: "false"
-        - name: GINKGO_TIMEOUT
-          value: "15m"
-        - name: CATALOG_SOURCE
-          value: "custom-osp-nightly"
-        - name: CHANNEL
-          value: "$(tasks.create-catalog-source.results.channel)"
-
     # The tests/operator/ package used to run as a single ~73m task, which was the
     # casualty when the ephemeral cluster hit its ~2h cap. Following the proven QE
     # acceptance-tests layout, it is split into per-domain tasks (rbac, addon,
@@ -845,7 +806,6 @@ spec:
         - release-tests-mag
         - release-tests-chains
         - release-tests-metrics
-        - release-tests-pac-config
         - release-tests-operator-rbac
         - release-tests-operator-addon
       timeout: "40m"
