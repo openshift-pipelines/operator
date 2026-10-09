@@ -24,9 +24,11 @@ spec:
     - name: RELEASE_TEST_TASKS_REPO
       default: https://github.com/openshift-pipelines/operator
     - name: RELEASE_TEST_TASKS_BRANCH
-      default: main
+      # TEMPORARY (PR testing): point at this PR branch; revert to "main" before merge
+      default: SRVKP-13194-migrate-eaas-to-openshift-ci
     - name: GIT_RELEASE_TESTS_URI
-      default: https://github.com/openshift-pipelines/release-tests.git
+      # TEMPORARY (PR testing): MAG fix fork; revert to openshift-pipelines/release-tests before merge
+      default: https://github.com/divyansh42/release-tests.git
 
   tasks:
     - name: parse-metadata
@@ -182,6 +184,9 @@ spec:
                 TESTS_BRANCH=$(echo "$RELEASE_BRANCH" | sed -E 's/release-v([0-9]+\.[0-9]+)\.x/release-v\1/')
               fi
               echo "Target branch: $RELEASE_BRANCH -> Release tests branch: $TESTS_BRANCH"
+              # TEMPORARY (PR testing): use the MAG-fix branch (release-tests#785);
+              # remove this override before merge to restore dynamic selection above
+              TESTS_BRANCH="mag-hypershift-impersonation"
               echo -n "$TESTS_BRANCH" | tee $(results.releaseTestsBranch.path)
 
           - name: create-catalog
