@@ -143,7 +143,7 @@ spec:
         - name: releases
           value: '{"latest":{"release":{"channel":"stable","version":"$(tasks.extract-ocp-version.results.ocpVersion)","architecture":"multi"}}}'
         - name: env
-          value: '{"COMPUTE_NODE_TYPE": "m5.2xlarge", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines"}'
+          value: '{"COMPUTE_NODE_TYPE": "m5.2xlarge", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "CONTROL_PLANE_NODE_SELECTOR": "kubernetes.io/arch=amd64", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines"}'
 
     # Configure Loki and OpenShift Logging, required by the Results configuration
     # applied during the Ginkgo install suite.
@@ -230,93 +230,6 @@ spec:
                   interval: 30m
               EOF
 
-    # Workaround for OCPBUGS-74567: on multi-arch HyperShift clusters the samples
-    # operator imports its imagestreams with importMode=Legacy, which resolves
-    # every tag to the control-plane architecture (arm64 on hosted-mgmt2) while
-    # the worker nodes are amd64. Every test step that uses
-    # image-registry.openshift-image-registry.svc:5000/openshift/golang then dies
-    # with "exec format error". Take the imagestreams the suites use away from
-    # the samples operator and re-import every tag preserving the manifest list,
-    # so each node pulls the manifest for its own architecture. All tags matter:
-    # the ecosystem S2I specs build once per tag of each language stream.
-    - name: fix-sample-imagestreams
-      runAfter:
-        - provision-ephemeral-cluster
-      timeout: "10m"
-      params:
-        - name: CLUSTER_SECRET_REF
-          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
-      taskSpec:
-        params:
-          - name: CLUSTER_SECRET_REF
-            type: string
-        volumes:
-          - name: credentials
-            secret:
-              secretName: $(params.CLUSTER_SECRET_REF)
-        steps:
-          - name: reimport
-            image: $(params.IMAGE)
-            volumeMounts:
-              - name: credentials
-                mountPath: /credentials
-                readOnly: true
-            env:
-              - name: KUBECONFIG
-                value: "/tmp/kubeconfig"
-              # Imagestreams in the openshift namespace referenced by the test fixtures.
-              - name: IMAGESTREAMS
-                value: "dotnet golang java nodejs perl php python ruby"
-            script: |
-              #!/usr/bin/env bash
-              set -u -o pipefail
-              cp /credentials/kubeconfig "${KUBECONFIG}"
-
-              node_arch="$(oc get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}')"
-              echo "Node architecture: ${node_arch}"
-
-              missing_tags() {  # <imagestream>: tags whose image provides no ${node_arch}
-                local tag archs
-                for tag in $(oc get is "$1" -n openshift -o jsonpath='{.status.tags[*].tag}'); do
-                  archs="$(oc get istag "$1:${tag}" -n openshift \
-                    -o jsonpath='{.image.dockerImageMetadata.Architecture} {.image.dockerImageManifests[*].architecture}' 2>/dev/null)"
-                  [[ " ${archs} " == *" ${node_arch} "* ]] || echo "${tag}"
-                done
-              }
-
-              # Stop the samples operator from managing (and reverting) these imagestreams.
-              current="$(oc get configs.samples.operator.openshift.io cluster -o jsonpath='{.spec.skippedImagestreams[*]}' 2>/dev/null)"
-              skipped="$(printf '%s\n' ${current} ${IMAGESTREAMS} | sort -u | sed 's/.*/"&"/' | paste -sd, -)"
-              oc patch configs.samples.operator.openshift.io cluster --type=merge \
-                -p "{\"spec\":{\"skippedImagestreams\":[${skipped}]}}" \
-                || echo "WARNING: could not update the samples operator config, it may revert the re-import"
-
-              rc=0
-              for is in ${IMAGESTREAMS}; do
-                echo "==> ${is}: $(oc get is "${is}" -n openshift -o jsonpath='{.status.tags[*].tag}')"
-                # Re-imports every tag from its source keeping the manifest list.
-                # Reference tags such as :latest follow the tag they track.
-                for attempt in 1 2 3; do
-                  oc import-image "${is}" -n openshift --all --import-mode=PreserveOriginal >/dev/null || true
-                  missing="$(missing_tags "${is}")"
-                  [[ -z "${missing}" ]] && break
-                  echo "    attempt ${attempt}: no ${node_arch} image for: $(echo ${missing})"
-                  sleep 10
-                done
-                if [[ -z "${missing}" ]]; then
-                  echo "    all tags provide ${node_arch}"
-                elif grep -qx latest <<<"${missing}"; then
-                  echo "ERROR: ${is}:latest provides no ${node_arch} image; test steps using it will fail"
-                  oc get is "${is}" -n openshift -o yaml | sed -n '/^status:/,$p' | head -60
-                  rc=1
-                else
-                  # Typically a tag whose source image no longer exists upstream:
-                  # only the S2I spec for that tag fails, so do not block the run.
-                  echo "WARNING: ${is}: no ${node_arch} image for $(echo ${missing}); S2I specs for these tags will fail"
-                fi
-              done
-              exit ${rc}
-
     # Install the operator by running the Ginkgo olm suite from the release-tests repo.
     # Serial on purpose: the install spec is a single Ordered container.
     # Task timeouts leave ~15m over GINKGO_TIMEOUT for image pull, clone and compile.
@@ -324,7 +237,6 @@ spec:
       runAfter:
         - create-catalog-source
         - configure-loki-logging
-        - fix-sample-imagestreams
       timeout: "45m"
       # OLM install is occasionally flaky (catalog pod not ready, slow subscription
       # reconcile). QE's acceptance-tests runs install with retries:2; mirror that so
@@ -359,14 +271,11 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
-    # Component suites run in two phases so the cluster-mutating suites cannot
-    # disturb the others while the ephemeral cluster (2h lifetime) is shared.
-    #
-    # Phase 1 - independent suites, fanned out right after the install. None of
-    # them changes settings another suite depends on, so adding a suite here
-    # only widens the fan-out.
-    # Suites with no e2e-labelled specs (hub) or external cluster requirements
-    # (tektonkueue) are intentionally absent.
+    # Every component suite is fanned out right after the install and runs in
+    # parallel, mirroring the proven QE acceptance-tests layout. onError: continue
+    # keeps the fan-out going when one suite fails; the finally task still fails the
+    # PipelineRun. Suites with no e2e-labelled specs (hub) or external cluster
+    # requirements (tektonkueue) are intentionally absent.
     - name: release-tests-pipelines
       onError: continue
       runAfter:
@@ -742,12 +651,12 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
-    # Phase 2 - suites that rewrite TektonConfig settings shared by every
-    # component (metrics mTLS/pruner toggles, the PAC enable/disable toggle,
-    # operator add-on/RBAC/pruner/TLS profile settings). Each change rolls all
-    # controllers and webhooks, so they wait for phase 1 and then run one after
-    # another. onError: continue keeps the chain going when one of them fails;
-    # the finally task still fails the PipelineRun.
+    # Cluster-mutating suites (metrics mTLS/pruner toggles, the PAC enable/disable
+    # toggle, operator add-on/RBAC/pruner settings). Each rewrites TektonConfig
+    # settings shared cluster-wide, but following the proven QE acceptance-tests
+    # layout they still fan out in parallel right after the install. onError:
+    # continue keeps the fan-out going when one fails; the finally task still fails
+    # the PipelineRun.
     - name: release-tests-metrics
       onError: continue
       # Metrics is the most flaky suite (Prometheus scrape timing, pruner mTLS
@@ -755,15 +664,7 @@ spec:
       # (default 2); a task-level retry cannot be used here because Tekton forbids it
       # together with onError: continue.
       runAfter:
-        - release-tests-pipelines
-        - release-tests-triggers
-        - release-tests-results
-        - release-tests-versions
-        - release-tests-tls
-        - release-tests-ecosystem
-        - release-tests-pac
-        - release-tests-mag
-        - release-tests-chains
+        - install-pipelines-operator
       # Budget covers the ~17 min mTLS poll plus per-spec flake reruns.
       timeout: "40m"
       taskRef:
@@ -802,13 +703,12 @@ spec:
           value: "$(tasks.create-catalog-source.results.channel)"
 
     # PIPELINES-20-TC01 disables and re-enables PAC through TektonConfig, which
-    # removes the PAC controller cluster-wide for a few minutes, so it cannot
-    # share the cluster with the webhook-driven pac suite in phase 1. Its
-    # container is labelled sanity without e2e, hence the inverted filter.
+    # removes the PAC controller cluster-wide for a few minutes. Its container is
+    # labelled sanity without e2e, hence the inverted filter.
     - name: release-tests-pac-config
       onError: continue
       runAfter:
-        - release-tests-metrics
+        - install-pipelines-operator
       timeout: "25m"
       taskRef:
         resolver: git
@@ -841,27 +741,21 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
-    # The operator containers are Serial and most of them rewrite cluster-wide
-    # settings the other suites rely on (pruner cron and tekton-pruner TTLs
-    # prune their runs, add-on params remove resolver tasks, RBAC creation is
-    # switched off, the TLS profile rolls every deployment, the networkpolicy
-    # toggle makes the operator proxy webhook unreachable while the policies
-    # are re-applied), so they cannot be spread over ginkgo processes or run
-    # next to anything else on a single cluster. The auto-prune and
-    # tekton-pruner specs make up ~37 of the ~60 min. The upgrade specs only
-    # make sense in an upgrade pipeline, so they are filtered out here; the
-    # HPA check (PIPELINES-13) is labelled without e2e and is added explicitly.
     # The tests/operator/ package used to run as a single ~73m task, which was the
     # casualty when the ephemeral cluster hit its ~2h cap. Following the proven QE
-    # acceptance-tests layout, it is split into parallel per-domain tasks (each runs
-    # the same package filtered to one label set), so the longest one is ~35m and the
-    # suite comfortably finishes inside the cap. Each specs' Describe is Serial/Ordered
-    # internally, and the domains touch different TektonConfig sections, so running the
-    # tasks concurrently against the one cluster mirrors what QE already validates.
+    # acceptance-tests layout, it is split into parallel per-domain tasks (rbac,
+    # addon, auto-prune, tekton-pruner), each running the same package filtered to
+    # one label set, so the longest one is ~35m and the suite comfortably finishes
+    # inside the cap. The operator specs rewrite cluster-wide settings (pruner cron
+    # and tekton-pruner TTLs, add-on params, RBAC creation), and each Describe is
+    # Serial/Ordered internally, so PARALLEL is false; the domains touch different
+    # TektonConfig sections, so running the tasks concurrently against the one
+    # cluster mirrors what QE already validates. The upgrade specs only make sense
+    # in an upgrade pipeline, so they are filtered out here.
     - name: release-tests-operator-rbac
       onError: continue
       runAfter:
-        - release-tests-pac-config
+        - install-pipelines-operator
       timeout: "25m"
       taskRef:
         resolver: git
@@ -897,7 +791,7 @@ spec:
     - name: release-tests-operator-addon
       onError: continue
       runAfter:
-        - release-tests-pac-config
+        - install-pipelines-operator
       timeout: "30m"
       taskRef:
         resolver: git
@@ -933,7 +827,7 @@ spec:
     - name: release-tests-operator-auto-prune
       onError: continue
       runAfter:
-        - release-tests-pac-config
+        - install-pipelines-operator
       timeout: "40m"
       taskRef:
         resolver: git
@@ -969,7 +863,7 @@ spec:
     - name: release-tests-operator-tekton-pruner
       onError: continue
       runAfter:
-        - release-tests-pac-config
+        - install-pipelines-operator
       timeout: "40m"
       taskRef:
         resolver: git
@@ -997,44 +891,6 @@ spec:
           value: "false"
         - name: GINKGO_TIMEOUT
           value: "35m"
-        - name: CATALOG_SOURCE
-          value: "custom-osp-nightly"
-        - name: CHANNEL
-          value: "$(tasks.create-catalog-source.results.channel)"
-
-    # Fast operator specs grouped into one task. hpa carries no "e2e" label, so the
-    # original `|| hpa` escape hatch is preserved here.
-    - name: release-tests-operator-misc
-      onError: continue
-      runAfter:
-        - release-tests-pac-config
-      timeout: "30m"
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: $(params.RELEASE_TEST_TASKS_REPO)
-          - name: revision
-            value: $(params.RELEASE_TEST_TASKS_BRANCH)
-          - name: pathInRepo
-            value: .konflux/tekton/task-ginkgo-e2e.yaml
-      params:
-        - name: CLUSTER_SECRET_REF
-          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
-        - name: IMAGE
-          value: $(params.GINKGO_IMAGE)
-        - name: GIT_RELEASE_TESTS_URI
-          value: $(params.GIT_RELEASE_TESTS_URI)
-        - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
-        - name: MODE
-          value: "(($(params.LABEL_FILTER)) || hpa) && (roles || networkpolicy || hpa || tls-profile) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
-        - name: TEST_PATH
-          value: "./tests/operator/"
-        - name: PARALLEL
-          value: "false"
-        - name: GINKGO_TIMEOUT
-          value: "25m"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
