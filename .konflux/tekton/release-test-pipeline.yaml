@@ -491,7 +491,7 @@ spec:
         - name: IMAGE
           value: $(params.IMAGE)
         - name: RUN_AS
-          value: "non-admin"
+          value: "admin"
         - name: SPECS
           value: "specs/results/"
         - name: TAGS
@@ -503,7 +503,7 @@ spec:
       runAfter:
         - setup-testing-accounts
 
-    #Release Tests - Triggers TLS (non-admin via kubeconfig impersonation)
+    #Release Tests - Triggers TLS
     - name: release-tests-triggers-tls
       onError: continue
       taskRef:
@@ -521,7 +521,7 @@ spec:
         - name: IMAGE
           value: $(params.IMAGE)
         - name: RUN_AS
-          value: "non-admin"
+          value: "admin"
         - name: SPECS
           value: "specs/triggers/eventlistener.spec"
         - name: TAGS
@@ -532,6 +532,204 @@ spec:
           value: $(tasks.create-catalog-source.results.releaseTestsBranch)
       runAfter:
         - setup-testing-accounts
+
+    #Release Tests - Operator RBAC
+    - name: release-tests-rbac
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/operator/rbac.spec"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.create-catalog-source.results.releaseTestsBranch)
+      runAfter:
+        - install-pipelines-operator
+
+    #Release Tests - Operator Addon
+    - name: release-tests-addon
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/operator/addon.spec"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.create-catalog-source.results.releaseTestsBranch)
+      runAfter:
+        - install-pipelines-operator
+
+    #Release Tests - Operator Auto Prune
+    - name: release-tests-auto-prune
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/operator/auto-prune.spec"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.create-catalog-source.results.releaseTestsBranch)
+      runAfter:
+        # Pruner tests mutate cluster-wide pruning config and delete
+        # PipelineRuns/TaskRuns; run after all other suites so they do not
+        # prune resources those suites depend on (matches QE ordering).
+        - install-pipelines-operator
+        - release-tests-versions
+        - release-tests-pipelines
+        - release-tests-triggers
+        - release-tests-triggers-tls
+        - release-tests-chains
+        - release-tests-pac
+        - release-tests-results
+        - release-tests-metrics
+        - release-tests-manual-approval
+        - release-tests-rbac
+        - release-tests-addon
+        - release-tests-ecosystem
+        - release-tests-ecosystem-s2i
+
+    #Release Tests - Tekton Pruner
+    - name: release-tests-tekton-pruner
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/operator/tekton-pruner.spec"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.create-catalog-source.results.releaseTestsBranch)
+      runAfter:
+        # Run after auto-prune (both are pruner suites) so the two do not
+        # interfere with each other or with other suites (matches QE ordering).
+        - release-tests-auto-prune
+
+    #Release Tests - Ecosystem
+    - name: release-tests-ecosystem
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/ecosystem/ecosystem.spec"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.create-catalog-source.results.releaseTestsBranch)
+      runAfter:
+        - install-pipelines-operator
+
+    #Release Tests - Ecosystem S2I
+    - name: release-tests-ecosystem-s2i
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/ecosystem/ecosystem-s2i.spec"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.create-catalog-source.results.releaseTestsBranch)
+      runAfter:
+        - install-pipelines-operator
 
   finally:
     # Deprovision disabled to save pipeline completion time
@@ -552,25 +750,71 @@ spec:
     #     - name: testPlatformClusterClaimNamespace
     #       value: $(tasks.provision-ephemeral-cluster.results.testPlatformClusterClaimNamespace)
 
-    # Verify aggregate status and fail pipeline if any e2e task failed
+    # Verify aggregate status, print a per-suite summary and a rerun hint for failed suites
     - name: verify-e2e-tests-status
       params:
         - name: aggregateStatus
           value: "$(tasks.status)"
+        - name: suiteStatuses
+          value: |
+            install-pipelines-operator=$(tasks.install-pipelines-operator.status)
+            release-tests-versions=$(tasks.release-tests-versions.status)
+            release-tests-pipelines=$(tasks.release-tests-pipelines.status)
+            release-tests-triggers=$(tasks.release-tests-triggers.status)
+            release-tests-triggers-tls=$(tasks.release-tests-triggers-tls.status)
+            release-tests-chains=$(tasks.release-tests-chains.status)
+            release-tests-pac=$(tasks.release-tests-pac.status)
+            release-tests-results=$(tasks.release-tests-results.status)
+            release-tests-metrics=$(tasks.release-tests-metrics.status)
+            release-tests-manual-approval=$(tasks.release-tests-manual-approval.status)
+            release-tests-rbac=$(tasks.release-tests-rbac.status)
+            release-tests-addon=$(tasks.release-tests-addon.status)
+            release-tests-auto-prune=$(tasks.release-tests-auto-prune.status)
+            release-tests-tekton-pruner=$(tasks.release-tests-tekton-pruner.status)
+            release-tests-ecosystem=$(tasks.release-tests-ecosystem.status)
+            release-tests-ecosystem-s2i=$(tasks.release-tests-ecosystem-s2i.status)
       taskSpec:
         params:
           - name: aggregateStatus
+          - name: suiteStatuses
         steps:
           - image: $(params.IMAGE)
             name: verify-aggregate-status
             script: |
-              #!/bin/sh
+              #!/usr/bin/env bash
               echo "📋 Aggregate Status: $(params.aggregateStatus)"
+              echo ""
+              echo "Per-suite results:"
+
+              failed=""
+              while IFS='=' read -r name status; do
+                name="$(echo "$name" | tr -d '[:space:]')"
+                status="$(echo "$status" | tr -d '[:space:]')"
+                [ -z "$name" ] && continue
+                if [[ "$status" == "Succeeded" || "$status" == "Completed" ]]; then
+                  echo "  ✅ ${name}: ${status}"
+                elif [[ "$status" == "None" || -z "$status" ]]; then
+                  echo "  ⏭️  ${name}: skipped (${status:-None})"
+                else
+                  echo "  ❌ ${name}: ${status}"
+                  failed="${failed} ${name}"
+                fi
+              done <<'EOF'
+              $(params.suiteStatuses)
+              EOF
+
+              if [[ -n "$failed" ]]; then
+                echo ""
+                echo "❌ Failed suites:${failed}"
+                echo "💡 To rerun only the failed suites, set TEST_SUITES to:${failed}"
+              fi
 
               if [[ "$(params.aggregateStatus)" != "Succeeded" ]]; then
+                echo ""
                 echo "❌ Pipeline contains failed tasks!"
                 echo "💡 Check individual task logs for detailed error information"
                 exit 1
               fi
 
+              echo ""
               echo "✅ All tasks succeeded!"
