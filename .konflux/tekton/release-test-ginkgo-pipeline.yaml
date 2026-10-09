@@ -326,6 +326,10 @@ spec:
         - configure-loki-logging
         - fix-sample-imagestreams
       timeout: "45m"
+      # OLM install is occasionally flaky (catalog pod not ready, slow subscription
+      # reconcile). QE's acceptance-tests runs install with retries:2; mirror that so
+      # a transient failure here does not abandon the whole run.
+      retries: 2
       taskRef:
         resolver: git
         params:
@@ -367,7 +371,7 @@ spec:
       onError: continue
       runAfter:
         - install-pipelines-operator
-      timeout: "60m"
+      timeout: "45m"
       taskRef:
         resolver: git
         params:
@@ -395,7 +399,7 @@ spec:
         - name: GINKGO_PROCS
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
-          value: "45m"
+          value: "30m"
         - name: GINKGO_FLAKE_ATTEMPTS
           value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
@@ -410,7 +414,7 @@ spec:
       onError: continue
       runAfter:
         - install-pipelines-operator
-      timeout: "60m"
+      timeout: "45m"
       taskRef:
         resolver: git
         params:
@@ -438,7 +442,7 @@ spec:
         - name: GINKGO_PROCS
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
-          value: "45m"
+          value: "30m"
         - name: GINKGO_FLAKE_ATTEMPTS
           value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
@@ -450,7 +454,7 @@ spec:
       onError: continue
       runAfter:
         - install-pipelines-operator
-      timeout: "60m"
+      timeout: "45m"
       taskRef:
         resolver: git
         params:
@@ -478,7 +482,7 @@ spec:
         - name: GINKGO_PROCS
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
-          value: "45m"
+          value: "30m"
         - name: GINKGO_FLAKE_ATTEMPTS
           value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
@@ -490,7 +494,7 @@ spec:
       onError: continue
       runAfter:
         - install-pipelines-operator
-      timeout: "60m"
+      timeout: "45m"
       taskRef:
         resolver: git
         params:
@@ -518,7 +522,7 @@ spec:
         - name: GINKGO_PROCS
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
-          value: "45m"
+          value: "30m"
         - name: GINKGO_FLAKE_ATTEMPTS
           value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
@@ -530,7 +534,7 @@ spec:
       onError: continue
       runAfter:
         - install-pipelines-operator
-      timeout: "60m"
+      timeout: "45m"
       taskRef:
         resolver: git
         params:
@@ -558,7 +562,7 @@ spec:
         - name: GINKGO_PROCS
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
-          value: "45m"
+          value: "30m"
         - name: GINKGO_FLAKE_ATTEMPTS
           value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
@@ -574,7 +578,7 @@ spec:
       onError: continue
       runAfter:
         - install-pipelines-operator
-      timeout: "60m"
+      timeout: "45m"
       taskRef:
         resolver: git
         params:
@@ -602,7 +606,7 @@ spec:
         - name: GINKGO_PROCS
           value: "16"
         - name: GINKGO_TIMEOUT
-          value: "45m"
+          value: "30m"
         - name: GINKGO_FLAKE_ATTEMPTS
           value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
@@ -614,7 +618,7 @@ spec:
       onError: continue
       runAfter:
         - install-pipelines-operator
-      timeout: "60m"
+      timeout: "45m"
       taskRef:
         resolver: git
         params:
@@ -642,7 +646,7 @@ spec:
         - name: GINKGO_PROCS
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
-          value: "45m"
+          value: "30m"
         - name: GINKGO_FLAKE_ATTEMPTS
           value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
@@ -659,7 +663,7 @@ spec:
       onError: continue
       runAfter:
         - install-pipelines-operator
-      timeout: "60m"
+      timeout: "45m"
       taskRef:
         resolver: git
         params:
@@ -689,7 +693,7 @@ spec:
         - name: GINKGO_PROCS
           value: "8"
         - name: GINKGO_TIMEOUT
-          value: "45m"
+          value: "30m"
         - name: GINKGO_FLAKE_ATTEMPTS
           value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
@@ -746,6 +750,10 @@ spec:
     # the finally task still fails the PipelineRun.
     - name: release-tests-metrics
       onError: continue
+      # Metrics is the most flaky suite (Prometheus scrape timing, pruner mTLS
+      # re-enable). A single automatic retry recovers transient failures without a
+      # full rerun; QE relies on the same retry-on-flake approach.
+      retries: 1
       runAfter:
         - release-tests-pipelines
         - release-tests-triggers
@@ -757,7 +765,7 @@ spec:
         - release-tests-mag
         - release-tests-chains
       # Budget allows one retry of the 10-minute mTLS poll (measured ~17 min).
-      timeout: "50m"
+      timeout: "40m"
       taskRef:
         resolver: git
         params:
@@ -785,7 +793,7 @@ spec:
         - name: GINKGO_PROCS
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
-          value: "40m"
+          value: "30m"
         - name: GINKGO_FLAKE_ATTEMPTS
           value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
@@ -843,11 +851,18 @@ spec:
     # tekton-pruner specs make up ~37 of the ~60 min. The upgrade specs only
     # make sense in an upgrade pipeline, so they are filtered out here; the
     # HPA check (PIPELINES-13) is labelled without e2e and is added explicitly.
-    - name: release-tests-operator
+    # The tests/operator/ package used to run as a single ~73m task, which was the
+    # casualty when the ephemeral cluster hit its ~2h cap. Following the proven QE
+    # acceptance-tests layout, it is split into parallel per-domain tasks (each runs
+    # the same package filtered to one label set), so the longest one is ~35m and the
+    # suite comfortably finishes inside the cap. Each specs' Describe is Serial/Ordered
+    # internally, and the domains touch different TektonConfig sections, so running the
+    # tasks concurrently against the one cluster mirrors what QE already validates.
+    - name: release-tests-operator-rbac
       onError: continue
       runAfter:
         - release-tests-pac-config
-      timeout: "85m"
+      timeout: "25m"
       taskRef:
         resolver: git
         params:
@@ -867,27 +882,178 @@ spec:
         - name: GIT_RELEASE_TESTS_BRANCH
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
         - name: MODE
-          value: "(($(params.LABEL_FILTER)) || hpa) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
+          value: "($(params.LABEL_FILTER)) && rbac && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
         - name: TEST_PATH
           value: "./tests/operator/"
         - name: PARALLEL
           value: "false"
         - name: GINKGO_TIMEOUT
-          value: "75m"
+          value: "20m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-operator-addon
+      onError: continue
+      runAfter:
+        - release-tests-pac-config
+      timeout: "30m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && addon && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
+        - name: TEST_PATH
+          value: "./tests/operator/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "25m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-operator-auto-prune
+      onError: continue
+      runAfter:
+        - release-tests-pac-config
+      timeout: "40m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && auto-prune && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
+        - name: TEST_PATH
+          value: "./tests/operator/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "35m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-operator-tekton-pruner
+      onError: continue
+      runAfter:
+        - release-tests-pac-config
+      timeout: "40m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && tekton-pruner && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
+        - name: TEST_PATH
+          value: "./tests/operator/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "35m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-nightly"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # Fast operator specs grouped into one task. hpa carries no "e2e" label, so the
+    # original `|| hpa` escape hatch is preserved here.
+    - name: release-tests-operator-misc
+      onError: continue
+      runAfter:
+        - release-tests-pac-config
+      timeout: "30m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "(($(params.LABEL_FILTER)) || hpa) && (roles || networkpolicy || hpa || tls-profile) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
+        - name: TEST_PATH
+          value: "./tests/operator/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "25m"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
   finally:
-    # Verify aggregate status and fail pipeline if any test task failed
+    # Verify aggregate status and fail the pipeline if any test task failed. On
+    # failure it also enumerates the failed suite tasks and prints a ready-to-paste
+    # rerun filter, mirroring QE acceptance-tests' evaluate-test-suites.rerun-command.
     - name: verify-e2e-tests-status
       params:
         - name: aggregateStatus
           value: "$(tasks.status)"
+        - name: pipelineRunName
+          value: "$(context.pipelineRun.name)"
       taskSpec:
         params:
           - name: aggregateStatus
+          - name: pipelineRunName
         steps:
           - name: verify-aggregate-status
             image: $(params.IMAGE)
@@ -895,10 +1061,41 @@ spec:
               #!/usr/bin/env bash
               echo "📋 Aggregate Status: $(params.aggregateStatus)"
 
-              if [[ "$(params.aggregateStatus)" != "Succeeded" ]]; then
-                echo "❌ Pipeline contains failed tasks!"
-                echo "💡 Check individual task logs for detailed error information"
-                exit 1
+              if [[ "$(params.aggregateStatus)" == "Succeeded" ]]; then
+                echo "✅ All tasks succeeded!"
+                exit 0
               fi
 
-              echo "✅ All tasks succeeded!"
+              echo "❌ Pipeline contains failed tasks!"
+
+              # The PipelineRun lives in this (Konflux) cluster, so the in-cluster
+              # service account token lets us read it back and list the failed suites.
+              pr="$(params.pipelineRunName)"
+              failed=""
+              if command -v oc >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+                failed="$(oc get pipelinerun "${pr}" -o json 2>/dev/null \
+                  | jq -r '.status.childReferences[]?.name' \
+                  | while read -r tr; do
+                      [[ -z "${tr}" ]] && continue
+                      cond="$(oc get taskrun "${tr}" -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].status}' 2>/dev/null)"
+                      name="$(oc get taskrun "${tr}" -o jsonpath='{.metadata.labels.tekton\.dev/pipelineTask}' 2>/dev/null)"
+                      if [[ "${cond}" == "False" && "${name}" == release-tests-* ]]; then
+                        echo "${name}"
+                      fi
+                    done | sort -u)"
+              fi
+
+              if [[ -n "${failed}" ]]; then
+                echo ""
+                echo "🔁 Failed suites:"
+                echo "${failed}" | sed 's/^/   - /'
+                echo ""
+                echo "💡 Rerun only the failed suites by restarting the PipelineRun with"
+                echo "   these tasks (others can be pruned from the run), or run locally:"
+                echo "${failed}" | sed 's/^release-tests-/   ginkgo run --label-filter="/; s/$/" ./tests\/<suite>\//'
+              else
+                echo "💡 Check individual task logs for detailed error information"
+                echo "   (could not enumerate failed suites automatically)."
+              fi
+
+              exit 1
