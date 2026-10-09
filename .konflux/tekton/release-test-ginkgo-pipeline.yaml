@@ -46,6 +46,9 @@ spec:
       default: https://github.com/openshift-pipelines/release-tests-ginkgo.git
     - name: GIT_RELEASE_TESTS_BRANCH
       type: string
+      # Version-matched to the OSP build under test: release-v1.24 for 1.24.x
+      # GA/z-stream, main for nightly/next. Overridden per-run by the
+      # IntegrationTestScenario; defaults to main for nightly.
       default: main
     - name: LABEL_FILTER
       type: string
@@ -316,9 +319,12 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
-    # TEMPORARY (validation of release-tests-ginkgo#100): the full triggers
-    # suite runs from the PR branch on the fork; restore the shared
-    # GIT_RELEASE_TESTS_* params once #100 is merged and backported.
+    # Triggers uses the shared, version-matched release-tests branch
+    # (GIT_RELEASE_TESTS_BRANCH: release-v1.24 for 1.24.x OSP, main for
+    # nightly/next). Both branches carry the EventListener TLS CN-length fix
+    # (#105) but write TLS certs to a shared path (the per-process cert dirs
+    # from the still-open #100 are not merged there), so this suite runs serial
+    # (PARALLEL=false) to avoid the concurrent cert-clobbering race.
     - name: release-tests-triggers
       onError: continue
       runAfter:
@@ -339,15 +345,15 @@ spec:
         - name: IMAGE
           value: $(params.GINKGO_IMAGE)
         - name: GIT_RELEASE_TESTS_URI
-          value: "https://github.com/divyansh42/release-tests-ginkgo.git"
+          value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: "triggers-tls-certs-per-process"
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
         - name: MODE
           value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: TEST_PATH
           value: "./tests/triggers/"
         - name: PARALLEL
-          value: "true"
+          value: "false"
         - name: GINKGO_PROCS
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
@@ -566,8 +572,10 @@ spec:
     # TEMPORARY (validation of release-tests-ginkgo#99): the group-user specs
     # need htpasswd users, which HyperShift clusters cannot provide; #99 makes
     # the suite impersonate them instead. Until it merges, this task clones the
-    # PR branch from the fork and runs the full mag suite. Restore the shared
-    # GIT_RELEASE_TESTS_* params once #99 is merged (and backported).
+    # PR branch from the fork and runs the full mag suite. This is the only
+    # remaining fork pin; switch it back to the shared, version-matched
+    # GIT_RELEASE_TESTS_* params before merging the operator PR (once #99 is
+    # merged and backported).
     - name: release-tests-mag
       onError: continue
       runAfter:
