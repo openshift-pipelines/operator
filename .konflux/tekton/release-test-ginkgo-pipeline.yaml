@@ -743,15 +743,16 @@ spec:
 
     # The tests/operator/ package used to run as a single ~73m task, which was the
     # casualty when the ephemeral cluster hit its ~2h cap. Following the proven QE
-    # acceptance-tests layout, it is split into parallel per-domain tasks (rbac,
-    # addon, auto-prune, tekton-pruner), each running the same package filtered to
-    # one label set, so the longest one is ~35m and the suite comfortably finishes
-    # inside the cap. The operator specs rewrite cluster-wide settings (pruner cron
-    # and tekton-pruner TTLs, add-on params, RBAC creation), and each Describe is
-    # Serial/Ordered internally, so PARALLEL is false; the domains touch different
-    # TektonConfig sections, so running the tasks concurrently against the one
-    # cluster mirrors what QE already validates. The upgrade specs only make sense
-    # in an upgrade pipeline, so they are filtered out here.
+    # acceptance-tests layout, it is split into per-domain tasks (rbac, addon,
+    # auto-prune, tekton-pruner), each running the same package filtered to one label
+    # set, so the longest one is ~35m and the suite comfortably finishes inside the
+    # cap. The operator specs rewrite cluster-wide settings (pruner cron and
+    # tekton-pruner TTLs, add-on params, RBAC creation) and each Describe is
+    # Serial/Ordered internally, so PARALLEL is false. rbac and addon fan out in
+    # parallel right after the install; the two pruner suites are gated to the end
+    # (see auto-prune below) because their sustained TektonConfig churn otherwise
+    # keeps the operator from reaching Installed=True while rbac is waiting on it.
+    # The upgrade specs only make sense in an upgrade pipeline, so they are filtered out.
     - name: release-tests-operator-rbac
       onError: continue
       runAfter:
@@ -824,10 +825,29 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
+    # auto-prune and tekton-pruner continuously rewrite the TektonConfig pruner
+    # settings and then wait on the operator reaching Installed=True. Running them
+    # next to the other TektonConfig-mutating suites (notably operator-rbac, whose
+    # rbac-disable spec also waits on Installed=True) keeps the single TektonConfig
+    # CR perpetually reconciling, so rbac timed out at Installed=False. Matching the
+    # proven QE acceptance-tests layout, the two pruner suites are gated to the end:
+    # auto-prune runs after every other suite, and tekton-pruner runs after auto-prune.
     - name: release-tests-operator-auto-prune
       onError: continue
       runAfter:
-        - install-pipelines-operator
+        - release-tests-pipelines
+        - release-tests-triggers
+        - release-tests-results
+        - release-tests-versions
+        - release-tests-tls
+        - release-tests-ecosystem
+        - release-tests-pac
+        - release-tests-mag
+        - release-tests-chains
+        - release-tests-metrics
+        - release-tests-pac-config
+        - release-tests-operator-rbac
+        - release-tests-operator-addon
       timeout: "40m"
       taskRef:
         resolver: git
@@ -863,7 +883,7 @@ spec:
     - name: release-tests-operator-tekton-pruner
       onError: continue
       runAfter:
-        - install-pipelines-operator
+        - release-tests-operator-auto-prune
       timeout: "40m"
       taskRef:
         resolver: git
