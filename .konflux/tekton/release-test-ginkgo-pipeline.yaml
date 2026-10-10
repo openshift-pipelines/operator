@@ -14,7 +14,10 @@ spec:
 
     Component suites carry no dependency on each other so Tekton runs them all in
     parallel, and each suite additionally fans out over GINKGO_PROCS Ginkgo processes.
-    This matters because the ephemeral cluster only lives for about two hours.
+    The real time budget is the Konflux PipelineRun timeout (~4h) set on the
+    IntegrationTestScenario, not the ephemeral cluster: that cluster lives up to
+    Prow's ~8h default decoration timeout, so the PipelineRun budget is what the
+    per-suite timeouts below are sized against.
   params:
     - name: SNAPSHOT
       type: string
@@ -65,7 +68,7 @@ spec:
         metrics. Absorbs transient failures such as admission webhook EOFs
         during HPA scale-down or Prometheus 401s; retried specs are listed as
         FLAKED in the task log. Not applied to operator, whose
-        serial retries would eat into the two-hour cluster budget.
+        serial retries would eat into the PipelineRun time budget.
       default: "2"
 
   tasks:
@@ -329,7 +332,7 @@ spec:
       onError: continue
       runAfter:
         - install-pipelines-operator
-      timeout: "45m"
+      timeout: "65m"
       taskRef:
         resolver: git
         params:
@@ -357,7 +360,7 @@ spec:
         - name: GINKGO_PROCS
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
-          value: "30m"
+          value: "50m"
         - name: GINKGO_FLAKE_ATTEMPTS
           value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
@@ -673,8 +676,10 @@ spec:
       # together with onError: continue.
       runAfter:
         - install-pipelines-operator
-      # Budget covers the ~17 min mTLS poll plus per-spec flake reruns.
-      timeout: "40m"
+      # Budget covers the ~17 min mTLS poll plus per-spec flake reruns. Raised
+      # to fit the ~4h PipelineRun budget (srwtf hit the old 30m cap at 58/80
+      # specs).
+      timeout: "65m"
       taskRef:
         resolver: git
         params:
@@ -702,7 +707,7 @@ spec:
         - name: GINKGO_PROCS
           value: "$(params.GINKGO_PROCS)"
         - name: GINKGO_TIMEOUT
-          value: "30m"
+          value: "50m"
         - name: GINKGO_FLAKE_ATTEMPTS
           value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
         - name: CATALOG_SOURCE
@@ -711,7 +716,7 @@ spec:
           value: "$(tasks.create-catalog-source.results.channel)"
 
     # The tests/operator/ package used to run as a single ~73m task, which was the
-    # casualty when the ephemeral cluster hit its ~2h cap. Following the proven QE
+    # casualty when the run approached the PipelineRun timeout. Following the proven QE
     # acceptance-tests layout, it is split into per-domain tasks (rbac, addon,
     # auto-prune, tekton-pruner), each running the same package filtered to one label
     # set, so the longest one is ~35m and the suite comfortably finishes inside the
@@ -816,7 +821,7 @@ spec:
         - release-tests-metrics
         - release-tests-operator-rbac
         - release-tests-operator-addon
-      timeout: "40m"
+      timeout: "70m"
       taskRef:
         resolver: git
         params:
@@ -842,7 +847,7 @@ spec:
         - name: PARALLEL
           value: "false"
         - name: GINKGO_TIMEOUT
-          value: "35m"
+          value: "55m"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
@@ -852,7 +857,7 @@ spec:
       onError: continue
       runAfter:
         - release-tests-operator-auto-prune
-      timeout: "40m"
+      timeout: "70m"
       taskRef:
         resolver: git
         params:
@@ -878,7 +883,7 @@ spec:
         - name: PARALLEL
           value: "false"
         - name: GINKGO_TIMEOUT
-          value: "35m"
+          value: "55m"
         - name: CATALOG_SOURCE
           value: "custom-osp-nightly"
         - name: CHANNEL
