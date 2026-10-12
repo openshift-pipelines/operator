@@ -63,8 +63,8 @@ metadata:
     app.kubernetes.io/component: controller
     app.kubernetes.io/instance: default
     app.kubernetes.io/part-of: tekton-chains
-    pipeline.tekton.dev/release: "v0.27.6"
-    version: "v0.27.6"
+    pipeline.tekton.dev/release: "v0.27.8"
+    version: "v0.27.8"
 spec:
   replicas: 1
   selector:
@@ -84,8 +84,8 @@ spec:
         app.kubernetes.io/instance: default
         app.kubernetes.io/part-of: tekton-chains
         # # tekton.dev/release value replaced with inputs.params.versionTag in pipeline/tekton/publish.yaml
-        pipeline.tekton.dev/release: "v0.27.6"
-        version: "v0.27.6"
+        pipeline.tekton.dev/release: "v0.27.8"
+        version: "v0.27.8"
     spec:
       affinity:
         nodeAffinity:
@@ -110,7 +110,7 @@ spec:
       serviceAccountName: tekton-chains-controller
       containers:
         - name: tekton-chains-controller
-          image: ghcr.io/tektoncd/chains/github.com/tektoncd/chains/cmd/controller:v0.27.6@sha256:eb45fc4a24a40003a8f0e71bad8b4edc1f9d9874806c368d264e92bbd60f59fd
+          image: ghcr.io/tektoncd/chains/github.com/tektoncd/chains/cmd/controller:v0.27.8@sha256:3f1d22b001e78ac7e688039df457192dc9fd9760657fc00d825f7c9e4efb6746
           volumeMounts:
             - name: signing-secrets
               mountPath: /etc/signing-secrets
@@ -203,13 +203,15 @@ rules:
     # Controller needs cluster access to all of the CRDs that it is responsible for
     # managing.
   - apiGroups: ["tekton.dev"]
-    resources: ["tasks", "clustertasks", "taskruns", "pipelines", "pipelineruns", "pipelineresources", "conditions", "runs"]
+    resources: ["tasks", "clustertasks", "taskruns", "pipelines", "pipelineruns",
+      "pipelineresources", "conditions", "runs"]
     verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
   - apiGroups: ["tekton.dev"]
     resources: ["taskruns/finalizers", "pipelineruns/finalizers", "runs/finalizers"]
     verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
   - apiGroups: ["tekton.dev"]
-    resources: ["tasks/status", "clustertasks/status", "taskruns/status", "pipelines/status", "pipelineruns/status", "pipelineresources/status", "runs/status"]
+    resources: ["tasks/status", "clustertasks/status", "taskruns/status", "pipelines/status",
+      "pipelineruns/status", "pipelineresources/status", "runs/status"]
     verbs: ["get", "list", "create", "update", "delete", "patch", "watch"]
 ---
 kind: ClusterRole
@@ -364,7 +366,7 @@ data:
   # this ConfigMap such that even if we don't have access to
   # other resources in the namespace, we can still access
   # this ConfigMap.
-  version: "v0.27.6"
+  version: "v0.27.8"
 
 ---
 # Copyright 2023 Tekton Authors LLC
