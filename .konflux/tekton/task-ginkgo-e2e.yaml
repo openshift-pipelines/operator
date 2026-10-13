@@ -75,6 +75,15 @@ spec:
     - name: SUBSCRIPTION_NAME
       type: string
       default: openshift-pipelines-operator-rh
+    - name: WAIT_FOR_UPGRADED_CLI
+      type: string
+      description: >
+        When "true", wait for the operator to finish re-rolling tkn-cli-serve
+        after an upgrade and re-download tkn/opc until the served client matches
+        the installed CSV's minor, so post-upgrade suites validate the upgraded
+        operator with the upgraded CLI rather than the cached pre-upgrade one.
+        Mirrors release-tests-infra's refresh_cli_from_upgraded_cluster.
+      default: "false"
     - name: CHAINS_REPOSITORY
       type: string
       description: OCI repository the Chains suite pushes signed images to.
@@ -159,6 +168,8 @@ spec:
           value: "$(params.UPGRADE_CHANNEL)"
         - name: SUBSCRIPTION_NAME
           value: "$(params.SUBSCRIPTION_NAME)"
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "$(params.WAIT_FOR_UPGRADED_CLI)"
         - name: CHAINS_REPOSITORY
           value: "$(params.CHAINS_REPOSITORY)"
         - name: ARTIFACTS_DIR
@@ -235,22 +246,60 @@ spec:
 
         cp /credentials/kubeconfig "${KUBECONFIG}"
 
-        # Prefer the CLIs served by the cluster (tkn, tkn-pac, opc of the release
-        # under test) over the ones baked into the test image, which may be a
-        # release behind. The download only exists once the operator is installed,
-        # so the install suite keeps using the image's binaries.
-        cli_url="$(oc get consoleclidownloads tkn \
-          -o jsonpath='{.spec.links[?(@.text=="Download tkn and tkn-pac for Linux x86_64")].href}' 2>/dev/null || true)"
-        if [[ -n "${cli_url}" ]]; then
-          mkdir -p /source/cli
-          if curl -sSfkL --retry 3 -o /source/cli/tkn.tar.gz "${cli_url}" \
-              && tar -xzf /source/cli/tkn.tar.gz -C /source/cli; then
-            rm -f /source/cli/tkn.tar.gz
-            export PATH="/source/cli:${PATH}"
-            echo "Using CLIs from ${cli_url}"
-          else
-            echo "WARNING: could not fetch ${cli_url}, using the CLIs of the test image"
+        # Prefer the CLIs served by the cluster (tkn, tkn-pac and opc of the release
+        # under test) over the ones baked into the test image, which may be a release
+        # behind. The ConsoleCLIDownload only exists once the operator is installed,
+        # so the install suite falls back to the image's binaries.
+        CLI_DIR=/source/cli
+        mkdir -p "${CLI_DIR}"
+        export PATH="${CLI_DIR}:${PATH}"
+
+        download_cluster_cli() {
+          local url
+          url="$(oc get consoleclidownloads tkn \
+            -o jsonpath='{.spec.links[?(@.text=="Download tkn and tkn-pac for Linux x86_64")].href}' 2>/dev/null || true)"
+          [[ -n "${url}" ]] || return 1
+          if curl -sSfkL --retry 3 -o "${CLI_DIR}/tkn.tar.gz" "${url}" \
+              && tar -xzf "${CLI_DIR}/tkn.tar.gz" -C "${CLI_DIR}"; then
+            rm -f "${CLI_DIR}/tkn.tar.gz"
+            hash -r 2>/dev/null || true
+            echo "Using CLIs from ${url}"
+            return 0
           fi
+          echo "WARNING: could not fetch ${url}, using the CLIs of the test image"
+          return 1
+        }
+
+        # After an operator upgrade the operator re-rolls tkn-cli-serve asynchronously,
+        # so a post-upgrade suite that downloads too early gets the pre-upgrade tkn/opc
+        # and then validates the upgraded operator with a stale CLI. When
+        # WAIT_FOR_UPGRADED_CLI is set, wait for that roll-out and re-download until opc
+        # reports the installed CSV's minor (mirrors release-tests-infra's
+        # refresh_cli_from_upgraded_cluster; we have no shared cache, so every
+        # post-upgrade task refreshes its own copy).
+        if [[ "${WAIT_FOR_UPGRADED_CLI:-false}" == "true" ]]; then
+          want="$(oc get subscription "${SUBSCRIPTION_NAME}" -n openshift-operators \
+            -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+          want="${want#${SUBSCRIPTION_NAME}.v}"; want="${want%.*}"   # target minor, e.g. 1.24
+          echo "Refreshing CLIs from upgraded cluster (want opc ${want:-any}.x)"
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            oc rollout status deployment/tkn-cli-serve -n openshift-pipelines --timeout=120s 2>/dev/null || true
+            if download_cluster_cli; then
+              served="$(opc version 2>/dev/null | grep -iE 'client' \
+                | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"
+              if [[ -z "${want}" || "${served}" == "${want}" || "${served}" == "${want}."* ]]; then
+                echo "tkn-cli-serve serving opc ${served:-unknown}"
+                break
+              fi
+              echo "  tkn-cli-serve still serving opc ${served:-unknown} (want ${want}.x); retrying..."
+            else
+              echo "  tkn-cli-serve not ready yet; retrying..."
+            fi
+            sleep 10
+          done
+        else
+          download_cluster_cli || true
         fi
 
         # `oc new-project` rewrites the kubeconfig it uses, so parallel Ginkgo
