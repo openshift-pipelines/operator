@@ -91,6 +91,16 @@ spec:
               #!/usr/bin/env bash
               set -e
 
+              # Validate the release-stream override up front so a typo fails
+              # loudly instead of silently falling through to the stable payload.
+              case "$RELEASE_STREAM" in
+                auto|stable|nightly) ;;
+                *)
+                  echo "ERROR: invalid OCP_RELEASE_STREAM '$RELEASE_STREAM'; expected one of: auto, stable, nightly" >&2
+                  exit 1
+                  ;;
+              esac
+
               # Extract OCP minor version from COMPONENT_NAME
               # Expected format: operator-1-22-index-4-20 -> 4.20
               echo "Component Name: $COMPONENT_NAME"
