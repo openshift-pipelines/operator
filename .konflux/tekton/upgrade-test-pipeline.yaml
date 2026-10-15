@@ -1,0 +1,1207 @@
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: upgrade-test-pipeline
+spec:
+  description: |
+    An integration test which provisions an ephemeral Hypershift cluster via OpenShift-CI,
+    installs the latest released OpenShift Pipelines operator from the prod redhat-operators
+    catalog, creates upgrade-persistent resources, then upgrades the operator to the bundle
+    built from this Konflux snapshot and verifies those resources survived the upgrade.
+
+    The upgrade source is the previous minor of the target channel (pipelines-X.Y ->
+    pipelines-X.(Y-1)); override with PRE_UPGRADE_CHANNEL.
+  # ==========================================================================
+  # Pipeline parameters
+  # ==========================================================================
+  params:
+    - description: Snapshot of the application
+      name: SNAPSHOT
+      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+      type: string
+    - description: Namespace where the Operator bundle will be deployed.
+      name: NAMESPACE
+      default: openshift-operators
+      type: string
+    - name: IMAGE
+      type: string
+      default: quay.io/openshift-pipeline/ci:latest
+    - name: TAGS
+      default: "(e2e | sanity)"
+    - name: RELEASE_TEST_TASKS_REPO
+      default: https://github.com/openshift-pipelines/operator
+    - name: RELEASE_TEST_TASKS_BRANCH
+      default: main
+    - name: GIT_RELEASE_TESTS_URI
+      default: https://github.com/openshift-pipelines/release-tests.git
+    - description: |
+        Override for the upgrade source channel (the "from" version), e.g. pipelines-1.23.
+        Leave empty to auto-derive the previous minor from the target channel
+        (pipelines-X.Y => pipelines-X.(Y-1)).
+      name: PRE_UPGRADE_CHANNEL
+      default: ""
+
+  tasks:
+    # ==========================================================================
+    # Phase 1 - Provision the ephemeral cluster and configure logging
+    # ==========================================================================
+    - name: parse-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/integration-examples
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/test_metadata.yaml
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+
+    - name: extract-ocp-version
+      runAfter:
+        - parse-metadata
+      params:
+        - name: componentName
+          value: "$(tasks.parse-metadata.results.component-name)"
+      taskSpec:
+        params:
+          - name: componentName
+            type: string
+        results:
+          - name: ocpVersion
+            description: The OCP minor version extracted from component name (e.g. 4.20)
+        steps:
+          - name: extract-version
+            image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+            env:
+              - name: COMPONENT_NAME
+                value: "$(params.componentName)"
+            script: |
+              #!/usr/bin/env bash
+              set -e
+
+              # Extract OCP minor version from COMPONENT_NAME
+              # Expected format: operator-1-22-index-4-20 -> 4.20
+              echo "Component Name: $COMPONENT_NAME"
+
+              VERSION_PATTERN=$(echo "$COMPONENT_NAME" | grep -oE '[0-9]+-[0-9]+' | tail -1)
+
+              if [ -z "$VERSION_PATTERN" ]; then
+                echo "Warning: Could not extract version from component name, using default"
+                OCP_VERSION="4.20"
+              else
+                OCP_VERSION=$(echo "$VERSION_PATTERN" | tr '-' '.')
+                echo "Extracted OCP Version: $OCP_VERSION"
+              fi
+
+              echo -n "$OCP_VERSION" | tee $(results.ocpVersion.path)
+
+    - name: provision-ephemeral-cluster
+      runAfter:
+        - extract-ocp-version
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/openshift/konflux-tasks
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/provision-ephemeral-cluster/0.1/provision-ephemeral-cluster.yaml
+      params:
+        - name: ownerName
+          value: $(context.pipelineRun.name)
+        - name: ownerUid
+          value: $(context.pipelineRun.uid)
+        - name: workflow
+          value: hypershift-hostedcluster-workflow
+        - name: clusterProfile
+          value: aws-konflux-prod
+        - name: releases
+          value: '{"latest":{"release":{"channel":"stable","version":"$(tasks.extract-ocp-version.results.ocpVersion)","architecture":"multi"}}}'
+        - name: env
+          value: '{"COMPUTE_NODE_TYPE": "m5.2xlarge", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "CONTROL_PLANE_NODE_SELECTOR": "kubernetes.io/arch=amd64", "FIPS": "true", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines"}'
+
+    # Configure Loki and OpenShift Logging
+    - name: configure-loki-logging
+      runAfter:
+        - provision-ephemeral-cluster
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-configure-loki-logging.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+
+    # Resolve the upgrade source channel ("from" version): the previous minor of the target.
+    # ==========================================================================
+    # Phase 2 - Install the previous GA and create upgrade-persistent resources
+    # ==========================================================================
+    # Target pipelines-X.Y  -> previous channel pipelines-X.(Y-1)  (minor upgrade).
+    # No cluster access needed; PRE_UPGRADE_CHANNEL overrides the derived value.
+    - name: derive-channels
+      runAfter:
+        - provision-ephemeral-cluster
+      taskSpec:
+        results:
+          - name: previousChannel
+            type: string
+          - name: releaseTestsBranch
+            type: string
+        stepTemplate:
+          image: $(params.IMAGE)
+          env:
+            - name: RELEASE_BRANCH
+              value: "$(tasks.parse-metadata.results.target-git-branch)"
+            - name: PRE_UPGRADE_CHANNEL
+              value: "$(params.PRE_UPGRADE_CHANNEL)"
+        steps:
+          - name: select-release-tests-branch
+            script: |
+              #!/usr/bin/env bash
+              set -x
+              # For release-vX.Y.x use the matching release-vX.Y branch of release-tests
+              # For nightly, next and main use the master branch
+              if [[ "$RELEASE_BRANCH" == "next" || "$RELEASE_BRANCH" == "nightly" || "$RELEASE_BRANCH" == "main" ]]; then
+                TESTS_BRANCH="master"
+              else
+                TESTS_BRANCH=$(echo "$RELEASE_BRANCH" | sed -E 's/release-v([0-9]+\.[0-9]+)\.x/release-v\1/')
+              fi
+              echo "Target branch: $RELEASE_BRANCH -> Release tests branch: $TESTS_BRANCH"
+              echo -n "$TESTS_BRANCH" | tee $(results.releaseTestsBranch.path)
+
+          - name: resolve-source-channel
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+
+              # Explicit override always wins.
+              if [[ -n "$PRE_UPGRADE_CHANNEL" ]]; then
+                echo "PRE_UPGRADE_CHANNEL override provided: $PRE_UPGRADE_CHANNEL"
+                echo -n "$PRE_UPGRADE_CHANNEL" | tee $(results.previousChannel.path)
+                exit 0
+              fi
+
+              # Target (upgrade "to") channel derived from the operator release branch.
+              if [[ "$RELEASE_BRANCH" == "next" || "$RELEASE_BRANCH" == "nightly" || "$RELEASE_BRANCH" == "main" ]]; then
+                TARGET_CHANNEL="latest"
+              else
+                TARGET_CHANNEL=$(echo "$RELEASE_BRANCH" | sed -E 's/release-v([0-9]+\.[0-9]+)\.x/pipelines-\1/')
+              fi
+              echo "Release branch: $RELEASE_BRANCH -> target channel: $TARGET_CHANNEL"
+
+              # Previous minor = pipelines-X.(Y-1).
+              if [[ "$TARGET_CHANNEL" =~ ^pipelines-([0-9]+)\.([0-9]+)$ ]]; then
+                MAJOR="${BASH_REMATCH[1]}"
+                MINOR="${BASH_REMATCH[2]}"
+                PREV="pipelines-${MAJOR}.$((MINOR - 1))"
+                echo "Derived previous channel from target $TARGET_CHANNEL -> $PREV"
+                echo -n "$PREV" | tee $(results.previousChannel.path)
+              else
+                echo "ERROR: cannot derive a previous channel from target '$TARGET_CHANNEL'." >&2
+                echo "nightly/next/main builds have no released predecessor; set PRE_UPGRADE_CHANNEL explicitly (e.g. pipelines-1.23)." >&2
+                exit 1
+              fi
+
+    # Install the previous (released) operator from the prod redhat-operators catalog.
+    - name: install-pre-upgrade-operator
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/olm.spec"
+        - name: TAGS
+          value: "install"
+        - name: CATALOG_SOURCE
+          value: "redhat-operators"
+        - name: CHANNEL
+          value: "$(tasks.derive-channels.results.previousChannel)"
+        - name: FAIL_ON_ERROR
+          value: "true"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        - derive-channels
+        - configure-loki-logging
+
+    - name: setup-testing-accounts
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-setup-testing-accounts.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+      runAfter:
+        - install-pre-upgrade-operator
+
+    # Create upgrade-persistent resources BEFORE the upgrade (fixed releasetest-upgrade-* namespaces).
+    - name: release-tests-pre-upgrade
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/operator/pre-upgrade.spec"
+        - name: STATE_CONFIGMAP
+          value: "upgrade-skiprange-state"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.derive-channels.results.previousChannel)"
+        - name: TAGS
+          value: "pre-upgrade"
+        - name: MAX_RETRIES
+          value: "3"
+        - name: FAIL_ON_ERROR
+          value: "true"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        - install-pre-upgrade-operator
+        - setup-testing-accounts
+
+    # ==========================================================================
+    # Phase 3 - Build the snapshot catalog and upgrade the operator to it
+    # ==========================================================================
+    # Create the Catalog Source from this PR's snapshot (the upgrade "to" version).
+    # Runs AFTER pre-upgrade resources exist so the upgrade happens with them in place.
+    - name: create-catalog-source
+      runAfter:
+        - release-tests-pre-upgrade
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+      taskSpec:
+        params:
+          - name: CLUSTER_SECRET_REF
+            type: string
+        results:
+          - name: channel
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.CLUSTER_SECRET_REF)
+        stepTemplate:
+          image: $(params.IMAGE)
+          env:
+            - name: INDEX_IMAGE
+              value: "$(tasks.parse-metadata.results.component-container-image)"
+            - name: RELEASE_BRANCH
+              value: "$(tasks.parse-metadata.results.target-git-branch)"
+          volumeMounts:
+            - name: credentials
+              mountPath: /credentials
+              readOnly: true
+        steps:
+          - name: extract-channel-name
+            script: |
+              #!/usr/bin/env bash
+              set -x
+              if [[ "$RELEASE_BRANCH" == "next" || "$RELEASE_BRANCH" == "nightly" || "$RELEASE_BRANCH" == "main" ]]; then
+                CHANNEL="latest"
+              else
+                CHANNEL=$(echo "$RELEASE_BRANCH" | sed -E 's/release-v([0-9]+\.[0-9]+)\.x/pipelines-\1/')
+              fi
+              echo -n "$CHANNEL" | tee $(results.channel.path)
+
+          - name: create-catalog
+            env:
+              - name: KUBECONFIG
+                value: "/tmp/kubeconfig"
+            script: |
+              #!/usr/bin/env bash
+              cp /credentials/kubeconfig /tmp/kubeconfig
+              cat <<EOF | oc apply -f-
+                apiVersion: operators.coreos.com/v1alpha1
+                kind: CatalogSource
+                metadata:
+                  name: "custom-osp-catalog"
+                  namespace: openshift-marketplace
+                spec:
+                  sourceType: grpc
+                  image: $INDEX_IMAGE
+                  displayName: "Custom OSP Catalog"
+                  publisher: Red Hat Local
+                  updateStrategy:
+                    registryPoll:
+                      interval: 30m
+              EOF
+
+    # Repoint the operator Subscription from the prod redhat-operators catalog to this PR's
+    # custom-osp-catalog (and the target channel). The gauge "upgrade" step only patches the
+    # Subscription channel, not its catalog source, so this cross-catalog move is done here.
+    # OLM (installPlanApproval: Automatic) then rolls out the new CSV; the gauge upgrade test
+    # that follows validates the upgraded operator.
+    - name: switch-to-upgrade-catalog
+      runAfter:
+        - create-catalog-source
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+      taskSpec:
+        params:
+          - name: CLUSTER_SECRET_REF
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.CLUSTER_SECRET_REF)
+        stepTemplate:
+          image: $(params.IMAGE)
+          env:
+            - name: TARGET_CHANNEL
+              value: "$(tasks.create-catalog-source.results.channel)"
+          volumeMounts:
+            - name: credentials
+              mountPath: /credentials
+              readOnly: true
+        steps:
+          - name: repoint-subscription
+            env:
+              - name: KUBECONFIG
+                value: "/tmp/kubeconfig"
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+              cp /credentials/kubeconfig /tmp/kubeconfig
+
+              # Wait for the custom catalog source to be serving before repointing.
+              echo "Waiting for custom-osp-catalog CatalogSource to be READY..."
+              for i in $(seq 1 60); do
+                STATE=$(oc get catalogsource custom-osp-catalog -n openshift-marketplace \
+                  -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
+                echo "  attempt $i: state=${STATE:-<none>}"
+                [[ "$STATE" == "READY" ]] && break
+                sleep 10
+              done
+              if [[ "${STATE:-}" != "READY" ]]; then
+                echo "ERROR: custom-osp-catalog did not become READY in time."
+                exit 1
+              fi
+
+              # Discover the Pipelines operator Subscription deterministically by its
+              # package (spec.name), not list order: openshift-operators may contain
+              # more than one Subscription and items[0] could repoint an unrelated one.
+              SUB=$(oc get subscription -n openshift-operators \
+                -o jsonpath='{.items[?(@.spec.name=="openshift-pipelines-operator-rh")].metadata.name}')
+              if [[ -z "$SUB" ]]; then
+                echo "ERROR: no openshift-pipelines-operator-rh Subscription found in openshift-operators."
+                exit 1
+              fi
+              echo "Repointing Subscription '$SUB' to custom-osp-catalog, channel $TARGET_CHANNEL"
+
+              # Record the currently-installed CSV so we can detect the actual
+              # upgrade transition below. The gauge upgrade step only waits for a
+              # non-empty installedCSV that is Succeeded, which the previous GA CSV
+              # already satisfies, so it can short-circuit on the old CSV while OLM
+              # is still rolling the new one. We block here until a DIFFERENT CSV is
+              # installed and Succeeded before downstream upgrade/post-upgrade suites.
+              PREV_CSV=$(oc get subscription "$SUB" -n openshift-operators \
+                -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
+              echo "Pre-upgrade installedCSV: ${PREV_CSV:-<none>}"
+
+              oc patch subscription "$SUB" -n openshift-operators --type merge -p \
+                "{\"spec\":{\"source\":\"custom-osp-catalog\",\"sourceNamespace\":\"openshift-marketplace\",\"channel\":\"${TARGET_CHANNEL}\"}}"
+
+              oc get subscription "$SUB" -n openshift-operators -o yaml | grep -E "channel:|source:|sourceNamespace:"
+
+              echo "Waiting for the operator to upgrade to a new Succeeded CSV..."
+              NEW_CSV=""
+              for i in $(seq 1 90); do
+                CUR_CSV=$(oc get subscription "$SUB" -n openshift-operators \
+                  -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
+                if [[ -n "$CUR_CSV" && "$CUR_CSV" != "$PREV_CSV" ]]; then
+                  PHASE=$(oc get csv "$CUR_CSV" -n openshift-operators \
+                    -o jsonpath='{.status.phase}' 2>/dev/null || true)
+                  echo "  attempt $i: installedCSV=$CUR_CSV phase=${PHASE:-<none>}"
+                  if [[ "$PHASE" == "Succeeded" ]]; then
+                    NEW_CSV="$CUR_CSV"
+                    break
+                  fi
+                else
+                  echo "  attempt $i: installedCSV=${CUR_CSV:-<none>} (unchanged)"
+                fi
+                sleep 10
+              done
+              if [[ -z "$NEW_CSV" ]]; then
+                echo "ERROR: operator did not upgrade to a new Succeeded CSV (still ${PREV_CSV:-<none>})."
+                exit 1
+              fi
+              echo "Operator upgraded: ${PREV_CSV:-<none>} -> $NEW_CSV"
+
+    # Validate the upgrade via the gauge olm.spec upgrade scenario (waits for the new CSV,
+    # validates the operator, RBAC and quickstarts on this PR's snapshot build).
+    - name: update-pipelines-operator
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/olm.spec"
+        - name: TAGS
+          value: "upgrade"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: FAIL_ON_ERROR
+          value: "true"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        - switch-to-upgrade-catalog
+
+    # ==========================================================================
+    # Phase 4 - Verify survival (post-upgrade) and re-run the full suite set
+    # ==========================================================================
+    # Verify the upgrade-persistent resources survived the upgrade.
+    - name: release-tests-post-upgrade
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/operator/post-upgrade.spec"
+        # Read the post-upgrade OLM skipRange from the custom upgrade catalog
+        # (the newly-installed build), not prod redhat-operators. The skipRange
+        # diff validation (PIPELINES-19-TC06) requires the matching channel's
+        # upper bound to advance vs the pre-upgrade read (which uses
+        # redhat-operators); without this the post read falls back to
+        # redhat-operators and the diff is empty -> "skipRange unchanged".
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: STATE_CONFIGMAP
+          value: "upgrade-skiprange-state"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "post-upgrade"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+        - name: MAX_RETRIES
+          value: "3"
+      runAfter:
+        - update-pipelines-operator
+
+    #Release Tests - Versions
+    - name: release-tests-versions
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/versions.spec"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        - update-pipelines-operator
+
+    #Release Tests - Pipelines (non-admin via kubeconfig impersonation)
+    - name: release-tests-pipelines
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "non-admin"
+        - name: SPECS
+          value: "specs/pipelines/"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+        - name: MAX_RETRIES
+          value: "3"
+      runAfter:
+        - update-pipelines-operator
+        - setup-testing-accounts
+
+    #Release Tests - Triggers (non-admin via kubeconfig impersonation)
+    - name: release-tests-triggers
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "non-admin"
+        - name: SPECS
+          value: "specs/triggers/"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "$(params.TAGS),!tls"
+        - name: OCP_VERSION
+          value: "$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        - update-pipelines-operator
+        - setup-testing-accounts
+
+    #Release Tests - Triggers TLS
+    - name: release-tests-triggers-tls
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/triggers/eventlistener.spec"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "tls,$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+        - name: MAX_RETRIES
+          value: "3"
+      runAfter:
+        - update-pipelines-operator
+
+    #Release Tests - Chains
+    - name: release-tests-chains
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/chains/"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: MAX_RETRIES
+          value: "3"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        - update-pipelines-operator
+
+    #Release Tests - Pipelines as Code
+    - name: release-tests-pac
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/pac/"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: MAX_RETRIES
+          value: "3"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        - update-pipelines-operator
+
+    #Release Tests - Results
+    - name: release-tests-results
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/results/"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: MAX_RETRIES
+          value: "3"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        - update-pipelines-operator
+
+    #Release Tests - Metrics
+    - name: release-tests-metrics
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/metrics/"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: MAX_RETRIES
+          value: "3"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        - update-pipelines-operator
+
+    #Release Tests - Operator RBAC
+    - name: release-tests-rbac
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/operator/rbac.spec"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        # Moved out of phase 1 to run in the tail (in parallel with addon / the
+        # pruner suites) after the main parallel suite batch, to reduce peak
+        # concurrency on the ephemeral cluster.
+        - update-pipelines-operator
+        - release-tests-post-upgrade
+        - release-tests-versions
+        - release-tests-pipelines
+        - release-tests-triggers
+        - release-tests-triggers-tls
+        - release-tests-chains
+        - release-tests-pac
+        - release-tests-results
+        - release-tests-metrics
+        - release-tests-manual-approval
+        - release-tests-ecosystem
+
+    #Release Tests - Operator Addon
+    - name: release-tests-addon
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/operator/addon.spec"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        # Moved out of phase 1 to run in the tail (in parallel with rbac / the
+        # pruner suites) after the main parallel suite batch, to reduce peak
+        # concurrency on the ephemeral cluster.
+        - update-pipelines-operator
+        - release-tests-post-upgrade
+        - release-tests-versions
+        - release-tests-pipelines
+        - release-tests-triggers
+        - release-tests-triggers-tls
+        - release-tests-chains
+        - release-tests-pac
+        - release-tests-results
+        - release-tests-metrics
+        - release-tests-manual-approval
+        - release-tests-ecosystem
+
+    #Release Tests - Manual Approval Gate
+    - name: release-tests-manual-approval
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/manualapprovalgate/"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+        - name: MAG_USE_IMPERSONATION
+          value: "true"
+      runAfter:
+        - update-pipelines-operator
+        - setup-testing-accounts
+
+    #Release Tests - Ecosystem
+    # KNOWN ISSUE (SRVKP-11139): on OCP >= 4.20 the ecosystem buildah-ns scenario is
+    # reported by gauge as a skip-as-fail, so this suite shows up as FailureIgnored.
+    # It is a tracked known bug, not a product/migration regression -> onError: continue.
+    - name: release-tests-ecosystem
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/ecosystem/ecosystem.spec"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        - update-pipelines-operator
+
+    # ==========================================================================
+    # Phase 5 - Pruning suites (serialized tail; mutate cluster-wide config)
+    # ==========================================================================
+    # Release Tests - Operator Auto Prune
+    # [TEMPORARILY DISABLED] Auto-prune suite commented out: it mutates cluster-wide
+    # pruning config and its long test tail needs more runtime than the current
+    # ~2h ephemeral-cluster lifetime allows. Re-enable once the cluster lifetime is
+    # increased beyond 2h. (tekton-pruner remains enabled below — it is quick.)
+    # When re-enabled it runs after all other suites and is
+    # serialized before tekton-pruner.
+#    - name: release-tests-auto-prune
+#      onError: continue
+#      taskRef:
+#        resolver: git
+#        params:
+#          - name: url
+#            value: $(params.RELEASE_TEST_TASKS_REPO)
+#          - name: revision
+#            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+#          - name: pathInRepo
+#            value: .konflux/tekton/task-e2e-pipeline.yaml
+#      params:
+#        - name: CLUSTER_SECRET_REF
+#          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+#        - name: IMAGE
+#          value: $(params.IMAGE)
+#        - name: RUN_AS
+#          value: "admin"
+#        - name: SPECS
+#          value: "specs/operator/auto-prune.spec"
+#        - name: REFRESH_CLI_FROM_CLUSTER
+#          value: "true"
+#        - name: EXPECTED_CLI_VERSION
+#          value: "$(tasks.create-catalog-source.results.channel)"
+#        - name: TAGS
+#          value: "$(params.TAGS)"
+#        - name: GIT_RELEASE_TESTS_URI
+#          value: $(params.GIT_RELEASE_TESTS_URI)
+#        - name: GIT_RELEASE_TESTS_BRANCH
+#          value: $(tasks.derive-channels.results.releaseTestsBranch)
+#      runAfter:
+#        # Pruner tests mutate cluster-wide pruning config and delete
+#        # PipelineRuns/TaskRuns; run after all other suites so they do not
+#        # prune resources those suites depend on.
+#        - update-pipelines-operator
+#        - release-tests-post-upgrade
+#        - release-tests-versions
+#        - release-tests-pipelines
+#        - release-tests-triggers
+#        - release-tests-triggers-tls
+#        - release-tests-chains
+#        - release-tests-pac
+#        - release-tests-results
+#        - release-tests-metrics
+#        - release-tests-rbac
+#        - release-tests-addon
+#        - release-tests-manual-approval
+#        - release-tests-ecosystem
+
+    #Release Tests - Tekton Pruner
+    - name: release-tests-tekton-pruner
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/operator/tekton-pruner.spec"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        # Pruner suite mutates cluster-wide pruning config and deletes
+        # PipelineRuns/TaskRuns; run after all other suites so it does not
+        # prune resources those suites depend on.
+        - update-pipelines-operator
+        - release-tests-post-upgrade
+        - release-tests-versions
+        - release-tests-pipelines
+        - release-tests-triggers
+        - release-tests-triggers-tls
+        - release-tests-chains
+        - release-tests-pac
+        - release-tests-results
+        - release-tests-metrics
+        - release-tests-rbac
+        - release-tests-addon
+        - release-tests-manual-approval
+        - release-tests-ecosystem
+  finally:
+    # ==========================================================================
+    # Always-run - Aggregate suite results and fail the pipeline on any failure
+    # ==========================================================================
+    # Deprovision disabled to save pipeline completion time
+    # Ephemeral clusters are automatically pruned after 4 hours, so no manual cleanup is required
+
+    # Verify aggregate status, print a per-suite summary and a rerun hint for failed suites
+    - name: verify-e2e-tests-status
+      params:
+        - name: aggregateStatus
+          value: "$(tasks.status)"
+        - name: suiteStatuses
+          value: |
+            install-pre-upgrade-operator=$(tasks.install-pre-upgrade-operator.status)
+            release-tests-pre-upgrade=$(tasks.release-tests-pre-upgrade.status)
+            update-pipelines-operator=$(tasks.update-pipelines-operator.status)
+            release-tests-post-upgrade=$(tasks.release-tests-post-upgrade.status)
+            release-tests-versions=$(tasks.release-tests-versions.status)
+            release-tests-pipelines=$(tasks.release-tests-pipelines.status)
+            release-tests-triggers=$(tasks.release-tests-triggers.status)
+            release-tests-triggers-tls=$(tasks.release-tests-triggers-tls.status)
+            release-tests-chains=$(tasks.release-tests-chains.status)
+            release-tests-pac=$(tasks.release-tests-pac.status)
+            release-tests-results=$(tasks.release-tests-results.status)
+            release-tests-metrics=$(tasks.release-tests-metrics.status)
+            release-tests-rbac=$(tasks.release-tests-rbac.status)
+            release-tests-addon=$(tasks.release-tests-addon.status)
+            release-tests-manual-approval=$(tasks.release-tests-manual-approval.status)
+            release-tests-ecosystem=$(tasks.release-tests-ecosystem.status)
+            release-tests-tekton-pruner=$(tasks.release-tests-tekton-pruner.status)
+      taskSpec:
+        params:
+          - name: aggregateStatus
+          - name: suiteStatuses
+        steps:
+          - image: $(params.IMAGE)
+            name: verify-aggregate-status
+            script: |
+              #!/usr/bin/env bash
+              echo "📋 Aggregate Status: $(params.aggregateStatus)"
+              echo ""
+              echo "Per-suite results:"
+
+              failed=""
+              while IFS='=' read -r name status; do
+                name="$(echo "$name" | tr -d '[:space:]')"
+                status="$(echo "$status" | tr -d '[:space:]')"
+                [ -z "$name" ] && continue
+                if [[ "$status" == "Succeeded" || "$status" == "Completed" ]]; then
+                  echo "  ✅ ${name}: ${status}"
+                elif [[ "$status" == "None" || -z "$status" ]]; then
+                  echo "  ⏭️  ${name}: skipped (${status:-None})"
+                else
+                  echo "  ❌ ${name}: ${status}"
+                  failed="${failed} ${name}"
+                fi
+              done <<'EOF'
+              $(params.suiteStatuses)
+              EOF
+
+              if [[ -n "$failed" ]]; then
+                echo ""
+                echo "❌ Failed suites:${failed}"
+                echo "💡 To rerun only the failed suites, set TEST_SUITES to:${failed}"
+              fi
+
+              if [[ "$(params.aggregateStatus)" != "Succeeded" ]]; then
+                echo ""
+                echo "❌ Pipeline contains failed tasks!"
+                echo "💡 Check individual task logs for detailed error information"
+                exit 1
+              fi
+
+              echo ""
+              echo "✅ All tasks succeeded!"
