@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
-  name: release-test-ginkgo-pipeline
+  name: acceptance-test-ginkgo-pipeline
 spec:
   description: |
     Release tests driven by the Ginkgo suite in openshift-pipelines/release-tests-ginkgo.
@@ -579,7 +579,7 @@ spec:
     # remaining fork pin; switch it back to the shared, version-matched
     # GIT_RELEASE_TESTS_* params before merging the operator PR (once #99 is
     # merged and backported).
-    - name: release-tests-mag
+    - name: release-tests-manual-approval
       onError: continue
       runAfter:
         - install-pipelines-operator
@@ -729,7 +729,7 @@ spec:
     # keeps the operator from reaching Installed=True while rbac waits on it, so they
     # are kept clear of the component suites and gated to the end of the run.
     # The upgrade specs only make sense in an upgrade pipeline, so they are filtered out.
-    - name: release-tests-operator-rbac
+    - name: release-tests-rbac
       onError: continue
       runAfter:
         - release-tests-pipelines
@@ -739,7 +739,7 @@ spec:
         - release-tests-tls
         - release-tests-ecosystem
         - release-tests-pac
-        - release-tests-mag
+        - release-tests-manual-approval
         - release-tests-chains
         - release-tests-metrics
       timeout: "25m"
@@ -774,7 +774,7 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
-    - name: release-tests-operator-addon
+    - name: release-tests-addon
       onError: continue
       runAfter:
         - release-tests-pipelines
@@ -784,7 +784,7 @@ spec:
         - release-tests-tls
         - release-tests-ecosystem
         - release-tests-pac
-        - release-tests-mag
+        - release-tests-manual-approval
         - release-tests-chains
         - release-tests-metrics
       timeout: "30m"
@@ -830,8 +830,8 @@ spec:
     # cluster and does not fit the ~2h ephemeral-cluster cap. Re-enable the block
     # below once a long-lived cluster is available. When re-enabled it runs in
     # parallel with rbac/addon (same runAfter: the component suites), and
-    # tekton-pruner's runAfter should list release-tests-operator-auto-prune again.
-    # - name: release-tests-operator-auto-prune
+    # tekton-pruner's runAfter should list release-tests-auto-prune again.
+    # - name: release-tests-auto-prune
     #   onError: continue
     #   runAfter:
     #     - release-tests-pipelines
@@ -841,7 +841,7 @@ spec:
     #     - release-tests-tls
     #     - release-tests-ecosystem
     #     - release-tests-pac
-    #     - release-tests-mag
+    #     - release-tests-manual-approval
     #     - release-tests-chains
     #     - release-tests-metrics
     #   timeout: "70m"
@@ -876,12 +876,12 @@ spec:
     #     - name: CHANNEL
     #       value: "$(tasks.create-catalog-source.results.channel)"
 
-    - name: release-tests-operator-tekton-pruner
+    - name: release-tests-tekton-pruner
       onError: continue
       runAfter:
-        # - release-tests-operator-auto-prune  # re-enable together with auto-prune above
-        - release-tests-operator-rbac
-        - release-tests-operator-addon
+        # - release-tests-auto-prune  # re-enable together with auto-prune above
+        - release-tests-rbac
+        - release-tests-addon
       timeout: "70m"
       taskRef:
         resolver: git
