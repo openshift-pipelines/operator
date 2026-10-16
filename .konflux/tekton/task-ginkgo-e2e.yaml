@@ -15,6 +15,16 @@ spec:
     - name: CLUSTER_SECRET_REF
       type: string
       description: "Name of the Secret containing the cluster kubeconfig (key: kubeconfig)"
+    - name: RUN_AS
+      type: string
+      description: >-
+        Which cluster identity the suite runs as: "admin" uses the provisioned
+        cluster-admin kubeconfig as-is; "non-admin" impersonates the "user"
+        account (an OpenShift User created by the setup-testing-accounts task) via
+        the kubeconfig `as` field and runs the suite with that identity. Mirrors
+        release-tests-infra's RUN_AS; impersonation is used because oauth/cluster
+        password login is blocked on these HyperShift ephemeral clusters.
+      default: "admin"
     - name: IMAGE
       type: string
       description: CI image providing go, ginkgo, oc and the remaining test tooling.
@@ -148,6 +158,8 @@ spec:
         # own per-process copies through the shims set up in the script below.
         - name: KUBECONFIG
           value: "/source/kubeconfig"
+        - name: RUN_AS
+          value: "$(params.RUN_AS)"
         - name: MODE
           value: "$(params.MODE)"
         - name: TEST_PATH
@@ -305,13 +317,48 @@ spec:
         # `oc new-project` rewrites the kubeconfig it uses, so parallel Ginkgo
         # processes sharing a single file corrupt it for each other. Shim the CLIs
         # so that every calling process ($PPID) works on its own copy, seeded from
-        # the pristine read-only credentials on first use.
-        # Only the shared admin kubeconfig is swapped: when the suite points a
+        # the run-as kubeconfig (/source/seed-kubeconfig) on first use.
+        # Only the shared run-as kubeconfig is swapped: when the suite points a
         # CLI at another file (the MAG suite runs opc with a per-user
         # impersonation kubeconfig), that file is used as is.
         # `opc results` is the one client ignoring KUBECONFIG (it reads
         # ~/.kube/config; fixed upstream in tektoncd/results@517a1a873 but not
         # released yet), so it is pointed at the copy explicitly.
+        #
+        # Establish that run-as kubeconfig now. Admin suites use the provisioned
+        # cluster-admin credentials as-is. Non-admin suites impersonate the "user"
+        # account (an OpenShift User object created by the setup-testing-accounts
+        # task) so the suite exercises the operator as a regular user, mirroring
+        # release-tests-infra's RUN_AS=non-admin. Password login is impossible on
+        # these HyperShift ephemeral clusters (oauth/cluster is blocked by a
+        # ValidatingAdmissionPolicy), so the cluster-admin credentials impersonate
+        # the user via the kubeconfig `as` field instead. The CLI download and
+        # post-upgrade refresh above run as admin before this switch, since they
+        # read cluster-scoped resources a non-admin cannot see.
+        cp /credentials/kubeconfig /source/seed-kubeconfig
+        if [[ "${RUN_AS:-admin}" == "non-admin" ]]; then
+          # Impersonate the "user" account by writing the kubeconfig `as` field
+          # onto the cluster-admin credentials; client-go and the oc/tkn/opc CLIs
+          # honor it and send Impersonate-User on every request. `oc config set
+          # users.<name>.as` cannot navigate the impersonate field, so flatten the
+          # kubeconfig to JSON and inject `as` with the python stdlib.
+          oc --kubeconfig=/credentials/kubeconfig config view --flatten -o json > /source/seed.json
+          python3 - user > /source/seed-kubeconfig <<'PY'
+        import json, sys
+        who = sys.argv[1]
+        kc = json.load(open("/source/seed.json"))
+        current = kc.get("current-context")
+        ctx = next(c["context"] for c in kc["contexts"] if c["name"] == current)
+        name = ctx["user"]
+        for entry in kc["users"]:
+            if entry["name"] == name:
+                entry["user"]["as"] = who
+        json.dump(kc, sys.stdout)
+        PY
+          echo "Running as non-admin: impersonating user '$(oc --kubeconfig=/source/seed-kubeconfig whoami 2>/dev/null || echo user)'"
+        fi
+        cp /source/seed-kubeconfig "${KUBECONFIG}"
+
         mkdir -p /source/bin /source/kubeconfigs
         chmod 700 /source/kubeconfigs
         cat > /source/bin/.kubeconfig-shim <<'EOF'
@@ -321,7 +368,7 @@ spec:
         if [[ -z "${kc}" || "${kc}" == "/source/kubeconfig" ]]; then
           kc="/source/kubeconfigs/kubeconfig.${PPID}"
           if [[ ! -s "${kc}" ]]; then
-            cp /credentials/kubeconfig "${kc}.$$" && mv -n "${kc}.$$" "${kc}"
+            cp /source/seed-kubeconfig "${kc}.$$" && mv -n "${kc}.$$" "${kc}"
             rm -f "${kc}.$$"
           fi
         fi
@@ -352,6 +399,7 @@ spec:
         fi
 
         echo "Cluster     : $(oc whoami --show-server 2>/dev/null || echo unknown)"
+        echo "Run as      : ${RUN_AS:-admin} ($(oc whoami 2>/dev/null || echo unknown))"
         echo "Mode        : ${MODE}"
         echo "Test path   : ${TEST_PATH}"
         echo "Channel     : ${CHANNEL}"

@@ -57,6 +57,23 @@ spec:
         oc adm policy add-cluster-role-to-user view consoledeveloper || true
         oc adm policy add-cluster-role-to-user basic-user pipelinesdeveloper || true
 
+        # Non-admin release-test suites (RUN_AS=non-admin) impersonate these users
+        # via `oc --as=<user>`. Impersonated identities only receive the
+        # system:authenticated group (not system:authenticated:oauth), so they do
+        # not inherit the default self-provisioner grant a real logged-in user
+        # has. The Ginkgo framework self-creates a test namespace per Describe
+        # with the impersonated identity, so grant the test users self-provisioner
+        # (namespace creation) plus edit on the operand namespace, matching the
+        # access a real non-admin user has in release-tests-infra.
+        for u in "${USERS[@]}"; do
+          oc adm policy add-cluster-role-to-user self-provisioner "$u" || true
+          oc create rolebinding "${u}-edit" --clusterrole=edit --user="$u" \
+            -n openshift-pipelines 2>/dev/null \
+            || oc create rolebinding "${u}-edit" --clusterrole=edit --user="$u" \
+                 -n openshift-pipelines --dry-run=client -o yaml | oc apply -f- || true
+        done
+        echo "self-provisioner + openshift-pipelines edit granted to test users"
+
         # Grant MAG approver RBAC to all test users cluster-wide.
         # After openshift-pipelines/manual-approval-gate@dc388bb the
         # system:authenticated binding was removed, so approvers need an
@@ -90,9 +107,9 @@ spec:
         echo ""
         echo "User               | Cluster roles"
         echo "-------------------|-----------------------------"
-        echo "consoledeveloper   | self-provisioner, view"
-        echo "pipelinesdeveloper | basic-user"
-        echo "user               | (none)"
+        echo "consoledeveloper   | self-provisioner, view, edit(openshift-pipelines)"
+        echo "pipelinesdeveloper | basic-user, self-provisioner, edit(openshift-pipelines)"
+        echo "user               | self-provisioner, edit(openshift-pipelines)"
         for i in $(seq 1 9); do
-          printf "user%-14s | (none)\n" "$i"
+          printf "user%-14s | self-provisioner, edit(openshift-pipelines)\n" "$i"
         done
