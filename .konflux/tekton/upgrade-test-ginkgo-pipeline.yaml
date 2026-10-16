@@ -47,8 +47,11 @@ spec:
       default: https://github.com/openshift-pipelines/operator
     - name: RELEASE_TEST_TASKS_BRANCH
       type: string
+      # Resolve task definitions from this PR branch so the pipeline and the
+      # tasks it references (task-ginkgo-e2e, task-setup-testing-accounts) stay
+      # self-consistent while the ginkgo migration is in review.
       # TODO: switch back to main once the ginkgo task definitions are merged.
-      default: ginkgo-release-tests
+      default: ginkgo-upgrade-tests
     - name: GIT_RELEASE_TESTS_URI
       type: string
       description: Ginkgo release-tests repository.
