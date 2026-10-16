@@ -660,10 +660,36 @@ spec:
     # them in parallel; onError: continue keeps the fan-out going when one fails
     # while the finally task still fails the PipelineRun.
     # ------------------------------------------------------------------
+    # Non-admin post-upgrade suites (pipelines, triggers) impersonate the "user"
+    # account, so create the test User objects and their RBAC after the upgrade
+    # completes and before those suites run. Mirrors release-tests-infra's
+    # setup-testing-accounts step: only pipelines and triggers run non-admin;
+    # every other suite runs as the provisioned cluster-admin (task-ginkgo-e2e
+    # RUN_AS default "admin"). This task only creates Users/RoleBindings (no oauth
+    # changes), so admin suites fanned out in parallel are unaffected.
+    - name: setup-testing-accounts
+      runAfter:
+        - update-pipelines-operator
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-setup-testing-accounts.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+
     - name: release-tests-pipelines
       onError: continue
       runAfter:
         - update-pipelines-operator
+        - setup-testing-accounts
       timeout: "45m"
       taskRef:
         resolver: git
@@ -687,6 +713,8 @@ spec:
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
         - name: MODE
           value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "non-admin"
         - name: TEST_PATH
           value: "./tests/pipelines/"
         - name: PARALLEL
@@ -712,6 +740,7 @@ spec:
       onError: continue
       runAfter:
         - update-pipelines-operator
+        - setup-testing-accounts
       timeout: "65m"
       taskRef:
         resolver: git
@@ -735,6 +764,8 @@ spec:
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
         - name: MODE
           value: "$(params.LABEL_FILTER) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "non-admin"
         - name: TEST_PATH
           value: "./tests/triggers/"
         - name: PARALLEL
