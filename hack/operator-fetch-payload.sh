@@ -130,12 +130,6 @@ env UPSTREAM_VERSION_TAG="${UPSTREAM_VERSION_TAG}" yq e -i \
 yq e -i 'del(.spec.install.spec.deployments[0].spec.selector.matchLabels.app)' \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 
-# Update createdAt annotation to current timestamp
-CREATED_AT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-env CREATED_AT_TIMESTAMP="${CREATED_AT_TIMESTAMP}" yq e -i \
-   '.metadata.annotations.createdAt = strenv(CREATED_AT_TIMESTAMP)' \
-   .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
-
 # Add valid-subscription annotation
 yq e -i '.metadata.annotations["operators.openshift.io/valid-subscription"] = "[\"OpenShift Container Platform\", \"OpenShift Platform Plus\"]"' \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
@@ -196,3 +190,7 @@ sed -i -E 's%LABEL com.redhat.openshift.versions=".*%LABEL com.redhat.openshift.
 # update channels in operator bundle dockerfile
 sed -i -E 's%LABEL operators.operatorframework.io.bundle.channels.v1=".*%LABEL operators.operatorframework.io.bundle.channels.v1="'latest,${CHANNEL_NAME}'"%' \
     .konflux/dockerfiles/bundle.Dockerfile
+
+# Update createdAt annotation to current timestamp
+BASEDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source $BASEDIR/update-csv-createdat.sh

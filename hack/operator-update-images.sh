@@ -79,3 +79,6 @@ REFERENCE=$(update_image_reference "$(yq e '.images[] | select(.name == "TEKTON_
 if [ $? -ne 1 ]; then
   yq eval --inplace "(.spec.install.spec.deployments[] | select(.name == \"tekton-operator-webhook\")| .spec.template.spec.containers[].image) = \"${REFERENCE}\"" $CSV_FILE
 fi
+
+# Update createdAt timestamp since CSV was modified
+source $BASEDIR/update-csv-createdat.sh
