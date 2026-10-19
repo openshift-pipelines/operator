@@ -41,6 +41,15 @@ spec:
     - name: MAX_RETRIES
       description: "Max number of times gauge reruns a failed scenario before marking it failed (1 = no retry)"
       default: "1"
+    - name: REFRESH_CLI_FROM_CLUSTER
+      description: "When 'true', download opc/tkn/tkn-pac from the cluster under test (tkn-cli-serve) and prepend them to PATH, so functional opc/tkn match the currently-installed operator (e.g. after an upgrade) instead of the version baked into the test image."
+      default: "false"
+    - name: EXPECTED_CLI_VERSION
+      description: "Optional OSP version or channel (e.g. '1.24' or 'pipelines-1.24') the refreshed CLI should match. Used only when REFRESH_CLI_FROM_CLUSTER=true to wait out the operator's tkn-cli-serve re-roll after an upgrade. Empty = accept whatever the cluster currently serves."
+      default: ""
+    - name: STATE_CONFIGMAP
+      description: "Optional name of a ConfigMap on the cluster under test used to persist testdata/olm/skiprange.json across the pre-upgrade and post-upgrade TaskRuns (which each clone the repo into their own emptyDir). Empty = disabled (e.g. acceptance runs)."
+      default: ""
 
   volumes:
     - name: credentials
@@ -83,6 +92,106 @@ spec:
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: REVISION
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
+    # Upgrade-only: refresh the functional CLI from the upgraded cluster.
+    # No-op for acceptance runs (REFRESH_CLI_FROM_CLUSTER left empty).
+    - name: refresh-cli
+      image: $(params.IMAGE)
+      env:
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "$(params.REFRESH_CLI_FROM_CLUSTER)"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(params.EXPECTED_CLI_VERSION)"
+      script: |
+        #!/usr/bin/env bash
+        # Refresh opc/tkn/tkn-pac from the cluster under test into the shared
+        # /source/cli dir so the next step's gauge suites (which call the CLI from
+        # PATH) match the currently-installed operator. After an operator upgrade
+        # the test image's baked-in CLI lags the upgraded server. No-op unless
+        # REFRESH_CLI_FROM_CLUSTER=true (acceptance runs leave it empty).
+        if [[ "$REFRESH_CLI_FROM_CLUSTER" != "true" ]]; then
+          echo "REFRESH_CLI_FROM_CLUSTER!=true; skipping CLI refresh."
+          exit 0
+        fi
+        cp /credentials/kubeconfig /tmp/kubeconfig
+        refresh_cli_from_cluster() {
+          local want cli_arch url host served deadline mant="/source/cli"
+          # Accept "pipelines-1.24" or "1.24.0"; reduce to the X.Y minor to match on.
+          want="${EXPECTED_CLI_VERSION#pipelines-}"
+          want="$(echo "$want" | cut -d. -f1-2)"
+          case "$(uname -m)" in
+            x86_64) cli_arch=amd64 ;;
+            aarch64|arm64) cli_arch=arm64 ;;
+            *) cli_arch=amd64 ;;
+          esac
+          mkdir -p "$mant"
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            # Wait for the operator's re-roll of tkn-cli-serve to complete.
+            KUBECONFIG=/tmp/kubeconfig oc rollout status deployment/tkn-cli-serve \
+              -n openshift-pipelines --timeout=120s 2>/dev/null || true
+            url=$(KUBECONFIG=/tmp/kubeconfig oc get consoleclidownloads.console.openshift.io tkn \
+              -o jsonpath='{.spec.links[*].href}' 2>/dev/null | tr ' ' '\n' \
+              | grep -m1 "tkn-linux-${cli_arch}\.tar\.gz") || true
+            if [[ -z "$url" ]]; then
+              host=$(KUBECONFIG=/tmp/kubeconfig oc get route tkn-cli-serve \
+                -n openshift-pipelines -o jsonpath='{.spec.host}' 2>/dev/null) || true
+              [[ -n "$host" ]] && url="https://${host}/tkn/tkn-linux-${cli_arch}.tar.gz"
+            fi
+            if [[ -n "$url" ]] && curl -kfsSL "$url" -o /tmp/cli.tar.gz 2>/dev/null; then
+              tar -xf /tmp/cli.tar.gz -C "$mant" 2>/dev/null || true
+              chmod +x "$mant"/opc "$mant"/tkn "$mant"/tkn-pac 2>/dev/null || true
+              served=$("$mant/opc" version 2>/dev/null | sed -n 's/.*[Cc]lient version:[[:space:]]*//p' | head -1)
+              if [[ -z "$want" || "$want" == "latest" ]] || "$mant/opc" version 2>/dev/null | grep -q "${want}\."; then
+                echo "CLI refreshed from cluster: opc ${served:-unknown} (want ${want:-any})"
+                return 0
+              fi
+              echo "  tkn-cli-serve still serving opc ${served:-unknown} (want ${want}.x); retrying..."
+            else
+              echo "  tkn-cli-serve not ready yet; retrying..."
+            fi
+            sleep 10
+          done
+          echo "WARN: could not refresh CLI to '${want:-target}' within timeout; using image CLI ($(opc version 2>/dev/null | head -1))"
+          return 1
+        }
+        refresh_cli_from_cluster
+        refresh_rc=$?
+        # Whether a concrete target version was requested (empty/'latest' = best-effort).
+        want_minor="${EXPECTED_CLI_VERSION#pipelines-}"
+        want_minor="$(echo "$want_minor" | cut -d. -f1-2)"
+        if [[ "$refresh_rc" -ne 0 && -n "$want_minor" && "$want_minor" != "latest" ]]; then
+          echo "FATAL: REFRESH_CLI_FROM_CLUSTER=true and EXPECTED_CLI_VERSION='$EXPECTED_CLI_VERSION' was requested, but the matching CLI could not be fetched from the cluster. Failing so upgrade suites do not run with a stale CLI and report misleading results."
+          exit 1
+        fi
+
+    # Upgrade-only: seed the pre-upgrade skipRange snapshot from the state
+    # ConfigMap. No-op for acceptance runs (STATE_CONFIGMAP left empty).
+    - name: seed-skiprange
+      image: $(params.IMAGE)
+      workingDir: /source/repo
+      env:
+        - name: STATE_CONFIGMAP
+          value: "$(params.STATE_CONFIGMAP)"
+      script: |
+        #!/usr/bin/env bash
+        # Seed testdata/olm/skiprange.json from a ConfigMap on the (persistent)
+        # cluster under test written by the previous upgrade TaskRun, so the
+        # post-upgrade skipRange diff can see the pre-upgrade snapshot (each
+        # TaskRun clones into its own emptyDir). Uses the admin kubeconfig. No-op
+        # unless STATE_CONFIGMAP is set (acceptance runs leave it empty).
+        if [[ -z "$STATE_CONFIGMAP" ]]; then
+          echo "STATE_CONFIGMAP unset; skipping skiprange seed."
+          exit 0
+        fi
+        cp /credentials/kubeconfig /tmp/kubeconfig
+        SKIPRANGE_FILE="testdata/olm/skiprange.json"
+        STATE_NS="default"
+        if KUBECONFIG=/tmp/kubeconfig oc get configmap "$STATE_CONFIGMAP" -n "$STATE_NS" >/dev/null 2>&1; then
+          if KUBECONFIG=/tmp/kubeconfig oc get configmap "$STATE_CONFIGMAP" -n "$STATE_NS" -o jsonpath='{.data.skiprange\.json}' > "$SKIPRANGE_FILE" 2>/dev/null; then
+            echo "Seeded $SKIPRANGE_FILE from configmap $STATE_NS/$STATE_CONFIGMAP"
+          fi
+        fi
+
     - name: run-e2e-tests-pipeline
       image: $(params.IMAGE)
       workingDir: /source/repo
@@ -142,8 +251,26 @@ spec:
           value: "$(params.OCP_VERSION)"
         - name: MAG_USE_IMPERSONATION
           value: "$(params.MAG_USE_IMPERSONATION)"
+        - name: STATE_CONFIGMAP
+          value: "$(params.STATE_CONFIGMAP)"
       script: |
+        #!/usr/bin/env bash
+        # Fail fast on prep errors. The explicit shebang suppresses Tekton's
+        # injected `set -e`, so without this a failed prep step (e.g. the
+        # non-admin impersonation below, or `go build`) would be ignored and the
+        # suite could run with the wrong credentials. The gauge run itself is
+        # wrapped in `set +e`/`set -e` so its non-zero exit on test failures does
+        # not abort before the skiprange state is persisted.
+        set -e
         cp /credentials/kubeconfig /tmp/kubeconfig
+
+        # Use the CLI refreshed from the cluster by the refresh-cli step, if any
+        # (upgrade runs only); otherwise fall back to the image's baked-in CLI.
+        if [[ -x /source/cli/opc ]]; then
+          export PATH="/source/cli:$PATH"; hash -r
+          echo "Using opc: $(command -v opc) -> $(opc version 2>/dev/null | head -1 || echo unknown)"
+          echo "Using tkn: $(command -v tkn) -> $(tkn version 2>/dev/null | head -1 || echo unknown)"
+        fi
 
         # For non-admin tests, impersonate consoledeveloper via kubeconfig.
         # HyperShift blocks HTPasswd IDP so password-based oc login is not possible.
@@ -160,10 +287,45 @@ spec:
         go build -p 1 ./...
         gauge config check_updates false
 
+        # Persist skiprange state across the pre-upgrade and post-upgrade TaskRuns.
+        # Seeding happens earlier in the seed-skiprange step; this run just produces
+        # the (possibly updated) testdata/olm/skiprange.json via the gauge suite.
+
         # Some of the tests fail on specific OCP versions
         set +H
         tags="$(params.TAGS),!(skip-$OCP_VERSION | to-do)"
         set -H
 
         echo "Running $(params.SPECS) with tags $tags"
+        set +e
         gauge run --tags="$tags" --max-retries-count=$(params.MAX_RETRIES) --log-level=debug --verbose $(params.SPECS)
+        gauge_rc=$?
+        set -e
+
+        # Persist the (possibly updated) skiprange state back to the ConfigMap (the
+        # seed-skiprange step read it before the suite) so the next upgrade TaskRun
+        # can validate the before/after diff. Runs regardless of the gauge result;
+        # the gauge exit code is preserved below.
+        SKIPRANGE_FILE="testdata/olm/skiprange.json"
+        STATE_NS="default"
+        if [[ -n "$STATE_CONFIGMAP" && -f "$SKIPRANGE_FILE" ]]; then
+          set +e
+          ( set -o pipefail
+            KUBECONFIG=/tmp/kubeconfig oc create configmap "$STATE_CONFIGMAP" -n "$STATE_NS" \
+              --from-file=skiprange.json="$SKIPRANGE_FILE" --dry-run=client -o yaml \
+              | KUBECONFIG=/tmp/kubeconfig oc apply -f - >/dev/null )
+          persist_rc=$?
+          set -e
+          if [[ $persist_rc -ne 0 ]]; then
+            echo "ERROR: failed to persist $SKIPRANGE_FILE to configmap $STATE_NS/$STATE_CONFIGMAP (rc=$persist_rc)"
+            # If the suite itself passed, surface the persist failure so the next
+            # upgrade TaskRun does not silently seed an empty/stale baseline.
+            if [[ $gauge_rc -eq 0 ]]; then
+              exit $persist_rc
+            fi
+          else
+            echo "Persisted $SKIPRANGE_FILE to configmap $STATE_NS/$STATE_CONFIGMAP"
+          fi
+        fi
+
+        exit $gauge_rc
