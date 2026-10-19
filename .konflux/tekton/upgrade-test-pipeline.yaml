@@ -41,6 +41,13 @@ spec:
         (pipelines-X.Y => pipelines-X.(Y-1)).
       name: PRE_UPGRADE_CHANNEL
       default: ""
+    - name: WAIT_FOR_TEARDOWN_TIMEOUT
+      description: |
+        How long the provision-ephemeral-cluster task waits for the tearDown
+        signal before auto-deprovisioning the cluster. Empty uses the task
+        default (2h); set a longer duration (e.g. 4h) so long-running suites
+        such as auto-prune can finish within the cluster lifetime.
+      default: "4h"
 
   tasks:
     # ==========================================================================
@@ -124,6 +131,8 @@ spec:
           value: '{"latest":{"release":{"channel":"stable","version":"$(tasks.extract-ocp-version.results.ocpVersion)","architecture":"multi"}}}'
         - name: env
           value: '{"COMPUTE_NODE_TYPE": "m5.2xlarge", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "CONTROL_PLANE_NODE_SELECTOR": "kubernetes.io/arch=amd64", "FIPS": "true", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines"}'
+        - name: waitForTearDownTimeout
+          value: "$(params.WAIT_FOR_TEARDOWN_TIMEOUT)"
 
     # Configure Loki and OpenShift Logging
     - name: configure-loki-logging
@@ -1043,60 +1052,58 @@ spec:
     # Phase 5 - Pruning suites (serialized tail; mutate cluster-wide config)
     # ==========================================================================
     # Release Tests - Operator Auto Prune
-    # [TEMPORARILY DISABLED] Auto-prune suite commented out: it mutates cluster-wide
-    # pruning config and its long test tail needs more runtime than the current
-    # ~2h ephemeral-cluster lifetime allows. Re-enable once the cluster lifetime is
-    # increased beyond 2h. (tekton-pruner remains enabled below — it is quick.)
-    # When re-enabled it runs after all other suites and is
+    # Auto-prune suite: mutates cluster-wide pruning config and has a long test
+    # tail, so it needs the extended ephemeral-cluster lifetime (see the
+    # WAIT_FOR_TEARDOWN_TIMEOUT param). Runs after all other suites and is
     # serialized before tekton-pruner.
-#    - name: release-tests-auto-prune
-#      onError: continue
-#      taskRef:
-#        resolver: git
-#        params:
-#          - name: url
-#            value: $(params.RELEASE_TEST_TASKS_REPO)
-#          - name: revision
-#            value: $(params.RELEASE_TEST_TASKS_BRANCH)
-#          - name: pathInRepo
-#            value: .konflux/tekton/task-e2e-pipeline.yaml
-#      params:
-#        - name: CLUSTER_SECRET_REF
-#          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
-#        - name: IMAGE
-#          value: $(params.IMAGE)
-#        - name: RUN_AS
-#          value: "admin"
-#        - name: SPECS
-#          value: "specs/operator/auto-prune.spec"
-#        - name: REFRESH_CLI_FROM_CLUSTER
-#          value: "true"
-#        - name: EXPECTED_CLI_VERSION
-#          value: "$(tasks.create-catalog-source.results.channel)"
-#        - name: TAGS
-#          value: "$(params.TAGS)"
-#        - name: GIT_RELEASE_TESTS_URI
-#          value: $(params.GIT_RELEASE_TESTS_URI)
-#        - name: GIT_RELEASE_TESTS_BRANCH
-#          value: $(tasks.derive-channels.results.releaseTestsBranch)
-#      runAfter:
-#        # Pruner tests mutate cluster-wide pruning config and delete
-#        # PipelineRuns/TaskRuns; run after all other suites so they do not
-#        # prune resources those suites depend on.
-#        - update-pipelines-operator
-#        - release-tests-post-upgrade
-#        - release-tests-versions
-#        - release-tests-pipelines
-#        - release-tests-triggers
-#        - release-tests-triggers-tls
-#        - release-tests-chains
-#        - release-tests-pac
-#        - release-tests-results
-#        - release-tests-metrics
-#        - release-tests-rbac
-#        - release-tests-addon
-#        - release-tests-manual-approval
-#        - release-tests-ecosystem
+    - name: release-tests-auto-prune
+      onError: continue
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-e2e-pipeline.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: RUN_AS
+          value: "admin"
+        - name: SPECS
+          value: "specs/operator/auto-prune.spec"
+        - name: REFRESH_CLI_FROM_CLUSTER
+          value: "true"
+        - name: EXPECTED_CLI_VERSION
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: TAGS
+          value: "$(params.TAGS)"
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
+      runAfter:
+        # Pruner tests mutate cluster-wide pruning config and delete
+        # PipelineRuns/TaskRuns; run after all other suites so they do not
+        # prune resources those suites depend on.
+        - update-pipelines-operator
+        - release-tests-post-upgrade
+        - release-tests-versions
+        - release-tests-pipelines
+        - release-tests-triggers
+        - release-tests-triggers-tls
+        - release-tests-chains
+        - release-tests-pac
+        - release-tests-results
+        - release-tests-metrics
+        - release-tests-rbac
+        - release-tests-addon
+        - release-tests-manual-approval
+        - release-tests-ecosystem
 
     #Release Tests - Tekton Pruner
     - name: release-tests-tekton-pruner
@@ -1147,12 +1154,14 @@ spec:
         - release-tests-addon
         - release-tests-manual-approval
         - release-tests-ecosystem
+        - release-tests-auto-prune
   finally:
     # ==========================================================================
     # Always-run - Aggregate suite results and fail the pipeline on any failure
     # ==========================================================================
     # Deprovision disabled to save pipeline completion time
-    # Ephemeral clusters are automatically pruned after 4 hours, so no manual cleanup is required
+    # Ephemeral clusters are automatically pruned after WAIT_FOR_TEARDOWN_TIMEOUT
+    # (default 4h), so no manual cleanup is required
 
     # Verify aggregate status, print a per-suite summary and a rerun hint for failed suites
     - name: verify-e2e-tests-status
@@ -1177,6 +1186,7 @@ spec:
             release-tests-addon=$(tasks.release-tests-addon.status)
             release-tests-manual-approval=$(tasks.release-tests-manual-approval.status)
             release-tests-ecosystem=$(tasks.release-tests-ecosystem.status)
+            release-tests-auto-prune=$(tasks.release-tests-auto-prune.status)
             release-tests-tekton-pruner=$(tasks.release-tests-tekton-pruner.status)
       taskSpec:
         params:
