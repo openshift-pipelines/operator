@@ -275,8 +275,8 @@ spec:
                   displayName: "Custom OSP Catalog"
                   publisher: Red Hat Local
                   updateStrategy:
-                  registryPoll:
-                  interval: 30m
+                    registryPoll:
+                      interval: 30m
               EOF
 
     #Release Tests - Install Pipelines Operator
@@ -421,6 +421,8 @@ spec:
           value: "specs/metrics/"
         - name: TAGS
           value: "$(params.TAGS)"
+        - name: MAX_RETRIES
+          value: "3"
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
