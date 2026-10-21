@@ -1,0 +1,1486 @@
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: upgrade-test-ginkgo-pipeline
+spec:
+  description: |
+    Upgrade release tests driven by the Ginkgo suite in
+    openshift-pipelines/release-tests-ginkgo.
+
+    Provisions an ephemeral Hypershift cluster via OpenShift-CI, then:
+      1. installs the previously released operator from the prod
+         redhat-operators catalog on the previous channel head,
+      2. runs the pre-upgrade suite (sets up resources that must survive the
+         upgrade),
+      3. repoints the operator subscription at the candidate CatalogSource built
+         from the Konflux snapshot index image and bumps it to the target
+         channel (OLM upgrades the CSV via skipRange),
+      4. runs the upgrade suite plus the post-upgrade suite and the full
+         component regression.
+
+    The catalog-source switch is done by an inline pipeline step because the
+    ginkgo olm upgrade spec only changes the subscription channel, not its
+    source. The ephemeral cluster only lives for about two hours, so the
+    component suites run in parallel and fan out over GINKGO_PROCS processes.
+  params:
+    - name: SNAPSHOT
+      type: string
+      description: Snapshot of the application
+      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+    - name: NAMESPACE
+      type: string
+      description: Namespace the operator subscription lives in.
+      default: openshift-operators
+    - name: IMAGE
+      type: string
+      description: Image used by the inline helper steps (needs oc).
+      default: quay.io/openshift-pipeline/ci:latest
+    - name: GINKGO_IMAGE
+      type: string
+      description: Image used to build and run the Ginkgo suites.
+      default: quay.io/openshift-pipeline/release-tests-ginkgo:latest
+    - name: RELEASE_TEST_TASKS_REPO
+      type: string
+      description: Repository the Tekton task definitions are resolved from.
+      default: https://github.com/openshift-pipelines/operator
+    - name: RELEASE_TEST_TASKS_BRANCH
+      type: string
+      # Branch the Tekton task definitions (task-ginkgo-e2e,
+      # task-setup-testing-accounts) are resolved from. Overridden per-run by the
+      # IntegrationTestScenario.
+      default: main
+    - name: GIT_RELEASE_TESTS_URI
+      type: string
+      description: Ginkgo release-tests repository.
+      default: https://github.com/openshift-pipelines/release-tests-ginkgo.git
+    - name: GIT_RELEASE_TESTS_BRANCH
+      type: string
+      # Version-matched to the OSP build under test: release-v1.24 for 1.24.x
+      # GA/z-stream, main for nightly/next. Overridden per-run by the
+      # IntegrationTestScenario; defaults to main for nightly.
+      default: main
+    - name: LABEL_FILTER
+      type: string
+      description: Base Ginkgo label filter applied to every component suite.
+      default: "e2e && !disconnected"
+    - name: SUBSCRIPTION_NAME
+      type: string
+      description: Name of the operator subscription repointed during the upgrade.
+      default: openshift-pipelines-operator-rh
+    - name: PRE_UPGRADE_CATALOG_SOURCE
+      type: string
+      description: Catalog source the pre-upgrade (released) operator is installed from.
+      default: redhat-operators
+    - name: PRE_UPGRADE_CHANNEL
+      type: string
+      description: >-
+        Starting channel for the pre-upgrade install. When empty it is derived as
+        the previous minor of the target channel (e.g. target pipelines-1.20 ->
+        pipelines-1.19). Must be set explicitly when the target channel is
+        "latest" (next/nightly/main), which has no derivable previous minor.
+      default: ""
+    - name: GINKGO_PROCS
+      type: string
+      description: Ginkgo parallel processes used per component suite.
+      default: "4"
+    - name: GINKGO_FLAKE_ATTEMPTS
+      type: string
+      description: >-
+        Attempts per spec (ginkgo --flake-attempts) for the phase-1 suites and
+        metrics. Absorbs transient failures; retried specs are listed as FLAKED
+        in the task log. Not applied to operator suites, whose serial retries
+        would eat into the two-hour cluster budget.
+      default: "2"
+    - name: OCP_RELEASE_STREAM
+      type: string
+      description: |
+        Which OpenShift release payload to provision: "auto" (default) probes the
+        stable upgrade graph for the target minor and falls back to the nightly
+        payload when no GA release exists yet (e.g. a pre-GA 4.23). Set to "stable"
+        or "nightly" to force a specific stream.
+      default: "auto"
+    - name: WAIT_FOR_TEARDOWN_TIMEOUT
+      type: string
+      description: |
+        How long the provision-ephemeral-cluster task waits for the tearDown
+        signal before auto-deprovisioning the cluster. Empty uses the task
+        default (2h); set a longer duration (e.g. 4h) so long-running suites
+        such as auto-prune can finish within the cluster lifetime.
+      default: "4h"
+
+  tasks:
+    - name: parse-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/integration-examples
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/test_metadata.yaml
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+
+    - name: extract-ocp-version
+      runAfter:
+        - parse-metadata
+      params:
+        - name: componentName
+          value: "$(tasks.parse-metadata.results.component-name)"
+        - name: releaseStream
+          value: "$(params.OCP_RELEASE_STREAM)"
+      taskSpec:
+        params:
+          - name: componentName
+            type: string
+          - name: releaseStream
+            type: string
+            default: "auto"
+        results:
+          - name: ocpVersion
+            description: The OCP minor version extracted from component name (e.g. 4.20)
+          - name: releases
+            description: |
+              The ci-operator "releases" JSON for the provision task. Uses the stable
+              release payload for GA minors, or the nightly candidate payload for
+              pre-GA minors (no stable release yet).
+        steps:
+          - name: extract-version
+            image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+            env:
+              - name: COMPONENT_NAME
+                value: "$(params.componentName)"
+              - name: RELEASE_STREAM
+                value: "$(params.releaseStream)"
+            script: |
+              #!/usr/bin/env bash
+              set -e
+
+              # Validate the release-stream override up front so a typo fails
+              # loudly instead of silently falling through to the stable payload.
+              case "$RELEASE_STREAM" in
+                auto|stable|nightly) ;;
+                *)
+                  echo "ERROR: invalid OCP_RELEASE_STREAM '$RELEASE_STREAM'; expected one of: auto, stable, nightly" >&2
+                  exit 1
+                  ;;
+              esac
+
+              # Extract OCP minor version from COMPONENT_NAME
+              # Expected format: operator-1-22-index-4-20 -> 4.20
+              echo "Component Name: $COMPONENT_NAME"
+
+              VERSION_PATTERN=$(echo "$COMPONENT_NAME" | grep -oE '[0-9]+-[0-9]+' | tail -1)
+
+              if [ -z "$VERSION_PATTERN" ]; then
+                echo "Warning: Could not extract version from component name, using default"
+                OCP_VERSION="4.20"
+              else
+                OCP_VERSION=$(echo "$VERSION_PATTERN" | tr '-' '.')
+                echo "Extracted OCP Version: $OCP_VERSION"
+              fi
+
+              echo -n "$OCP_VERSION" | tee $(results.ocpVersion.path)
+              echo
+
+              # Decide which release payload to provision. A pre-GA minor (e.g. 4.23
+              # before it ships) has no release on the stable channel, so the
+              # ci-operator stable resolution returns an empty list and provisioning
+              # fails at input resolution. In that case provision the nightly payload.
+              stream="$RELEASE_STREAM"
+              if [ "$stream" = "auto" ]; then
+                graph="https://api.openshift.com/api/upgrades_info/graph?arch=multi&channel=stable-${OCP_VERSION}"
+                echo "Probing stable channel for ${OCP_VERSION}: $graph"
+                # Default to stable so a probe/network error preserves current behavior
+                # (GA minors keep working); only switch to nightly on a definitive
+                # empty release list.
+                stream="stable"
+                if resp=$(curl -fsS --connect-timeout 10 --max-time 30 "$graph" 2>/dev/null); then
+                  if echo "$resp" | grep -q '"nodes":\[\]'; then
+                    echo "No GA release found on stable-${OCP_VERSION}; using nightly payload."
+                    stream="nightly"
+                  else
+                    echo "Found GA releases on stable-${OCP_VERSION}; using stable payload."
+                  fi
+                else
+                  echo "WARN: could not probe the stable upgrade graph; defaulting to stable."
+                fi
+              fi
+
+              if [ "$stream" = "nightly" ]; then
+                releases="{\"latest\":{\"candidate\":{\"product\":\"ocp\",\"stream\":\"nightly\",\"version\":\"${OCP_VERSION}\",\"architecture\":\"multi\"}}}"
+              else
+                releases="{\"latest\":{\"release\":{\"channel\":\"stable\",\"version\":\"${OCP_VERSION}\",\"architecture\":\"multi\"}}}"
+              fi
+              echo "Selected release stream: $stream"
+              echo "releases: $releases"
+              printf '%s' "$releases" | tee $(results.releases.path)
+
+    - name: provision-ephemeral-cluster
+      runAfter:
+        - extract-ocp-version
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/openshift/konflux-tasks
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: tasks/provision-ephemeral-cluster/0.1/provision-ephemeral-cluster.yaml
+      params:
+        - name: ownerName
+          value: $(context.pipelineRun.name)
+        - name: ownerUid
+          value: $(context.pipelineRun.uid)
+        - name: workflow
+          value: hypershift-hostedcluster-workflow
+        - name: clusterProfile
+          value: aws-konflux-prod
+        - name: releases
+          value: '$(tasks.extract-ocp-version.results.releases)'
+        - name: env
+          value: '{"COMPUTE_NODE_TYPE": "m5.2xlarge", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "CONTROL_PLANE_NODE_SELECTOR": "kubernetes.io/arch=amd64", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines"}'
+        - name: waitForTearDownTimeout
+          value: "$(params.WAIT_FOR_TEARDOWN_TIMEOUT)"
+
+    # Configure Loki and OpenShift Logging, required by the Results configuration
+    # applied during the Ginkgo install suite.
+    - name: configure-loki-logging
+      runAfter:
+        - provision-ephemeral-cluster
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-configure-loki-logging.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+
+    # Create the candidate CatalogSource from the Konflux snapshot index image and
+    # derive the target channel from the release branch of the snapshot. The
+    # pre-upgrade install does NOT use this source; it is switched in only for the
+    # upgrade step (see switch-to-upgrade-catalog).
+    - name: create-catalog-source
+      runAfter:
+        - release-tests-pre-upgrade
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+      taskSpec:
+        params:
+          - name: CLUSTER_SECRET_REF
+            type: string
+        results:
+          - name: channel
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.CLUSTER_SECRET_REF)
+        stepTemplate:
+          image: $(params.IMAGE)
+          env:
+            - name: INDEX_IMAGE
+              value: "$(tasks.parse-metadata.results.component-container-image)"
+            - name: RELEASE_BRANCH
+              value: "$(tasks.parse-metadata.results.target-git-branch)"
+          volumeMounts:
+            - name: credentials
+              mountPath: /credentials
+              readOnly: true
+        steps:
+          - name: extract-channel-name
+            script: |
+              #!/usr/bin/env bash
+              set -x
+              if [[ "$RELEASE_BRANCH" == "next" || "$RELEASE_BRANCH" == "nightly" || "$RELEASE_BRANCH" == "main" ]]; then
+                CHANNEL="latest"
+              else
+                CHANNEL=$(echo "$RELEASE_BRANCH" | sed -E 's/release-v([0-9]+\.[0-9]+)\.x/pipelines-\1/')
+              fi
+              echo -n "$CHANNEL" | tee $(results.channel.path)
+
+          - name: create-catalog
+            env:
+              - name: KUBECONFIG
+                value: "/tmp/kubeconfig"
+            script: |
+              #!/usr/bin/env bash
+              cp /credentials/kubeconfig /tmp/kubeconfig
+              cat <<EOF | oc apply -f-
+                apiVersion: operators.coreos.com/v1alpha1
+                kind: CatalogSource
+                metadata:
+                  name: "custom-osp-catalog"
+                  namespace: openshift-marketplace
+                spec:
+                  sourceType: grpc
+                  image: $INDEX_IMAGE
+                  displayName: "Custom OSP Catalog"
+                  publisher: Red Hat Local
+                  updateStrategy:
+                    registryPoll:
+                      interval: 30m
+              EOF
+
+    # Determine the pre-upgrade (starting) channel. Honour PRE_UPGRADE_CHANNEL when
+    # set, otherwise derive the previous minor of the target channel. The target
+    # channel is derived from the operator release branch here, so this task is
+    # self-contained and does not depend on create-catalog-source (which is built
+    # later, after the pre-upgrade resources exist). Fails fast when the target is
+    # "latest" and no override was given.
+    - name: derive-channels
+      runAfter:
+        - provision-ephemeral-cluster
+      params:
+        - name: releaseBranch
+          value: "$(tasks.parse-metadata.results.target-git-branch)"
+        - name: override
+          value: "$(params.PRE_UPGRADE_CHANNEL)"
+      taskSpec:
+        params:
+          - name: releaseBranch
+            type: string
+          - name: override
+            type: string
+        results:
+          - name: previousChannel
+            type: string
+        steps:
+          - name: derive
+            image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+            env:
+              - name: RELEASE_BRANCH
+                value: "$(params.releaseBranch)"
+              - name: OVERRIDE
+                value: "$(params.override)"
+            script: |
+              #!/usr/bin/env bash
+              set -e
+              if [[ -n "$OVERRIDE" ]]; then
+                echo "Using PRE_UPGRADE_CHANNEL override: $OVERRIDE"
+                echo -n "$OVERRIDE" | tee $(results.previousChannel.path)
+                exit 0
+              fi
+              # Target (upgrade "to") channel, derived from the operator release branch.
+              if [[ "$RELEASE_BRANCH" == "next" || "$RELEASE_BRANCH" == "nightly" || "$RELEASE_BRANCH" == "main" ]]; then
+                TARGET="latest"
+              else
+                TARGET=$(echo "$RELEASE_BRANCH" | sed -E 's/release-v([0-9]+\.[0-9]+)\.x/pipelines-\1/')
+              fi
+              echo "Release branch: $RELEASE_BRANCH -> target channel: $TARGET"
+              if [[ "$TARGET" =~ ^pipelines-([0-9]+)\.([0-9]+)$ ]]; then
+                MAJ="${BASH_REMATCH[1]}"
+                MIN="${BASH_REMATCH[2]}"
+                PREV=$((MIN - 1))
+                echo "Derived previous channel from target $TARGET -> pipelines-${MAJ}.${PREV}"
+                echo -n "pipelines-${MAJ}.${PREV}" | tee $(results.previousChannel.path)
+              else
+                echo "ERROR: cannot derive a previous channel from target '$TARGET'." >&2
+                echo "nightly/next/main builds have no released predecessor; set PRE_UPGRADE_CHANNEL explicitly (e.g. pipelines-1.19)." >&2
+                exit 1
+              fi
+
+    # Install the previously released operator from the prod redhat-operators
+    # catalog on the derived previous channel. Serial on purpose: the install spec
+    # is a single Ordered container. Retries:2 mirrors the e2e pipeline because OLM
+    # install is occasionally flaky.
+    - name: install-pre-upgrade-operator
+      runAfter:
+        - configure-loki-logging
+        - derive-channels
+      timeout: "45m"
+      retries: 2
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "install"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "30m"
+        - name: CATALOG_SOURCE
+          value: "$(params.PRE_UPGRADE_CATALOG_SOURCE)"
+        - name: CHANNEL
+          value: "$(tasks.derive-channels.results.previousChannel)"
+        - name: SUBSCRIPTION_NAME
+          value: "$(params.SUBSCRIPTION_NAME)"
+
+    # Pre-upgrade suite (PIPELINES-18): sets up an Eventlistener with TLS, an S2I
+    # pipeline, a linked secret and olm skiprange expectations that the post-upgrade
+    # suite verifies survived the upgrade. tests/operator package, label pre-upgrade.
+    - name: release-tests-pre-upgrade
+      onError: continue
+      runAfter:
+        - install-pre-upgrade-operator
+      timeout: "40m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "pre-upgrade && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/operator/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "35m"
+        - name: CATALOG_SOURCE
+          value: "$(params.PRE_UPGRADE_CATALOG_SOURCE)"
+        - name: CHANNEL
+          value: "$(tasks.derive-channels.results.previousChannel)"
+        - name: SUBSCRIPTION_NAME
+          value: "$(params.SUBSCRIPTION_NAME)"
+
+    # Repoint the operator subscription at the candidate CatalogSource and bump it to
+    # the target channel. The ginkgo olm upgrade spec can only change the channel, not
+    # the source, so the source switch is done here. Both are patched together so OLM
+    # resolves the candidate CSV on the target channel (via skipRange) in one step.
+    - name: switch-to-upgrade-catalog
+      runAfter:
+        - create-catalog-source
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: subscriptionName
+          value: "$(params.SUBSCRIPTION_NAME)"
+        - name: namespace
+          value: "$(params.NAMESPACE)"
+        - name: targetChannel
+          value: "$(tasks.create-catalog-source.results.channel)"
+      taskSpec:
+        params:
+          - name: CLUSTER_SECRET_REF
+            type: string
+          - name: subscriptionName
+            type: string
+          - name: namespace
+            type: string
+          - name: targetChannel
+            type: string
+        volumes:
+          - name: credentials
+            secret:
+              secretName: $(params.CLUSTER_SECRET_REF)
+        steps:
+          - name: switch-source
+            image: $(params.IMAGE)
+            env:
+              - name: KUBECONFIG
+                value: "/tmp/kubeconfig"
+              - name: SUBSCRIPTION_NAME
+                value: "$(params.subscriptionName)"
+              - name: SUBSCRIPTION_NAMESPACE
+                value: "$(params.namespace)"
+              - name: TARGET_CHANNEL
+                value: "$(params.targetChannel)"
+            volumeMounts:
+              - name: credentials
+                mountPath: /credentials
+                readOnly: true
+            script: |
+              #!/usr/bin/env bash
+              set -euo pipefail
+              cp /credentials/kubeconfig /tmp/kubeconfig
+
+              # Wait for the candidate catalog source to be serving before repointing.
+              echo "Waiting for custom-osp-catalog CatalogSource to be READY..."
+              for i in $(seq 1 60); do
+                STATE=$(oc get catalogsource custom-osp-catalog -n openshift-marketplace \
+                  -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
+                echo "  attempt $i: state=${STATE:-<none>}"
+                [[ "$STATE" == "READY" ]] && break
+                sleep 10
+              done
+              if [[ "${STATE:-}" != "READY" ]]; then
+                echo "ERROR: custom-osp-catalog did not become READY in time."
+                exit 1
+              fi
+
+              # Record the currently-installed CSV so we can detect the actual upgrade
+              # transition below. The ginkgo olm upgrade spec only waits for a non-empty
+              # installedCSV that is Succeeded, which the previous GA CSV already
+              # satisfies, so it can short-circuit on the old CSV while OLM is still
+              # rolling the new one. Block here until a DIFFERENT CSV is installed and
+              # Succeeded before the downstream upgrade/post-upgrade suites run.
+              PREV_CSV=$(oc get subscription "${SUBSCRIPTION_NAME}" -n "${SUBSCRIPTION_NAMESPACE}" \
+                -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
+              echo "Pre-upgrade installedCSV: ${PREV_CSV:-<none>}"
+
+              echo "Repointing subscription ${SUBSCRIPTION_NAME} (ns ${SUBSCRIPTION_NAMESPACE})"
+              echo "  source  -> custom-osp-catalog (openshift-marketplace)"
+              echo "  channel -> ${TARGET_CHANNEL}"
+              oc patch subscription "${SUBSCRIPTION_NAME}" \
+                -n "${SUBSCRIPTION_NAMESPACE}" --type merge \
+                -p "{\"spec\":{\"source\":\"custom-osp-catalog\",\"sourceNamespace\":\"openshift-marketplace\",\"channel\":\"${TARGET_CHANNEL}\"}}"
+              oc get subscription "${SUBSCRIPTION_NAME}" -n "${SUBSCRIPTION_NAMESPACE}" \
+                -o jsonpath='{.spec.source} {.spec.channel}{"\n"}'
+
+              echo "Waiting for the operator to upgrade to a new Succeeded CSV..."
+              NEW_CSV=""
+              for i in $(seq 1 90); do
+                CUR_CSV=$(oc get subscription "${SUBSCRIPTION_NAME}" -n "${SUBSCRIPTION_NAMESPACE}" \
+                  -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
+                if [[ -n "$CUR_CSV" && "$CUR_CSV" != "$PREV_CSV" ]]; then
+                  PHASE=$(oc get csv "$CUR_CSV" -n "${SUBSCRIPTION_NAMESPACE}" \
+                    -o jsonpath='{.status.phase}' 2>/dev/null || true)
+                  echo "  attempt $i: installedCSV=$CUR_CSV phase=${PHASE:-<none>}"
+                  if [[ "$PHASE" == "Succeeded" ]]; then
+                    NEW_CSV="$CUR_CSV"
+                    break
+                  fi
+                else
+                  echo "  attempt $i: installedCSV=${CUR_CSV:-<none>} (unchanged)"
+                fi
+                sleep 10
+              done
+              if [[ -z "$NEW_CSV" ]]; then
+                echo "ERROR: operator did not upgrade to a new Succeeded CSV (still ${PREV_CSV:-<none>})."
+                exit 1
+              fi
+              echo "Operator upgraded: ${PREV_CSV:-<none>} -> $NEW_CSV"
+
+    # Upgrade suite (olm PIPELINES-09-TC02): re-asserts the target channel and waits
+    # for the subscription/CSV to reach Succeeded, then validates the operator is
+    # healthy after the upgrade (TektonConfig, RBAC, quickstarts).
+    - name: update-pipelines-operator
+      runAfter:
+        - switch-to-upgrade-catalog
+      timeout: "45m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "upgrade"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "30m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: UPGRADE_CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: SUBSCRIPTION_NAME
+          value: "$(params.SUBSCRIPTION_NAME)"
+
+    # Post-upgrade suite (PIPELINES-19): verifies the resources created by the
+    # pre-upgrade suite survived, TLS/S2I pipelines still work and olm skiprange is
+    # correct after the upgrade. tests/operator package, label post-upgrade.
+    - name: release-tests-post-upgrade
+      onError: continue
+      runAfter:
+        - update-pipelines-operator
+      timeout: "40m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "post-upgrade && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/operator/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "35m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+        - name: SUBSCRIPTION_NAME
+          value: "$(params.SUBSCRIPTION_NAME)"
+
+    # ------------------------------------------------------------------
+    # Post-upgrade component regression (mirrors the e2e pipeline, gated after
+    # the upgrade). Every suite carries no dependency on another so Tekton runs
+    # them in parallel; onError: continue keeps the fan-out going when one fails
+    # while the finally task still fails the PipelineRun.
+    # ------------------------------------------------------------------
+    # Non-admin post-upgrade suites (pipelines, triggers) impersonate the "user"
+    # account, so create the test User objects and their RBAC after the upgrade
+    # completes and before those suites run. Mirrors release-tests-infra's
+    # setup-testing-accounts step: only pipelines and triggers run non-admin;
+    # every other suite runs as the provisioned cluster-admin (task-ginkgo-e2e
+    # RUN_AS default "admin"). This task only creates Users/RoleBindings (no oauth
+    # changes), so admin suites fanned out in parallel are unaffected.
+    - name: setup-testing-accounts
+      runAfter:
+        - update-pipelines-operator
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-setup-testing-accounts.yaml
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.IMAGE)
+
+    - name: release-tests-pipelines
+      onError: continue
+      runAfter:
+        - update-pipelines-operator
+        - setup-testing-accounts
+      timeout: "45m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "non-admin"
+        - name: TEST_PATH
+          value: "./tests/pipelines/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "30m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # Triggers uses the shared, version-matched release-tests branch
+    # (GIT_RELEASE_TESTS_BRANCH: release-v1.24 for 1.24.x OSP, main for
+    # nightly/next). Both branches carry the EventListener TLS CN-length fix
+    # (#105) but write TLS certs to a shared path (the per-process cert dirs
+    # from the still-open #100 are not merged there), so this suite runs serial
+    # (PARALLEL=false) to avoid the concurrent cert-clobbering race.
+    - name: release-tests-triggers
+      onError: continue
+      runAfter:
+        - update-pipelines-operator
+        - setup-testing-accounts
+      timeout: "65m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        # The TLS EventListener specs label the namespace
+        # (operator.tekton.dev/enable-annotation), which patches the
+        # cluster-scoped namespace object and needs cluster-admin a
+        # self-provisioner user lacks. They are excluded here and run as admin in
+        # release-tests-triggers-tls.
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && !tls && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "non-admin"
+        - name: TEST_PATH
+          value: "./tests/triggers/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "50m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # Admin half of the triggers split: the TLS EventListener specs patch the
+    # cluster-scoped namespace object (operator.tekton.dev/enable-annotation),
+    # which a non-admin self-provisioner user cannot do, so they run as admin.
+    - name: release-tests-triggers-tls
+      onError: continue
+      runAfter:
+        - update-pipelines-operator
+      timeout: "30m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && tls && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/triggers/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "20m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-results
+      onError: continue
+      runAfter:
+        - update-pipelines-operator
+      timeout: "50m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/results/"
+        # Run serially (procs=1). The results suite is stateful
+        # (retention specs resolve the "--last" run via "opc describe -n <ns>");
+        # parallel procs give each spec its own namespace, which breaks that
+        # resolution and the retention assertions.
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "45m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-versions
+      onError: continue
+      runAfter:
+        - update-pipelines-operator
+      timeout: "45m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/versions/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "30m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-tls
+      onError: continue
+      runAfter:
+        - update-pipelines-operator
+      timeout: "45m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/tls/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "30m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # Longest suite of the phase: its S2I specs start one build per imagestream tag
+    # and then only wait, so it gets more processes than the others.
+    - name: release-tests-ecosystem
+      onError: continue
+      runAfter:
+        - update-pipelines-operator
+      timeout: "45m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/ecosystem/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "16"
+        - name: GINKGO_TIMEOUT
+          value: "30m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-pac
+      onError: continue
+      runAfter:
+        - update-pipelines-operator
+      timeout: "45m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/pac/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "30m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # Admin suite: the manual-approval-gate (mag) specs include group-user cases
+    # that impersonate users (HyperShift clusters cannot provision htpasswd
+    # users), so the suite runs as admin.
+    - name: release-tests-manual-approval
+      onError: continue
+      runAfter:
+        - update-pipelines-operator
+      timeout: "45m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/mag/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "8"
+        - name: GINKGO_TIMEOUT
+          value: "30m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # The chains specs rewrite TektonConfig spec.chain, which only rolls the chains
+    # controller; every spec changes that config so the suite runs single-proc.
+    - name: release-tests-chains
+      onError: continue
+      runAfter:
+        - update-pipelines-operator
+      timeout: "30m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/chains/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "20m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-metrics
+      onError: continue
+      runAfter:
+        - update-pipelines-operator
+      timeout: "65m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/metrics/"
+        - name: PARALLEL
+          value: "true"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "50m"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # Operator suites (rbac, addon) rewrite cluster-wide TektonConfig settings and
+    # run serial; the upgrade/pre-upgrade/post-upgrade specs are filtered out here.
+    # They are gated after the component suites and run in parallel with each other;
+    # tekton-pruner is gated after both of them (see note below).
+    - name: release-tests-rbac
+      onError: continue
+      runAfter:
+        - release-tests-post-upgrade
+        - release-tests-pipelines
+        - release-tests-triggers
+        - release-tests-triggers-tls
+        - release-tests-results
+        - release-tests-versions
+        - release-tests-tls
+        - release-tests-ecosystem
+        - release-tests-pac
+        - release-tests-manual-approval
+        - release-tests-chains
+        - release-tests-metrics
+      timeout: "25m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && rbac && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/operator/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "20m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    - name: release-tests-addon
+      onError: continue
+      runAfter:
+        - release-tests-post-upgrade
+        - release-tests-pipelines
+        - release-tests-triggers
+        - release-tests-triggers-tls
+        - release-tests-results
+        - release-tests-versions
+        - release-tests-tls
+        - release-tests-ecosystem
+        - release-tests-pac
+        - release-tests-manual-approval
+        - release-tests-chains
+        - release-tests-metrics
+      timeout: "30m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && addon && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/operator/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "25m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # tekton-pruner is gated to the very end: it continuously rewrites the
+    # TektonConfig pruner settings and then waits on the operator reaching
+    # Installed=True. Running it next to the other TektonConfig-mutating suites
+    # (notably rbac, whose rbac-disable spec also waits on Installed=True) keeps the
+    # single TektonConfig CR perpetually reconciling, so rbac times out at
+    # Installed=False. It therefore runs after rbac and addon.
+    #
+    # auto-prune mutates cluster-wide pruning config and has a long TTL-based
+    # test tail, so it needs the extended ephemeral-cluster lifetime (see the
+    # WAIT_FOR_TEARDOWN_TIMEOUT param). It is serialized after rbac/addon (they
+    # also mutate TektonConfig), and tekton-pruner is gated after it.
+    - name: release-tests-tekton-pruner
+      onError: continue
+      runAfter:
+        - release-tests-auto-prune
+      timeout: "70m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && tekton-pruner && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
+        - name: RUN_AS
+          value: "admin"
+        - name: TEST_PATH
+          value: "./tests/operator/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "55m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+    # auto-prune mutates cluster-wide pruning config and has a long TTL-based
+    # test tail, so it needs the extended ephemeral-cluster lifetime (see the
+    # WAIT_FOR_TEARDOWN_TIMEOUT param). It is serialized after rbac/addon (they
+    # also mutate TektonConfig), and tekton-pruner is gated after it.
+    - name: release-tests-auto-prune
+      onError: continue
+      runAfter:
+        - release-tests-rbac
+        - release-tests-addon
+      timeout: "70m"
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-ginkgo-e2e.yaml
+      params:
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "true"
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
+        - name: IMAGE
+          value: $(params.GINKGO_IMAGE)
+        - name: GIT_RELEASE_TESTS_URI
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: GIT_RELEASE_TESTS_BRANCH
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+        - name: MODE
+          value: "($(params.LABEL_FILTER)) && auto-prune && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
+        - name: TEST_PATH
+          value: "./tests/operator/"
+        - name: PARALLEL
+          value: "false"
+        - name: GINKGO_TIMEOUT
+          value: "55m"
+        - name: CATALOG_SOURCE
+          value: "custom-osp-catalog"
+        - name: CHANNEL
+          value: "$(tasks.create-catalog-source.results.channel)"
+
+  finally:
+    # Verify aggregate status and fail the pipeline if any test task failed. On
+    # failure it also enumerates the failed suite tasks and prints a ready-to-paste
+    # rerun filter.
+    - name: verify-e2e-tests-status
+      params:
+        - name: aggregateStatus
+          value: "$(tasks.status)"
+        - name: pipelineRunName
+          value: "$(context.pipelineRun.name)"
+      taskSpec:
+        params:
+          - name: aggregateStatus
+          - name: pipelineRunName
+        steps:
+          - name: verify-aggregate-status
+            image: $(params.IMAGE)
+            script: |
+              #!/usr/bin/env bash
+              echo "📋 Aggregate Status: $(params.aggregateStatus)"
+
+              if [[ "$(params.aggregateStatus)" == "Succeeded" ]]; then
+                echo "✅ All tasks succeeded!"
+                exit 0
+              fi
+
+              echo "❌ Pipeline contains failed tasks!"
+
+              # The PipelineRun lives in this (Konflux) cluster, so the in-cluster
+              # service account token lets us read it back and list the failed suites.
+              pr="$(params.pipelineRunName)"
+              # Tab-separated per failed suite: <task>\t<MODE>\t<TEST_PATH>. Capturing
+              # each TaskRun's resolved MODE/TEST_PATH lets the rerun hint reproduce the
+              # exact label filter and package instead of guessing from the task name
+              # (e.g. manual-approval runs tests/mag/, triggers-tls filters on tls).
+              failed=""
+              if command -v oc >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+                failed="$(oc get pipelinerun "${pr}" -o json 2>/dev/null \
+                  | jq -r '.status.childReferences[]?.name' \
+                  | while read -r tr; do
+                      [[ -z "${tr}" ]] && continue
+                      cond="$(oc get taskrun "${tr}" -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].status}' 2>/dev/null)"
+                      name="$(oc get taskrun "${tr}" -o jsonpath='{.metadata.labels.tekton\.dev/pipelineTask}' 2>/dev/null)"
+                      if [[ "${cond}" == "False" && ( "${name}" == release-tests-* || "${name}" == *upgrade* ) ]]; then
+                        mode="$(oc get taskrun "${tr}" -o jsonpath='{.spec.params[?(@.name=="MODE")].value}' 2>/dev/null)"
+                        path="$(oc get taskrun "${tr}" -o jsonpath='{.spec.params[?(@.name=="TEST_PATH")].value}' 2>/dev/null)"
+                        printf '%s\t%s\t%s\n' "${name}" "${mode}" "${path}"
+                      fi
+                    done | sort -u)"
+              fi
+
+              if [[ -n "${failed}" ]]; then
+                echo ""
+                echo "🔁 Failed suites:"
+                echo "${failed}" | cut -f1 | sed 's/^/   - /'
+                echo ""
+                echo "💡 Rerun only the failed suites by restarting the PipelineRun with"
+                echo "   these tasks (others can be pruned from the run), or run locally"
+                echo "   from a release-tests-ginkgo checkout:"
+                # printf %q shell-quotes the filter (preserving && and !) and the path
+                # so each printed command can be pasted into a shell as-is.
+                while IFS=$'\t' read -r name mode path; do
+                  [[ -z "${name}" ]] && continue
+                  qpath="$(printf '%q' "${path:-./tests/}")"
+                  if [[ -n "${mode}" ]]; then
+                    qmode="$(printf '%q' "${mode}")"
+                    echo "   ginkgo run --label-filter=${qmode} ${qpath}"
+                  else
+                    echo "   ginkgo run ${qpath}"
+                  fi
+                done <<< "${failed}"
+              else
+                echo "💡 Check individual task logs for detailed error information"
+                echo "   (could not enumerate failed suites automatically)."
+              fi
+
+              exit 1
