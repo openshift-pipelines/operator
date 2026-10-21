@@ -1,0 +1,539 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: ginkgo-e2e-tests
+spec:
+  description: |
+    Runs a Ginkgo suite from openshift-pipelines/release-tests-ginkgo against an
+    ephemeral cluster provisioned through OpenShift-CI.
+
+    Operator installation and test execution are both driven by the Ginkgo suites
+    in the release-tests repository, so this task only has to clone the repo,
+    mount the cluster credentials and invoke `ginkgo` on the requested suite.
+  params:
+    - name: CLUSTER_SECRET_REF
+      type: string
+      description: "Name of the Secret containing the cluster kubeconfig (key: kubeconfig)"
+    - name: RUN_AS
+      type: string
+      description: >-
+        Which cluster identity the suite runs as: "admin" uses the provisioned
+        cluster-admin kubeconfig as-is; "non-admin" impersonates the "user"
+        account (an OpenShift User created by the setup-testing-accounts task) via
+        the kubeconfig `as` field and runs the suite with that identity. Mirrors
+        release-tests-infra's RUN_AS; impersonation is used because oauth/cluster
+        password login is blocked on these HyperShift ephemeral clusters.
+      default: "admin"
+    - name: IMAGE
+      type: string
+      description: CI image providing go, ginkgo, oc and the remaining test tooling.
+      default: quay.io/openshift-pipeline/release-tests-ginkgo:latest
+    - name: GIT_RELEASE_TESTS_URI
+      type: string
+      default: https://github.com/openshift-pipelines/release-tests-ginkgo.git
+    - name: GIT_RELEASE_TESTS_BRANCH
+      type: string
+      default: main
+    - name: MODE
+      type: string
+      description: |
+        MODE argument of the repo's scripts/run-tests.sh: one of its named modes
+        (install, upgrade, uninstall, sanity, smoke, e2e, e2e-connected,
+        disconnected, all) or a raw Ginkgo --label-filter expression such as
+        "e2e && !disconnected".
+      default: e2e
+    - name: TEST_PATH
+      type: string
+      description: |
+        Package path(s) to run, e.g. ./tests/pipelines/. Ignored by the install,
+        upgrade and uninstall modes which always target ./tests/olm/.
+      default: ./tests/...
+    - name: PARALLEL
+      type: string
+      description: Run the suite with Ginkgo parallel processes ("true" or "false").
+      default: "true"
+    - name: GINKGO_PROCS
+      type: string
+      description: Number of Ginkgo parallel processes when PARALLEL is "true".
+      default: "4"
+    - name: GINKGO_TIMEOUT
+      type: string
+      description: Ginkgo suite timeout.
+      default: 45m
+    - name: GINKGO_FLAKE_ATTEMPTS
+      type: string
+      description: >-
+        Maximum attempts per spec (ginkgo --flake-attempts). A spec that fails
+        is retried in place and counted as Flaked, not Failed, when a later
+        attempt passes. "0" or "1" disables retries.
+      default: "0"
+    - name: CATALOG_SOURCE
+      type: string
+      description: Catalog source the operator subscription is created from.
+      default: redhat-operators
+    - name: CHANNEL
+      type: string
+      description: Channel the operator subscription subscribes to.
+      default: latest
+    - name: UPGRADE_CHANNEL
+      type: string
+      description: >-
+        Target channel for the olm upgrade suite (MODE=upgrade). The upgrade spec
+        switches the existing subscription to this channel. Empty skips the upgrade.
+      default: ""
+    - name: SUBSCRIPTION_NAME
+      type: string
+      default: openshift-pipelines-operator-rh
+    - name: WAIT_FOR_UPGRADED_CLI
+      type: string
+      description: >
+        When "true", wait for the operator to finish re-rolling tkn-cli-serve
+        after an upgrade and re-download tkn/opc until the served client matches
+        the installed CSV's minor, so post-upgrade suites validate the upgraded
+        operator with the upgraded CLI rather than the cached pre-upgrade one.
+        Mirrors release-tests-infra's refresh_cli_from_upgraded_cluster.
+      default: "false"
+    - name: CHAINS_REPOSITORY
+      type: string
+      description: OCI repository the Chains suite pushes signed images to.
+      default: quay.io/openshift-pipeline/chainstest
+
+  volumes:
+    - name: credentials
+      secret:
+        secretName: $(params.CLUSTER_SECRET_REF)
+    - name: source
+      emptyDir: {}
+    - name: go-cache
+      emptyDir: {}
+
+  stepTemplate:
+    image: $(params.IMAGE)
+    volumeMounts:
+      - name: source
+        mountPath: /source
+      - name: credentials
+        mountPath: /credentials
+        readOnly: true
+      - name: go-cache
+        mountPath: /go-cache
+
+  steps:
+    - name: create-repo
+      script: |
+        mkdir -p /source/repo /source/artifacts
+        chmod 777 /source/repo /source/artifacts
+
+    - name: fetch-repo
+      ref:
+        resolver: http
+        params:
+          - name: url
+            value: https://raw.githubusercontent.com/openshift-pipelines/tektoncd-catalog/p/stepactions/stepaction-git-clone/0.4.1/stepaction-git-clone.yaml
+      params:
+        - name: OUTPUT_PATH
+          value: /source/repo
+        - name: URL
+          value: $(params.GIT_RELEASE_TESTS_URI)
+        - name: REVISION
+          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+
+    - name: run-ginkgo-suite
+      workingDir: /source/repo
+      # Without explicit resources the step inherits the namespace LimitRange
+      # defaults: a 2Gi memory limit and NO cpu limit. Go then sizes GOMAXPROCS
+      # (and `go build -p`) to the whole node (16-32 cores), and compiling the
+      # suite blows past 2Gi and gets OOM-killed (exit 137) within a minute.
+      # The cpu limit caps the compile parallelism; peak is ~1Gi at 2 cores.
+      computeResources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+        limits:
+          cpu: "4"
+          memory: 4Gi
+      env:
+        # Copy read by the Go clients of the suite. CLIs (oc, tkn, opc) get their
+        # own per-process copies through the shims set up in the script below.
+        - name: KUBECONFIG
+          value: "/source/kubeconfig"
+        - name: RUN_AS
+          value: "$(params.RUN_AS)"
+        - name: MODE
+          value: "$(params.MODE)"
+        - name: TEST_PATH
+          value: "$(params.TEST_PATH)"
+        - name: PARALLEL
+          value: "$(params.PARALLEL)"
+        - name: GINKGO_PROCS
+          value: "$(params.GINKGO_PROCS)"
+        - name: GINKGO_TIMEOUT
+          value: "$(params.GINKGO_TIMEOUT)"
+        - name: GINKGO_FLAKE_ATTEMPTS
+          value: "$(params.GINKGO_FLAKE_ATTEMPTS)"
+        - name: CATALOG_SOURCE
+          value: "$(params.CATALOG_SOURCE)"
+        - name: CHANNEL
+          value: "$(params.CHANNEL)"
+        - name: UPGRADE_CHANNEL
+          value: "$(params.UPGRADE_CHANNEL)"
+        - name: SUBSCRIPTION_NAME
+          value: "$(params.SUBSCRIPTION_NAME)"
+        - name: WAIT_FOR_UPGRADED_CLI
+          value: "$(params.WAIT_FOR_UPGRADED_CLI)"
+        - name: CHAINS_REPOSITORY
+          value: "$(params.CHAINS_REPOSITORY)"
+        - name: ARTIFACTS_DIR
+          value: /source/artifacts
+        - name: GINKGO_NO_COLOR
+          value: "TRUE"
+        # Reuse the module cache baked into the CI image, keep the build cache local.
+        - name: GOCACHE
+          value: /go-cache/build
+        - name: GOFLAGS
+          value: "-mod=mod"
+        - name: CHAINS_DOCKER_CONFIG_JSON
+          valueFrom:
+            secretKeyRef:
+              name: quay-io-dockerconfig
+              key: config.json
+              optional: true
+        # The jib-maven spec (PIPELINES-32-TC01) skips unless both are set. The
+        # built image goes to the internal registry; the dockerconfig only becomes
+        # the registry secret linked to the pipeline SA, so the Chains one is reused.
+        - name: JIB_MAVEN_REPOSITORY
+          value: quay.io/openshift-pipeline/jib-maven
+        - name: JIB_MAVEN_DOCKER_CONFIG_JSON
+          valueFrom:
+            secretKeyRef:
+              name: quay-io-dockerconfig
+              key: config.json
+              optional: true
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github
+              key: github-token
+              optional: true
+        - name: GITLAB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pac-gitlab
+              key: gitlab-token
+              optional: true
+        - name: GITLAB_WEBHOOK_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pac-gitlab
+              key: gitlab-webhook-token
+              optional: true
+        - name: GITLAB_GROUP_NAMESPACE
+          valueFrom:
+            secretKeyRef:
+              name: pac-gitlab
+              key: gitlab-group-ns
+              optional: true
+        - name: GITLAB_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: pac-gitlab
+              key: gitlab-project-id
+              optional: true
+        # GitHub PAC specs (PIPELINES-35) skip themselves when this is unset.
+        # The token needs admin, contents, pull-request and webhook rights on
+        # the org below, where the suite creates and deletes release-tests-pac-*
+        # repositories. The webhook secret is generated per repository.
+        - name: PAC_GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pac-github
+              key: github-token
+              optional: true
+        - name: PAC_GITHUB_ORG
+          value: "pipelinesascodetests"
+      script: |
+        #!/usr/bin/env bash
+        set -u -o pipefail
+
+        cp /credentials/kubeconfig "${KUBECONFIG}"
+
+        # Prefer the CLIs served by the cluster (tkn, tkn-pac and opc of the release
+        # under test) over the ones baked into the test image, which may be a release
+        # behind. The ConsoleCLIDownload only exists once the operator is installed,
+        # so the install suite falls back to the image's binaries.
+        CLI_DIR=/source/cli
+        mkdir -p "${CLI_DIR}"
+        export PATH="${CLI_DIR}:${PATH}"
+
+        download_cluster_cli() {
+          local url
+          url="$(oc get consoleclidownloads tkn \
+            -o jsonpath='{.spec.links[?(@.text=="Download tkn and tkn-pac for Linux x86_64")].href}' 2>/dev/null || true)"
+          [[ -n "${url}" ]] || return 1
+          if curl -sSfkL --retry 3 -o "${CLI_DIR}/tkn.tar.gz" "${url}" \
+              && tar -xzf "${CLI_DIR}/tkn.tar.gz" -C "${CLI_DIR}"; then
+            rm -f "${CLI_DIR}/tkn.tar.gz"
+            hash -r 2>/dev/null || true
+            echo "Using CLIs from ${url}"
+            return 0
+          fi
+          echo "WARNING: could not fetch ${url}, using the CLIs of the test image"
+          return 1
+        }
+
+        # After an operator upgrade the operator re-rolls tkn-cli-serve asynchronously,
+        # so a post-upgrade suite that downloads too early gets the pre-upgrade tkn/opc
+        # and then validates the upgraded operator with a stale CLI. When
+        # WAIT_FOR_UPGRADED_CLI is set, wait for that roll-out and re-download until opc
+        # reports the installed CSV's minor (mirrors release-tests-infra's
+        # refresh_cli_from_upgraded_cluster; we have no shared cache, so every
+        # post-upgrade task refreshes its own copy).
+        if [[ "${WAIT_FOR_UPGRADED_CLI:-false}" == "true" ]]; then
+          want="$(oc get subscription "${SUBSCRIPTION_NAME}" -n openshift-operators \
+            -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+          want="${want#${SUBSCRIPTION_NAME}.v}"; want="${want%.*}"   # target minor, e.g. 1.24
+          echo "Refreshing CLIs from upgraded cluster (want opc ${want:-any}.x)"
+          deadline=$((SECONDS + 600))
+          refreshed=false
+          while (( SECONDS < deadline )); do
+            oc rollout status deployment/tkn-cli-serve -n openshift-pipelines --timeout=120s 2>/dev/null || true
+            if download_cluster_cli; then
+              served="$(opc version 2>/dev/null | grep -iE 'client' \
+                | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"
+              if [[ -z "${want}" || "${served}" == "${want}" || "${served}" == "${want}."* ]]; then
+                echo "tkn-cli-serve serving opc ${served:-unknown}"
+                refreshed=true
+                break
+              fi
+              echo "  tkn-cli-serve still serving opc ${served:-unknown} (want ${want}.x); retrying..."
+            else
+              echo "  tkn-cli-serve not ready yet; retrying..."
+            fi
+            sleep 10
+          done
+          # Proceeding with a stale/pre-upgrade CLI would silently test the wrong
+          # version, so fail loudly instead of running the post-upgrade suites.
+          if [[ "${refreshed}" != "true" ]]; then
+            echo "ERROR: timed out after 600s waiting for tkn-cli-serve to serve opc ${want:-any}.x; refusing to run tests with a stale CLI" >&2
+            exit 1
+          fi
+        else
+          download_cluster_cli || true
+        fi
+
+        # `oc new-project` rewrites the kubeconfig it uses, so parallel Ginkgo
+        # processes sharing a single file corrupt it for each other. Shim the CLIs
+        # so that every calling process ($PPID) works on its own copy, seeded from
+        # the run-as kubeconfig (/source/seed-kubeconfig) on first use.
+        # Only the shared run-as kubeconfig is swapped: when the suite points a
+        # CLI at another file (the MAG suite runs opc with a per-user
+        # impersonation kubeconfig), that file is used as is.
+        # `opc results` is the one client ignoring KUBECONFIG (it reads
+        # ~/.kube/config; fixed upstream in tektoncd/results@517a1a873 but not
+        # released yet), so it is pointed at the copy explicitly.
+        #
+        # Establish that run-as kubeconfig now. Admin suites use the provisioned
+        # cluster-admin credentials as-is. Non-admin suites impersonate the "user"
+        # account (an OpenShift User object created by the setup-testing-accounts
+        # task) so the suite exercises the operator as a regular user, mirroring
+        # release-tests-infra's RUN_AS=non-admin. Password login is impossible on
+        # these HyperShift ephemeral clusters (oauth/cluster is blocked by a
+        # ValidatingAdmissionPolicy), so the cluster-admin credentials impersonate
+        # the user via the kubeconfig `as` field instead. The CLI download and
+        # post-upgrade refresh above run as admin before this switch, since they
+        # read cluster-scoped resources a non-admin cannot see.
+        cp /credentials/kubeconfig /source/seed-kubeconfig
+        if [[ "${RUN_AS:-admin}" == "non-admin" ]]; then
+          # Impersonate the "user" account by writing the kubeconfig `as` field
+          # onto the cluster-admin credentials; client-go and the oc/tkn/opc CLIs
+          # honor it and send Impersonate-User on every request. `oc config set
+          # users.<name>.as` cannot navigate the impersonate field, so flatten the
+          # kubeconfig to JSON and inject `as` with the python stdlib.
+          oc --kubeconfig=/credentials/kubeconfig config view --flatten --raw -o json > /source/seed.json
+          # The shim re-applies this same impersonation identity after a project
+          # switch (which rewrites the kubeconfig and drops the `as` field), so
+          # export it for the shim to read.
+          export IMPERSONATE_USER=user
+          python3 - "${IMPERSONATE_USER}" > /source/seed-kubeconfig <<'PY'
+        import json, sys
+        who = sys.argv[1]
+        kc = json.load(open("/source/seed.json"))
+        current = kc.get("current-context")
+        ctx = next(c["context"] for c in kc["contexts"] if c["name"] == current)
+        name = ctx["user"]
+        for entry in kc["users"]:
+            if entry["name"] == name:
+                entry["user"]["as"] = who
+        json.dump(kc, sys.stdout)
+        PY
+          echo "Running as non-admin: impersonating user '$(oc --kubeconfig=/source/seed-kubeconfig whoami 2>/dev/null || echo user)'"
+        fi
+        cp /source/seed-kubeconfig "${KUBECONFIG}"
+
+        mkdir -p /source/bin /source/kubeconfigs
+        chmod 700 /source/kubeconfigs
+        cat > /source/bin/.kubeconfig-shim <<'EOF'
+        #!/usr/bin/env bash
+        real="$1"; shift
+        kc="${KUBECONFIG:-}"
+        if [[ -z "${kc}" || "${kc}" == "/source/kubeconfig" ]]; then
+          # Seed a per-process kubeconfig ONCE; it carries the impersonation `as`
+          # field. `oc new-project`/`oc project` may then switch its namespace, and
+          # that selection must persist so CLI calls without an explicit `-n` (e.g.
+          # the MAG `opc approvaltask approve/reject` helpers) target the test
+          # namespace the suite just created rather than the seed namespace.
+          kc="/source/kubeconfigs/kubeconfig.${PPID}"
+          managed=1
+          if [[ ! -f "${kc}" ]]; then
+            cp /source/seed-kubeconfig "${kc}.$$" && mv "${kc}.$$" "${kc}"
+            rm -f "${kc}.$$"
+          fi
+        fi
+        if [[ -n "${managed:-}" && -n "${IMPERSONATE_USER:-}" && "${real##*/}" == "oc" && ( "${1:-}" == "new-project" || "${1:-}" == "project" ) ]]; then
+          # `oc new-project`/`oc project` rewrite the kubeconfig and drop the
+          # impersonation `as` field, splitting identity (CLI as cluster-admin, Go
+          # client still impersonated) -> Forbidden reads that time out. Run the
+          # switch, then restore `as` by re-seeding while re-applying the namespace
+          # it just selected, so identity AND namespace stay consistent for the
+          # later CLI calls that rely on the current namespace.
+          KUBECONFIG="${kc}" "${real}" "$@"; rc=$?
+          if [[ ${rc} -eq 0 ]]; then
+            ns="$(KUBECONFIG="${kc}" "${real}" config view --minify -o jsonpath='{..namespace}' 2>/dev/null)"
+            cp /source/seed-kubeconfig "${kc}.$$" && mv "${kc}.$$" "${kc}"
+            rm -f "${kc}.$$"
+            [[ -n "${ns}" ]] && KUBECONFIG="${kc}" "${real}" config set-context --current --namespace="${ns}" >/dev/null 2>&1
+          fi
+          exit ${rc}
+        fi
+        if [[ "${real##*/}" == "opc" && "${1:-}" == "results" ]]; then
+          # `opc results config set` persists the Results API host/token INTO its
+          # kubeconfig, and that state must survive from the `config set` call to
+          # the following `opc results` verb (a separate process, same PPID). The
+          # namespace/impersonation repair above re-seeds the shared kubeconfig and
+          # would wipe it, yielding "API server host not configured: host field is
+          # empty". Point `opc results` at a dedicated kubeconfig seeded ONCE per
+          # process so the config sticks.
+          rkc="/source/kubeconfigs/results-kubeconfig.${PPID}"
+          if [[ ! -f "${rkc}" ]]; then
+            cp /source/seed-kubeconfig "${rkc}.$$" && mv "${rkc}.$$" "${rkc}"
+            rm -f "${rkc}.$$"
+          fi
+          set -- "$@" --kubeconfig="${rkc}"
+          KUBECONFIG="${rkc}" exec "${real}" "$@"
+        fi
+        KUBECONFIG="${kc}" exec "${real}" "$@"
+        EOF
+        chmod +x /source/bin/.kubeconfig-shim
+        for cli in oc kubectl tkn tkn-pac opc; do
+          real="$(command -v "${cli}")" || continue
+          printf '#!/usr/bin/env bash\nexec /source/bin/.kubeconfig-shim %q "$@"\n' "${real}" > "/source/bin/${cli}"
+          chmod +x "/source/bin/${cli}"
+        done
+        export PATH="/source/bin:${PATH}"
+
+        # Tekton merges every pull secret of the service account into
+        # ~/.docker/config.json. Registry clients match those entries by host, so
+        # cosign would present a random Konflux robot to quay.io. Give it a config
+        # of its own holding only the Chains registry credentials, if any.
+        export DOCKER_CONFIG=/source/docker
+        mkdir -p "${DOCKER_CONFIG}"
+        chmod 700 "${DOCKER_CONFIG}"
+        if [[ -n "${CHAINS_DOCKER_CONFIG_JSON:-}" ]]; then
+          printf '%s' "${CHAINS_DOCKER_CONFIG_JSON}" > "${DOCKER_CONFIG}/config.json"
+        else
+          echo '{"auths":{}}' > "${DOCKER_CONFIG}/config.json"
+        fi
+
+        echo "Cluster     : $(oc whoami --show-server 2>/dev/null || echo unknown)"
+        echo "Run as      : ${RUN_AS:-admin} ($(oc whoami 2>/dev/null || echo unknown))"
+        echo "Mode        : ${MODE}"
+        echo "Test path   : ${TEST_PATH}"
+        echo "Channel     : ${CHANNEL}"
+        echo "Upg channel : ${UPGRADE_CHANNEL:-<none>}"
+        echo "Catalog     : ${CATALOG_SOURCE}"
+        echo "Parallel    : ${PARALLEL} (procs=${GINKGO_PROCS})"
+        echo "Flake tries : ${GINKGO_FLAKE_ATTEMPTS:-0}"
+
+        oc version || true
+        echo "tkn client  : $(tkn version --component client 2>/dev/null || echo unknown)"
+        opc version || true
+
+        # The CI image ships a prewarmed module cache. Arbitrary UIDs cannot always
+        # write to it, so fall back to the local scratch volume when that happens.
+        modcache="$(go env GOMODCACHE)"
+        if ! mkdir -p "${modcache}" 2>/dev/null || ! touch "${modcache}/.writable" 2>/dev/null; then
+          export GOMODCACHE=/go-cache/mod
+          echo "Prewarmed module cache is read-only, falling back to ${GOMODCACHE}"
+        else
+          rm -f "${modcache}/.writable"
+        fi
+
+        go mod download || exit 1
+
+        # The invocation itself belongs to the release-tests repo: its
+        # scripts/run-tests.sh maps the mode to a label filter and suite path and
+        # reads ARTIFACTS_DIR, GINKGO_TIMEOUT and GINKGO_PROCS from the environment.
+        # Its --ci option is not used: it passes --fail-on-focused, which the
+        # ginkgo CLI rejects. Colour is disabled through GINKGO_NO_COLOR instead.
+        run_args=("${MODE}" "--path=${TEST_PATH}")
+        if [[ "${PARALLEL}" == "true" ]]; then
+          run_args+=("--parallel")
+        fi
+        # run-tests.sh forwards everything after "--" to the test binary, which
+        # accepts the same flags as the CLI under the --ginkgo. prefix. A retried
+        # spec passes the suite but still shows up as Flaked in the summary below.
+        if [[ "${GINKGO_FLAKE_ATTEMPTS:-0}" =~ ^[0-9]+$ ]] && (( GINKGO_FLAKE_ATTEMPTS > 1 )); then
+          run_args+=("--" "--ginkgo.flake-attempts=${GINKGO_FLAKE_ATTEMPTS}")
+        fi
+
+        SECONDS=0
+        echo "==> $(date -u '+%H:%M:%S') scripts/run-tests.sh ${run_args[*]}"
+        ./scripts/run-tests.sh "${run_args[@]}"
+        rc=$?
+        echo "==> $(date -u '+%H:%M:%S') finished in ${SECONDS}s (exit ${rc})"
+
+        python3 - "${ARTIFACTS_DIR}" <<'PY'
+        import glob, os, sys, xml.etree.ElementTree as ET
+
+        reports = sorted(glob.glob(os.path.join(sys.argv[1], "*junit*.xml")))
+        if not reports:
+            print("No JUnit report produced.")
+            raise SystemExit(0)
+
+        print("=== JUnit summary ===")
+        for report in reports:
+            try:
+                root = ET.parse(report).getroot()
+            except ET.ParseError as err:
+                print(f"{os.path.basename(report)}: unparsable ({err})")
+                continue
+            suites = root.iter("testsuite") if root.tag == "testsuites" else [root]
+            for suite in suites:
+                failed, flaked = [], []
+                for case in suite.iter("testcase"):
+                    outcomes = list(case.findall("failure")) + list(case.findall("error"))
+                    failed.extend((case, outcome) for outcome in outcomes)
+                    # Ginkgo reports a spec that passed on a retry as passed; the
+                    # failed attempt only survives in the captured output.
+                    if not outcomes and "Failure recorded during attempt" in (case.findtext("system-err") or ""):
+                        flaked.append(case)
+                print(
+                    "{name}: tests={tests} failures={failures} errors={errors} skipped={skipped} flaked={flaked} time={time}s".format(
+                        name=suite.get("name", os.path.basename(report)),
+                        tests=suite.get("tests", "?"),
+                        failures=suite.get("failures", "?"),
+                        errors=suite.get("errors", "?"),
+                        skipped=suite.get("skipped", "?"),
+                        flaked=len(flaked),
+                        time=suite.get("time", "?"),
+                    )
+                )
+                for case, outcome in failed:
+                    print(f"  FAILED: {case.get('name')}")
+                    print(f"          {(outcome.get('message') or '').strip()[:500]}")
+                for case in flaked:
+                    print(f"  FLAKED: {case.get('name')}")
+        PY
+
+        exit $rc
