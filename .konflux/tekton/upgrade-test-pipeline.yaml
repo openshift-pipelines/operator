@@ -48,6 +48,13 @@ spec:
         default (2h); set a longer duration (e.g. 4h) so long-running suites
         such as auto-prune can finish within the cluster lifetime.
       default: "4h"
+    - name: OCP_RELEASE_STREAM
+      description: |
+        Which OpenShift release payload to provision: "auto" (default) probes the
+        stable upgrade graph for the target minor and falls back to the nightly
+        payload when no GA release exists yet (e.g. a pre-GA 4.23). Set to "stable"
+        or "nightly" to force a specific stream.
+      default: "auto"
 
   tasks:
     # ==========================================================================
@@ -73,22 +80,44 @@ spec:
       params:
         - name: componentName
           value: "$(tasks.parse-metadata.results.component-name)"
+        - name: releaseStream
+          value: "$(params.OCP_RELEASE_STREAM)"
       taskSpec:
         params:
           - name: componentName
             type: string
+          - name: releaseStream
+            type: string
+            default: "auto"
         results:
           - name: ocpVersion
             description: The OCP minor version extracted from component name (e.g. 4.20)
+          - name: releases
+            description: |
+              The ci-operator "releases" JSON for the provision task. Uses the stable
+              release payload for GA minors, or the nightly candidate payload for
+              pre-GA minors (no stable release yet).
         steps:
           - name: extract-version
             image: registry.access.redhat.com/ubi9/ubi-minimal:latest
             env:
               - name: COMPONENT_NAME
                 value: "$(params.componentName)"
+              - name: RELEASE_STREAM
+                value: "$(params.releaseStream)"
             script: |
               #!/usr/bin/env bash
               set -e
+
+              # Validate the release-stream override up front so a typo fails
+              # loudly instead of silently falling through to the stable payload.
+              case "$RELEASE_STREAM" in
+                auto|stable|nightly) ;;
+                *)
+                  echo "ERROR: invalid OCP_RELEASE_STREAM '$RELEASE_STREAM'; expected one of: auto, stable, nightly" >&2
+                  exit 1
+                  ;;
+              esac
 
               # Extract OCP minor version from COMPONENT_NAME
               # Expected format: operator-1-22-index-4-20 -> 4.20
@@ -105,6 +134,40 @@ spec:
               fi
 
               echo -n "$OCP_VERSION" | tee $(results.ocpVersion.path)
+              echo
+
+              # Decide which release payload to provision. A pre-GA minor (e.g. 4.23
+              # before it ships) has no release on the stable channel, so the
+              # ci-operator stable resolution returns an empty list and provisioning
+              # fails at input resolution. In that case provision the nightly payload.
+              stream="$RELEASE_STREAM"
+              if [ "$stream" = "auto" ]; then
+                graph="https://api.openshift.com/api/upgrades_info/graph?arch=multi&channel=stable-${OCP_VERSION}"
+                echo "Probing stable channel for ${OCP_VERSION}: $graph"
+                # Default to stable so a probe/network error preserves current behavior
+                # (GA minors keep working); only switch to nightly on a definitive
+                # empty release list.
+                stream="stable"
+                if resp=$(curl -fsS --connect-timeout 10 --max-time 30 "$graph" 2>/dev/null); then
+                  if echo "$resp" | grep -q '"nodes":\[\]'; then
+                    echo "No GA release found on stable-${OCP_VERSION}; using nightly payload."
+                    stream="nightly"
+                  else
+                    echo "Found GA releases on stable-${OCP_VERSION}; using stable payload."
+                  fi
+                else
+                  echo "WARN: could not probe the stable upgrade graph; defaulting to stable."
+                fi
+              fi
+
+              if [ "$stream" = "nightly" ]; then
+                releases="{\"latest\":{\"candidate\":{\"product\":\"ocp\",\"stream\":\"nightly\",\"version\":\"${OCP_VERSION}\",\"architecture\":\"multi\"}}}"
+              else
+                releases="{\"latest\":{\"release\":{\"channel\":\"stable\",\"version\":\"${OCP_VERSION}\",\"architecture\":\"multi\"}}}"
+              fi
+              echo "Selected release stream: $stream"
+              echo "releases: $releases"
+              printf '%s' "$releases" | tee $(results.releases.path)
 
     - name: provision-ephemeral-cluster
       runAfter:
@@ -128,7 +191,7 @@ spec:
         - name: clusterProfile
           value: aws-konflux-prod
         - name: releases
-          value: '{"latest":{"release":{"channel":"stable","version":"$(tasks.extract-ocp-version.results.ocpVersion)","architecture":"multi"}}}'
+          value: '$(tasks.extract-ocp-version.results.releases)'
         - name: env
           value: '{"COMPUTE_NODE_TYPE": "m5.2xlarge", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "CONTROL_PLANE_NODE_SELECTOR": "kubernetes.io/arch=amd64", "FIPS": "true", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines"}'
         - name: waitForTearDownTimeout
