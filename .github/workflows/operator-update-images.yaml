@@ -34,6 +34,13 @@ jobs:
       - name: Checkout the current repo
         uses: actions/checkout@v5
 
+      # upstream/go.mod can lag behind the vendored deps' Go requirement
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.x'
+          check-latest: true
+
       - name: update-bundle
         run: |
           # Operator SDK
