@@ -10,14 +10,12 @@ spec:
     catalog, creates upgrade-persistent resources, then upgrades the operator to the bundle
     built from this Konflux snapshot and verifies those resources survived the upgrade.
 
-    The upgrade source alternates by OCP minor parity purely to spread both upgrade types
-    across the OCP test matrix without running both for every version (a CI convenience, not
-    a product requirement): odd OCP minor exercises a z-stream upgrade from the same channel
-    pipelines-X.Y (previous patch -> current), even OCP minor exercises a minor upgrade from
-    the previous minor pipelines-X.(Y-1) (previous minor -> current). A z-stream source only
-    exists when this build is a patch release (version X.Y.Z with Z>=1); when the build is the
-    first of its minor (X.Y.0) there is no previous patch, so odd OCP falls back to the minor
-    upgrade too. Override with PRE_UPGRADE_CHANNEL.
+    The upgrade source alternates by OCP minor parity to spread both upgrade types across the
+    OCP matrix (a CI convenience, not a product requirement): odd OCP minor does a z-stream
+    upgrade from the same channel pipelines-X.Y, even OCP minor does a minor upgrade from
+    pipelines-X.(Y-1). The z-stream source is used only when pipelines-X.Y has a released head
+    on redhat-operators; otherwise odd OCP falls back to the minor upgrade. Override with
+    PRE_UPGRADE_CHANNEL.
   # ==========================================================================
   # Pipeline parameters
   # ==========================================================================
@@ -43,10 +41,8 @@ spec:
       default: https://github.com/openshift-pipelines/release-tests.git
     - description: |
         Override for the upgrade source channel (the "from" version), e.g. pipelines-1.23.
-        Leave empty to auto-derive from the OCP minor parity: odd OCP minor uses the same
-        target channel pipelines-X.Y (z-stream: previous patch -> current) when this build
-        is a patch release (X.Y.Z, Z>=1), else the previous minor; even OCP minor always
-        uses the previous minor pipelines-X.(Y-1) (minor upgrade).
+        Leave empty to auto-derive from OCP minor parity (odd = same channel z-stream when it
+        has a released head on redhat-operators, else previous minor; even = previous minor).
       name: PRE_UPGRADE_CHANNEL
       default: ""
     - name: WAIT_FOR_TEARDOWN_TIMEOUT
@@ -228,33 +224,32 @@ spec:
     # ==========================================================================
     # Phase 2 - Install the previous GA and create upgrade-persistent resources
     # ==========================================================================
-    # Parity is only a CI convenience to spread both upgrade types across the OCP
-    # matrix (not a product requirement):
-    #   Odd OCP minor  -> source = target channel pipelines-X.Y   (z-stream: previous patch),
-    #                     but only when this build is a patch release (X.Y.Z, Z>=1). A first
-    #                     build of a minor (X.Y.0) has no previous patch, so it falls back to
-    #                     the previous minor below.
-    #   Even OCP minor -> source = previous minor  pipelines-X.(Y-1) (minor upgrade).
-    # The target patch Z is read from this snapshot's catalog index image; PRE_UPGRADE_CHANNEL
-    # overrides the derived value. The even branch never touches the registry.
+    # Parity is a CI convenience to spread both upgrade types across the OCP matrix:
+    #   Odd OCP minor  -> same channel pipelines-X.Y (z-stream) when it has a released head on
+    #                     redhat-operators, else previous minor.
+    #   Even OCP minor -> previous minor pipelines-X.(Y-1).
+    # PRE_UPGRADE_CHANNEL overrides.
     - name: derive-channels
       runAfter:
         - provision-ephemeral-cluster
         - extract-ocp-version
+      params:
+        - name: CLUSTER_SECRET_REF
+          value: $(tasks.provision-ephemeral-cluster.results.secretRef)
       taskSpec:
+        params:
+          - name: CLUSTER_SECRET_REF
+            type: string
         results:
           - name: previousChannel
             type: string
           - name: releaseTestsBranch
             type: string
         volumes:
-          # Registry credentials for reading this snapshot's catalog index image. Optional:
-          # when absent (or the image is public) the render may fail and the odd branch
-          # safely falls back to a minor upgrade.
-          - name: registry-auth
+          # Guest cluster kubeconfig, for reading the redhat-operators packagemanifest.
+          - name: credentials
             secret:
-              secretName: quay-io-dockerconfig
-              optional: true
+              secretName: $(params.CLUSTER_SECRET_REF)
         stepTemplate:
           image: $(params.IMAGE)
           env:
@@ -264,11 +259,9 @@ spec:
               value: "$(tasks.extract-ocp-version.results.ocpVersion)"
             - name: PRE_UPGRADE_CHANNEL
               value: "$(params.PRE_UPGRADE_CHANNEL)"
-            - name: INDEX_IMAGE
-              value: "$(tasks.parse-metadata.results.component-container-image)"
           volumeMounts:
-            - name: registry-auth
-              mountPath: /tmp/registry-auth
+            - name: credentials
+              mountPath: /credentials
               readOnly: true
         steps:
           - name: select-release-tests-branch
@@ -286,6 +279,9 @@ spec:
               echo -n "$TESTS_BRANCH" | tee $(results.releaseTestsBranch.path)
 
           - name: resolve-source-channel
+            env:
+              - name: KUBECONFIG
+                value: "/tmp/kubeconfig"
             script: |
               #!/usr/bin/env bash
               set -euo pipefail
@@ -297,35 +293,29 @@ spec:
                 exit 0
               fi
 
-              # Read the target build's patch number (Z) from this snapshot's catalog index
-              # image (version string openshift-pipelines-operator-rh.vX.Y.Z). Echoes Z on
-              # success; returns non-zero when the version cannot be determined (missing
-              # tooling/credentials, public-image/auth issues, unexpected index layout), in
-              # which case the caller safely treats the build as a first-of-minor and uses a
-              # minor upgrade (a minor source always exists).
-              detect_target_patch() {
-                local idx="$INDEX_IMAGE"
-                [[ -n "$idx" && "$idx" != *example/repo* ]] || return 1
-                export DOCKER_CONFIG=/tmp/registry-auth
-                local versions=""
-                if command -v opm >/dev/null 2>&1; then
-                  versions=$(opm render "$idx" 2>/dev/null \
-                    | grep -oE 'openshift-pipelines-operator-rh\.v[0-9]+\.[0-9]+\.[0-9]+' || true)
-                fi
-                if [[ -z "$versions" ]]; then
-                  local dir; dir=$(mktemp -d)
-                  if oc image extract "$idx" --path /configs/:"$dir" --confirm \
-                       --registry-config="$DOCKER_CONFIG/config.json" >/dev/null 2>&1; then
-                    versions=$(grep -rhoE 'openshift-pipelines-operator-rh\.v[0-9]+\.[0-9]+\.[0-9]+' \
-                      "$dir" 2>/dev/null || true)
-                  fi
-                fi
-                [[ -n "$versions" ]] || return 1
-                # Highest semver = the target build packaged in this snapshot index.
-                local top
-                top=$(echo "$versions" | sed 's/.*\.v//' | sort -V | tail -1)
-                [[ "$top" =~ ^[0-9]+\.[0-9]+\.([0-9]+)$ ]] || return 1
-                echo "${BASH_REMATCH[1]}"
+              cp /credentials/kubeconfig /tmp/kubeconfig
+
+              # Is a channel exposed with a released head on the prod redhat-operators catalog
+              # (the catalog install-pre-upgrade installs from)? The packagemanifest populates
+              # shortly after provisioning, so poll until it is available.
+              #   0: present   1: catalog populated but channel absent   2: undetermined
+              redhat_operators_has_channel() {
+                local want="$1" channels=""
+                for i in $(seq 1 30); do
+                  channels=$(oc get packagemanifests -n openshift-marketplace \
+                    -l "catalog=redhat-operators" \
+                    --field-selector "metadata.name=openshift-pipelines-operator-rh" \
+                    -o jsonpath='{.items[0].status.channels[*].name}' 2>/dev/null || true)
+                  [[ -n "$channels" ]] && break
+                  echo "  waiting for redhat-operators packagemanifest (attempt $i)..." >&2
+                  sleep 10
+                done
+                echo "redhat-operators channels: ${channels:-<none>}" >&2
+                [[ -n "$channels" ]] || return 2
+                for c in $channels; do
+                  [[ "$c" == "$want" ]] && return 0
+                done
+                return 1
               }
 
               # Target (upgrade "to") channel derived from the operator release branch.
@@ -336,39 +326,23 @@ spec:
               fi
               echo "Release branch: $RELEASE_BRANCH -> target channel: $TARGET_CHANNEL"
 
-              # Previous channel is chosen by OCP minor parity purely to spread both upgrade
-              # types across the OCP test matrix (a CI convenience, not a product requirement):
-              # odd OCP minor upgrades from the previous patch of the SAME channel, even OCP
-              # minor upgrades from the previous minor. The odd (z-stream) path only applies
-              # when this build actually has a previous patch (target version X.Y.Z, Z>=1);
-              # a first-of-minor build (X.Y.0) has no previous patch and falls back to the
-              # minor upgrade. OLM installs the chosen channel's head (latest GA), which yields
-              # the previous patch (same channel) or the max z-stream of the previous minor.
               if [[ "$TARGET_CHANNEL" =~ ^pipelines-([0-9]+)\.([0-9]+)$ ]]; then
                 MAJOR="${BASH_REMATCH[1]}"
                 MINOR="${BASH_REMATCH[2]}"
                 PREV_MINOR_CHANNEL="pipelines-${MAJOR}.$((MINOR - 1))"
 
-                # OCP minor (the integer after the dot, e.g. 4.23 -> 23) decides parity.
                 OCP_MINOR=$(echo "$OCP_VERSION" | cut -d. -f2)
                 if ! [[ "$OCP_MINOR" =~ ^[0-9]+$ ]]; then
                   echo "ERROR: could not parse OCP minor from OCP_VERSION '$OCP_VERSION'." >&2
                   exit 1
                 fi
 
-                if (( OCP_MINOR % 2 == 1 )); then
-                  # Odd OCP -> z-stream upgrade, but only if a previous patch exists (Z>=1).
-                  if TARGET_PATCH=$(detect_target_patch) && (( TARGET_PATCH >= 1 )); then
-                    PREV="$TARGET_CHANNEL"
-                    echo "OCP $OCP_VERSION (minor $OCP_MINOR, odd), target patch Z=$TARGET_PATCH (>=1) -> z-stream upgrade; source channel $PREV (previous patch -> current)"
-                  else
-                    PREV="$PREV_MINOR_CHANNEL"
-                    echo "OCP $OCP_VERSION (minor $OCP_MINOR, odd) but target is a first-of-minor (X.Y.0) or version undetermined -> minor upgrade; source channel $PREV (previous minor -> current)"
-                  fi
+                if (( OCP_MINOR % 2 == 1 )) && redhat_operators_has_channel "$TARGET_CHANNEL"; then
+                  PREV="$TARGET_CHANNEL"
+                  echo "OCP $OCP_VERSION (minor $OCP_MINOR, odd); $TARGET_CHANNEL available -> z-stream upgrade; source $PREV"
                 else
-                  # Even OCP -> minor upgrade from pipelines-X.(Y-1).
                   PREV="$PREV_MINOR_CHANNEL"
-                  echo "OCP $OCP_VERSION (minor $OCP_MINOR, even) -> minor upgrade; source channel $PREV (previous minor -> current)"
+                  echo "OCP $OCP_VERSION (minor $OCP_MINOR) -> minor upgrade; source $PREV"
                 fi
                 echo -n "$PREV" | tee $(results.previousChannel.path)
               else
