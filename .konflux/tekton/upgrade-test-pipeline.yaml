@@ -12,9 +12,12 @@ spec:
 
     The upgrade source alternates by OCP minor parity purely to spread both upgrade types
     across the OCP test matrix without running both for every version (a CI convenience, not
-    a product requirement): odd OCP minor -> same channel pipelines-X.Y (previous patch ->
-    current, z-stream), even OCP minor -> previous minor pipelines-X.(Y-1) (previous minor ->
-    current). Override with PRE_UPGRADE_CHANNEL.
+    a product requirement): odd OCP minor exercises a z-stream upgrade from the same channel
+    pipelines-X.Y (previous patch -> current), even OCP minor exercises a minor upgrade from
+    the previous minor pipelines-X.(Y-1) (previous minor -> current). A z-stream source only
+    exists when this build is a patch release (version X.Y.Z with Z>=1); when the build is the
+    first of its minor (X.Y.0) there is no previous patch, so odd OCP falls back to the minor
+    upgrade too. Override with PRE_UPGRADE_CHANNEL.
   # ==========================================================================
   # Pipeline parameters
   # ==========================================================================
@@ -41,7 +44,8 @@ spec:
     - description: |
         Override for the upgrade source channel (the "from" version), e.g. pipelines-1.23.
         Leave empty to auto-derive from the OCP minor parity: odd OCP minor uses the same
-        target channel pipelines-X.Y (z-stream: previous patch -> current), even OCP minor
+        target channel pipelines-X.Y (z-stream: previous patch -> current) when this build
+        is a patch release (X.Y.Z, Z>=1), else the previous minor; even OCP minor always
         uses the previous minor pipelines-X.(Y-1) (minor upgrade).
       name: PRE_UPGRADE_CHANNEL
       default: ""
@@ -226,9 +230,13 @@ spec:
     # ==========================================================================
     # Parity is only a CI convenience to spread both upgrade types across the OCP
     # matrix (not a product requirement):
-    #   Odd OCP minor  -> source = target channel pipelines-X.Y   (z-stream: previous patch).
+    #   Odd OCP minor  -> source = target channel pipelines-X.Y   (z-stream: previous patch),
+    #                     but only when this build is a patch release (X.Y.Z, Z>=1). A first
+    #                     build of a minor (X.Y.0) has no previous patch, so it falls back to
+    #                     the previous minor below.
     #   Even OCP minor -> source = previous minor  pipelines-X.(Y-1) (minor upgrade).
-    # No cluster access needed; PRE_UPGRADE_CHANNEL overrides the derived value.
+    # The target patch Z is read from this snapshot's catalog index image; PRE_UPGRADE_CHANNEL
+    # overrides the derived value. The even branch never touches the registry.
     - name: derive-channels
       runAfter:
         - provision-ephemeral-cluster
@@ -239,6 +247,14 @@ spec:
             type: string
           - name: releaseTestsBranch
             type: string
+        volumes:
+          # Registry credentials for reading this snapshot's catalog index image. Optional:
+          # when absent (or the image is public) the render may fail and the odd branch
+          # safely falls back to a minor upgrade.
+          - name: registry-auth
+            secret:
+              secretName: quay-io-dockerconfig
+              optional: true
         stepTemplate:
           image: $(params.IMAGE)
           env:
@@ -248,6 +264,12 @@ spec:
               value: "$(tasks.extract-ocp-version.results.ocpVersion)"
             - name: PRE_UPGRADE_CHANNEL
               value: "$(params.PRE_UPGRADE_CHANNEL)"
+            - name: INDEX_IMAGE
+              value: "$(tasks.parse-metadata.results.component-container-image)"
+          volumeMounts:
+            - name: registry-auth
+              mountPath: /tmp/registry-auth
+              readOnly: true
         steps:
           - name: select-release-tests-branch
             script: |
@@ -275,6 +297,37 @@ spec:
                 exit 0
               fi
 
+              # Read the target build's patch number (Z) from this snapshot's catalog index
+              # image (version string openshift-pipelines-operator-rh.vX.Y.Z). Echoes Z on
+              # success; returns non-zero when the version cannot be determined (missing
+              # tooling/credentials, public-image/auth issues, unexpected index layout), in
+              # which case the caller safely treats the build as a first-of-minor and uses a
+              # minor upgrade (a minor source always exists).
+              detect_target_patch() {
+                local idx="$INDEX_IMAGE"
+                [[ -n "$idx" && "$idx" != *example/repo* ]] || return 1
+                export DOCKER_CONFIG=/tmp/registry-auth
+                local versions=""
+                if command -v opm >/dev/null 2>&1; then
+                  versions=$(opm render "$idx" 2>/dev/null \
+                    | grep -oE 'openshift-pipelines-operator-rh\.v[0-9]+\.[0-9]+\.[0-9]+' || true)
+                fi
+                if [[ -z "$versions" ]]; then
+                  local dir; dir=$(mktemp -d)
+                  if oc image extract "$idx" --path /configs/:"$dir" --confirm \
+                       --registry-config="$DOCKER_CONFIG/config.json" >/dev/null 2>&1; then
+                    versions=$(grep -rhoE 'openshift-pipelines-operator-rh\.v[0-9]+\.[0-9]+\.[0-9]+' \
+                      "$dir" 2>/dev/null || true)
+                  fi
+                fi
+                [[ -n "$versions" ]] || return 1
+                # Highest semver = the target build packaged in this snapshot index.
+                local top
+                top=$(echo "$versions" | sed 's/.*\.v//' | sort -V | tail -1)
+                [[ "$top" =~ ^[0-9]+\.[0-9]+\.([0-9]+)$ ]] || return 1
+                echo "${BASH_REMATCH[1]}"
+              }
+
               # Target (upgrade "to") channel derived from the operator release branch.
               if [[ "$RELEASE_BRANCH" == "next" || "$RELEASE_BRANCH" == "nightly" || "$RELEASE_BRANCH" == "main" ]]; then
                 TARGET_CHANNEL="latest"
@@ -283,15 +336,18 @@ spec:
               fi
               echo "Release branch: $RELEASE_BRANCH -> target channel: $TARGET_CHANNEL"
 
-              # Previous channel is chosen by OCP minor parity purely to spread both
-              # upgrade types across the OCP test matrix (a CI convenience, not a product
-              # requirement): odd OCP minor upgrades from the previous patch of the SAME
-              # channel, even OCP minor upgrades from the previous minor. OLM installs the
-              # chosen channel's head (latest GA), which yields the previous patch (same
-              # channel) or the max z-stream of the previous minor respectively.
+              # Previous channel is chosen by OCP minor parity purely to spread both upgrade
+              # types across the OCP test matrix (a CI convenience, not a product requirement):
+              # odd OCP minor upgrades from the previous patch of the SAME channel, even OCP
+              # minor upgrades from the previous minor. The odd (z-stream) path only applies
+              # when this build actually has a previous patch (target version X.Y.Z, Z>=1);
+              # a first-of-minor build (X.Y.0) has no previous patch and falls back to the
+              # minor upgrade. OLM installs the chosen channel's head (latest GA), which yields
+              # the previous patch (same channel) or the max z-stream of the previous minor.
               if [[ "$TARGET_CHANNEL" =~ ^pipelines-([0-9]+)\.([0-9]+)$ ]]; then
                 MAJOR="${BASH_REMATCH[1]}"
                 MINOR="${BASH_REMATCH[2]}"
+                PREV_MINOR_CHANNEL="pipelines-${MAJOR}.$((MINOR - 1))"
 
                 # OCP minor (the integer after the dot, e.g. 4.23 -> 23) decides parity.
                 OCP_MINOR=$(echo "$OCP_VERSION" | cut -d. -f2)
@@ -301,12 +357,17 @@ spec:
                 fi
 
                 if (( OCP_MINOR % 2 == 1 )); then
-                  # Odd OCP -> z-stream upgrade from the previous patch (same channel).
-                  PREV="$TARGET_CHANNEL"
-                  echo "OCP $OCP_VERSION (minor $OCP_MINOR, odd) -> z-stream upgrade; source channel $PREV (previous patch -> current)"
+                  # Odd OCP -> z-stream upgrade, but only if a previous patch exists (Z>=1).
+                  if TARGET_PATCH=$(detect_target_patch) && (( TARGET_PATCH >= 1 )); then
+                    PREV="$TARGET_CHANNEL"
+                    echo "OCP $OCP_VERSION (minor $OCP_MINOR, odd), target patch Z=$TARGET_PATCH (>=1) -> z-stream upgrade; source channel $PREV (previous patch -> current)"
+                  else
+                    PREV="$PREV_MINOR_CHANNEL"
+                    echo "OCP $OCP_VERSION (minor $OCP_MINOR, odd) but target is a first-of-minor (X.Y.0) or version undetermined -> minor upgrade; source channel $PREV (previous minor -> current)"
+                  fi
                 else
                   # Even OCP -> minor upgrade from pipelines-X.(Y-1).
-                  PREV="pipelines-${MAJOR}.$((MINOR - 1))"
+                  PREV="$PREV_MINOR_CHANNEL"
                   echo "OCP $OCP_VERSION (minor $OCP_MINOR, even) -> minor upgrade; source channel $PREV (previous minor -> current)"
                 fi
                 echo -n "$PREV" | tee $(results.previousChannel.path)
