@@ -10,8 +10,11 @@ spec:
     catalog, creates upgrade-persistent resources, then upgrades the operator to the bundle
     built from this Konflux snapshot and verifies those resources survived the upgrade.
 
-    The upgrade source is the previous minor of the target channel (pipelines-X.Y ->
-    pipelines-X.(Y-1)); override with PRE_UPGRADE_CHANNEL.
+    The upgrade source alternates by OCP minor parity purely to spread both upgrade types
+    across the OCP test matrix without running both for every version (a CI convenience, not
+    a product requirement): odd OCP minor -> same channel pipelines-X.Y (previous patch ->
+    current, z-stream), even OCP minor -> previous minor pipelines-X.(Y-1) (previous minor ->
+    current). Override with PRE_UPGRADE_CHANNEL.
   # ==========================================================================
   # Pipeline parameters
   # ==========================================================================
@@ -37,8 +40,9 @@ spec:
       default: https://github.com/openshift-pipelines/release-tests.git
     - description: |
         Override for the upgrade source channel (the "from" version), e.g. pipelines-1.23.
-        Leave empty to auto-derive the previous minor from the target channel
-        (pipelines-X.Y => pipelines-X.(Y-1)).
+        Leave empty to auto-derive from the OCP minor parity: odd OCP minor uses the same
+        target channel pipelines-X.Y (z-stream: previous patch -> current), even OCP minor
+        uses the previous minor pipelines-X.(Y-1) (minor upgrade).
       name: PRE_UPGRADE_CHANNEL
       default: ""
     - name: WAIT_FOR_TEARDOWN_TIMEOUT
@@ -216,15 +220,19 @@ spec:
         - name: IMAGE
           value: $(params.IMAGE)
 
-    # Resolve the upgrade source channel ("from" version): the previous minor of the target.
+    # Resolve the upgrade source channel ("from" version) from the OCP minor parity.
     # ==========================================================================
     # Phase 2 - Install the previous GA and create upgrade-persistent resources
     # ==========================================================================
-    # Target pipelines-X.Y  -> previous channel pipelines-X.(Y-1)  (minor upgrade).
+    # Parity is only a CI convenience to spread both upgrade types across the OCP
+    # matrix (not a product requirement):
+    #   Odd OCP minor  -> source = target channel pipelines-X.Y   (z-stream: previous patch).
+    #   Even OCP minor -> source = previous minor  pipelines-X.(Y-1) (minor upgrade).
     # No cluster access needed; PRE_UPGRADE_CHANNEL overrides the derived value.
     - name: derive-channels
       runAfter:
         - provision-ephemeral-cluster
+        - extract-ocp-version
       taskSpec:
         results:
           - name: previousChannel
@@ -236,6 +244,8 @@ spec:
           env:
             - name: RELEASE_BRANCH
               value: "$(tasks.parse-metadata.results.target-git-branch)"
+            - name: OCP_VERSION
+              value: "$(tasks.extract-ocp-version.results.ocpVersion)"
             - name: PRE_UPGRADE_CHANNEL
               value: "$(params.PRE_UPGRADE_CHANNEL)"
         steps:
@@ -273,12 +283,32 @@ spec:
               fi
               echo "Release branch: $RELEASE_BRANCH -> target channel: $TARGET_CHANNEL"
 
-              # Previous minor = pipelines-X.(Y-1).
+              # Previous channel is chosen by OCP minor parity purely to spread both
+              # upgrade types across the OCP test matrix (a CI convenience, not a product
+              # requirement): odd OCP minor upgrades from the previous patch of the SAME
+              # channel, even OCP minor upgrades from the previous minor. OLM installs the
+              # chosen channel's head (latest GA), which yields the previous patch (same
+              # channel) or the max z-stream of the previous minor respectively.
               if [[ "$TARGET_CHANNEL" =~ ^pipelines-([0-9]+)\.([0-9]+)$ ]]; then
                 MAJOR="${BASH_REMATCH[1]}"
                 MINOR="${BASH_REMATCH[2]}"
-                PREV="pipelines-${MAJOR}.$((MINOR - 1))"
-                echo "Derived previous channel from target $TARGET_CHANNEL -> $PREV"
+
+                # OCP minor (the integer after the dot, e.g. 4.23 -> 23) decides parity.
+                OCP_MINOR=$(echo "$OCP_VERSION" | cut -d. -f2)
+                if ! [[ "$OCP_MINOR" =~ ^[0-9]+$ ]]; then
+                  echo "ERROR: could not parse OCP minor from OCP_VERSION '$OCP_VERSION'." >&2
+                  exit 1
+                fi
+
+                if (( OCP_MINOR % 2 == 1 )); then
+                  # Odd OCP -> z-stream upgrade from the previous patch (same channel).
+                  PREV="$TARGET_CHANNEL"
+                  echo "OCP $OCP_VERSION (minor $OCP_MINOR, odd) -> z-stream upgrade; source channel $PREV (previous patch -> current)"
+                else
+                  # Even OCP -> minor upgrade from pipelines-X.(Y-1).
+                  PREV="pipelines-${MAJOR}.$((MINOR - 1))"
+                  echo "OCP $OCP_VERSION (minor $OCP_MINOR, even) -> minor upgrade; source channel $PREV (previous minor -> current)"
+                fi
                 echo -n "$PREV" | tee $(results.previousChannel.path)
               else
                 echo "ERROR: cannot derive a previous channel from target '$TARGET_CHANNEL'." >&2
