@@ -108,6 +108,8 @@ spec:
               (Graviton) instance for odd OCP minors, amd64 for even OCP minors.
           - name: clusterArch
             description: Target compute architecture for the hosted cluster workers (arm64 or amd64).
+          - name: fips
+            description: Whether the hosted cluster is provisioned in FIPS mode ("true" for OCP minors <= 20, otherwise "false").
         steps:
           - name: extract-version
             image: registry.access.redhat.com/ubi9/ubi-minimal:latest
@@ -163,9 +165,19 @@ spec:
               fi
               echo "Architecture decision: OCP ${OCP_VERSION} (minor ${OCP_MINOR}) -> arch=${CLUSTER_ARCH}, computeNodeType=${COMPUTE_NODE_TYPE}"
 
+              # Enable FIPS only for OCP 4.20 and older minors.
+              if [ "$OCP_MINOR" -le 20 ]; then
+                FIPS="true"
+              else
+                FIPS="false"
+              fi
+              echo "FIPS decision: OCP ${OCP_VERSION} (minor ${OCP_MINOR}) -> FIPS=${FIPS}"
+
               echo -n "$COMPUTE_NODE_TYPE" | tee $(results.computeNodeType.path)
               echo
               echo -n "$CLUSTER_ARCH" | tee $(results.clusterArch.path)
+              echo
+              echo -n "$FIPS" | tee $(results.fips.path)
               echo
 
               # Decide which release payload to provision. A pre-GA minor (e.g. 4.23
@@ -225,7 +237,7 @@ spec:
         - name: releases
           value: '$(tasks.extract-ocp-version.results.releases)'
         - name: env
-          value: '{"COMPUTE_NODE_TYPE": "$(tasks.extract-ocp-version.results.computeNodeType)", "HYPERSHIFT_NODE_ARCH": "$(tasks.extract-ocp-version.results.clusterArch)", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "CONTROL_PLANE_NODE_SELECTOR": "kubernetes.io/arch=$(tasks.extract-ocp-version.results.clusterArch)", "FIPS": "true", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines"}'
+          value: '{"COMPUTE_NODE_TYPE": "$(tasks.extract-ocp-version.results.computeNodeType)", "HYPERSHIFT_NODE_ARCH": "$(tasks.extract-ocp-version.results.clusterArch)", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "CONTROL_PLANE_NODE_SELECTOR": "kubernetes.io/arch=$(tasks.extract-ocp-version.results.clusterArch)", "FIPS": "$(tasks.extract-ocp-version.results.fips)", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines"}'
         - name: waitForTearDownTimeout
           value: "$(params.WAIT_FOR_TEARDOWN_TIMEOUT)"
 
