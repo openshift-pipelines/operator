@@ -59,6 +59,12 @@ spec:
         payload when no GA release exists yet (e.g. a pre-GA 4.23). Set to "stable"
         or "nightly" to force a specific stream.
       default: "auto"
+    - name: ARM_COMPUTE_NODE_TYPE
+      description: AWS instance type used for the hosted cluster's compute nodes when the OCP minor is odd (arm64).
+      default: "m6g.2xlarge"
+    - name: AMD64_COMPUTE_NODE_TYPE
+      description: AWS instance type used for the hosted cluster's compute nodes when the OCP minor is even (amd64).
+      default: "m5.2xlarge"
 
   tasks:
     # ==========================================================================
@@ -86,6 +92,10 @@ spec:
           value: "$(tasks.parse-metadata.results.component-name)"
         - name: releaseStream
           value: "$(params.OCP_RELEASE_STREAM)"
+        - name: armNodeType
+          value: "$(params.ARM_COMPUTE_NODE_TYPE)"
+        - name: amdNodeType
+          value: "$(params.AMD64_COMPUTE_NODE_TYPE)"
       taskSpec:
         params:
           - name: componentName
@@ -93,6 +103,12 @@ spec:
           - name: releaseStream
             type: string
             default: "auto"
+          - name: armNodeType
+            type: string
+            default: "m6g.2xlarge"
+          - name: amdNodeType
+            type: string
+            default: "m5.2xlarge"
         results:
           - name: ocpVersion
             description: The OCP minor version extracted from component name (e.g. 4.20)
@@ -101,6 +117,14 @@ spec:
               The ci-operator "releases" JSON for the provision task. Uses the stable
               release payload for GA minors, or the nightly candidate payload for
               pre-GA minors (no stable release yet).
+          - name: computeNodeType
+            description: |
+              AWS instance type for the hosted cluster's compute nodes. ARM
+              (Graviton) instance for odd OCP minors, amd64 for even OCP minors.
+          - name: clusterArch
+            description: Target compute architecture for the hosted cluster workers (arm64 or amd64).
+          - name: fips
+            description: Whether the hosted cluster is provisioned in FIPS mode ("true" for OCP minors <= 20, otherwise "false").
         steps:
           - name: extract-version
             image: registry.access.redhat.com/ubi9/ubi-minimal:latest
@@ -109,6 +133,10 @@ spec:
                 value: "$(params.componentName)"
               - name: RELEASE_STREAM
                 value: "$(params.releaseStream)"
+              - name: ARM_NODE_TYPE
+                value: "$(params.armNodeType)"
+              - name: AMD_NODE_TYPE
+                value: "$(params.amdNodeType)"
             script: |
               #!/usr/bin/env bash
               set -e
@@ -138,6 +166,33 @@ spec:
               fi
 
               echo -n "$OCP_VERSION" | tee $(results.ocpVersion.path)
+              echo
+
+              # Decide the hosted cluster's compute architecture from the OCP minor
+              # parity: odd minors run on arm64, even minors on amd64.
+              OCP_MINOR="${OCP_VERSION#*.}"
+              if [ $(( OCP_MINOR % 2 )) -eq 1 ]; then
+                COMPUTE_NODE_TYPE="$ARM_NODE_TYPE"
+                CLUSTER_ARCH="arm64"
+              else
+                COMPUTE_NODE_TYPE="$AMD_NODE_TYPE"
+                CLUSTER_ARCH="amd64"
+              fi
+              echo "Architecture decision: OCP ${OCP_VERSION} (minor ${OCP_MINOR}) -> arch=${CLUSTER_ARCH}, computeNodeType=${COMPUTE_NODE_TYPE}"
+
+              # Enable FIPS only for OCP 4.20 and older minors.
+              if [ "$OCP_MINOR" -le 20 ]; then
+                FIPS="true"
+              else
+                FIPS="false"
+              fi
+              echo "FIPS decision: OCP ${OCP_VERSION} (minor ${OCP_MINOR}) -> FIPS=${FIPS}"
+
+              echo -n "$COMPUTE_NODE_TYPE" | tee $(results.computeNodeType.path)
+              echo
+              echo -n "$CLUSTER_ARCH" | tee $(results.clusterArch.path)
+              echo
+              echo -n "$FIPS" | tee $(results.fips.path)
               echo
 
               # Decide which release payload to provision. A pre-GA minor (e.g. 4.23
@@ -197,7 +252,7 @@ spec:
         - name: releases
           value: '$(tasks.extract-ocp-version.results.releases)'
         - name: env
-          value: '{"COMPUTE_NODE_TYPE": "m5.2xlarge", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "CONTROL_PLANE_NODE_SELECTOR": "kubernetes.io/arch=amd64", "FIPS": "true", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines\n- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.stage.redhat.io/openshift-pipelines"}'
+          value: '{"COMPUTE_NODE_TYPE": "$(tasks.extract-ocp-version.results.computeNodeType)", "HYPERSHIFT_NODE_ARCH": "$(tasks.extract-ocp-version.results.clusterArch)", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "CONTROL_PLANE_NODE_SELECTOR": "kubernetes.io/arch=$(tasks.extract-ocp-version.results.clusterArch)", "FIPS": "$(tasks.extract-ocp-version.results.fips)", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines\n- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.stage.redhat.io/openshift-pipelines"}'
         - name: waitForTearDownTimeout
           value: "$(params.WAIT_FOR_TEARDOWN_TIMEOUT)"
 
