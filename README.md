@@ -56,14 +56,13 @@ provisioned per run:
   survived and re-runs the suites.
 
 Both pipelines read the **OCP minor version** encoded in the Konflux component name
-(e.g. `...-index-4-20` → OCP `4.20`) in their `extract-ocp-version` task. The **acceptance**
-pipeline uses it to select the compute architecture and FIPS mode (below); the **upgrade**
-pipeline uses it to select the upgrade source channel, and always provisions an amd64,
-FIPS-enabled cluster.
+(e.g. `...-index-4-20` → OCP `4.20`) in their `extract-ocp-version` task, and use it to
+select the compute architecture and FIPS mode (below). The **upgrade** pipeline additionally
+uses it to select the upgrade source channel.
 
-### Compute architecture by OCP minor parity (acceptance pipeline)
+### Compute architecture by OCP minor parity
 
-The **acceptance** pipeline chooses the hosted cluster's compute-node architecture by the
+Both pipelines choose the hosted cluster's compute-node architecture by the
 **parity** of the OCP minor:
 
 | OCP minor | Example        | Compute arch | Node type (default)    |
@@ -76,18 +75,14 @@ The HyperShift `CONTROL_PLANE_NODE_SELECTOR` is pinned to the same architecture
 runs on a management node of the worker architecture. This ensures `Legacy`-mode imagestream
 imports resolve to the worker's arch and avoids `exec format error` on arm64 workers.
 
-The **upgrade** pipeline always provisions amd64 (`m5.2xlarge`) compute nodes.
+### FIPS by OCP minor
 
-### FIPS by OCP minor (acceptance pipeline)
-
-The **acceptance** pipeline enables FIPS mode only for **OCP 4.20 and older** minors:
+Both pipelines enable FIPS mode only for **OCP 4.20 and older** minors:
 
 | OCP minor      | FIPS    |
 |----------------|---------|
 | **<= 4.20**    | `true`  |
 | **>= 4.21**    | `false` |
-
-The **upgrade** pipeline always provisions a FIPS-enabled cluster.
 
 ### Upgrade paths
 
@@ -121,7 +116,7 @@ in the Konflux configuration (external to this repository). Each ITS references 
 file in this repo through a Git resolver (`url`, `revision`, `pathInRepo`) and supplies the
 snapshot plus any parameter overrides. When onboarding a new OCP minor or release branch, add
 or update the corresponding ITS to point at the right `revision` and pipeline path; the
-per-run cluster shape — compute architecture and FIPS mode (acceptance pipeline) and upgrade
+per-run cluster shape — compute architecture and FIPS mode (both pipelines) and the upgrade
 source channel (upgrade pipeline) — is then derived automatically from the OCP minor as
 described above.
 
