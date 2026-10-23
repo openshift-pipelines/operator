@@ -37,17 +37,11 @@ spec:
         payload when no GA release exists yet (e.g. a pre-GA 4.23). Set to "stable"
         or "nightly" to force a specific stream.
       default: "auto"
-    - name: ARM_OCP_VERSIONS
-      description: |
-        Space-separated list of OCP minor versions whose ephemeral cluster should
-        be provisioned with ARM (AWS Graviton) compute nodes instead of amd64. Any
-        minor not in this list gets amd64 compute nodes. Defaults to "4.18 4.20".
-      default: "4.18 4.20"
     - name: ARM_COMPUTE_NODE_TYPE
-      description: AWS instance type used for the hosted cluster's compute nodes when the OCP minor is in ARM_OCP_VERSIONS.
+      description: AWS instance type used for the hosted cluster's compute nodes when the OCP minor is odd (arm64).
       default: "m6g.2xlarge"
     - name: AMD64_COMPUTE_NODE_TYPE
-      description: AWS instance type used for the hosted cluster's compute nodes for all other OCP minors.
+      description: AWS instance type used for the hosted cluster's compute nodes when the OCP minor is even (amd64).
       default: "m5.2xlarge"
     - name: WAIT_FOR_TEARDOWN_TIMEOUT
       description: |
@@ -83,8 +77,6 @@ spec:
           value: "$(tasks.parse-metadata.results.component-name)"
         - name: releaseStream
           value: "$(params.OCP_RELEASE_STREAM)"
-        - name: armVersions
-          value: "$(params.ARM_OCP_VERSIONS)"
         - name: armNodeType
           value: "$(params.ARM_COMPUTE_NODE_TYPE)"
         - name: amdNodeType
@@ -96,9 +88,6 @@ spec:
           - name: releaseStream
             type: string
             default: "auto"
-          - name: armVersions
-            type: string
-            default: "4.18 4.20"
           - name: armNodeType
             type: string
             default: "m6g.2xlarge"
@@ -116,7 +105,7 @@ spec:
           - name: computeNodeType
             description: |
               AWS instance type for the hosted cluster's compute nodes. ARM
-              (Graviton) instance for minors in armVersions, otherwise amd64.
+              (Graviton) instance for odd OCP minors, amd64 for even OCP minors.
           - name: clusterArch
             description: Target compute architecture for the hosted cluster workers (arm64 or amd64).
         steps:
@@ -127,8 +116,6 @@ spec:
                 value: "$(params.componentName)"
               - name: RELEASE_STREAM
                 value: "$(params.releaseStream)"
-              - name: ARM_VERSIONS
-                value: "$(params.armVersions)"
               - name: ARM_NODE_TYPE
                 value: "$(params.armNodeType)"
               - name: AMD_NODE_TYPE
@@ -164,18 +151,17 @@ spec:
               echo -n "$OCP_VERSION" | tee $(results.ocpVersion.path)
               echo
 
-              # Decide the hosted cluster's compute architecture from the OCP minor.
-              # so their tests run on arm64; everything else stays amd64.
-              COMPUTE_NODE_TYPE="$AMD_NODE_TYPE"
-              CLUSTER_ARCH="amd64"
-              for v in $ARM_VERSIONS; do
-                if [ "$v" = "$OCP_VERSION" ]; then
-                  COMPUTE_NODE_TYPE="$ARM_NODE_TYPE"
-                  CLUSTER_ARCH="arm64"
-                  break
-                fi
-              done
-              echo "Architecture decision: OCP ${OCP_VERSION} -> arch=${CLUSTER_ARCH}, computeNodeType=${COMPUTE_NODE_TYPE} (ARM minors: ${ARM_VERSIONS})"
+              # Decide the hosted cluster's compute architecture from the OCP minor
+              # parity: odd minors run on arm64, even minors on amd64.
+              OCP_MINOR="${OCP_VERSION#*.}"
+              if [ $(( OCP_MINOR % 2 )) -eq 1 ]; then
+                COMPUTE_NODE_TYPE="$ARM_NODE_TYPE"
+                CLUSTER_ARCH="arm64"
+              else
+                COMPUTE_NODE_TYPE="$AMD_NODE_TYPE"
+                CLUSTER_ARCH="amd64"
+              fi
+              echo "Architecture decision: OCP ${OCP_VERSION} (minor ${OCP_MINOR}) -> arch=${CLUSTER_ARCH}, computeNodeType=${COMPUTE_NODE_TYPE}"
 
               echo -n "$COMPUTE_NODE_TYPE" | tee $(results.computeNodeType.path)
               echo
