@@ -239,7 +239,7 @@ spec:
         - name: releases
           value: '$(tasks.extract-ocp-version.results.releases)'
         - name: env
-          value: '{"COMPUTE_NODE_TYPE": "$(tasks.extract-ocp-version.results.computeNodeType)", "HYPERSHIFT_NODE_ARCH": "$(tasks.extract-ocp-version.results.clusterArch)", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "CONTROL_PLANE_NODE_SELECTOR": "kubernetes.io/arch=amd64", "FIPS": "true", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines"}'
+          value: '{"COMPUTE_NODE_TYPE": "$(tasks.extract-ocp-version.results.computeNodeType)", "HYPERSHIFT_NODE_ARCH": "$(tasks.extract-ocp-version.results.clusterArch)", "HYPERSHIFT_NODE_COUNT": "3", "HOSTED_MANAGEMENT_CLUSTER": "hosted-mgmt2", "CONTROL_PLANE_NODE_SELECTOR": "kubernetes.io/arch=$(tasks.extract-ocp-version.results.clusterArch)", "FIPS": "true", "IMAGE_CONTENT_SOURCES": "- mirrors:\n  - quay.io/openshift-pipeline\n  source: registry.redhat.io/openshift-pipelines"}'
         - name: waitForTearDownTimeout
           value: "$(params.WAIT_FOR_TEARDOWN_TIMEOUT)"
 
