@@ -337,12 +337,27 @@ spec:
                   exit 1
                 fi
 
-                if (( OCP_MINOR % 2 == 1 )) && redhat_operators_has_channel "$TARGET_CHANNEL"; then
-                  PREV="$TARGET_CHANNEL"
-                  echo "OCP $OCP_VERSION (minor $OCP_MINOR, odd); $TARGET_CHANNEL available -> z-stream upgrade; source $PREV"
+                if (( OCP_MINOR % 2 == 1 )); then
+                  rc=0
+                  redhat_operators_has_channel "$TARGET_CHANNEL" || rc=$?
+                  case "$rc" in
+                    0)
+                      PREV="$TARGET_CHANNEL"
+                      echo "OCP $OCP_VERSION (minor $OCP_MINOR, odd); $TARGET_CHANNEL available -> z-stream upgrade; source $PREV"
+                      ;;
+                    1)
+                      PREV="$PREV_MINOR_CHANNEL"
+                      echo "OCP $OCP_VERSION (minor $OCP_MINOR, odd); $TARGET_CHANNEL not yet released -> minor upgrade; source $PREV"
+                      ;;
+                    *)
+                      echo "ERROR: redhat-operators catalog did not confirm its channels within the timeout; cannot determine the upgrade source." >&2
+                      echo "Re-run the pipeline, or set PRE_UPGRADE_CHANNEL explicitly (e.g. pipelines-1.23)." >&2
+                      exit 1
+                      ;;
+                  esac
                 else
                   PREV="$PREV_MINOR_CHANNEL"
-                  echo "OCP $OCP_VERSION (minor $OCP_MINOR) -> minor upgrade; source $PREV"
+                  echo "OCP $OCP_VERSION (minor $OCP_MINOR, even) -> minor upgrade; source $PREV"
                 fi
                 echo -n "$PREV" | tee $(results.previousChannel.path)
               else
