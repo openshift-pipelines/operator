@@ -901,12 +901,12 @@ spec:
         - name: CHANNEL
           value: "$(tasks.create-catalog-source.results.channel)"
 
-    # Triggers uses the shared, version-matched release-tests branch
-    # (GIT_RELEASE_TESTS_BRANCH: release-v1.24 for 1.24.x OSP, main for
-    # nightly/next). Both branches carry the EventListener TLS CN-length fix
-    # (#105) but write TLS certs to a shared path (the per-process cert dirs
-    # from the unmerged #100 are not merged there), so this suite runs serial
-    # (PARALLEL=false) to avoid the concurrent cert-clobbering race.
+    # Triggers runs the shared, version-matched release-tests branch. Its
+    # EventListener specs regenerate route TLS certs into a shared checkout path
+    # (testdata/triggers/certs/), which parallel Ginkgo processes would clobber,
+    # so the suite runs serial (PARALLEL=false) -- as QE does, running this suite
+    # single-process. The admin-only TLS specs are split into
+    # release-tests-triggers-tls.
     - name: release-tests-triggers
       onError: continue
       runAfter:
