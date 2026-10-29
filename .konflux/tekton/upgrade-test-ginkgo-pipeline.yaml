@@ -57,12 +57,6 @@ spec:
       type: string
       description: Ginkgo release-tests repository.
       default: https://github.com/openshift-pipelines/release-tests-ginkgo.git
-    - name: GIT_RELEASE_TESTS_BRANCH
-      type: string
-      # Version-matched to the OSP build under test: release-v1.24 for 1.24.x
-      # GA/z-stream, main for nightly/next. Overridden per-run by the
-      # IntegrationTestScenario; defaults to main for nightly.
-      default: main
     - name: LABEL_FILTER
       type: string
       description: Base Ginkgo label filter applied to every component suite.
@@ -430,6 +424,8 @@ spec:
         results:
           - name: previousChannel
             type: string
+          - name: releaseTestsBranch
+            type: string
         volumes:
           # Guest cluster kubeconfig, for reading the redhat-operators packagemanifest.
           - name: credentials
@@ -533,6 +529,25 @@ spec:
                 exit 1
               fi
 
+          - name: select-release-tests-branch
+            image: $(params.IMAGE)
+            env:
+              - name: RELEASE_BRANCH
+                value: "$(params.releaseBranch)"
+            script: |
+              #!/usr/bin/env bash
+              set -x
+              # Version-match the release-tests-ginkgo branch to the OSP build
+              # under test: nightly/next/main run from the repo's main branch,
+              # release-vX.Y.x GA/z-stream runs from the matching release-vX.Y.
+              if [[ "$RELEASE_BRANCH" == "next" || "$RELEASE_BRANCH" == "nightly" || "$RELEASE_BRANCH" == "main" ]]; then
+                TESTS_BRANCH="main"
+              else
+                TESTS_BRANCH=$(echo "$RELEASE_BRANCH" | sed -E 's/release-v([0-9]+\.[0-9]+)\.x/release-v\1/')
+              fi
+              echo "Target branch: $RELEASE_BRANCH -> Release tests branch: $TESTS_BRANCH"
+              echo -n "$TESTS_BRANCH" | tee $(results.releaseTestsBranch.path)
+
     # Install the previously released operator from the prod redhat-operators
     # catalog on the derived previous channel. Serial on purpose: the install spec
     # is a single Ordered container. Retries:2 mirrors the e2e pipeline because OLM
@@ -560,7 +575,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "install"
         - name: PARALLEL
@@ -599,7 +614,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "pre-upgrade && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: RUN_AS
@@ -749,7 +764,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "upgrade"
         - name: PARALLEL
@@ -792,7 +807,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "post-upgrade && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: RUN_AS
@@ -866,7 +881,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: RUN_AS
@@ -917,7 +932,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         # The TLS EventListener specs label the namespace
         # (operator.tekton.dev/enable-annotation), which patches the
         # cluster-scoped namespace object and needs cluster-admin a
@@ -969,7 +984,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && tls && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: RUN_AS
@@ -1013,7 +1028,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: RUN_AS
@@ -1059,7 +1074,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: RUN_AS
@@ -1103,7 +1118,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: RUN_AS
@@ -1149,7 +1164,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: RUN_AS
@@ -1193,7 +1208,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: RUN_AS
@@ -1240,7 +1255,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: RUN_AS
@@ -1286,7 +1301,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: RUN_AS
@@ -1328,7 +1343,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion)"
         - name: RUN_AS
@@ -1387,7 +1402,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && rbac && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
         - name: RUN_AS
@@ -1438,7 +1453,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && addon && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
         - name: RUN_AS
@@ -1489,7 +1504,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && tekton-pruner && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
         - name: RUN_AS
@@ -1534,7 +1549,7 @@ spec:
         - name: GIT_RELEASE_TESTS_URI
           value: $(params.GIT_RELEASE_TESTS_URI)
         - name: GIT_RELEASE_TESTS_BRANCH
-          value: $(params.GIT_RELEASE_TESTS_BRANCH)
+          value: $(tasks.derive-channels.results.releaseTestsBranch)
         - name: MODE
           value: "($(params.LABEL_FILTER)) && auto-prune && !to-do && !skip-$(tasks.extract-ocp-version.results.ocpVersion) && !pre-upgrade && !post-upgrade"
         - name: TEST_PATH
