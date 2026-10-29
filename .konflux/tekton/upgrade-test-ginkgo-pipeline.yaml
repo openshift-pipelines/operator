@@ -49,9 +49,9 @@ spec:
       default: https://github.com/openshift-pipelines/operator
     - name: RELEASE_TEST_TASKS_BRANCH
       type: string
-      # Branch the Tekton task definitions (task-ginkgo-e2e,
-      # task-setup-testing-accounts) are resolved from. Overridden per-run by the
-      # IntegrationTestScenario.
+      # Operator-repo branch the release-test Tekton task definitions
+      # (task-ginkgo-e2e, task-configure-loki-logging,
+      # task-setup-testing-accounts) are resolved from.
       default: ginkgo-upgrade-tests
     - name: GIT_RELEASE_TESTS_URI
       type: string
@@ -905,7 +905,7 @@ spec:
     # (GIT_RELEASE_TESTS_BRANCH: release-v1.24 for 1.24.x OSP, main for
     # nightly/next). Both branches carry the EventListener TLS CN-length fix
     # (#105) but write TLS certs to a shared path (the per-process cert dirs
-    # from the still-open #100 are not merged there), so this suite runs serial
+    # from the unmerged #100 are not merged there), so this suite runs serial
     # (PARALLEL=false) to avoid the concurrent cert-clobbering race.
     - name: release-tests-triggers
       onError: continue
