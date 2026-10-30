@@ -16,7 +16,7 @@ fetch-payload: ## Update tektoncd operator payloads and bundle manifests
 	@./hack/operator-fetch-payload.sh
 
 update-reference: ## Update references in the generate clusterserviceversion.yaml
-	@./hack/operator-update-images.sh ${ENVIRONMENT}
+	@./hack/operator-update-images.sh
 
 # update/version/update-payload:
 # 	@./hack/update-version.sh
