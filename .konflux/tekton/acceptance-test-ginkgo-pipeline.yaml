@@ -82,6 +82,23 @@ spec:
         default (2h); set a longer duration (e.g. 4h) so long-running suites
         such as auto-prune can finish within the cluster lifetime.
       default: "4h"
+    - name: CLUSTER_ARCH_OVERRIDE
+      type: string
+      description: |
+        Force the hosted cluster's compute architecture ("amd64" or "arm64"),
+        bypassing the OCP-minor parity rule. Empty (default) keeps the derived
+        value, so 4.x behavior is untouched. Set by the OCP 5.0 arm64 ITS to run
+        a second cluster shape (arm64) from the same snapshot; the compute node
+        type follows the resulting arch.
+      default: ""
+    - name: FIPS_OVERRIDE
+      type: string
+      description: |
+        Force the hosted cluster's FIPS mode ("true" or "false"), bypassing the
+        FIPS-by-minor rule (minor <= 20 => true). Empty (default) keeps the
+        derived value, so 4.x behavior is untouched. Set by the OCP 5.0 arm64 ITS
+        (FIPS_OVERRIDE=false) for the non-FIPS second shape.
+      default: ""
 
   tasks:
     - name: parse-metadata
@@ -110,6 +127,10 @@ spec:
           value: "$(params.ARM_COMPUTE_NODE_TYPE)"
         - name: amdNodeType
           value: "$(params.AMD64_COMPUTE_NODE_TYPE)"
+        - name: clusterArchOverride
+          value: "$(params.CLUSTER_ARCH_OVERRIDE)"
+        - name: fipsOverride
+          value: "$(params.FIPS_OVERRIDE)"
       taskSpec:
         params:
           - name: componentName
@@ -123,6 +144,12 @@ spec:
           - name: amdNodeType
             type: string
             default: "m5.2xlarge"
+          - name: clusterArchOverride
+            type: string
+            default: ""
+          - name: fipsOverride
+            type: string
+            default: ""
         results:
           - name: ocpVersion
             description: The OCP minor version extracted from component name (e.g. 4.20)
@@ -151,6 +178,10 @@ spec:
                 value: "$(params.armNodeType)"
               - name: AMD_NODE_TYPE
                 value: "$(params.amdNodeType)"
+              - name: CLUSTER_ARCH_OVERRIDE
+                value: "$(params.clusterArchOverride)"
+              - name: FIPS_OVERRIDE
+                value: "$(params.fipsOverride)"
             script: |
               #!/usr/bin/env bash
               set -e
@@ -186,11 +217,33 @@ spec:
               # parity: odd minors run on arm64, even minors on amd64.
               OCP_MINOR="${OCP_VERSION#*.}"
               if [ $(( OCP_MINOR % 2 )) -eq 1 ]; then
-                COMPUTE_NODE_TYPE="$ARM_NODE_TYPE"
                 CLUSTER_ARCH="arm64"
               else
-                COMPUTE_NODE_TYPE="$AMD_NODE_TYPE"
                 CLUSTER_ARCH="amd64"
+              fi
+
+              # Arch override: an empty value keeps the parity-derived arch, so 4.x
+              # ITS (which set no override) are untouched. The OCP 5.0 arm64 ITS sets
+              # CLUSTER_ARCH_OVERRIDE=arm64 to run the second cluster shape.
+              if [ -n "$CLUSTER_ARCH_OVERRIDE" ]; then
+                case "$CLUSTER_ARCH_OVERRIDE" in
+                  amd64|arm64)
+                    echo "Arch override: ${CLUSTER_ARCH} -> ${CLUSTER_ARCH_OVERRIDE}"
+                    CLUSTER_ARCH="$CLUSTER_ARCH_OVERRIDE"
+                    ;;
+                  *)
+                    echo "ERROR: invalid CLUSTER_ARCH_OVERRIDE '$CLUSTER_ARCH_OVERRIDE'; expected one of: amd64, arm64" >&2
+                    exit 1
+                    ;;
+                esac
+              fi
+
+              # Pick the compute node type from the final arch so an overridden arch
+              # still lands on a matching instance family.
+              if [ "$CLUSTER_ARCH" = "arm64" ]; then
+                COMPUTE_NODE_TYPE="$ARM_NODE_TYPE"
+              else
+                COMPUTE_NODE_TYPE="$AMD_NODE_TYPE"
               fi
               echo "Architecture decision: OCP ${OCP_VERSION} (minor ${OCP_MINOR}) -> arch=${CLUSTER_ARCH}, computeNodeType=${COMPUTE_NODE_TYPE}"
 
@@ -199,6 +252,22 @@ spec:
                 FIPS="true"
               else
                 FIPS="false"
+              fi
+
+              # FIPS override: an empty value keeps the minor-derived FIPS, so 4.x
+              # ITS are untouched. The OCP 5.0 arm64 ITS sets FIPS_OVERRIDE=false for
+              # the non-FIPS second shape.
+              if [ -n "$FIPS_OVERRIDE" ]; then
+                case "$FIPS_OVERRIDE" in
+                  true|false)
+                    echo "FIPS override: ${FIPS} -> ${FIPS_OVERRIDE}"
+                    FIPS="$FIPS_OVERRIDE"
+                    ;;
+                  *)
+                    echo "ERROR: invalid FIPS_OVERRIDE '$FIPS_OVERRIDE'; expected one of: true, false" >&2
+                    exit 1
+                    ;;
+                esac
               fi
               echo "FIPS decision: OCP ${OCP_VERSION} (minor ${OCP_MINOR}) -> FIPS=${FIPS}"
 
