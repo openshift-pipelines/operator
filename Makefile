@@ -2,7 +2,7 @@ DATE         ?= $(shell date +%FT%T%z)
 REMOTE        = 127.0.0.1
 TAG           = latest
 RUNTIME       = docker
-ENVIRONMENT="devel"
+ENVIRONMENT=""
 OPM_VERSION=v1.47.0
 
 BIN_DIR := $(CURDIR)/.bin
@@ -28,7 +28,7 @@ fetch-payload: ## Update tektoncd operator payloads and bundle manifests
 	@./hack/operator-fetch-payload.sh
 
 update-reference: olm## Update references in the generate clusterserviceversion.yaml
-	@./hack/operator-update-images.sh
+	@./hack/operator-update-images.sh ${ENVIRONMENT}
 
 .PHONY: olm
 olm:
