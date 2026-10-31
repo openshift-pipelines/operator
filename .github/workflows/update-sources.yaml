@@ -68,25 +68,6 @@ jobs:
             sed -i "s/go 1.27.0/go 1.26.10/g" vendor/modules.txt
 
           popd
-      - name: update-rpms
-        continue-on-error: true
-        run: |
-          set -x
-          export BASE_IMAGE=$(grep -h "_RUNTIME=" .konflux/dockerfiles/* | sed -E 's/.*_RUNTIME=["'\'']?([^"'\'' ]+).*/\1/' | head -n 1)
-          docker run --rm\
-            -e BASE_IMAGE=$BASE_IMAGE \
-            -v ./.konflux/rpms/:/rpms -w /rpms $BASE_IMAGE  sh -c "
-              cp -f /etc/yum.repos.d/*.repo ./
-              sed -i 's/^\[ubi-8-/\[ubi-8-for-\$basearch-/' *.repo
-              sed -i 's/^\[ubi-9-/\[ubi-9-for-\$basearch-/' *.repo
-          "
-          docker run  --rm\
-            -e BASE_IMAGE=$BASE_IMAGE \
-            -v ./.konflux/rpms/:/rpms -w /rpms registry.access.redhat.com/ubi9/ubi-minimal:latest sh -c "
-          	  microdnf update -y	 &&   microdnf install -y python3-dnf skopeo pip
-              python3 -m pip install https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.21.0.tar.gz
-              rpm-lockfile-prototype --image $BASE_IMAGE rpms.in.yaml
-            "
       - name: Commit new changes
         run: |          
         
