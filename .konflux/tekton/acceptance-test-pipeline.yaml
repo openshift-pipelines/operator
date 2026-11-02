@@ -50,6 +50,10 @@ spec:
         default (2h); set a longer duration (e.g. 4h) so long-running suites
         such as auto-prune can finish within the cluster lifetime.
       default: "4h"
+    - name: SEND_SLACK_NOTIFICATION
+      type: string
+      description: Post pipeline status to Slack (requires coreos-tektondev-webhook secret)
+      default: "true"
 
   tasks:
     # ==========================================================================
@@ -1056,3 +1060,29 @@ spec:
 
               echo ""
               echo "✅ All tasks succeeded!"
+
+    # Collect logs from all TaskRuns, upload to GCS, and notify Slack
+    - name: collect-logs-notify-slack
+      onError: continue
+      timeout: 10m
+      params:
+        - name: IMAGE
+          value: $(params.IMAGE)
+        - name: SEND_SLACK_NOTIFICATION
+          value: $(params.SEND_SLACK_NOTIFICATION)
+        - name: AGGREGATE_TASKS_STATUS
+          value: "$(tasks.status)"
+        - name: PIPELINE_RUN_NAME
+          value: $(context.pipelineRun.name)
+        - name: MESSAGE_TEMPLATE
+          value: |
+            <icon> operator acceptance tests <pr_name> *<run_status>* <icon> <<logs_url>|logs>
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: $(params.RELEASE_TEST_TASKS_REPO)
+          - name: revision
+            value: $(params.RELEASE_TEST_TASKS_BRANCH)
+          - name: pathInRepo
+            value: .konflux/tekton/task-collect-logs-notify-slack.yaml
