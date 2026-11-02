@@ -229,6 +229,11 @@ spec:
     params:
     - name: IMAGE
       value: $(params.output-image)
+    # Force Docker V2 manifests (mediaType) instead of the task default of OCI.
+    # Required so relatedImages pass the validate-fbc media-type check for FBC
+    # fragments targeting OCP <= 4.20, which does not support OCI media types.
+    - name: BUILDAH_FORMAT
+      value: docker
     - name: DOCKERFILE
       value: $(params.dockerfile)
     - name: CONTEXT
