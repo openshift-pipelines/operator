@@ -1,0 +1,343 @@
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: collect-logs-notify-slack
+spec:
+  description: |
+    Collects logs from all TaskRuns in the current PipelineRun, uploads them to GCS,
+    generates an index.html with links to the logs, and posts a notification to Slack.
+
+    This task is designed for pipelines that don't use persistent workspaces.
+    It extracts logs directly from Tekton TaskRuns via `oc logs` and uploads them to GCS.
+  params:
+    - name: IMAGE
+      description: CI image
+      default: quay.io/openshift-pipeline/ci:latest
+      type: string
+    - name: SEND_SLACK_NOTIFICATION
+      description: Whether to send Slack notification (requires coreos-tektondev-webhook secret)
+      default: "true"
+      type: string
+    - name: AGGREGATE_TASKS_STATUS
+      description: "Tekton $(tasks.status) — aggregate status of all pipeline tasks"
+      default: ""
+      type: string
+    - name: MESSAGE_TEMPLATE
+      description: Slack message template with placeholders <icon>, <run_status>, <logs_url>, <pr_name>
+      default: "<icon> operator acceptance tests <pr_name> *<run_status>* <icon> <<logs_url>|logs>"
+      type: string
+    - name: PIPELINE_RUN_NAME
+      description: "PipelineRun name (passed from pipeline via $(context.pipelineRun.name))"
+      default: ""
+      type: string
+  results:
+    - name: artifacts-url
+      description: Public URL to the artifacts index.html (clickable, no auth required)
+  steps:
+    - name: collect-upload-notify
+      image: $(params.IMAGE)
+      env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /gcs/sa-key.json
+        - name: GCS_BUCKET
+          valueFrom:
+            secretKeyRef:
+              name: gcs-artifacts
+              key: bucket
+        - name: GCS_PROJECT
+          valueFrom:
+            secretKeyRef:
+              name: gcs-artifacts
+              key: project
+              optional: true
+        - name: SLACK_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: coreos-tektondev-webhook
+              key: slack_webhook_url
+              optional: true
+      volumeMounts:
+        - name: gcs-creds
+          mountPath: /gcs
+          readOnly: true
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        # Get PipelineRun name from pipeline context parameter
+        PIPELINE_RUN="$(params.PIPELINE_RUN_NAME)"
+
+        if [[ -z "$PIPELINE_RUN" ]]; then
+          echo "ERROR: Could not determine PipelineRun name"
+          printf "(error)" > "$(results.artifacts-url.path)"
+          exit 1
+        fi
+
+        AGGREGATE_STATUS="$(params.AGGREGATE_TASKS_STATUS)"
+        SEND_SLACK="$(params.SEND_SLACK_NOTIFICATION)"
+        TEMP_DIR="/tmp/logs"
+        mkdir -p "$TEMP_DIR"
+
+        UPLOAD_PREFIX="CI/${PIPELINE_RUN}"
+        ARTIFACTS_URL="https://storage.googleapis.com/${GCS_BUCKET}/${UPLOAD_PREFIX}/index.html"
+
+        echo "=========================================="
+        echo "Collecting logs from PipelineRun: $PIPELINE_RUN"
+        echo "=========================================="
+
+        # Get all TaskRuns from this PipelineRun using label selector (survives name hashing)
+        # Then filter by pipelineTask label to exclude infrastructure and collection tasks
+        all_taskruns=$(oc get taskrun -l tekton.dev/pipelineRun="$PIPELINE_RUN" \
+          -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || echo "")
+
+        if [[ -z "$all_taskruns" ]]; then
+          echo "No TaskRuns found in PipelineRun"
+          printf "(none)" > "$(results.artifacts-url.path)"
+          exit 0
+        fi
+
+        # Build the list of TaskRuns to collect logs from by filtering the pipelineTask label
+        taskruns=""
+        while IFS= read -r tr; do
+          [[ -z "$tr" ]] && continue
+          task_name=$(oc get taskrun "$tr" -o jsonpath='{.metadata.labels.tekton\.dev/pipelineTask}' 2>/dev/null || echo "")
+          # Include test and upgrade tasks; skip infrastructure/collection tasks
+          if [[ ! "$task_name" =~ ^(parse-metadata|extract-ocp-version|provision-ephemeral-cluster|configure-loki-logging|create-catalog-source|setup-testing-accounts|verify-e2e-tests-status|collect-logs-notify-slack|deprovision-ephemeral-cluster)$ ]]; then
+            taskruns="${taskruns:+${taskruns} }${tr}"
+          fi
+        done <<< "$all_taskruns"
+
+        if [[ -z "$taskruns" ]]; then
+          echo "No test/upgrade TaskRuns found (only infrastructure/collection tasks exist)"
+          printf "(none)" > "$(results.artifacts-url.path)"
+          exit 0
+        fi
+
+        log_count=0
+        pass_count=0
+        fail_count=0
+        failed_tasks=""
+        task_results_html=""
+
+        for taskrun in $taskruns; do
+          status=$(oc get taskrun "$taskrun" -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].status}' 2>/dev/null || echo "Unknown")
+          task_name=$(oc get taskrun "$taskrun" -o jsonpath='{.metadata.labels.tekton\.dev/pipelineTask}' 2>/dev/null || echo "$taskrun")
+
+          echo ""
+          echo "Task: $task_name (Status: $status)"
+
+          # Collect logs using opc (OpenShift Pipelines CLI)
+          # opc tr logs works reliably even when pods are garbage collected
+          log_file="${TEMP_DIR}/${task_name}.log"
+          if opc tr logs "$taskrun" > "$log_file" 2>&1; then
+            log_size=$(wc -c < "$log_file" | awk '{print $1}')
+            if [[ $log_size -gt 0 ]]; then
+              echo "  ✓ Collected $(du -h "$log_file" | cut -f1) log"
+              log_count=$((log_count + 1))
+
+              # Determine pass/fail status
+              if [[ "$status" == "True" ]]; then
+                pass_count=$((pass_count + 1))
+                status_class="pass"
+                badge_class="badge-pass"
+                badge_text="PASS"
+              else
+                fail_count=$((fail_count + 1))
+                status_class="fail"
+                badge_class="badge-fail"
+                badge_text="FAIL"
+                failed_tasks="${failed_tasks:+${failed_tasks}, }${task_name}"
+              fi
+
+              task_results_html="${task_results_html}<li class=\"${status_class}\"><a href=\"${task_name}.log\">📋 ${task_name}.log</a> <span class=\"badge ${badge_class}\">${badge_text}</span> <span class=\"size\">$(du -h "$log_file" | cut -f1)</span></li>\n"
+            else
+              echo "  ✗ Empty log (task may still be running or have no output)"
+            fi
+          else
+            echo "  ✗ Failed to collect logs"
+          fi
+        done
+
+        if [[ $log_count -eq 0 ]]; then
+          echo ""
+          echo "No logs collected. All TaskRuns may still be running."
+          printf "(none)" > "$(results.artifacts-url.path)"
+          exit 0
+        fi
+
+        echo ""
+        echo "=========================================="
+        echo "Uploading $log_count log files to GCS"
+        echo "=========================================="
+
+        # Generate OAuth2 access token from service account key
+        _sa_email=$(python3 -c "import json,sys; print(json.load(open('${GOOGLE_APPLICATION_CREDENTIALS}'))['client_email'])")
+        _private_key_file=$(mktemp)
+        python3 -c "import json,sys; print(json.load(open('${GOOGLE_APPLICATION_CREDENTIALS}'))['private_key'])" > "$_private_key_file"
+
+        _header=$(printf '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e | tr -d '=\n' | tr '/+' '_-')
+        _now=$(date +%s)
+        _exp=$((_now + 3600))
+        _claim=$(printf '{"iss":"%s","scope":"https://www.googleapis.com/auth/devstorage.read_write","aud":"https://oauth2.googleapis.com/token","iat":%d,"exp":%d}' "$_sa_email" "$_now" "$_exp" | openssl base64 -e | tr -d '=\n' | tr '/+' '_-')
+        _sign_input="${_header}.${_claim}"
+        _signature=$(printf '%s' "$_sign_input" | openssl dgst -sha256 -sign "$_private_key_file" | openssl base64 -e | tr -d '=\n' | tr '/+' '_-')
+        _jwt="${_sign_input}.${_signature}"
+        rm -f "$_private_key_file"
+
+        GCS_ACCESS_TOKEN=$(curl -sf -X POST "https://oauth2.googleapis.com/token" \
+          -H "Content-Type: application/x-www-form-urlencoded" \
+          -d "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${_jwt}" \
+          | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
+
+        if [[ -z "$GCS_ACCESS_TOKEN" ]]; then
+          echo "ERROR: Failed to obtain GCS access token"
+          printf "(auth-failed)" > "$(results.artifacts-url.path)"
+          exit 1
+        fi
+        echo "OAuth2 token obtained successfully"
+
+        gcs_upload() {
+          local file="$1" dest_name="$2" content_type="${3:-text/plain}"
+          local encoded_name
+          encoded_name=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "${UPLOAD_PREFIX}/${dest_name}")
+          local http_code
+          http_code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${GCS_ACCESS_TOKEN}" \
+            -H "Content-Type: ${content_type}" \
+            --data-binary "@${file}" \
+            "https://storage.googleapis.com/upload/storage/v1/b/${GCS_BUCKET}/o?uploadType=media&name=${encoded_name}")
+          if [[ "$http_code" != "200" ]]; then
+            echo "    ERROR: upload returned HTTP ${http_code} for ${dest_name}"
+          fi
+        }
+
+        echo "Uploading to gs://${GCS_BUCKET}/${UPLOAD_PREFIX}/"
+        for f in "${TEMP_DIR}"/*.log; do
+          [[ -f "$f" ]] || continue
+          fname=$(basename "$f")
+          gcs_upload "$f" "$fname"
+          echo "  ✓ uploaded: $fname ($(du -h "$f" | cut -f1))"
+        done
+
+        # Generate index.html
+        INDEX_FILE=$(mktemp)
+        cat > "$INDEX_FILE" <<HTMLEOF
+        <!DOCTYPE html>
+        <html lang="en"><head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${PIPELINE_RUN} - Pipeline Logs</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 900px; margin: 0 auto; padding: 2em 1.5em; background: #f8f9fa; color: #212529; line-height: 1.6; }
+          h1 { font-size: 1.5em; font-weight: 700; color: #1a1a2e; border-bottom: 3px solid #dee2e6; padding-bottom: 0.5em; }
+          h2 { font-size: 1.1em; font-weight: 600; color: #495057; margin-top: 1.8em; }
+          a { color: #0d6efd; text-decoration: none; } a:hover { text-decoration: underline; }
+          .meta { color: #6c757d; font-size: 0.88em; }
+          .back { display: inline-block; margin-bottom: 1em; font-size: 0.9em; }
+          .summary { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 1em 1.5em; margin: 1em 0; }
+          .summary-pass { border-left: 4px solid #198754; }
+          .summary-fail { border-left: 4px solid #dc3545; }
+          .summary strong { font-size: 1.05em; }
+          ul { list-style: none; padding: 0; margin: 0; }
+          li { padding: 0.55em 1em; background: #fff; border: 1px solid #e9ecef; border-radius: 6px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+          li:hover { background: #f0f7ff; }
+          li a { font-weight: 500; font-size: 0.93em; }
+          .pass a { color: #198754; } .fail a { color: #dc3545; }
+          .badge { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 0.78em; font-weight: 600; }
+          .badge-pass { background: #d1e7dd; color: #0f5132; }
+          .badge-fail { background: #f8d7da; color: #842029; }
+          .size { color: #adb5bd; font-size: 0.82em; }
+          footer { margin-top: 2.5em; padding-top: 1em; border-top: 1px solid #dee2e6; color: #adb5bd; font-size: 0.82em; }
+        </style></head><body>
+        <h1>${PIPELINE_RUN}</h1>
+        <p class="meta">Uploaded: $(date -u '+%Y-%m-%d %H:%M UTC') | Auto-deletes in 30 days</p>
+        HTMLEOF
+
+        # Generate summary based on pass/fail counts
+        if [[ $fail_count -gt 0 ]]; then
+          summary_class="summary-fail"
+          summary_text="${pass_count}/${log_count} passed, ${fail_count}/${log_count} failed"
+          if [[ -n "$failed_tasks" ]]; then
+            summary_text="${summary_text}<br><span class=\"meta\">Failed: ${failed_tasks}</span>"
+          fi
+        else
+          summary_class="summary-pass"
+          summary_text="All ${log_count} tasks passed"
+        fi
+
+        echo "<div class=\"summary ${summary_class}\"><strong>${summary_text}</strong></div>" >> "$INDEX_FILE"
+        echo '<h2>Test Results</h2><ul>' >> "$INDEX_FILE"
+        echo -e "$task_results_html" >> "$INDEX_FILE"
+        echo "</ul>" >> "$INDEX_FILE"
+
+        cat >> "$INDEX_FILE" <<HTMLEOF
+        <footer>Generated by operator pipeline collect-logs-notify-slack task<br>
+        Bucket: gs://${GCS_BUCKET}/${UPLOAD_PREFIX}/</footer>
+        </body></html>
+        HTMLEOF
+
+        gcs_upload "$INDEX_FILE" "index.html" "text/html; charset=utf-8"
+        rm -f "$INDEX_FILE"
+
+        # Write the URL as a Tekton Task Result
+        printf '%s' "${ARTIFACTS_URL}" > "$(results.artifacts-url.path)"
+
+        echo ""
+        echo "=========================================="
+        echo "✓ LOGS UPLOADED: $log_count files"
+        echo "=========================================="
+        echo "View results: ${ARTIFACTS_URL}"
+        echo "(Open directly in browser - no login required)"
+        echo ""
+
+        # ============================================
+        # Send Slack notification if enabled
+        # ============================================
+        if [[ "$SEND_SLACK" != "true" && "$SEND_SLACK" != "True" ]]; then
+          echo "Slack notification disabled (SEND_SLACK_NOTIFICATION=false)"
+          exit 0
+        fi
+
+        if [[ -z "${SLACK_WEBHOOK_URL:-}" ]]; then
+          echo "Slack webhook secret not configured, skipping notification"
+          exit 0
+        fi
+
+        echo ""
+        echo "=========================================="
+        echo "Sending Slack notification"
+        echo "=========================================="
+
+        # Determine status from aggregate tasks status
+        if [[ "$AGGREGATE_STATUS" == "Succeeded" || "$AGGREGATE_STATUS" == "Completed" ]]; then
+          ICON=":rainbow_2:"
+          RUN_STATUS="succeeded"
+        else
+          ICON=":volcano:"
+          RUN_STATUS="failed"
+        fi
+
+        # Replace placeholders in message template
+        MESSAGE="$(params.MESSAGE_TEMPLATE)"
+        MESSAGE="${MESSAGE//<icon>/$ICON}"
+        MESSAGE="${MESSAGE//<run_status>/$RUN_STATUS}"
+        MESSAGE="${MESSAGE//<logs_url>/$ARTIFACTS_URL}"
+        MESSAGE="${MESSAGE//<pr_name>/$PIPELINE_RUN}"
+
+        # Send to Slack
+        curl --no-progress-meter -X POST -H 'Content-Type: application/json' \
+          --data "{\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"${MESSAGE}\"}}]}" \
+          "${SLACK_WEBHOOK_URL}" || echo "Warning: Failed to send Slack notification"
+
+        echo "✓ Slack notification sent"
+
+  volumes:
+    - name: gcs-creds
+      secret:
+        secretName: gcs-artifacts
+        items:
+          - key: sa-key.json
+            path: sa-key.json
+        optional: true
