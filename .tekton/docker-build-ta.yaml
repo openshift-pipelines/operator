@@ -289,6 +289,11 @@ spec:
     params:
     - name: IMAGE
       value: $(params.output-image)
+    # Match the Docker V2 format used for the per-platform images above;
+    # otherwise an OCI index over docker platform images fails with
+    # "platform image contains docker format, but index will be oci".
+    - name: BUILDAH_FORMAT
+      value: docker
     - name: ALWAYS_BUILD_INDEX
       value: $(params.build-image-index)
     - name: IMAGES
