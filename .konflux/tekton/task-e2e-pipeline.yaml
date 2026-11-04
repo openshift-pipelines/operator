@@ -117,6 +117,8 @@ spec:
           local want want_minor cli_arch url host served served_minor deadline sub csv mant="/source/cli"
           # Hard target is the upgraded MINOR from EXPECTED_CLI_VERSION ("pipelines-1.24"
           # or "1.24.0" -> 1.24); a minor mismatch means the re-roll is not finished.
+          # Empty EXPECTED_CLI_VERSION stays best-effort (accept whatever is served), so
+          # the minor is derived ONLY from it -- never from the installed CSV.
           want_minor="${EXPECTED_CLI_VERSION#pipelines-}"
           want_minor="$(echo "$want_minor" | cut -d. -f1-2)"
           # Preferred target is the exact PATCH from the installed CSV (e.g. 1.24.1), so a
@@ -129,7 +131,6 @@ spec:
             csv="$(KUBECONFIG=/tmp/kubeconfig oc get subscription "$sub" -n openshift-operators \
               -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
             want="${csv#openshift-pipelines-operator-rh.}"; want="${want#v}"   # e.g. 1.24.1
-            [[ -z "$want_minor" && -n "$want" ]] && want_minor="$(echo "$want" | cut -d. -f1-2)"
           fi
           echo "Refreshing CLI from cluster (operator ${want:-unknown}, want opc minor ${want_minor:-any})"
           case "$(uname -m)" in
@@ -139,6 +140,7 @@ spec:
           esac
           mkdir -p "$mant"
           deadline=$((SECONDS + 600))
+          grace_deadline=0          # bounded wait for the exact patch, armed once the upgraded minor is served
           while (( SECONDS < deadline )); do
             # Require the operator's re-roll of tkn-cli-serve to actually complete before
             # sampling, so we never read a 503/old binary mid-roll.
@@ -164,12 +166,26 @@ spec:
               if [[ -z "$want_minor" || "$want_minor" == "latest" || "$served_minor" == "$want_minor" ]]; then
                 if [[ -z "$want" || "$served" == "$want" ]]; then
                   echo "CLI refreshed from cluster: opc ${served:-unknown} (want ${want:-${want_minor:-any}})"
-                else
-                  echo "CLI refreshed from cluster: opc ${served:-unknown}; no newer CLI published for operator ${want}, using the previous same-minor client"
+                  return 0
                 fi
-                return 0
+                # Best-effort (no requested minor): accept whatever the cluster serves.
+                if [[ -z "$want_minor" || "$want_minor" == "latest" ]]; then
+                  echo "CLI refreshed from cluster: opc ${served:-unknown} (want any)"
+                  return 0
+                fi
+                # Same minor but not the exact upgraded patch. rollout status can pass on
+                # the old revision before the operator starts the re-roll, so give the
+                # newer CLI a bounded grace before accepting the previous same-minor client
+                # (correct only if no new CLI was published for this z-stream).
+                [[ "$grace_deadline" -eq 0 ]] && grace_deadline=$((SECONDS + 180))
+                if (( SECONDS >= grace_deadline )); then
+                  echo "CLI refreshed from cluster: opc ${served:-unknown} after grace; no newer CLI published for operator ${want}, using the previous same-minor client"
+                  return 0
+                fi
+                echo "  operator ${want} but tkn-cli-serve serving opc ${served:-unknown}; waiting for a newer CLI..."
+              else
+                echo "  tkn-cli-serve still serving opc ${served:-unknown} (want minor ${want_minor}); retrying..."
               fi
-              echo "  tkn-cli-serve still serving opc ${served:-unknown} (want minor ${want_minor}); retrying..."
             else
               echo "  tkn-cli-serve not ready yet; retrying..."
             fi
