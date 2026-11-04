@@ -139,9 +139,13 @@ spec:
             *) cli_arch=amd64 ;;
           esac
           mkdir -p "$mant"
+          local healthy_minor=false fallback_served=""
           deadline=$((SECONDS + 600))
           grace_deadline=0          # bounded wait for the exact patch, armed once the upgraded minor is served
           while (( SECONDS < deadline )); do
+            # Re-evaluate readiness every attempt: a stale earlier success must never be
+            # accepted if the re-roll later breaks and never recovers.
+            healthy_minor=false
             # Require the operator's re-roll of tkn-cli-serve to actually complete before
             # sampling, so we never read a 503/old binary mid-roll.
             if ! KUBECONFIG=/tmp/kubeconfig oc rollout status deployment/tkn-cli-serve \
@@ -173,10 +177,13 @@ spec:
                   echo "CLI refreshed from cluster: opc ${served:-unknown} (want any)"
                   return 0
                 fi
-                # Same minor but not the exact upgraded patch. rollout status can pass on
-                # the old revision before the operator starts the re-roll, so give the
-                # newer CLI a bounded grace before accepting the previous same-minor client
-                # (correct only if no new CLI was published for this z-stream).
+                # Same minor but not the exact upgraded patch: a valid same-minor client.
+                healthy_minor=true
+                fallback_served="$served"
+                # rollout status can pass on the old revision before the operator starts
+                # the re-roll, so give the newer CLI a bounded grace before accepting the
+                # previous same-minor client (correct only if no new CLI was published for
+                # this z-stream).
                 [[ "$grace_deadline" -eq 0 ]] && grace_deadline=$((SECONDS + 180))
                 if (( SECONDS >= grace_deadline )); then
                   echo "CLI refreshed from cluster: opc ${served:-unknown} after grace; no newer CLI published for operator ${want}, using the previous same-minor client"
@@ -191,6 +198,15 @@ spec:
             fi
             sleep 10
           done
+          # Reaching the 600s deadline with a healthy same-minor client confirmed by the
+          # most recent attempt is still a success: the patch preference is best-effort and
+          # the grace window may land past the deadline (e.g. a first same-minor sample at
+          # 450s). A stale earlier sample is rejected because healthy_minor is reset each
+          # attempt, so only the last loop iteration's result survives.
+          if [[ "$healthy_minor" == "true" && -n "$fallback_served" ]]; then
+            echo "CLI refreshed from cluster: opc ${fallback_served:-unknown}; no newer CLI published for operator ${want}, using the previous same-minor client"
+            return 0
+          fi
           echo "WARN: could not refresh CLI to '${want:-${want_minor:-target}}' within timeout; using image CLI ($(opc version 2>/dev/null | head -1))"
           return 1
         }
