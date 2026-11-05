@@ -41,6 +41,14 @@ spec:
       type: string
       description: Ginkgo release-tests repository.
       default: https://github.com/openshift-pipelines/release-tests-ginkgo.git
+    - name: GIT_RELEASE_TESTS_BRANCH
+      type: string
+      description: |
+        Force the release-tests-ginkgo branch to check out, bypassing the
+        version-matched auto-selection (nightly/next/main => main;
+        release-vX.Y.x => release-vX.Y). Empty (default) keeps the derived
+        value, so existing behavior is untouched.
+      default: ""
     - name: LABEL_FILTER
       type: string
       description: Base Ginkgo label filter applied to every component suite.
@@ -387,6 +395,8 @@ spec:
               value: "$(tasks.parse-metadata.results.component-container-image)"
             - name: RELEASE_BRANCH
               value: "$(tasks.parse-metadata.results.target-git-branch)"
+            - name: RELEASE_TESTS_BRANCH_OVERRIDE
+              value: "$(params.GIT_RELEASE_TESTS_BRANCH)"
           volumeMounts:
             - name: credentials
               mountPath: /credentials
@@ -407,6 +417,13 @@ spec:
             script: |
               #!/usr/bin/env bash
               set -x
+              # An explicit override wins; empty falls back to auto-selection.
+              if [[ -n "$RELEASE_TESTS_BRANCH_OVERRIDE" ]]; then
+                TESTS_BRANCH="$RELEASE_TESTS_BRANCH_OVERRIDE"
+                echo "Release tests branch override: $TESTS_BRANCH"
+                echo -n "$TESTS_BRANCH" | tee $(results.releaseTestsBranch.path)
+                exit 0
+              fi
               # Version-match the release-tests-ginkgo branch to the OSP build
               # under test: nightly/next/main run from the repo's main branch,
               # release-vX.Y.x GA/z-stream runs from the matching release-vX.Y.
