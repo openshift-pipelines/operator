@@ -94,6 +94,26 @@ spec:
         operator with the upgraded CLI rather than the cached pre-upgrade one.
         Mirrors release-tests-infra's refresh_cli_from_upgraded_cluster.
       default: "false"
+    - name: STATE_CONFIGMAP
+      type: string
+      description: >
+        Optional name of a ConfigMap (in the "default" namespace of the cluster
+        under test) used to carry testdata/olm/skiprange.json across the
+        pre-upgrade and post-upgrade TaskRuns, which each clone the repo into
+        their own emptyDir. The pre-upgrade run writes the baseline, the
+        post-upgrade run seeds it back before the skipRange diff. Empty = disabled
+        (e2e/acceptance runs leave it unset).
+      default: ""
+    - name: REQUIRE_STATE_SEED
+      type: string
+      description: >
+        When "true", the seed-skiprange step must restore a populated
+        pre-upgrade baseline from STATE_CONFIGMAP or it fails the TaskRun. Set on
+        the post-upgrade (consumer) run: the skipRange diff is a silent no-op when
+        the pre-upgrade map is empty, so a missing/empty baseline would pass
+        without comparing channels. Left "false" for the pre-upgrade producer run,
+        whose ConfigMap does not exist yet.
+      default: "false"
     - name: CHAINS_REPOSITORY
       type: string
       description: OCI repository the Chains suite pushes signed images to.
@@ -139,6 +159,71 @@ spec:
         - name: REVISION
           value: $(params.GIT_RELEASE_TESTS_BRANCH)
 
+    # Upgrade-only: seed the pre-upgrade skipRange snapshot written by the
+    # previous (pre-upgrade) TaskRun from the state ConfigMap, since each TaskRun
+    # clones into its own emptyDir. No-op for e2e/acceptance runs (STATE_CONFIGMAP
+    # left empty) and for the pre-upgrade run itself (ConfigMap not created yet).
+    - name: seed-skiprange
+      workingDir: /source/repo
+      env:
+        - name: STATE_CONFIGMAP
+          value: "$(params.STATE_CONFIGMAP)"
+        - name: REQUIRE_STATE_SEED
+          value: "$(params.REQUIRE_STATE_SEED)"
+      script: |
+        #!/usr/bin/env bash
+        set -u -o pipefail
+        if [[ -z "${STATE_CONFIGMAP}" ]]; then
+          # An empty name with REQUIRE_STATE_SEED=true must fail closed: silently
+          # exiting here would let the post-upgrade diff run against the committed
+          # template instead of the recorded pre-upgrade baseline.
+          if [[ "${REQUIRE_STATE_SEED}" == "true" ]]; then
+            echo "FATAL: REQUIRE_STATE_SEED=true but STATE_CONFIGMAP is empty; no baseline to restore."
+            exit 1
+          fi
+          echo "STATE_CONFIGMAP unset; skipping skiprange seed."
+          exit 0
+        fi
+        SKIPRANGE_FILE="testdata/olm/skiprange.json"
+        STATE_NS="default"
+        mkdir -p "$(dirname "${SKIPRANGE_FILE}")"
+
+        seeded=0
+        if KUBECONFIG=/credentials/kubeconfig oc get configmap "${STATE_CONFIGMAP}" -n "${STATE_NS}" >/dev/null 2>&1; then
+          # Fetch into a temp buffer and replace the committed template only on a
+          # successful, nonempty read: a redirect straight into the file would
+          # truncate the committed baseline before the fetch result is known.
+          tmp_seed="$(mktemp)"
+          if KUBECONFIG=/credentials/kubeconfig oc get configmap "${STATE_CONFIGMAP}" -n "${STATE_NS}" \
+              -o jsonpath='{.data.skiprange\.json}' > "${tmp_seed}" 2>/dev/null && [[ -s "${tmp_seed}" ]]; then
+            mv "${tmp_seed}" "${SKIPRANGE_FILE}"
+            seeded=1
+            echo "Seeded ${SKIPRANGE_FILE} from configmap ${STATE_NS}/${STATE_CONFIGMAP}"
+          else
+            rm -f "${tmp_seed}"
+          fi
+        fi
+
+        if [[ "${REQUIRE_STATE_SEED}" != "true" ]]; then
+          # Pre-upgrade producer: the ConfigMap is written only after this suite,
+          # so a missing baseline is expected; keep the repo's committed template.
+          [[ "${seeded}" -eq 1 ]] || echo "No pre-upgrade baseline to seed yet; using committed template."
+          exit 0
+        fi
+
+        # Post-upgrade consumer: ValidateOlmSkipRangeDiff iterates the pre-upgrade
+        # map, so an empty/missing baseline makes the diff pass without comparing
+        # any channel. Require a populated snapshot before running the suite.
+        if [[ "${seeded}" -ne 1 ]]; then
+          echo "FATAL: REQUIRE_STATE_SEED=true but could not restore ${SKIPRANGE_FILE} from configmap ${STATE_NS}/${STATE_CONFIGMAP}."
+          exit 1
+        fi
+        if ! python3 -c 'import json,sys; sys.exit(0 if json.load(open("testdata/olm/skiprange.json")).get("pre-upgrade-olm-skip-range") else 1)'; then
+          echo "FATAL: restored ${SKIPRANGE_FILE} has an empty pre-upgrade-olm-skip-range; the post-upgrade diff would pass without comparing channels."
+          exit 1
+        fi
+        echo "Verified non-empty pre-upgrade skiprange baseline."
+
     - name: run-ginkgo-suite
       workingDir: /source/repo
       # Without explicit resources the step inherits the namespace LimitRange
@@ -182,6 +267,8 @@ spec:
           value: "$(params.SUBSCRIPTION_NAME)"
         - name: WAIT_FOR_UPGRADED_CLI
           value: "$(params.WAIT_FOR_UPGRADED_CLI)"
+        - name: STATE_CONFIGMAP
+          value: "$(params.STATE_CONFIGMAP)"
         - name: CHAINS_REPOSITORY
           value: "$(params.CHAINS_REPOSITORY)"
         - name: ARTIFACTS_DIR
@@ -294,40 +381,88 @@ spec:
           return 1
         }
 
-        # After an operator upgrade the operator re-rolls tkn-cli-serve asynchronously,
-        # so a post-upgrade suite that downloads too early gets the pre-upgrade tkn/opc
-        # and then validates the upgraded operator with a stale CLI. When
-        # WAIT_FOR_UPGRADED_CLI is set, wait for that roll-out and re-download until opc
-        # reports the installed CSV's minor (mirrors release-tests-infra's
-        # refresh_cli_from_upgraded_cluster; we have no shared cache, so every
-        # post-upgrade task refreshes its own copy).
+        # After upgrade the operator re-rolls tkn-cli-serve asynchronously, so a
+        # post-upgrade suite that samples too early gets the stale pre-upgrade CLI.
+        # When WAIT_FOR_UPGRADED_CLI is set, wait for the roll-out, then hard-gate on
+        # the upgraded MINOR (rollout status alone can pass on the old generation).
+        # Prefer the exact upgraded PATCH, but z-streams don't always republish the
+        # CLI, so fall back to the previous same-minor client instead of timing out.
+        # No shared cache: every post-upgrade task refreshes its own copy.
         if [[ "${WAIT_FOR_UPGRADED_CLI:-false}" == "true" ]]; then
-          want="$(oc get subscription "${SUBSCRIPTION_NAME}" -n openshift-operators \
-            -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
-          want="${want#${SUBSCRIPTION_NAME}.v}"; want="${want%.*}"   # target minor, e.g. 1.24
-          echo "Refreshing CLIs from upgraded cluster (want opc ${want:-any}.x)"
+          # The target version gates the whole refresh, so this read must succeed with
+          # a nonempty installedCSV. A swallowed failure would leave want/want_minor
+          # empty and make the loop below accept ANY healthy CLI (including the stale
+          # pre-upgrade client) as an exact match, so retry and fail closed instead.
+          want=""
+          for _ in $(seq 1 6); do
+            want="$(oc get subscription "${SUBSCRIPTION_NAME}" -n openshift-operators \
+              -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+            want="${want#${SUBSCRIPTION_NAME}.v}"                   # target patch, e.g. 1.24.1
+            [[ -n "${want}" ]] && break
+            echo "  installedCSV for ${SUBSCRIPTION_NAME} not readable yet; retrying..."
+            sleep 5
+          done
+          if [[ -z "${want}" ]]; then
+            echo "ERROR: could not read the upgraded installedCSV for ${SUBSCRIPTION_NAME}; cannot gate on the upgraded CLI version" >&2
+            exit 1
+          fi
+          want_minor="$(echo "${want}" | cut -d. -f1-2)"           # target minor, e.g. 1.24
+          echo "Refreshing CLIs from upgraded cluster (operator ${want}, want opc minor ${want_minor})"
           deadline=$((SECONDS + 600))
-          refreshed=false
+          grace_deadline=0          # bounded wait for the exact patch, armed once the upgraded minor is served
+          exact=false
+          healthy_minor=false       # the most recent attempt confirmed a healthy, same-minor CLI
+          fallback_served=""
+          served=""
           while (( SECONDS < deadline )); do
-            oc rollout status deployment/tkn-cli-serve -n openshift-pipelines --timeout=120s 2>/dev/null || true
-            if download_cluster_cli; then
+            # Re-evaluate readiness every attempt: a stale earlier success must never
+            # let the tests proceed if the re-roll later breaks and never recovers.
+            healthy_minor=false
+            # Require the roll-out to actually complete before sampling, so we never
+            # read a 503/old binary mid-roll.
+            if oc rollout status deployment/tkn-cli-serve -n openshift-pipelines --timeout=60s >/dev/null 2>&1 \
+              && download_cluster_cli; then
               served="$(opc version 2>/dev/null | grep -iE 'client' \
                 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"
-              if [[ -z "${want}" || "${served}" == "${want}" || "${served}" == "${want}."* ]]; then
-                echo "tkn-cli-serve serving opc ${served:-unknown}"
-                refreshed=true
-                break
+              served_minor="$(echo "${served}" | cut -d. -f1-2)"
+              if [[ "${served_minor}" == "${want_minor}" ]]; then
+                healthy_minor=true
+                fallback_served="${served}"
+                if [[ "${served}" == "${want}" ]]; then
+                  exact=true
+                  break
+                fi
+                # Same minor but not the exact upgraded patch. rollout status can pass
+                # on the old revision before the operator starts the re-roll, so give
+                # the newer CLI a bounded grace to appear before accepting the previous
+                # same-minor client (correct only if no new CLI was published for this
+                # z-stream).
+                [[ "${grace_deadline}" -eq 0 ]] && grace_deadline=$((SECONDS + 180))
+                if (( SECONDS >= grace_deadline )); then
+                  echo "tkn-cli-serve still serving opc ${served:-unknown} after grace; no newer CLI published for operator ${want}, using the previous same-minor client"
+                  break
+                fi
+                echo "  operator ${want} but tkn-cli-serve serving opc ${served:-unknown}; waiting for a newer CLI..."
+              else
+                echo "  tkn-cli-serve still serving opc ${served:-unknown} (want minor ${want_minor}); retrying..."
               fi
-              echo "  tkn-cli-serve still serving opc ${served:-unknown} (want ${want}.x); retrying..."
             else
-              echo "  tkn-cli-serve not ready yet; retrying..."
+              echo "  tkn-cli-serve roll-out not complete yet; retrying..."
             fi
             sleep 10
           done
-          # Proceeding with a stale/pre-upgrade CLI would silently test the wrong
-          # version, so fail loudly instead of running the post-upgrade suites.
-          if [[ "${refreshed}" != "true" ]]; then
-            echo "ERROR: timed out after 600s waiting for tkn-cli-serve to serve opc ${want:-any}.x; refusing to run tests with a stale CLI" >&2
+          # Accept the exact upgraded patch, or the healthy same-minor client from the
+          # most recent attempt: reaching the deadline while the upgraded minor is served
+          # is still success (patch preference is best-effort). healthy_minor resets each
+          # attempt, so a stale earlier sample can never slip through.
+          if [[ "${exact}" == "true" ]]; then
+            echo "CLI refreshed to upgraded operator version opc ${served}"
+          elif [[ "${healthy_minor}" == "true" && -n "${fallback_served}" ]]; then
+            echo "No newer CLI published for operator ${want}; using the previous same-minor client opc ${fallback_served}"
+          else
+            # Never reaching a healthy upgraded minor means the re-roll did not finish; a
+            # stale pre-upgrade CLI would silently test the wrong version, so fail loudly.
+            echo "ERROR: timed out after 600s waiting for tkn-cli-serve to serve opc minor ${want_minor}; refusing to run tests with a stale CLI" >&2
             exit 1
           fi
         elif [[ "${MODE}" == "install" ]]; then
@@ -557,5 +692,31 @@ spec:
                 for case in flaked:
                     print(f"  FLAKED: {case.get('name')}")
         PY
+
+        # Persist the (possibly updated) skiprange baseline back to the state
+        # ConfigMap so the next upgrade TaskRun (post-upgrade) can diff against it;
+        # each TaskRun clones into its own emptyDir. Runs regardless of the suite
+        # result; the suite exit code is preserved below. No-op unless
+        # STATE_CONFIGMAP is set and the suite produced the file. Uses the admin
+        # kubeconfig directly (the shim passes an explicit KUBECONFIG through).
+        SKIPRANGE_FILE="testdata/olm/skiprange.json"
+        STATE_NS="default"
+        if [[ -n "${STATE_CONFIGMAP}" && -f "${SKIPRANGE_FILE}" ]]; then
+          ( set -o pipefail
+            KUBECONFIG=/credentials/kubeconfig oc create configmap "${STATE_CONFIGMAP}" -n "${STATE_NS}" \
+              --from-file=skiprange.json="${SKIPRANGE_FILE}" --dry-run=client -o yaml \
+              | KUBECONFIG=/credentials/kubeconfig oc apply -f - >/dev/null )
+          persist_rc=$?
+          if [[ ${persist_rc} -ne 0 ]]; then
+            echo "ERROR: failed to persist ${SKIPRANGE_FILE} to configmap ${STATE_NS}/${STATE_CONFIGMAP} (rc=${persist_rc})"
+            # Surface the persist failure only when the suite itself passed, so the
+            # next upgrade TaskRun does not silently seed a stale/empty baseline.
+            if [[ ${rc} -eq 0 ]]; then
+              exit ${persist_rc}
+            fi
+          else
+            echo "Persisted ${SKIPRANGE_FILE} to configmap ${STATE_NS}/${STATE_CONFIGMAP}"
+          fi
+        fi
 
         exit $rc
