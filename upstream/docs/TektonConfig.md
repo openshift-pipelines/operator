@@ -814,14 +814,15 @@ platforms:
 
 Pipelines as Code supports configuring remote hub catalogs to fetch tasks and pipelines. You can configure custom catalogs using the `catalog-{INDEX}-*` settings pattern.
 
-Each custom catalog requires the following four fields:
+Each custom catalog requires the following three fields:
 
 | Field | Description | Required |
 |-------|-------------|----------|
 | `catalog-{INDEX}-id` | Unique identifier for the catalog. Users reference tasks from this catalog using this ID as prefix (e.g., `custom://task-name`) | Yes |
 | `catalog-{INDEX}-name` | Name of the catalog within the hub | Yes |
 | `catalog-{INDEX}-url` | URL endpoint of the hub API | Yes |
-| `catalog-{INDEX}-type` | Type of hub: `artifacthub` (for Artifact Hub) or `tektonhub` (for Tekton Hub) | Yes |
+
+`catalog-{INDEX}-type` and `hub-catalog-type` were removed in Pipelines as Code 0.51.0. On upgrade, the operator deletes `hub-catalog-type` from TektonConfig, the OpenShiftPipelinesAsCode CR, and the `pipelines-as-code` ConfigMap.
 
 Where `{INDEX}` is a number that can be incremented to add multiple catalogs (e.g., `1`, `2`, `3`).
 
@@ -836,7 +837,6 @@ platforms:
         catalog-1-id: "custom"
         catalog-1-name: "tekton"
         catalog-1-url: "https://api.custom.hub/v1"
-        catalog-1-type: "tektonhub"
 ```
 
 ##### Example: Configuring Multiple Hub Catalogs
@@ -852,11 +852,9 @@ platforms:
         catalog-1-id: "custom"
         catalog-1-name: "tekton"
         catalog-1-url: "https://api.custom.hub/v1"
-        catalog-1-type: "tektonhub"
         catalog-2-id: "artifact"
         catalog-2-name: "tekton-catalog-tasks"
         catalog-2-url: "https://artifacthub.io"
-        catalog-2-type: "artifacthub"
 ```
 
 ##### Referencing Tasks from Custom Catalogs
@@ -975,7 +973,44 @@ spec:
 - The event-based pruner responds to resource events in real-time, providing more efficient cleanup
 - When `enforcedConfigLevel` is set to `namespace`, individual namespaces can override these settings using ConfigMaps
 
+#### Resource Limits
 
+The operator applies default resource limits to pruner deployments based on benchmark data:
+
+**Controller:** `requests: 100m CPU, 256Mi memory` | `limits: 2Gi memory`  
+**Webhook:** `requests: 50m CPU, 64Mi memory` | `limits: 512Mi memory`
+
+CPU limits are omitted to avoid CFS throttling during reconciliation bursts. Memory limits are based on linear growth (~13.6 MB per 1k resident PipelineRuns). The 2Gi controller limit supports up to ~50k runs with some safety margin.
+
+**Benchmark data:**
+
+| Scale | Resident PRs | Heap (MB) | Container (MB) |
+|-------|--------------|-----------|----------------|
+| Baseline | 0 | 23 | - |
+| Low | 1,000 | 65 | 58 |
+| Medium | 6,000 | 148 | 69 |
+| High | 16,000 | 301 | 104 |
+| Production | 41,000 | 579 | 170 |
+
+
+**Override via options:**
+```yaml
+  tektonpruner:
+    options:
+      deployments:
+        tekton-pruner-controller:
+          spec:
+            template:
+              spec:
+                containers:
+                - name: controller
+                  resources:
+                    limits:
+                      memory: 4Gi
+                      cpu: 1000m
+```
+
+For >50k resident runs, calculate required memory: `memory_mb = 23 + (13.6 × runs_in_thousands)` and apply 1.5x safety factor.
 
 ### Additional fields as `options`
 
