@@ -31,7 +31,12 @@ func (spec *TektonConfigSpec) MigrateScheduler() bool {
 	if reflect.DeepEqual(spec.Scheduler, Scheduler{}) {
 		return false
 	}
-	if reflect.DeepEqual(spec.Kueue, Kueue{}) {
+	// CRD defaulting can populate the fleet manager before legacy migration.
+	kueue := spec.Kueue
+	if kueue.FleetManager == FleetManagerManual {
+		kueue.FleetManager = ""
+	}
+	if reflect.DeepEqual(kueue, Kueue{}) {
 		spec.Kueue = spec.Scheduler.ToKueue()
 	}
 	spec.Scheduler = Scheduler{}
@@ -214,6 +219,17 @@ func (tc *TektonConfig) SetDefaults(ctx context.Context) {
 			ns.CreateSCCRoleBinding = ptr.Bool(true)
 		}
 
+		// ShipwrightBuild is enabled by default on OpenShift. Only default when the
+		// block is absent so an explicit user block (incl. enabled: false) is kept.
+		if tc.Spec.Platforms.OpenShift.ShipwrightBuild == nil {
+			tc.Spec.Platforms.OpenShift.ShipwrightBuild = &ShipwrightBuildConfig{Enabled: true}
+		}
+
+		// SharedResource is OpenShift-only and enabled by default.
+		if tc.Spec.Platforms.OpenShift.SharedResource == nil {
+			tc.Spec.Platforms.OpenShift.SharedResource = &SharedResourceConfig{Enabled: true}
+		}
+
 		setAddonDefaults(&tc.Spec.Addon)
 	} else {
 		// Kubernetes Platform
@@ -242,6 +258,13 @@ func (tc *TektonConfig) SetDefaults(ctx context.Context) {
 			logger := logging.FromContext(ctx)
 			tc.Spec.Platforms.Kubernetes.PipelinesAsCode.PACSettings.setPACDefaults(logger)
 		}
+
+		// ShipwrightBuild is disabled by default on Kubernetes. Only default when the
+		// block is absent so an explicit user block (incl. enabled: true) is kept.
+		if tc.Spec.Platforms.Kubernetes.ShipwrightBuild == nil {
+			tc.Spec.Platforms.Kubernetes.ShipwrightBuild = &ShipwrightBuildConfig{Enabled: false}
+		}
+
 		setAddonDefaults(&tc.Spec.Addon)
 	}
 

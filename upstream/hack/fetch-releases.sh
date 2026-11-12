@@ -158,43 +158,43 @@ release_yaml_github() {
   url="https://github.com/$github_component/releases/download/${version}/${releaseFileName}"
   echo "URL to download Release YAML is : $url"
 
-    ko_data=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata
-    # syncer-service uses non-prefixed directory (similar to pruner/manual-approval-gate)
-    if [[ $component == "syncer-service" ]]; then
-      comp_dir=${ko_data}/${component}
-    else
-      comp_dir=${ko_data}/tekton-${component}
+  ko_data=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata
+  # These components use their repository name without a tekton- prefix.
+  if [[ $component == "syncer-service" || $component == "pipelines-multikueue-plugin" ]]; then
+    comp_dir=${ko_data}/${component}
+  else
+    comp_dir=${ko_data}/tekton-${component}
+  fi
+  dirPath=${comp_dir}/${dirVersion}
+
+  # destination file
+  dest=${dirPath}/${destFileName}
+  echo $dest
+
+  if [ -f "$dest" ] && [ $FORCE_FETCH_RELEASE = "false" ]; then
+    label="app.kubernetes.io/version: \"$version\""
+    label2="app.kubernetes.io/version: $version"
+    label3="version: \"$version\""
+    if grep -Eq "$label" $dest || grep -Eq "$label2" $dest || grep -Eq "$label3" $dest;
+    then
+        echo "release file already exist with required version, skipping!"
+        echo ""
+        return
     fi
-    dirPath=${comp_dir}/${dirVersion}
+  fi
 
-    # destination file
-    dest=${dirPath}/${destFileName}
-    echo $dest
+  #Cleanup the Directory
+  rm -rf $comp_dir || true
 
-    if [ -f "$dest" ] && [ $FORCE_FETCH_RELEASE = "false" ]; then
-      label="app.kubernetes.io/version: \"$version\""
-      label2="app.kubernetes.io/version: $version"
-      label3="version: \"$version\""
-      if grep -Eq "$label" $dest || grep -Eq "$label2" $dest || grep -Eq "$label3" $dest;
-      then
-          echo "release file already exist with required version, skipping!"
-          echo ""
-          return
-      fi
-    fi
+  # create a directory
+  mkdir -p ${dirPath} || true
 
-    #Cleanup the Directory
-    rm -rf $comp_dir || true
-    
-    # create a directory
-    mkdir -p ${dirPath} || true
-
-    http_response=$(curl -s -L -o ${dest} -w "%{http_code}" ${url})
-    if [[ $http_response != "200" ]]; then
-        echo "Error: failed to get $component yaml, status code: $http_response"
-        exit 1
-    fi
-    echo "Info: Added $component/$releaseFileName:$version release yaml !!"
+  http_response=$(curl -s -L -o ${dest} -w "%{http_code}" ${url})
+  if [[ $http_response != "200" ]]; then
+      echo "Error: failed to get $component yaml, status code: $http_response"
+      exit 1
+  fi
+  echo "Info: Added $component/$releaseFileName:$version release yaml !!"
 
 }
 
@@ -309,6 +309,46 @@ release_yaml_manualapprovalgate() {
 
 }
 
+release_yaml_custom() {
+  local component=$1; shift;
+  local filenames=("$@")
+  local repository=$(yq .${component}.github ${CONFIG})
+  local version=$(yq .${component}.version ${CONFIG})
+  local destination=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata/${component}/${version//v}
+
+  rm -rf "${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata/${component}"
+  mkdir -p ${destination}
+
+  github_fetch() {
+    echo Fetching '|' component: ${component} '|' file: ${filename} '|' version: ${version}
+    local url="https://github.com/${repository}/releases/download/${version}/${filename}"
+    echo URL: ${url}
+    local http_response=$(curl -s -L -o ${destination}/${filename} -w "%{http_code}" ${url})
+    if [[ $http_response != "200" ]]; then
+       echo "ERROR: failed to get ${filename}, status code: ${http_response}"
+       exit 1
+    fi
+    echo "INFO: Added ${component}/${filename}:${version} !!"
+    echo ""
+  }
+
+  for filename in "${filenames[@]}"; do
+    github_fetch
+  done
+
+  # If TARGET is "openshift", fetch OpenShift specific files
+  if [[ ${TARGET} == "openshift" ]]; then
+    unset filenames
+    yq ".[\"${component}\"].openshift[] | . as \$o | \$o.files[] | \$o.github + \" \" + \$o.version + \" \" + ." "${CONFIG}" |
+    while read -r repository version filenames; do
+      filenames=(${filenames})
+      for filename in "${filenames[@]}"; do
+        github_fetch
+      done
+    done
+  fi
+}
+
 fetch_openshift_addon_tasks() {
   fetch_addon_task_script="${SCRIPT_DIR}/hack/openshift"
   local dest_dir='cmd/openshift/operator/kodata/tekton-addon/addons/06-ecosystem/tasks'
@@ -323,6 +363,59 @@ copy_pruner_yaml() {
   dstPath=${ko_data}/tekton-pruner
   rm -rf $dstPath
   cp -r $srcPath $dstPath
+}
+
+# append_openshift_results_postgres ensures db.yaml is present exactly once in the
+# OpenShift results release manifest. Repeated cat >> without a document separator
+# merges the StatefulSet spec into the following ConfigMap and breaks install:
+#   unable to find api field in struct ConfigMap for the json field "spec"
+append_openshift_results_postgres() {
+  local results_file=$1
+  local db_yaml=$2
+  local postgres_cm_count
+  local postgres_line
+  local cut_line
+  local tmp_file
+
+  if [[ ! -f "${db_yaml}" ]]; then
+    echo "Warning: ${db_yaml} not found, skipping OpenShift Results postgres append"
+    return
+  fi
+  if [[ ! -f "${results_file}" ]]; then
+    echo "Error: ${results_file} not found, cannot append postgres manifest"
+    exit 1
+  fi
+
+  # release_base never ships POSTGRES_DB; only our appended db.yaml does.
+  postgres_cm_count=$(grep -c '^  POSTGRES_DB: tekton-results$' "${results_file}" || true)
+
+  if [[ "${postgres_cm_count}" -eq 1 ]]; then
+    echo "PostgreSQL manifest already present in ${results_file}, skipping append"
+    return
+  fi
+
+  if [[ "${postgres_cm_count}" -gt 1 ]]; then
+    echo "Duplicated postgres manifests (${postgres_cm_count}) in ${results_file}, repairing..."
+    postgres_line=$(grep -n '^  POSTGRES_DB: tekton-results$' "${results_file}" | head -1 | cut -d: -f1)
+    # Appended block starts at: apiVersion / data / POSTGRES_DB (2 lines above).
+    cut_line=$((postgres_line - 2))
+    if [[ "${cut_line}" -lt 1 ]]; then
+      echo "Error: cannot locate postgres append start in ${results_file}"
+      exit 1
+    fi
+    # If a --- document separator sits immediately above, drop it too.
+    if [[ "${cut_line}" -gt 1 ]] && [[ "$(sed -n "$((cut_line - 1))p" "${results_file}")" == "---" ]]; then
+      cut_line=$((cut_line - 1))
+    fi
+    tmp_file=$(mktemp)
+    head -n "$((cut_line - 1))" "${results_file}" > "${tmp_file}"
+    mv "${tmp_file}" "${results_file}"
+  fi
+
+  echo "Appending PostgreSQL manifest to main results manifest..."
+  printf '\n---\n' >> "${results_file}"
+  cat "${db_yaml}" >> "${results_file}"
+  echo "PostgreSQL manifest appended to: ${results_file}"
 }
 
 main() {
@@ -348,14 +441,12 @@ main() {
   if [[ ${TARGET} == "openshift" ]]
   then
       release_yaml results release_base 00-results ${r_version}
-      # Append PostgreSQL manifest to main results manifest for OpenShift
-      # PostgreSQL is now part of main reconciliation flow, not PreReconcile
-      results_version_dir=${ko_data}/tekton-results/${r_version//v}
-      if [[ -f "${ko_data}/static/tekton-results/internal-db/db.yaml" ]]; then
-        echo "Appending PostgreSQL manifest to main results manifest..."
-        cat ${ko_data}/static/tekton-results/internal-db/db.yaml >> ${results_version_dir}/00-results.yaml
-        echo "PostgreSQL manifest appended to: ${results_version_dir}/00-results.yaml"
-      fi
+      # Append PostgreSQL manifest to main results manifest for OpenShift.
+      # PostgreSQL is part of main reconciliation (not PreReconcile).
+      ko_data=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata
+      results_file=${ko_data}/tekton-results/${r_version//v}/00-results.yaml
+      db_yaml=${ko_data}/static/tekton-results/internal-db/db.yaml
+      append_openshift_results_postgres "${results_file}" "${db_yaml}"
   else
       release_yaml results release 00-results ${r_version}
   fi
@@ -369,6 +460,7 @@ main() {
 
   pac_version=$(go run ./cmd/tool component-version ${CONFIG} pipelines-as-code)
   release_yaml_pac pipelinesascode release ${pac_version}
+
 
   if [[ ${TARGET} == "openshift" ]]; then
     fetch_openshift_addon_tasks
@@ -385,11 +477,27 @@ main() {
   # Tekton Kueue
   release_yaml_github kueue
 
+  if [[ ${TARGET} == "openshift" ]]; then
+    release_yaml_github pipelines-multikueue-plugin
+  fi
+
   # Tekton Multicluster Proxy AAE
   release_yaml_github multicluster-proxy-aae
 
   # Syncer Service
   release_yaml_github syncer-service
+
+  # Shipwright Build
+  if [[ ${TARGET} == "openshift" ]]; then
+    release_yaml_custom shipwright-build release.yaml
+  else
+    release_yaml_custom shipwright-build release.yaml sample-strategies.yaml
+  fi
+
+  # Shared Resource CSI Driver
+  if [[ ${TARGET} == "openshift" ]]; then
+    release_yaml_custom shared-resource release.yaml
+  fi
 
   echo updated payload tree
   find cmd/${TARGET}/operator/kodata

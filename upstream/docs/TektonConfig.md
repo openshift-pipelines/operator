@@ -20,12 +20,14 @@ Other than the above components depending on the platform operator also provides
   - [TektonChain](./TektonChain.md)
   - [TektonResult](./TektonResult.md)
   - [ManualApprovalGate](./ManualApprovalGate.md)
+  - [ShipwrightBuild](./ShipwrightBuild.md) (installed via `spec.platforms.<platform>.shipwrightBuild`)
 - On Kubernetes
   - [TektonDashboard](./TektonDashboard.md)
   - [OpenShiftPipelinesAsCode](./OpenShiftPipelinesAsCode.md) (installed via `spec.platforms.kubernetes.pipelinesAsCode`; same CRD/kind as on OpenShift)
 - On OpenShift
   - [TektonAddon](./TektonAddon.md)
   - [OpenShiftPipelinesAsCode](./OpenShiftPipelinesAsCode.md)
+  - [SharedResource](./SharedResource.md) (installed via `spec.platforms.openshift.sharedResource`)
 - When Tekton Kueue multi-cluster is enabled with Hub role (both Kubernetes and OpenShift)
   - [TektonMulticlusterProxyAAE](./TektonMulticlusterProxyAAE.md)
 
@@ -158,6 +160,10 @@ platforms:
           remote-tasks: "true"
           secret-auto-create: "true"
           secret-github-app-token-scoped: "true"
+      shipwrightBuild:
+        enabled: false
+      sharedResource:   # OpenShift only
+        enabled: false
       options:
         disabled: false
         configMaps: {}
@@ -523,6 +529,10 @@ kueue:
 
 - `disabled`: set to `false` to enable the Tekton Kueue component (default is `true`).
 - `multi-cluster-disabled`: when `false`, multi-cluster features are enabled (default is `true`).
+- `fleet-manager`: `manual` (default when omitted) or `acm`. On an enabled
+  OpenShift Hub, `acm` installs the Pipelines MultiKueue Plugin as a TektonKueue-owned
+  subcomponent. See [Fleet manager](./TektonKueue.md#fleet-manager)
+  for prerequisites, existing deployment options and removal behavior.
 - `multi-cluster-role`: `Hub` or `Spoke`. When set to **Hub**, TektonConfig also creates and manages the [TektonMulticlusterProxyAAE](./TektonMulticlusterProxyAAE.md) component automatically (the proxy is used to communicate with spoke clusters, e.g. for [Kueue MultiKueue](https://kueue.sigs.k8s.io/docs/concepts/multikueue/)). On spoke clusters use `Spoke`; the proxy is not installed there.
 
 See [TektonMulticlusterProxyAAE](./TektonMulticlusterProxyAAE.md) for details on the proxy component and its requirements.
@@ -814,14 +824,15 @@ platforms:
 
 Pipelines as Code supports configuring remote hub catalogs to fetch tasks and pipelines. You can configure custom catalogs using the `catalog-{INDEX}-*` settings pattern.
 
-Each custom catalog requires the following four fields:
+Each custom catalog requires the following three fields:
 
 | Field | Description | Required |
 |-------|-------------|----------|
 | `catalog-{INDEX}-id` | Unique identifier for the catalog. Users reference tasks from this catalog using this ID as prefix (e.g., `custom://task-name`) | Yes |
 | `catalog-{INDEX}-name` | Name of the catalog within the hub | Yes |
 | `catalog-{INDEX}-url` | URL endpoint of the hub API | Yes |
-| `catalog-{INDEX}-type` | Type of hub: `artifacthub` (for Artifact Hub) or `tektonhub` (for Tekton Hub) | Yes |
+
+`catalog-{INDEX}-type` and `hub-catalog-type` were removed in Pipelines as Code 0.51.0. On upgrade, the operator deletes `hub-catalog-type` from TektonConfig, the OpenShiftPipelinesAsCode CR, and the `pipelines-as-code` ConfigMap.
 
 Where `{INDEX}` is a number that can be incremented to add multiple catalogs (e.g., `1`, `2`, `3`).
 
@@ -836,7 +847,6 @@ platforms:
         catalog-1-id: "custom"
         catalog-1-name: "tekton"
         catalog-1-url: "https://api.custom.hub/v1"
-        catalog-1-type: "tektonhub"
 ```
 
 ##### Example: Configuring Multiple Hub Catalogs
@@ -852,11 +862,9 @@ platforms:
         catalog-1-id: "custom"
         catalog-1-name: "tekton"
         catalog-1-url: "https://api.custom.hub/v1"
-        catalog-1-type: "tektonhub"
         catalog-2-id: "artifact"
         catalog-2-name: "tekton-catalog-tasks"
         catalog-2-url: "https://artifacthub.io"
-        catalog-2-type: "artifacthub"
 ```
 
 ##### Referencing Tasks from Custom Catalogs
@@ -873,6 +881,70 @@ pipelinesascode.tekton.dev/task: "artifact://buildah"
 For more details, see the [Pipelines-as-Code Remote Hub Catalogs documentation](https://pipelinesascode.com/docs/install/settings/#remote-hub-catalogs).
 
 **NOTE**: On Kubernetes clusters, use `spec.platforms.kubernetes.pipelinesAsCode`. The custom resource kind remains `OpenShiftPipelinesAsCode`.
+
+### ShipwrightBuild
+
+The `shipwrightBuild` section under `spec.platforms` installs and manages the
+[ShipwrightBuild](./ShipwrightBuild.md) component, a framework for building
+container images on Kubernetes. It is available on both Kubernetes and OpenShift;
+configure it under the matching platform block (`spec.platforms.openshift.shipwrightBuild`
+or `spec.platforms.kubernetes.shipwrightBuild`). When enabled, the operator creates
+and manages the singleton `ShipwrightBuild` CR automatically.
+
+> **NOTE:** ShipwrightBuild depends on [TektonPipeline](./TektonPipeline.md) being
+> installed and ready, since Shipwright runs builds as Tekton `TaskRuns`.
+
+Example (OpenShift):
+
+```yaml
+spec:
+  platforms:
+    openshift:
+      shipwrightBuild:
+        enabled: true
+```
+
+Example (Kubernetes):
+
+```yaml
+spec:
+  platforms:
+    kubernetes:
+      shipwrightBuild:
+        enabled: true
+```
+
+- `enabled`: set to `true` to install the ShipwrightBuild component. Default is `true` for OpenShift platform and `false` for Kubernetes platform.
+
+The operator propagates the top-level `spec.targetNamespace`, `spec.config`, and
+`spec.networkPolicy` onto the generated `ShipwrightBuild` CR. For the full list of
+fields on the component CR, see [ShipwrightBuild](./ShipwrightBuild.md).
+
+### SharedResource
+
+The `sharedResource` section under `spec.platforms.openshift` installs and manages
+the [SharedResource](./SharedResource.md) component, which lets Tekton workloads
+mount cluster `Secret` and `ConfigMap` resources as CSI volumes. When enabled, the
+operator creates and manages the singleton `SharedResource` CR automatically.
+
+> **NOTE:** SharedResource is an OpenShift-only component; it is configured only
+> under `spec.platforms.openshift.sharedResource`.
+
+Example:
+
+```yaml
+spec:
+  platforms:
+    openshift:
+      sharedResource:
+        enabled: true
+```
+
+- `enabled`: set to `true` to install the SharedResource component. Default is `true` when the block is present.
+
+The operator propagates the top-level `spec.targetNamespace`, `spec.config`, and
+`spec.networkPolicy` onto the generated `SharedResource` CR. For the full list of
+fields on the component CR, see [SharedResource](./SharedResource.md).
 
 ### Event based pruner 
 
@@ -975,7 +1047,44 @@ spec:
 - The event-based pruner responds to resource events in real-time, providing more efficient cleanup
 - When `enforcedConfigLevel` is set to `namespace`, individual namespaces can override these settings using ConfigMaps
 
+#### Resource Limits
 
+The operator applies default resource limits to pruner deployments based on benchmark data:
+
+**Controller:** `requests: 100m CPU, 256Mi memory` | `limits: 2Gi memory`  
+**Webhook:** `requests: 50m CPU, 64Mi memory` | `limits: 512Mi memory`
+
+CPU limits are omitted to avoid CFS throttling during reconciliation bursts. Memory limits are based on linear growth (~13.6 MB per 1k resident PipelineRuns). The 2Gi controller limit supports up to ~50k runs with some safety margin.
+
+**Benchmark data:**
+
+| Scale | Resident PRs | Heap (MB) | Container (MB) |
+|-------|--------------|-----------|----------------|
+| Baseline | 0 | 23 | - |
+| Low | 1,000 | 65 | 58 |
+| Medium | 6,000 | 148 | 69 |
+| High | 16,000 | 301 | 104 |
+| Production | 41,000 | 579 | 170 |
+
+
+**Override via options:**
+```yaml
+  tektonpruner:
+    options:
+      deployments:
+        tekton-pruner-controller:
+          spec:
+            template:
+              spec:
+                containers:
+                - name: controller
+                  resources:
+                    limits:
+                      memory: 4Gi
+                      cpu: 1000m
+```
+
+For >50k resident runs, calculate required memory: `memory_mb = 23 + (13.6 × runs_in_thousands)` and apply 1.5x safety factor.
 
 ### Additional fields as `options`
 

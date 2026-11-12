@@ -96,6 +96,44 @@ tekton-operator
 {{- end -}}
 {{- end -}}
 
+{{- define "tekton-operator.controllers" -}}
+{{- if .Values.openshift.enabled -}}
+tektonconfig,tektonpipeline,tektontrigger,tektonchain,tektonaddon,tektonresult,openshiftpipelinesascode,manualapprovalgate,tektonpruner,tektonkueue,tektonmulticlusterproxyaae,syncerservice,shipwrightbuild,sharedresource
+{{- else -}}
+tektonconfig,tektonpipeline,tektontrigger,tektonchain,tektonresult,tektondashboard,manualapprovalgate,tektonpruner,tektonkueue,tektonmulticlusterproxyaae,openshiftpipelinesascode,shipwrightbuild
+{{- end -}}
+{{- end -}}
+
+{{- define "tekton-operator.validateTargetNamespace" -}}
+{{- if and .Values.openshift.enabled .Values.operator.defaultTargetNamespace (ne .Values.operator.defaultTargetNamespace "openshift-pipelines") -}}
+{{- fail (printf "operator.defaultTargetNamespace must be \"openshift-pipelines\" when openshift.enabled=true (got %q). The openshift addon sample pipelines hardcode that namespace, so a custom value breaks them; this is also first-install-only - once the TektonConfig CR exists the operator never re-reads it. To change the target namespace, set spec.targetNamespace on the TektonConfig CR (requires deleting and recreating the CR)." .Values.operator.defaultTargetNamespace) -}}
+{{- end -}}
+{{- end -}}
+
+{{/* validateControllers fails the render when the controllers value contains a
+     name the selected operator binary does not register — each binary exits
+     fatally at startup on unknown names (openshift has no tektondashboard,
+     kubernetes has no tektonaddon/syncerservice). Catches the v0.81.1
+     --reuse-values upgrade path, where the old chart's hardcoded kubernetes
+     list crash-loops the openshift operator. */}}
+{{- define "tekton-operator.validateControllers" -}}
+{{- $root := . -}}
+{{- $list := .Values.controllers | default (include "tekton-operator.controllers" .) -}}
+{{- $invalid := list "tektonaddon" "syncerservice" "sharedresource" -}}
+{{- if .Values.openshift.enabled -}}
+{{- $invalid = list "tektondashboard" -}}
+{{- end -}}
+{{- range $raw := splitList "," $list -}}
+{{- $c := trim $raw -}}
+{{- if and $c (has $c $invalid) -}}
+{{- fail (printf "controllers must not contain %q: the %s operator binary does not register it and exits fatally at startup. This usually happens when upgrading with --reuse-values from a chart that hardcoded the kubernetes list; set controllers to \"\" to use the flavor default." $c (ternary "openshift" "kubernetes" $root.Values.openshift.enabled)) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Image repositories are the ko-published binary slugs from the v0.81.0
+     release assets; the tag follows Chart.AppVersion. If a release renames
+     the slugs, update all three (operator/webhook/proxy-webhook). */}}
 {{- define "tekton-operator.operator-image" -}}
 {{- $tag := default .Chart.AppVersion .Values.operator.image.tag -}}
 {{- $image := "" -}}
@@ -103,20 +141,22 @@ tekton-operator
   {{- $image = .Values.operator.image.repository }}
 {{- else -}}
 {{- if .Values.openshift.enabled -}}
-  {{- $image = "ghcr.io/tektoncd/operator/operator-303303c315a48490ba6517859ef65b77" -}}
+{{- $image = "ghcr.io/tektoncd/operator/operator-1d69a75f22dd094880847eac907fb2c1" -}}
 {{- else -}}
-  {{- $image = "ghcr.io/tektoncd/operator/operator-303303c315a48490ba6517859ef65b77" -}}
+{{- $image = "ghcr.io/tektoncd/operator/operator-303303c315a48490ba6517859ef65b77" -}}
 {{- end -}}
 {{- end -}}
-{{- printf "%s:%s" $image $tag -}}
+{{- include "tekton-operator.withRegistry" (dict "image" (printf "%s:%s" $image $tag) "registry" .Values.registry) -}}
 {{- end -}}
 
 {{- define "tekton-operator.pruner-image" -}}
+{{- $image := "" -}}
 {{- if contains "sha256:" .Values.pruner.image.tag -}}
-{{- printf "%s@%s" .Values.pruner.image.repository .Values.pruner.image.tag -}}
+{{- $image = printf "%s@%s" .Values.pruner.image.repository .Values.pruner.image.tag -}}
 {{- else -}}
-{{- printf "%s:%s" .Values.pruner.image.repository .Values.pruner.image.tag -}}
+{{- $image = printf "%s:%s" .Values.pruner.image.repository .Values.pruner.image.tag -}}
 {{- end -}}
+{{- $image -}}
 {{- end -}}
 
 {{- define "tekton-operator.webhook-image" -}}
@@ -126,12 +166,12 @@ tekton-operator
   {{- $image = .Values.webhook.image.repository }}
 {{- else -}}
 {{- if .Values.openshift.enabled -}}
-  {{- $image = "ghcr.io/tektoncd/operator/webhook-f2bb711aa8f0c0892856a4cbf6d9ddd8" -}}
+{{- $image = "ghcr.io/tektoncd/operator/webhook-340ad78e88ca5477447aa144fedfe1a1" -}}
 {{- else -}}
-  {{- $image = "ghcr.io/tektoncd/operator/webhook-f2bb711aa8f0c0892856a4cbf6d9ddd8" -}}
+{{- $image = "ghcr.io/tektoncd/operator/webhook-f2bb711aa8f0c0892856a4cbf6d9ddd8" -}}
 {{- end -}}
 {{- end -}}
-{{- printf "%s:%s" $image $tag -}}
+{{- include "tekton-operator.withRegistry" (dict "image" (printf "%s:%s" $image $tag) "registry" .Values.registry) -}}
 {{- end -}}
 
 
@@ -149,10 +189,43 @@ tekton-operator
   {{- $image = .Values.webhookProxy.image.repository }}
 {{- else -}}
 {{- if .Values.openshift.enabled -}}
-  {{- $image = "ghcr.io/tektoncd/operator/proxy-webhook-f6167da7bc41b96a27c5529f850e63d1" -}}
+{{- $image = "ghcr.io/tektoncd/operator/proxy-webhook-f8f95c9cea9508fe8915ae3d012d15fb" -}}
 {{- else -}}
-  {{- $image = "ghcr.io/tektoncd/operator/proxy-webhook-f6167da7bc41b96a27c5529f850e63d1" -}}
+{{- $image = "ghcr.io/tektoncd/operator/proxy-webhook-f6167da7bc41b96a27c5529f850e63d1" -}}
 {{- end -}}
 {{- end -}}
 {{- printf "%s:%s" $image $tag -}}
+{{- end -}}
+
+{{/*
+Replace the image's registry host with .Values.registry (same rule as TEKTON_REGISTRY_OVERRIDE).
+Images already under .Values.registry are left unchanged.
+*/}}
+{{- define "tekton-operator.withRegistry" -}}
+{{- $image := .image -}}
+{{- $registry := .registry | default "" | trimSuffix "/" -}}
+{{- if and $registry (not (hasPrefix (printf "%s/" $registry) $image)) -}}
+{{- $parts := splitList "/" $image -}}
+{{- $first := first $parts -}}
+{{- if and (gt (len $parts) 1) (or (contains "." $first) (contains ":" $first) (eq $first "localhost")) -}}
+{{- $image = printf "%s/%s" $registry (join "/" (rest $parts)) -}}
+{{- else -}}
+{{- $image = printf "%s/%s" $registry $image -}}
+{{- end -}}
+{{- end -}}
+{{- $image -}}
+{{- end -}}
+
+{{/*
+TEKTON_REGISTRY_OVERRIDE from .Values.registry, unless set in operator.additionalEnvs.
+*/}}
+{{- define "tekton-operator.registryOverrideEnv" -}}
+{{- $userDefined := false -}}
+{{- range .Values.operator.additionalEnvs -}}
+{{- if eq .name "TEKTON_REGISTRY_OVERRIDE" -}}{{- $userDefined = true -}}{{- end -}}
+{{- end -}}
+{{- if and .Values.registry (not $userDefined) }}
+- name: TEKTON_REGISTRY_OVERRIDE
+  value: {{ .Values.registry | trimSuffix "/" | quote }}
+{{- end }}
 {{- end -}}
