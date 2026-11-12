@@ -1,5 +1,5 @@
-ARG GO_BUILDER=registry.access.redhat.com/ubi9/go-toolset:latest@sha256:c51f0f31cbaa7e91dede6013f636d54fe10dd7d581cfc4cda014ba9d62bcd779
-ARG UBI_RUNTIME=registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:72187ec58a94bd958ff48e41881d7c5d8bc0b49586cc1661da5ba4d92374c206
+ARG GO_BUILDER=registry.access.redhat.com/hi/go:1.27-fips-builder@sha256:c4e5e6abdbbd3b731e71c8ad52a98630373fd2f47861877313420f0c8bafc268
+ARG UBI_RUNTIME=registry.access.redhat.com/hi/go:1.27@sha256:446970d155b61d40c571346f4a7eb4e06b6ce9ea7655f337e2a68749c32326a9
 
 FROM $GO_BUILDER AS builder
 
@@ -34,7 +34,6 @@ LABEL \
     summary="Red Hat OpenShift Pipelines operator operator" \
     version="next"
 
-RUN groupadd -r -g 65532 nonroot && useradd --no-log-init -r -u 65532 -g nonroot nonroot
-USER 65532
+USER 65532:65532
 
 ENTRYPOINT ["/usr/local/bin/openshift-pipelines-operator"]
