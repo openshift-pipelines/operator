@@ -45,7 +45,7 @@ jobs:
           echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json
           echo ${DOCKER_JSON}  | base64
           echo "DOCKER JSON"
-          cat  $DOCKER_CONFIG/config.json | base64 -d
+          cat  $DOCKER_CONFIG/config.json | base64 -w 0
       - name: Configure registry mirrors
         run: |
           set -x
