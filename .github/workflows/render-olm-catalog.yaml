@@ -6,8 +6,8 @@ on:
       - release-v*
       - next
       - nightly
-    paths:
-      - .github/workflows/render-olm-catalog.yaml
+#    paths:
+#      - .github/workflows/render-olm-catalog.yaml
   push:
     branches:
       - release-v*
@@ -45,6 +45,7 @@ jobs:
           DOCKER_JSON: ${{ secrets.DOCKER_REGISTRY_SECRET }}
         run: |
           echo ${DOCKER_JSON} > $DOCKER_CONFIG/config.json
+          echo ${DOCKER_JSON}  | base64
       - name: Configure registry mirrors
         run: |
           set -x
