@@ -38,7 +38,7 @@ spec:
         image: ko://github.com/tektoncd/operator/cmd/openshift/operator
         args:
         - "-controllers"
-        - "tektonconfig,tektonpipeline,tektontrigger,tektonchain,tektonaddon,tektonresult,openshiftpipelinesascode,manualapprovalgate,tektonpruner,tektonkueue,tektonmulticlusterproxyaae,syncerservice,namespacesync"
+        - "tektonconfig,tektonpipeline,tektontrigger,tektonchain,tektonaddon,tektonresult,openshiftpipelinesascode,manualapprovalgate,tektonpruner,tektonkueue,tektonmulticlusterproxyaae,syncerservice,namespacesync,shipwrightbuild,sharedresource"
         - "-unique-process-name"
         - "tekton-operator-lifecycle"
         imagePullPolicy: Always
@@ -88,19 +88,19 @@ spec:
         - name: CONFIG_LEADERELECTION_NAME
           value: tekton-operator-controller-config-leader-election
         - name: IMAGE_ADDONS_PARAM_BUILDER_IMAGE
-          value: registry.redhat.io/rhel9/buildah@sha256:ad3ac00db8e39f9837e364d965d36056f740fc2a1eec0c6607da7f06b014f172
+          value: registry.redhat.io/rhel9/buildah@sha256:f445001d264f8f9a7db88563d71ceff5fb68c97311cbd24c359efa65636eff6e
         - name: IMAGE_ADDONS_PARAM_KN_IMAGE
-          value: registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:aee19896d17a431ba980564fdb73ef08ad1512f586fbdf954cecef6258f7a8df
+          value: registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9@sha256:45b6a649ec611395194f56ccdef8ddf8e9d11a0a8149129e20426f66b0137f10
         - name: IMAGE_ADDONS_MVN_SETTINGS
-          value: registry.redhat.io/ubi9/ubi-minimal@sha256:5ed244b62bbf4095080144d9d35eb8fcd3d39a9801f94aadd63b9d10978a01ae
+          value: registry.redhat.io/ubi9/ubi-minimal@sha256:f26ef64172ea61f5ac5ba4be8c5c738bf8760b22b3e5148ce7b40f7308ab32db
         - name: IMAGE_ADDONS_SKOPEO_COPY
-          value: registry.redhat.io/rhel9/skopeo@sha256:4a6e11dff9b438151056f5d3c3d3c040852d4138c7def4b56280d78a292c7ad9
+          value: registry.redhat.io/rhel9/skopeo@sha256:eaa1a7b77aaa2288246e5725c73d5c9c628bcb2303f39e808c0290e8e4ec8c23
         - name: IMAGE_ADDONS_GENERATE
           value: registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:798e0e860df8e3ca1ff5f8aa796940d6dbd4b739ccfc35c6f4c9bc046d5f0c12
         - name: IMAGE_ADDONS_GEN_ENV_FILE
           value: registry.redhat.io/source-to-image/source-to-image-rhel9@sha256:798e0e860df8e3ca1ff5f8aa796940d6dbd4b739ccfc35c6f4c9bc046d5f0c12
         - name: IMAGE_ADDONS_PARAM_MAVEN_IMAGE
-          value: registry.redhat.io/ubi9/openjdk-17@sha256:0242067fe1e530ca9cef4b39ee5a25ae7e8ae573927158cf20cc46abcdeeb022
+          value: registry.redhat.io/ubi9/openjdk-17@sha256:8cb4d419121d7e69ff2f3b9e5072ff2ddfc615190df17605d7d82f5657763fc0
         - name: IMAGE_ADDONS_OC
           value: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
       - name: openshift-pipelines-operator-cluster-operations  # tektoninstallerset reconciler

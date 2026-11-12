@@ -26,16 +26,39 @@ set -e
 
 source $(dirname $0)/../vendor/github.com/tektoncd/plumbing/scripts/e2e-tests.sh
 
+# cert-manager version to install for Kubernetes e2e runs. Override with the
+# CERT_MANAGER_VERSION env var.
+CERT_MANAGER_VERSION=${CERT_MANAGER_VERSION:-"v1.16.5"}
+
+# install_cert_manager installs cert-manager and waits for it to become ready.
+# cert-manager is only installed on Kubernetes; on OpenShift it is skipped since
+# that platform does not rely on it for the e2e suite.
+function install_cert_manager() {
+  echo ">> Installing cert-manager ${CERT_MANAGER_VERSION}"
+  kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml" \
+  || fail_test "cert-manager installation failed"
+
+  echo ">> Waiting for cert-manager to be ready"
+  # Wait for the Deployments to report Available so webhook calls do not race the
+  # cert-manager webhook coming up.
+  kubectl wait --for=condition=Available --timeout=300s \
+    deployment/cert-manager deployment/cert-manager-webhook deployment/cert-manager-cainjector \
+    -n cert-manager || fail_test "cert-manager did not become ready"
+
+  wait_until_pods_running cert-manager || fail_test "cert-manager pods did not come up"
+}
+
 function install_operator_resources() {
 
   echo :Payload Targets:
-  echo Pipelines: ${TEKTON_PIPELINE_VERSION}
-  echo Triggers: ${TEKTON_TRIGGERS_VERSION}
-  echo Chains: ${TEKTON_CHAINS_VERSION}
-  echo Hub: ${TEKTON_HUB_VERSION}
+  # Optional debug vars (may be unset); use :- so callers with `set -u` are fine.
+  echo Pipelines: ${TEKTON_PIPELINE_VERSION:-}
+  echo Triggers: ${TEKTON_TRIGGERS_VERSION:-}
+  echo Chains: ${TEKTON_CHAINS_VERSION:-}
+  echo Hub: ${TEKTON_HUB_VERSION:-}
   if [[ ${TARGET} != "openshift" ]]; then
-    echo Results: ${TEKTON_RESULTS_VERSION}
-    echo Dashboard: ${TEKTON_DASHBOARD_VERSION}
+    echo Results: ${TEKTON_RESULTS_VERSION:-}
+    echo Dashboard: ${TEKTON_DASHBOARD_VERSION:-}
   fi
   echo '------------------------------'
 
@@ -50,10 +73,31 @@ function install_operator_resources() {
   wait_until_pods_running ${operator_namespace} || fail_test "Tekton Operator controller did not come up"
 }
 
+function dump_tektonconfig_diagnostics() {
+  local operator_namespace
+  operator_namespace=$(get_operator_namespace)
+  echo "==== TektonConfig ===="
+  kubectl get tektonconfig config -o yaml || true
+  echo "==== Operator pods (${operator_namespace}) ===="
+  kubectl get pods -n "${operator_namespace}" -o wide || true
+  echo "==== Operator logs ===="
+  kubectl logs -n "${operator_namespace}" -l name=tekton-operator --all-containers --tail=200 || true
+}
+
+# Wait until TektonConfig exists, matches the info ConfigMap version, and is Ready.
+# Optional arg: timeout in seconds (default 900 = 15m).
 function tektonconfig_ready_wait() {
-  echo "Wait for controller to start and create TektonConfig"
+  local timeout_secs=${1:-900}
+  local start
+  start=$(date +%s)
+  echo "Wait for controller to start and create TektonConfig (timeout ${timeout_secs}s)"
   TEKTONCONFIG_READY=False
   until [[ "${TEKTONCONFIG_READY}" = "True" ]]; do
+    if (( $(date +%s) - start >= timeout_secs )); then
+      echo "Timed out waiting for TektonConfig Ready after ${timeout_secs}s"
+      dump_tektonconfig_diagnostics
+      fail_test "TektonConfig did not become Ready within ${timeout_secs}s"
+    fi
     echo waiting for TektonConfig config Ready status
     sleep 5
     if is_tektonconfig_cr_created && is_tektonconfig_cr_uptodate && is_tektonconfig_cr_ready; then
@@ -123,6 +167,8 @@ function get_operator_namespace() {
 function install_latest_released_version() {
   local platform=${1}
   version=$(latest_released_version)
+  # Exported for upgrade tests to assert a real release→HEAD transition.
+  export INSTALLED_RELEASE_TAG="${version}"
   release_file_name=$(set_release_file_name ${platform})
   release_manifest_url="https://github.com/tektoncd/operator/releases/download/${version}/${release_file_name}"
   echo "latest_release_url: ${release_manifest_url}"
