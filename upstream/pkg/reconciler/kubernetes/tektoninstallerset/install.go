@@ -18,6 +18,7 @@ package tektoninstallerset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -36,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"knative.dev/pkg/logging"
@@ -43,8 +45,9 @@ import (
 )
 
 const (
-	annotationsPath = "metadata.annotations"
-	labelsPath      = "metadata.labels"
+	annotationsPath   = "metadata.annotations"
+	labelsPath        = "metadata.labels"
+	hubCatalogTypeKey = "hub-catalog-type"
 )
 
 type installer struct {
@@ -57,6 +60,7 @@ type installer struct {
 	namespaceScoped []unstructured.Unstructured
 	deployment      []unstructured.Unstructured
 	statefulset     []unstructured.Unstructured
+	daemonset       []unstructured.Unstructured
 	job             []unstructured.Unstructured
 }
 
@@ -71,6 +75,7 @@ func NewInstaller(manifest *mf.Manifest, mfClient mf.Client, kubeClientSet kuber
 		namespaceScoped: []unstructured.Unstructured{},
 		deployment:      []unstructured.Unstructured{},
 		statefulset:     []unstructured.Unstructured{},
+		daemonset:       []unstructured.Unstructured{},
 		job:             []unstructured.Unstructured{},
 	}
 
@@ -87,6 +92,9 @@ func NewInstaller(manifest *mf.Manifest, mfClient mf.Client, kubeClientSet kuber
 			continue
 		} else if res.GetKind() == "StatefulSet" {
 			installer.statefulset = append(installer.statefulset, res)
+			continue
+		} else if res.GetKind() == "DaemonSet" {
+			installer.daemonset = append(installer.daemonset, res)
 			continue
 		} else if res.GetKind() == "Job" {
 			installer.job = append(installer.job, res)
@@ -136,6 +144,13 @@ func (i *installer) ensureResources(resources []unstructured.Unstructured, insta
 			"namespace", r.GetNamespace(),
 			"name", r.GetName(),
 		)
+		// Pipelines as Code 0.51.0 removed hub-catalog-type. Drop it from the
+		// desired ConfigMap before hashing so an older rendered manifest cannot
+		// write the key back.
+		if err := omitHubCatalogType(&r); err != nil {
+			ressourceLogger.Error("failed to omit hub-catalog-type", "error", err)
+			return err
+		}
 		expectedHash, err := hash.Compute(r.Object)
 		if err != nil {
 			ressourceLogger.Error("failed to compute resource hash", "error", err)
@@ -239,7 +254,7 @@ func (i *installer) ensureResources(resources []unstructured.Unstructured, insta
 		// on the resource
 		hashOnResource := res.GetAnnotations()[v1alpha1.LastAppliedHashKey]
 
-		if expectedHash == hashOnResource {
+		if expectedHash == hashOnResource && !configMapHasHubCatalogType(res) {
 			ressourceLogger.Debug("resource is up-to-date, no changes needed")
 			continue
 		}
@@ -254,6 +269,18 @@ func (i *installer) ensureResources(resources []unstructured.Unstructured, insta
 		}
 		anno[v1alpha1.LastAppliedHashKey] = expectedHash
 		r.SetAnnotations(anno)
+
+		if configMapHasHubCatalogType(res) {
+			// One apply update. Last-applied is given hub-catalog-type so the
+			// 3-way strategic merge deletes that single live data key instead of
+			// keeping it and requiring another reconcile to remove it.
+			if err := i.applyConfigMapWithoutHubCatalogType(res, &r); err != nil {
+				ressourceLogger.Error("failed to apply config map without hub-catalog-type", "error", err)
+				return err
+			}
+			ressourceLogger.Debug("resource updated successfully")
+			continue
+		}
 
 		installManifests, err := mf.ManifestFrom(mf.Slice([]unstructured.Unstructured{r}), mf.UseClient(i.mfClient))
 		if err != nil {
@@ -270,6 +297,160 @@ func (i *installer) ensureResources(resources []unstructured.Unstructured, insta
 		return v1alpha1.RECONCILE_AGAIN_ERR
 	}
 	return nil
+}
+
+// omitHubCatalogType removes hub-catalog-type from a desired ConfigMap so apply
+// cannot write the key back from a previously rendered manifest.
+func omitHubCatalogType(obj *unstructured.Unstructured) error {
+	if !strings.EqualFold(obj.GetKind(), "ConfigMap") {
+		return nil
+	}
+	data, found, err := unstructured.NestedStringMap(obj.Object, "data")
+	if err != nil || !found {
+		return err
+	}
+	if _, ok := data[hubCatalogTypeKey]; !ok {
+		return nil
+	}
+	delete(data, hubCatalogTypeKey)
+	return unstructured.SetNestedStringMap(obj.Object, data, "data")
+}
+
+func configMapHasHubCatalogType(obj *unstructured.Unstructured) bool {
+	if obj == nil || !strings.EqualFold(obj.GetKind(), "ConfigMap") {
+		return false
+	}
+	data, found, err := unstructured.NestedStringMap(obj.Object, "data")
+	if err != nil || !found {
+		return false
+	}
+	_, ok := data[hubCatalogTypeKey]
+	return ok
+}
+
+// applyConfigMapWithoutHubCatalogType updates the live ConfigMap once. The
+// last-applied annotation is given hub-catalog-type when the live object still
+// has it, so the 3-way strategic merge emits a deletion for that key only.
+func (i *installer) applyConfigMapWithoutHubCatalogType(live, desired *unstructured.Unstructured) error {
+	original, err := lastAppliedIncludingHubCatalogType(live, desired)
+	if err != nil {
+		return err
+	}
+	modified, err := desired.MarshalJSON()
+	if err != nil {
+		return err
+	}
+	current, err := live.MarshalJSON()
+	if err != nil {
+		return err
+	}
+	schema, err := strategicpatch.NewPatchMetaFromStruct(&corev1.ConfigMap{})
+	if err != nil {
+		return err
+	}
+	patchBytes, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, schema, true)
+	if err != nil {
+		return err
+	}
+	merged, err := strategicpatch.StrategicMergePatch(current, patchBytes, &corev1.ConfigMap{})
+	if err != nil {
+		return err
+	}
+	updated := &unstructured.Unstructured{}
+	if err := updated.UnmarshalJSON(merged); err != nil {
+		return err
+	}
+	if updated.GetResourceVersion() == "" {
+		updated.SetResourceVersion(live.GetResourceVersion())
+	}
+	if updated.GetName() == "" {
+		updated.SetName(live.GetName())
+	}
+	if updated.GetNamespace() == "" {
+		updated.SetNamespace(live.GetNamespace())
+	}
+	if updated.GetKind() == "" {
+		updated.SetGroupVersionKind(live.GroupVersionKind())
+	}
+	data, found, err := unstructured.NestedStringMap(updated.Object, "data")
+	if err != nil {
+		return err
+	}
+	if found {
+		delete(data, hubCatalogTypeKey)
+		if err := unstructured.SetNestedStringMap(updated.Object, data, "data"); err != nil {
+			return err
+		}
+	}
+	ann := updated.GetAnnotations()
+	if ann == nil {
+		ann = map[string]string{}
+	}
+	spec, err := configMapSpecJSON(desired)
+	if err != nil {
+		return err
+	}
+	ann[corev1.LastAppliedConfigAnnotation] = spec
+	if hashValue := desired.GetAnnotations()[v1alpha1.LastAppliedHashKey]; hashValue != "" {
+		ann[v1alpha1.LastAppliedHashKey] = hashValue
+	}
+	updated.SetAnnotations(ann)
+	return i.mfClient.Update(updated)
+}
+
+// lastAppliedIncludingHubCatalogType returns the last-applied document with
+// hub-catalog-type present, copied from the live ConfigMap when the annotation
+// does not already contain it. CreateThreeWayMergePatch then deletes that key
+// because the desired manifest does not have it.
+func lastAppliedIncludingHubCatalogType(live, desired *unstructured.Unstructured) ([]byte, error) {
+	applied := map[string]interface{}{}
+	if prev := live.GetAnnotations()[corev1.LastAppliedConfigAnnotation]; prev != "" {
+		if err := json.Unmarshal([]byte(prev), &applied); err != nil {
+			applied = map[string]interface{}{}
+		}
+	}
+	if len(applied) == 0 {
+		raw, err := desired.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(raw, &applied); err != nil {
+			return nil, err
+		}
+	}
+	data, _ := applied["data"].(map[string]interface{})
+	if data == nil {
+		data = map[string]interface{}{}
+	}
+	if _, ok := data[hubCatalogTypeKey]; !ok {
+		liveData, found, err := unstructured.NestedStringMap(live.Object, "data")
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			if value, ok := liveData[hubCatalogTypeKey]; ok {
+				data[hubCatalogTypeKey] = value
+			}
+		}
+	}
+	applied["data"] = data
+	return json.Marshal(applied)
+}
+
+func configMapSpecJSON(obj *unstructured.Unstructured) (string, error) {
+	cp := obj.DeepCopy()
+	ann := cp.GetAnnotations()
+	delete(ann, corev1.LastAppliedConfigAnnotation)
+	if len(ann) == 0 {
+		cp.SetAnnotations(nil)
+	} else {
+		cp.SetAnnotations(ann)
+	}
+	raw, err := cp.MarshalJSON()
+	if err != nil {
+		return "", err
+	}
+	return string(raw), nil
 }
 
 func (i *installer) EnsureCRDs(installerSetName string) error {
@@ -296,6 +477,18 @@ func (i *installer) EnsureStatefulSetResources(ctx context.Context) error {
 	return nil
 }
 
+func (i *installer) EnsureDaemonSetResources(ctx context.Context) error {
+	for _, d := range i.daemonset {
+		if err := i.ensureResource(ctx, &d); err != nil {
+			return err
+		}
+		if err := i.isDaemonSetAvailable(&d); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (i *installer) EnsureDeploymentResources(ctx context.Context) error {
 	for _, d := range i.deployment {
 		if err := i.ensureResource(ctx, &d); err != nil {
@@ -312,7 +505,7 @@ func (i *installer) EnsureJobResources(installerSetName string) error {
 // list of fields should be reconciled
 func (i *installer) resourceReconcileFields(u *unstructured.Unstructured) []string {
 	switch u.GetKind() {
-	case "Deployment", "StatefulSet":
+	case "Deployment", "StatefulSet", "DaemonSet":
 		return []string{
 			annotationsPath,
 			labelsPath,
@@ -758,6 +951,25 @@ func (i *installer) isStatefulSetAvailable(sfs *unstructured.Unstructured) error
 	return nil
 }
 
+func (i *installer) isDaemonSetAvailable(ds *unstructured.Unstructured) error {
+	resource, err := i.mfClient.Get(ds)
+	if err != nil {
+		return err
+	}
+
+	daemonSet := &appsv1.DaemonSet{}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(resource.Object, daemonSet)
+	if err != nil {
+		return err
+	}
+
+	if !isDaemonSetReady(daemonSet) {
+		i.logger.Infof("daemonset %v not ready, returning will retry!", daemonSet.GetName())
+		return fmt.Errorf("%s daemonset is not ready", daemonSet.GetName())
+	}
+	return nil
+}
+
 func (i *installer) isDeploymentReady(d *unstructured.Unstructured) error {
 	resource, err := i.mfClient.Get(d)
 	if err != nil {
@@ -814,6 +1026,21 @@ func isStatefulSetReady(sfs *appsv1.StatefulSet) bool {
 	return false
 }
 
+// isDaemonSetReady reports whether the DaemonSet has finished rolling out: every
+// node that should run a pod has an updated pod that is available. DaemonSets have
+// no replica count, so readiness is derived from the desired/available scheduling
+// status instead.
+func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
+	status := ds.Status
+	// A freshly created DaemonSet may not have its status populated yet; treat
+	// desiredNumberScheduled == 0 with no updates observed as not-ready.
+	if status.ObservedGeneration < ds.Generation {
+		return false
+	}
+	return status.DesiredNumberScheduled == status.NumberAvailable &&
+		status.UpdatedNumberScheduled == status.DesiredNumberScheduled
+}
+
 func isJobCompleted(d *batchv1.Job) bool {
 	for _, c := range d.Status.Conditions {
 		if c.Type == batchv1.JobComplete && c.Status == corev1.ConditionTrue {
@@ -838,6 +1065,9 @@ func (i *installer) DeleteResources() error {
 		return err
 	}
 	if err := i.delete(i.deployment); err != nil {
+		return err
+	}
+	if err := i.delete(i.daemonset); err != nil {
 		return err
 	}
 	return nil
