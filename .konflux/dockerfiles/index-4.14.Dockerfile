@@ -10,7 +10,7 @@ RUN ["/bin/opm", "serve", "/configs", "--cache-dir=/tmp/cache", "--cache-only"]
 
 LABEL \
     com.redhat.component="openshift-pipelines-index-4.14-container" \
-    cpe="cpe:/a:redhat:openshift_pipelines:next::el9" \
+    cpe="cpe:/a:redhat:openshift_pipelines:1.25::el9" \
     description="Red Hat OpenShift Pipelines operator index-4.14" \
     io.k8s.description="Red Hat OpenShift Pipelines operator index-4.14" \
     io.k8s.display-name="Red Hat OpenShift Pipelines operator index-4.14" \
@@ -18,7 +18,7 @@ LABEL \
     maintainer="pipelines-extcomm@redhat.com" \
     name="openshift-pipelines/pipelines-index-4.14" \
     operators.operatorframework.io.bundle.channel.default.v1="latest" \
-    operators.operatorframework.io.bundle.channels.v1="latest,pipelines-next" \
+    operators.operatorframework.io.bundle.channels.v1="latest,pipelines-1.25" \
     operators.operatorframework.io.bundle.manifests.v1="manifests/" \
     operators.operatorframework.io.bundle.mediatype.v1="registry+v1" \
     operators.operatorframework.io.bundle.metadata.v1="metadata/" \
@@ -27,4 +27,4 @@ LABEL \
     operators.operatorframework.io.metrics.builder="operator-sdk-v1.37.0" \
     operators.operatorframework.io.metrics.mediatype.v1="metrics+v1" \
     summary="Red Hat OpenShift Pipelines operator index-4.14" \
-    version="next"
+    version="v1.25.0"
