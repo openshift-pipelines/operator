@@ -36,6 +36,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -193,6 +194,54 @@ var (
 	// so that spec.template.spec.containers isn't a JSON null, matching what a
 	// real manifest looks like once ApplyProxySettings processes it.
 	statefulsetPodTemplate = corev1.PodTemplateSpec{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{
+				Name:  "test",
+				Image: "test",
+			}},
+		},
+	}
+	// notReadyDaemonSet has pods desired but none available yet.
+	notReadyDaemonSet = &appsv1.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "notready-daemonset",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Template: daemonsetPodTemplate,
+		},
+		Status: appsv1.DaemonSetStatus{
+			DesiredNumberScheduled: 1,
+			UpdatedNumberScheduled: 1,
+			NumberAvailable:        0,
+		},
+	}
+	// existDaemonSet is fully rolled out: every desired pod is updated and available.
+	existDaemonSet = &appsv1.DaemonSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "exist-daemonset",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Template: daemonsetPodTemplate,
+		},
+		Status: appsv1.DaemonSetStatus{
+			DesiredNumberScheduled: 1,
+			UpdatedNumberScheduled: 1,
+			NumberAvailable:        1,
+		},
+	}
+	// daemonsetPodTemplate mirrors statefulsetPodTemplate so the DaemonSet fixtures
+	// carry a real container rather than a JSON null.
+	daemonsetPodTemplate = corev1.PodTemplateSpec{
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name:  "test",
@@ -512,6 +561,89 @@ func TestEnsureStatefulSetResources(t *testing.T) {
 				t.Errorf("EnsureStatefulSetResources() error = %v, wantErr %v", err, tt.wantError)
 			}
 		})
+	}
+}
+
+func TestEnsureDaemonSetResources(t *testing.T) {
+	ctx := context.TODO()
+	k8sClient := k8sfake.NewSimpleClientset()
+
+	tests := []struct {
+		name      string
+		dsObject  *appsv1.DaemonSet
+		wantError bool
+	}{
+		{
+			name:      "valid status check",
+			dsObject:  existDaemonSet,
+			wantError: false,
+		},
+		{
+			name:      "invalid status check",
+			dsObject:  notReadyDaemonSet,
+			wantError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var dsObjectFromInstallerSet unstructured.Unstructured
+			data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tt.dsObject)
+			assert.NilError(t, err)
+			dsObjectFromInstallerSet.Object = data
+			inExist := []unstructured.Unstructured{dsObjectFromInstallerSet}
+			client := fake.New([]runtime.Object{tt.dsObject}...)
+			manifest, err := mf.ManifestFrom(mf.Slice(inExist), mf.UseClient(client))
+			if err != nil {
+				t.Fatalf("Failed to generate manifest: %v", err)
+			}
+
+			observer, _ := zapobserver.New(zap.InfoLevel)
+			logger := zap.New(observer).Sugar()
+			i := NewInstaller(&manifest, client, k8sClient, logger)
+
+			// NewInstaller must classify the DaemonSet into the dedicated bucket.
+			assert.Equal(t, len(i.daemonset), 1)
+
+			err = i.EnsureDaemonSetResources(ctx)
+			if err != nil != tt.wantError {
+				t.Errorf("EnsureDaemonSetResources() error = %v, wantErr %v", err, tt.wantError)
+			}
+		})
+	}
+}
+
+// TestDeleteResources_DaemonSet verifies DeleteResources removes DaemonSet
+// resources owned by the installer set.
+func TestDeleteResources_DaemonSet(t *testing.T) {
+	k8sClient := k8sfake.NewSimpleClientset()
+
+	var dsObjectFromInstallerSet unstructured.Unstructured
+	data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(existDaemonSet)
+	assert.NilError(t, err)
+	dsObjectFromInstallerSet.Object = data
+
+	client := fake.New([]runtime.Object{existDaemonSet}...)
+	manifest, err := mf.ManifestFrom(mf.Slice([]unstructured.Unstructured{dsObjectFromInstallerSet}), mf.UseClient(client))
+	if err != nil {
+		t.Fatalf("Failed to generate manifest: %v", err)
+	}
+
+	observer, _ := zapobserver.New(zap.InfoLevel)
+	logger := zap.New(observer).Sugar()
+	i := NewInstaller(&manifest, client, k8sClient, logger)
+	assert.Equal(t, len(i.daemonset), 1)
+
+	// Resource exists before deletion.
+	if _, err := client.Get(&dsObjectFromInstallerSet); err != nil {
+		t.Fatalf("expected DaemonSet to exist before deletion: %v", err)
+	}
+
+	err = i.DeleteResources()
+	assert.NilError(t, err)
+
+	// Resource is gone after deletion.
+	if _, err := client.Get(&dsObjectFromInstallerSet); !apierrs.IsNotFound(err) {
+		t.Errorf("expected DaemonSet to be deleted, got err = %v", err)
 	}
 }
 
@@ -937,4 +1069,89 @@ func getHPA(name, namespace string, desiredReplicas int32, targetKind, targetNam
 			Conditions:      []autoscalingv2.HorizontalPodAutoscalerCondition{},
 		},
 	}
+}
+
+func TestEnsureResources_DropsHubCatalogTypeOnApply(t *testing.T) {
+	desired := pipelinesAsCodeConfigMap(t, map[string]string{
+		"hub-url":          "https://artifacthub.io",
+		"application-name": "Pipelines as Code CI",
+		"hub-catalog-type": "artifacthub",
+	}, nil)
+	live := pipelinesAsCodeConfigMap(t, map[string]string{
+		"hub-url":          "https://artifacthub.io",
+		"hub-catalog-type": "artifacthub",
+		"keep-me":          "yes",
+	}, map[string]string{
+		v1alpha1.LastAppliedHashKey:        "stale",
+		corev1.LastAppliedConfigAnnotation: `{"apiVersion":"v1","kind":"ConfigMap","data":{"hub-url":"https://artifacthub.io"}}`,
+	})
+
+	assertHubCatalogTypeRemoved(t, desired, live)
+	got := configMapData(t, live)
+	assert.Equal(t, got["keep-me"], "yes")
+	assert.Equal(t, got["application-name"], "Pipelines as Code CI")
+	assert.Equal(t, got["hub-url"], "https://artifacthub.io")
+}
+
+func TestEnsureResources_DropsHubCatalogTypeWhenHashMatches(t *testing.T) {
+	desired := pipelinesAsCodeConfigMap(t, map[string]string{
+		"hub-url": "https://artifacthub.io",
+	}, nil)
+	sum, err := hash.Compute(desired.Object)
+	assert.NilError(t, err)
+	live := pipelinesAsCodeConfigMap(t, map[string]string{
+		"hub-url":          "https://artifacthub.io",
+		"hub-catalog-type": "artifacthub",
+		"keep-me":          "yes",
+	}, map[string]string{
+		v1alpha1.LastAppliedHashKey:        sum,
+		corev1.LastAppliedConfigAnnotation: `{"apiVersion":"v1","kind":"ConfigMap","data":{"hub-url":"https://artifacthub.io"}}`,
+	})
+
+	assertHubCatalogTypeRemoved(t, desired, live)
+	assert.Equal(t, configMapData(t, live)["keep-me"], "yes")
+}
+
+func assertHubCatalogTypeRemoved(t *testing.T, desired, live *unstructured.Unstructured) {
+	t.Helper()
+	fakeClient := fake.New(live)
+	logger := zap.NewNop().Sugar()
+	manifest, err := mf.ManifestFrom(mf.Slice([]unstructured.Unstructured{*desired}))
+	assert.NilError(t, err)
+	installer := NewInstaller(&manifest, fakeClient, k8sfake.NewSimpleClientset(), logger)
+	assert.NilError(t, installer.EnsureNamespaceScopedResources("test-installerset"))
+
+	got, err := fakeClient.Get(desired)
+	assert.NilError(t, err)
+	_, exists := configMapData(t, got)["hub-catalog-type"]
+	assert.Equal(t, exists, false)
+	*live = *got
+}
+
+func pipelinesAsCodeConfigMap(t *testing.T, data, annotations map[string]string) *unstructured.Unstructured {
+	t.Helper()
+	cm := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "pipelines-as-code",
+			Namespace:   "openshift-pipelines",
+			Annotations: annotations,
+		},
+		Data: data,
+	}
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cm)
+	assert.NilError(t, err)
+	u := &unstructured.Unstructured{Object: obj}
+	u.SetAPIVersion("v1")
+	u.SetKind("ConfigMap")
+	u.SetName(cm.Name)
+	u.SetNamespace(cm.Namespace)
+	return u
+}
+
+func configMapData(t *testing.T, obj *unstructured.Unstructured) map[string]string {
+	t.Helper()
+	data, _, err := unstructured.NestedStringMap(obj.Object, "data")
+	assert.NilError(t, err)
+	return data
 }

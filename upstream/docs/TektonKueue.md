@@ -11,6 +11,13 @@ Install these APIs before enabling Tekton Kueue:
 - [Kueue](https://kueue.sigs.k8s.io/)
 - [cert-manager](https://cert-manager.io/docs/installation/)
 
+On an OpenShift hub that uses the `acm` [fleet manager](#fleet-manager), the
+plugin installs them when they are missing.
+
+Tekton Kueue itself is not installed while one of them is missing. TektonKueue
+reports, for example, `Dependency missing: API cert-manager.io/v1 does not exist.
+Please install cert-manager.io/v1`, and TektonConfig shows the same reason.
+
 ## Configuration
 
 Enable Tekton Kueue through `TektonConfig`:
@@ -81,6 +88,76 @@ spec:
   config.yaml:
     queueName: pipelines-queue
 ```
+
+## Fleet manager
+
+`fleet-manager` selects how worker clusters are connected to MultiKueue:
+
+- `manual` (default when omitted): administrators or external tooling manage
+  cluster connections. The operator does not install a plugin.
+- `acm`: on an OpenShift hub, the operator installs the
+  [Pipelines MultiKueue Plugin](https://github.com/openshift-pipelines/pipelines-multikueue-plugin).
+  Tekton Kueue and multi-cluster mode must be enabled.
+
+For example, configure an ACM hub through TektonConfig:
+
+```yaml
+apiVersion: operator.tekton.dev/v1alpha1
+kind: TektonConfig
+metadata:
+  name: config
+spec:
+  kueue:
+    disabled: false
+    multi-cluster-disabled: false
+    multi-cluster-role: Hub
+    fleet-manager: acm
+    config.yaml:
+      queueName: pipelines-queue
+```
+
+For a standalone TektonKueue, set the same fields directly under `spec`.
+Existing installations default to `manual`.
+
+The hub requires OLM and the OCM ManagedCluster, ManifestWork and
+ManagedServiceAccount APIs. Its ManagedServiceAccount add-on must also be running.
+
+Kueue and cert-manager do not have to be installed first. The operator installs
+the plugin before Tekton Kueue. When the hub has no Subscription for the OpenShift
+Kueue or cert-manager operator, the plugin creates one from the `redhat-operators`
+catalog, on the channel defined by the bundled plugin release. Tekton Kueue is
+installed once both APIs are served, and the
+[proxy](./TektonMulticlusterProxyAAE.md) once Kueue serves MultiKueueClusters. The
+operator does not check how Kueue was installed, so do not use `acm` on a hub that
+runs a Kueue other than OpenShift Kueue.
+
+While the plugin or one of these APIs is missing, TektonKueue is not ready, and
+TektonConfig reports the same reason.
+
+The current plugin enrolls all non-local ManagedClusters, bootstraps operators on
+workers, and creates its default hub queue resources. These behaviors are defined
+by the bundled plugin release. Its default LocalQueue is `pipelines-queue` in
+`default`; changing TektonKueue's `config.yaml.queueName` does not reconfigure the
+plugin's queue names.
+
+The operator installs the plugin in `targetNamespace` through a Custom InstallerSet
+owned by TektonKueue. TektonKueue readiness includes plugin installation readiness,
+not the connectivity of every worker. Selecting `manual`, disabling the parent or
+multi-cluster mode, or deleting TektonKueue removes the plugin installation.
+Operators, queues and connections provisioned by the plugin remain. After removal,
+administrators or external tooling must maintain connection credentials.
+
+The operator sets the plugin's `KUEUE_NAMESPACE` environment variable to
+`openshift-kueue-operator`, independently of `targetNamespace`. Existing
+`spec.kueue.options.deployments.pipelines-multikueue-plugin-controller` options
+can customize the `controller` container, including supported environment
+variables. For standalone TektonKueue, use `spec.options.deployments`.
+`KUEUE_NAMESPACE` changes Secret placement only; the bundled external Kueue RBAC
+binding still targets `openshift-kueue-operator`.
+
+Operator deployments can override the plugin image with
+`IMAGE_MULTIKUEUE_PLUGIN_CONTROLLER`. The plugin also uses the existing
+`TEKTON_REGISTRY_OVERRIDE` mechanism.
 
 ## Upgrade compatibility
 
