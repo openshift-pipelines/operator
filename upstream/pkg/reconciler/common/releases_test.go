@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -31,6 +32,25 @@ const (
 	CHAINS_VERSION = "0.26.2"
 	PAC_VERSION    = "0.2.0"
 )
+
+func TestMultiKueuePluginPayload(t *testing.T) {
+	root := t.TempDir()
+	versionDir := filepath.Join(root, MultiKueuePluginManifestDir, "0.1.1")
+	if err := os.MkdirAll(versionDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(versionDir, "release-v0.1.1.yaml"), []byte("apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: plugin\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(KoEnvKey, root)
+	var manifest mf.Manifest
+	ctrl := Controller{Manifest: &manifest, VersionConfigMap: MultiKueuePluginManifestDir + "-info"}
+	if err := ctrl.fetchSourceManifests(t.Context(), PayloadOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	util.AssertEqual(t, len(manifest.Resources()), 1)
+	util.AssertEqual(t, manifest.Resources()[0].GetName(), "plugin")
+}
 
 func TestGetLatestRelease(t *testing.T) {
 	koPath := "testdata/kodata"
@@ -75,6 +95,18 @@ func TestListReleases(t *testing.T) {
 	version, err = allReleases(&v1alpha1.OpenShiftPipelinesAsCode{})
 	util.AssertEqual(t, err, nil)
 	util.AssertDeepEqual(t, version, expectedPACVersions)
+
+	// Shared Resource (kodata/shared-resource)
+	expectedSharedResourceVersions := []string{"0.2.0", "0.1.0"}
+	version, err = allReleases(&v1alpha1.SharedResource{})
+	util.AssertEqual(t, err, nil)
+	util.AssertDeepEqual(t, version, expectedSharedResourceVersions)
+
+	// Shipwright Build (kodata/shipwright-build)
+	expectedShipwrightBuildVersions := []string{"0.21.0", "0.20.0"}
+	version, err = allReleases(&v1alpha1.ShipwrightBuild{})
+	util.AssertEqual(t, err, nil)
+	util.AssertDeepEqual(t, version, expectedShipwrightBuildVersions)
 }
 
 func TestComponentDir_OpenShiftPipelinesAsCode(t *testing.T) {

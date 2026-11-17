@@ -27,15 +27,19 @@ spec:
         name: tekton-operator
         app: tekton-operator
     spec:
+      enableServiceLinks: false
       serviceAccountName: tekton-operator
       containers:
       - name: tekton-operator-lifecycle  # all reconcilers except tektoninstallerset reconciler
         image: ko://github.com/tektoncd/operator/cmd/kubernetes/operator
         args:
         - "-controllers"
-        - "tektonconfig,tektonpipeline,tektontrigger,tektonchain,tektonresult,tektondashboard,manualapprovalgate,tektonpruner,tektonkueue,tektonmulticlusterproxyaae,openshiftpipelinesascode"
+        - "tektonconfig,tektonpipeline,tektontrigger,tektonchain,tektonresult,tektondashboard,manualapprovalgate,tektonpruner,tektonkueue,tektonmulticlusterproxyaae,openshiftpipelinesascode,shipwrightbuild"
         - "-unique-process-name"
         - "tekton-operator-lifecycle"
+        ports:
+        - name: http-metrics
+          containerPort: 9090
         imagePullPolicy: IfNotPresent
         env:
         - name: KUBERNETES_MIN_VERSION

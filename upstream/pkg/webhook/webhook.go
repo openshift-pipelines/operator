@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/tektoncd/operator/pkg/apis/operator/v1alpha1"
+	dynamicclient "github.com/tektoncd/operator/pkg/client/injection/dynamic"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"knative.dev/pkg/configmap"
 	"knative.dev/pkg/controller"
@@ -38,18 +39,21 @@ var types = map[schema.GroupVersionKind]resourcesemantics.GenericCRD{
 	v1alpha1.SchemeGroupVersion.WithKind(v1alpha1.KindTektonChain):        &v1alpha1.TektonChain{},
 	v1alpha1.SchemeGroupVersion.WithKind(v1alpha1.KindTektonPruner):       &v1alpha1.TektonPruner{},
 	v1alpha1.SchemeGroupVersion.WithKind(v1alpha1.KindManualApprovalGate): &v1alpha1.ManualApprovalGate{},
+	v1alpha1.SchemeGroupVersion.WithKind(v1alpha1.KindShipwrightBuild):    &v1alpha1.ShipwrightBuild{},
 }
 
 func SetTypes(platform string) {
 	if platform == "openshift" {
 		types[v1alpha1.SchemeGroupVersion.WithKind(v1alpha1.KindTektonAddon)] = &v1alpha1.TektonAddon{}
 		types[v1alpha1.SchemeGroupVersion.WithKind(v1alpha1.KindOpenShiftPipelinesAsCode)] = &v1alpha1.OpenShiftPipelinesAsCode{}
+		types[v1alpha1.SchemeGroupVersion.WithKind(v1alpha1.KindSharedResource)] = &v1alpha1.SharedResource{}
 	} else {
 		types[v1alpha1.SchemeGroupVersion.WithKind(v1alpha1.KindTektonDashboard)] = &v1alpha1.TektonDashboard{}
 	}
 }
 
 func NewDefaultingAdmissionController(ctx context.Context, cmw configmap.Watcher) *controller.Impl {
+	client := dynamicclient.Get(ctx)
 	return defaulting.NewAdmissionController(ctx,
 
 		// Name of the resource webhook.
@@ -60,9 +64,10 @@ func NewDefaultingAdmissionController(ctx context.Context, cmw configmap.Watcher
 		// The resources to validate and default.
 		types,
 
-		// A function that infuses the context passed to Validate/SetDefaults with custom metadata.
+		// Admission requests have independent contexts. Carry the injected client
+		// into SetDefaults so cluster-aware defaults reuse the shared API client.
 		func(ctx context.Context) context.Context {
-			return ctx
+			return dynamicclient.WithClient(ctx, client)
 		},
 
 		// Whether to disallow unknown fields.
