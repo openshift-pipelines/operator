@@ -26,6 +26,8 @@ spec:
       name: tekton-operator-webhook
   template:
     metadata:
+      annotations:
+        openshift.io/required-scc: restricted-v2
       labels:
         name: tekton-operator-webhook
         app: tekton-operator
@@ -34,6 +36,7 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+      enableServiceLinks: false
       serviceAccountName: openshift-pipelines-operator
       containers:
       - name: tekton-operator-webhook
@@ -65,6 +68,8 @@ spec:
         - name: https-webhook
           containerPort: 8443
         securityContext:
+          runAsNonRoot: true
+          privileged: false
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
           capabilities:
