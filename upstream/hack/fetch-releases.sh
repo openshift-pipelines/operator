@@ -145,7 +145,10 @@ release_yaml_github() {
   version=$(yq .$component.version ${CONFIG})
   releaseFileName=release-$version.yaml
   destFileName=$releaseFileName
-
+  if [[ ${component} == "kueue" ]]; then
+    releaseFileName=release.yaml
+    destFileName=release.yaml
+  fi
   echo "$github_component version is $version"
   case $version in
     latest)
@@ -310,14 +313,17 @@ release_yaml_manualapprovalgate() {
 }
 
 release_yaml_custom() {
-  local component=$1; shift;
-  local filenames=("$@")
-  local repository=$(yq .${component}.github ${CONFIG})
-  local version=$(yq .${component}.version ${CONFIG})
-  local destination=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata/${component}/${version//v}
+  local component=$1
+  local repository=${2:-$(yq .${component}.github ${CONFIG})}
+  local version=${3:-$(yq .${component}.version ${CONFIG})}
+  local clean=${4:-true}
+  local filenames=("${@:5}")
+  local destination=${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata/${component}/$(yq ".${component}.version" "${CONFIG}" | tr -d 'v')
 
-  rm -rf "${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata/${component}"
-  mkdir -p ${destination}
+  if "$clean"; then
+    rm -rf "${SCRIPT_DIR}/cmd/${TARGET}/operator/kodata/${component}"
+    mkdir -p ${destination}
+  fi
 
   github_fetch() {
     echo Fetching '|' component: ${component} '|' file: ${filename} '|' version: ${version}
@@ -335,18 +341,13 @@ release_yaml_custom() {
   for filename in "${filenames[@]}"; do
     github_fetch
   done
+}
 
-  # If TARGET is "openshift", fetch OpenShift specific files
-  if [[ ${TARGET} == "openshift" ]]; then
-    unset filenames
-    yq ".[\"${component}\"].openshift[] | . as \$o | \$o.files[] | \$o.github + \" \" + \$o.version + \" \" + ." "${CONFIG}" |
-    while read -r repository version filenames; do
-      filenames=(${filenames})
-      for filename in "${filenames[@]}"; do
-        github_fetch
-      done
-    done
-  fi
+fetch_openshift_build_strategies() {
+    local shipwright_version=$(yq .shipwright-build.version ${CONFIG})
+    local strategy_repository="redhat-openshift-builds/strategies"
+    local strategy_version=$(curl -sL https://api.github.com/repos/$strategy_repository/releases | jq -r ".[].tag_name" | grep "^${shipwright_version%.*}" | sort -Vr | head -n1)
+    release_yaml_custom shipwright-build $strategy_repository $strategy_version false strategies.yaml
 }
 
 fetch_openshift_addon_tasks() {
@@ -489,14 +490,15 @@ main() {
 
   # Shipwright Build
   if [[ ${TARGET} == "openshift" ]]; then
-    release_yaml_custom shipwright-build release.yaml
+    release_yaml_custom shipwright-build "" "" true release.yaml
+    fetch_openshift_build_strategies
   else
-    release_yaml_custom shipwright-build release.yaml sample-strategies.yaml
+    release_yaml_custom shipwright-build "" "" true release.yaml sample-strategies.yaml
   fi
 
   # Shared Resource CSI Driver
   if [[ ${TARGET} == "openshift" ]]; then
-    release_yaml_custom shared-resource release.yaml
+    release_yaml_custom shared-resource "" "" true release.yaml
   fi
 
   echo updated payload tree
