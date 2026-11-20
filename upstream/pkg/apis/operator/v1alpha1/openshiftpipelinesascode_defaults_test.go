@@ -41,6 +41,8 @@ func TestSetPACControllerDefaultSettings(t *testing.T) {
 	opacCR.Spec.PACSettings.setPACDefaults(zap.NewNop().Sugar())
 
 	expectedSettings := map[string]string{
+		"api-retry-max-attempts":                     "4",
+		"api-retry-max-wait-seconds":                 "120",
 		"application-name":                           "Pipelines as Code CI",
 		"auto-configure-new-github-repo":             "false",
 		"auto-configure-repo-namespace-template":     "",
@@ -51,17 +53,19 @@ func TestSetPACControllerDefaultSettings(t *testing.T) {
 		"custom-console-url":                         "",
 		"custom-console-url-namespace":               "",
 		"custom-console-url-pr-details":              "",
+		"custom-console-url-pr-steplog":              "",
 		"custom-console-url-pr-tasklog":              "",
 		"default-max-keep-runs":                      "0",
+		"enable-api-retry":                           "false",
 		"enable-cancel-in-progress-on-pull-requests": "false",
 		"enable-cancel-in-progress-on-push":          "false",
+		"enable-follow-up-runs":                      "false",
 		"error-detection-from-container-logs":        "true",
 		"error-detection-max-number-of-lines":        "50",
 		"error-detection-simple-regexp":              "^(?P<filename>[^:]*):(?P<line>[0-9]+):(?P<column>[0-9]+)?([ ]*)?(?P<error>.*)",
 		"error-log-snippet":                          "true",
 		"error-log-snippet-number-of-lines":          "3",
-		"hub-catalog-type":                           "artifacthub",
-		"hub-url":                                    "https://artifacthub.io/api/v1",
+		"hub-url":                                    "https://artifacthub.io",
 		"max-keep-run-upper-limit":                   "0",
 		"remember-ok-to-test":                        "false",
 		"require-ok-to-test-sha":                     "false",
@@ -70,10 +74,13 @@ func TestSetPACControllerDefaultSettings(t *testing.T) {
 		"secret-auto-create":                         "true",
 		"secret-github-app-scope-extra-repos":        "",
 		"secret-github-app-token-scoped":             "true",
+		"status-show-steps":                          "true",
+		"support-edited-comments":                    "false",
 		"tekton-dashboard-url":                       "",
 		"tracing-label-action":                       "",
 		"tracing-label-application":                  "",
 		"tracing-label-component":                    "",
+		"trusted-provider-hostnames":                 "",
 	}
 
 	assert.DeepEqual(t, opacCR.Spec.PACSettings.Settings, expectedSettings)
@@ -103,6 +110,8 @@ func TestSetPACControllerLimitedSettings(t *testing.T) {
 	opacCR.Spec.PACSettings.setPACDefaults(zap.NewNop().Sugar())
 
 	expectedSettings := map[string]string{
+		"api-retry-max-attempts":                     "4",
+		"api-retry-max-wait-seconds":                 "120",
 		"application-name":                           "Pipelines as Code CI test name",
 		"auto-configure-new-github-repo":             "false",
 		"auto-configure-repo-namespace-template":     "",
@@ -113,17 +122,19 @@ func TestSetPACControllerLimitedSettings(t *testing.T) {
 		"custom-console-url":                         "",
 		"custom-console-url-namespace":               "",
 		"custom-console-url-pr-details":              "",
+		"custom-console-url-pr-steplog":              "",
 		"custom-console-url-pr-tasklog":              "",
 		"default-max-keep-runs":                      "0",
+		"enable-api-retry":                           "false",
 		"enable-cancel-in-progress-on-pull-requests": "false",
 		"enable-cancel-in-progress-on-push":          "false",
+		"enable-follow-up-runs":                      "false",
 		"error-detection-from-container-logs":        "true",
 		"error-detection-max-number-of-lines":        "100",
 		"error-detection-simple-regexp":              "^(?P<filename>[^:]*):(?P<line>[0-9]+):(?P<column>[0-9]+)?([ ]*)?(?P<error>.*)",
 		"error-log-snippet":                          "true",
 		"error-log-snippet-number-of-lines":          "3",
-		"hub-catalog-type":                           "artifacthub",
-		"hub-url":                                    "https://artifacthub.io/api/v1",
+		"hub-url":                                    "https://artifacthub.io",
 		"max-keep-run-upper-limit":                   "0",
 		"remember-ok-to-test":                        "false",
 		"require-ok-to-test-sha":                     "false",
@@ -132,10 +143,13 @@ func TestSetPACControllerLimitedSettings(t *testing.T) {
 		"secret-auto-create":                         "true",
 		"secret-github-app-scope-extra-repos":        "",
 		"secret-github-app-token-scoped":             "true",
+		"status-show-steps":                          "true",
+		"support-edited-comments":                    "false",
 		"tekton-dashboard-url":                       "",
 		"tracing-label-action":                       "",
 		"tracing-label-application":                  "",
 		"tracing-label-component":                    "",
+		"trusted-provider-hostnames":                 "",
 	}
 
 	assert.DeepEqual(t, opacCR.Spec.PACSettings.Settings, expectedSettings)
@@ -164,6 +178,8 @@ func TestSetPACControllerDefaultSettingsWithMultipleCatalogs(t *testing.T) {
 	opacCR.Spec.PACSettings.setPACDefaults(zap.NewNop().Sugar())
 
 	expectedSettings := map[string]string{
+		"api-retry-max-attempts":                     "4",
+		"api-retry-max-wait-seconds":                 "120",
 		"application-name":                           "Pipelines as Code CI",
 		"auto-configure-new-github-repo":             "false",
 		"auto-configure-repo-namespace-template":     "",
@@ -172,27 +188,27 @@ func TestSetPACControllerDefaultSettingsWithMultipleCatalogs(t *testing.T) {
 		"bitbucket-cloud-check-source-ip":            "true",
 		"catalog-1-id":                               "anotherhub",
 		"catalog-1-name":                             "tekton",
-		"catalog-1-type":                             "tektonhub",
 		"catalog-1-url":                              "https://api.other.com/v1",
 		"catalog-5-id":                               "anotherhub5",
 		"catalog-5-name":                             "tekton1",
-		"catalog-5-type":                             "artifacthub",
 		"catalog-5-url":                              "https://artifacthub.io/api/v1",
 		"custom-console-name":                        "",
 		"custom-console-url":                         "",
 		"custom-console-url-namespace":               "",
 		"custom-console-url-pr-details":              "",
+		"custom-console-url-pr-steplog":              "",
 		"custom-console-url-pr-tasklog":              "",
 		"default-max-keep-runs":                      "0",
+		"enable-api-retry":                           "false",
 		"enable-cancel-in-progress-on-pull-requests": "false",
 		"enable-cancel-in-progress-on-push":          "false",
+		"enable-follow-up-runs":                      "false",
 		"error-detection-from-container-logs":        "true",
 		"error-detection-max-number-of-lines":        "50",
 		"error-detection-simple-regexp":              "^(?P<filename>[^:]*):(?P<line>[0-9]+):(?P<column>[0-9]+)?([ ]*)?(?P<error>.*)",
 		"error-log-snippet":                          "true",
 		"error-log-snippet-number-of-lines":          "3",
-		"hub-catalog-type":                           "artifacthub",
-		"hub-url":                                    "https://artifacthub.io/api/v1",
+		"hub-url":                                    "https://artifacthub.io",
 		"max-keep-run-upper-limit":                   "0",
 		"remember-ok-to-test":                        "false",
 		"require-ok-to-test-sha":                     "false",
@@ -201,10 +217,13 @@ func TestSetPACControllerDefaultSettingsWithMultipleCatalogs(t *testing.T) {
 		"secret-auto-create":                         "true",
 		"secret-github-app-scope-extra-repos":        "",
 		"secret-github-app-token-scoped":             "true",
+		"status-show-steps":                          "true",
+		"support-edited-comments":                    "false",
 		"tekton-dashboard-url":                       "",
 		"tracing-label-action":                       "",
 		"tracing-label-application":                  "",
 		"tracing-label-component":                    "",
+		"trusted-provider-hostnames":                 "",
 	}
 
 	assert.DeepEqual(t, opacCR.Spec.PACSettings.Settings, expectedSettings)
@@ -267,7 +286,7 @@ func TestSetAdditionalPACControllerDefaultHavingAdditionalPACController(t *testi
 }
 
 func TestSetPACControllerDefaultWhenNotArtifactHubSetsTektonHub(t *testing.T) {
-	// When default catalog is not artifacthub, operator sets it to tektonhub
+	// When default catalog is not artifacthub, operator preserves the custom hub URL
 	opacCR := &OpenShiftPipelinesAsCode{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "name",
@@ -276,8 +295,7 @@ func TestSetPACControllerDefaultWhenNotArtifactHubSetsTektonHub(t *testing.T) {
 		Spec: OpenShiftPipelinesAsCodeSpec{
 			PACSettings: PACSettings{
 				Settings: map[string]string{
-					"hub-catalog-type": "tektonhub",
-					"hub-url":          "https://api.hub.tekton.dev/v1",
+					"hub-url": "https://api.hub.tekton.dev/v1",
 				},
 			},
 		},
@@ -285,7 +303,6 @@ func TestSetPACControllerDefaultWhenNotArtifactHubSetsTektonHub(t *testing.T) {
 
 	opacCR.Spec.PACSettings.setPACDefaults(zap.NewNop().Sugar())
 
-	// Default catalog should be tektonhub when not artifacthub
-	assert.Equal(t, "tektonhub", opacCR.Spec.PACSettings.Settings["hub-catalog-type"])
+	// Custom hub URL should be preserved
 	assert.Equal(t, "https://api.hub.tekton.dev/v1", opacCR.Spec.PACSettings.Settings["hub-url"])
 }
