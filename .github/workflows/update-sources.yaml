@@ -58,16 +58,6 @@ jobs:
             git checkout HEAD .
           popd
       
-      - name: Generate patches
-        run: |
-          pushd upstream
-            sed -i "s/go 1.27.3/go 1.26.10/g" go.mod
-
-            sed -i "s/go 1.27.3/go 1.26.10/g" vendor/modules.txt
-
-            sed -i "s/go 1.27.0/go 1.26.10/g" vendor/modules.txt
-
-          popd
       - name: Commit new changes
         run: |          
         
