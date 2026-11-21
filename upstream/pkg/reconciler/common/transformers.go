@@ -54,10 +54,13 @@ const (
 	ManualApprovalGatePrefix        = "IMAGE_MAG_"
 	PrunerImagePrefix               = "IMAGE_PRUNER_"
 	KueueImagePrefix                = "IMAGE_KUEUE_"
+	MultiKueuePluginImagePrefix     = "IMAGE_MULTIKUEUE_PLUGIN_"
 	MulticlusterProxyAAEImagePrefix = "IMAGE_MULTICLUSTERPROXYAAE_"
 	SyncerServiceImagePrefix        = "IMAGE_SYNCER_SERVICE_WORKLOAD_"
 	ResultsImagePrefix              = "IMAGE_RESULTS_"
 	DashboardImagePrefix            = "IMAGE_DASHBOARD_"
+	ShipwrightBuildImagePrefix      = "IMAGE_SHIPWRIGHT_BUILD_"
+	SharedResourceImagePrefix       = "IMAGE_SHARED_RESOURCE_"
 
 	DefaultTargetNamespace = "tekton-pipelines"
 
@@ -210,13 +213,25 @@ func overrideImageRegistry(registry, imageName string) string {
 	if strings.Contains(imageName, "$(") {
 		return imageName
 	}
+	// Already under the override registry: leave it alone so that a second
+	// pass (e.g. an image pre-rewritten by the Helm chart) is a no-op.
+	registry = strings.TrimSuffix(registry, "/")
+	if strings.HasPrefix(imageName, registry+"/") {
+		return imageName
+	}
 	parts := strings.Split(imageName, "/")
-	if len(parts) > 1 {
+	if len(parts) > 1 && isRegistryHost(parts[0]) {
 		// if image has registry part, replace it
 		return registry + "/" + strings.Join(parts[1:], "/")
 	}
-	// if image does not have registry part, add it
+	// no registry part (e.g. "bitnami/postgresql"): prepend the registry
 	return registry + "/" + imageName
+}
+
+// isRegistryHost uses the Docker rule: a registry host contains "." or ":",
+// or is "localhost". Otherwise it is a namespace, e.g. "bitnami".
+func isRegistryHost(component string) bool {
+	return strings.ContainsAny(component, ".:") || component == "localhost"
 }
 
 // ToLowerCaseKeys converts key value to lower cases.
@@ -311,6 +326,71 @@ func JobImages(images map[string]string) mf.Transformer {
 	}
 }
 
+// DaemonSetImages replaces container and args images.
+func DaemonSetImages(images map[string]string) mf.Transformer {
+	return func(u *unstructured.Unstructured) error {
+		if u.GetKind() != "DaemonSet" {
+			return nil
+		}
+
+		ds := &appsv1.DaemonSet{}
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, ds)
+		if err != nil {
+			return err
+		}
+
+		containers := ds.Spec.Template.Spec.Containers
+		replaceContainerImages(containers, images)
+
+		unstrObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ds)
+		if err != nil {
+			return err
+		}
+		u.SetUnstructuredContent(unstrObj)
+
+		return nil
+	}
+}
+
+// EnvImages replaces image references carried in the environment
+// variables of a Deployment's containers (and init containers). Unlike
+// DeploymentImages — which rewrites the container image and CLI args — this
+// targets images delivered through env vars: an env var whose name maps to an
+// entry in images (keyed with EnvPrefix, e.g. IMAGE_<COMPONENT>_SIDECAR_IMAGE)
+// is set to that image; otherwise image-like env vars have just their registry
+// domain rewritten via TEKTON_REGISTRY_OVERRIDE. It is a separate, opt-in
+// transformer so components only apply it when they ship an image through an env
+// var.
+func EnvImages(images map[string]string) mf.Transformer {
+	return func(u *unstructured.Unstructured) error {
+		if u.GetKind() != "Deployment" {
+			return nil
+		}
+
+		d := &appsv1.Deployment{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, d); err != nil {
+			return err
+		}
+
+		containers := d.Spec.Template.Spec.Containers
+		for i := range containers {
+			replaceContainersEnvImage(&containers[i], images)
+		}
+		initContainers := d.Spec.Template.Spec.InitContainers
+		for i := range initContainers {
+			replaceContainersEnvImage(&initContainers[i], images)
+		}
+
+		unstrObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(d)
+		if err != nil {
+			return err
+		}
+		u.SetUnstructuredContent(unstrObj)
+
+		return nil
+	}
+}
+
 func replaceContainerImages(containers []corev1.Container, images map[string]string) {
 	registry := os.Getenv(ImageRegistryOverride)
 	for i, container := range containers {
@@ -325,13 +405,42 @@ func replaceContainerImages(containers []corev1.Container, images map[string]str
 	}
 }
 
+// replaceContainersEnvImage replaces image references passed as container
+// environment variables. An env var whose name maps to an entry in images
+// (keyed with EnvPrefix, e.g. IMAGE_<COMPONENT>_ENV_SIDECAR_IMAGE) is set to
+// that image. Otherwise, env vars whose name looks like an image (its key
+// contains "_image") have just their registry domain rewritten, so
+// TEKTON_REGISTRY_OVERRIDE alone also applies to env-based images and not only
+// to container.Image. Env vars sourced from ValueFrom carry no literal image
+// and are skipped.
+func replaceContainersEnvImage(container *corev1.Container, images map[string]string) {
+	registry := os.Getenv(ImageRegistryOverride)
+	for e := range container.Env {
+		if container.Env[e].ValueFrom != nil {
+			continue
+		}
+		key := formKey("", container.Env[e].Name)
+		if url, exist := images[key]; exist {
+			container.Env[e].Value = url
+		} else if strings.Contains(key, "_image") {
+			container.Env[e].Value = overrideImageRegistry(registry, container.Env[e].Value)
+		}
+	}
+}
+
 // replaceContainersArgsImage replaces image references passed as container
 // args (e.g. "-workingdirinit-image", "gcr.io/..."). If no per-image env var
 // matches a given "*-image*" flag (e.g. "-shell-image-win"), it falls back
 // to rewriting just the registry domain, so TEKTON_REGISTRY_OVERRIDE alone
 // also applies to arg-based images and not only to container.Image.
+// Only flags are matched; a flag's value is never treated as a flag.
 func replaceContainersArgsImage(container *corev1.Container, images map[string]string, registry string) {
-	for a, arg := range container.Args {
+	for a := 0; a < len(container.Args); a++ {
+		arg := container.Args[a]
+		if !strings.HasPrefix(arg, "-") {
+			continue
+		}
+
 		if argVal, hasArg := SplitsByEqual(arg); hasArg {
 			argument := formKey(ArgPrefix, argVal[0])
 			if url, exist := images[argument]; exist {
@@ -342,12 +451,18 @@ func replaceContainersArgsImage(container *corev1.Container, images map[string]s
 			continue
 		}
 
+		if a+1 >= len(container.Args) || strings.HasPrefix(container.Args[a+1], "-") {
+			// flag without a value
+			continue
+		}
+
 		argument := formKey(ArgPrefix, arg)
 		if url, exist := images[argument]; exist {
 			container.Args[a+1] = url
 		} else if strings.Contains(argument, "_image") {
 			container.Args[a+1] = overrideImageRegistry(registry, container.Args[a+1])
 		}
+		a++ // skip the value
 	}
 }
 
@@ -1379,6 +1494,55 @@ func ReplaceNamespaceInWebhookNamespaceSelector(targetNamespace string) mf.Trans
 				u.Object["webhooks"] = webhooks
 			}
 		}
+		return nil
+	}
+}
+
+// AddContainerArgs returns a transformer that sets command-line arguments on a
+// specific container of a Deployment. It lets a reconciler inject runtime flags
+// (for example the component version or TLS settings passed to the ShipwrightBuild
+// webhook) without editing the shipped manifests. An empty deploymentName matches
+// any Deployment; replace overwrites the existing args instead of appending to them.
+func AddContainerArgs(deploymentName, containerName string, arguments []string, replace bool) mf.Transformer {
+	return func(u *unstructured.Unstructured) error {
+		// Only Deployments carry containers; skip everything else.
+		if u.GetKind() != KindDeployment {
+			return nil
+		}
+		// When a name is given, only touch the matching Deployment.
+		if deploymentName != "" && u.GetName() != deploymentName {
+			return nil
+		}
+
+		deployment := &appsv1.Deployment{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, deployment); err != nil {
+			return err
+		}
+
+		// Locate the target container and apply the arguments to it.
+		containers := deployment.Spec.Template.Spec.Containers
+		found := false
+		for i := range containers {
+			if containers[i].Name == containerName {
+				found = true
+				if replace {
+					containers[i].Args = arguments
+				} else {
+					containers[i].Args = append(containers[i].Args, arguments...)
+				}
+				break
+			}
+		}
+		// Leave the manifest untouched if the container is absent.
+		if !found {
+			return nil
+		}
+
+		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(deployment)
+		if err != nil {
+			return err
+		}
+		u.SetUnstructuredContent(obj)
 		return nil
 	}
 }
