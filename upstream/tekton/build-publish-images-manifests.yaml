@@ -80,7 +80,7 @@ spec:
   steps:
 
   - name: container-registy-auth
-    image: cgr.dev/chainguard/crane:latest-dev@sha256:8eb18b800f2101050923cbfc6fbcdcd2395ae9927aeb2158f5f24edeb8bb5b8d
+    image: cgr.dev/chainguard/crane:latest-dev@sha256:91c52cabb130d4fd609b8fa2c5367671c04963f9d8d789b44a43bd617e1ad802
     script: |
       #!/bin/sh
       set -ex
@@ -99,10 +99,13 @@ spec:
       cp ${DOCKER_CONFIG} /workspace/${KUBE_DISTRO}-docker-config.json
 
   - name: rewrite-devel-in-source
-    image: ghcr.io/tektoncd/plumbing/ko@sha256:ec9fb65fc9b3bb680cf4f1da0cecf598c9dab05026e1c55358c271a394a46298
+    image: ghcr.io/tektoncd/plumbing/ko@sha256:868afb8398022ad3e80388ce7296d3a7489f9adbcfacfeb01a4354b5606d7d90
     script: |
       #!/usr/bin/env sh
       set -ex
+
+      cd ${PROJECT_ROOT}
+      git config --global --add safe.directory "${PROJECT_ROOT}"
 
       # Rewrite VERSION env var value in operator.yaml (not in ko/kustomize output, sed on release.yaml won't catch it)
       # Uses awk for multi-line: match '- name: VERSION', then rewrite the following 'value:' line
@@ -113,14 +116,21 @@ spec:
 
       # Rewrite kodata cabundles (openshift only) - these are baked into the container image
       # and never appear in release.yaml, so must be updated before ko builds the image
-      if [ -d "${PROJECT_ROOT}/cmd/openshift/operator/kodata/cabundles" ]; then
+      if [ "${KUBE_DISTRO}" = "openshift" ] && [ -d "${PROJECT_ROOT}/cmd/openshift/operator/kodata/cabundles" ]; then
         sed -i -E \
           -e 's/(operator.tekton.dev\/release): "?devel"?/\1: $(params.versionTag)/g' \
           ${PROJECT_ROOT}/cmd/openshift/operator/kodata/cabundles/*.yaml
       fi
 
+      # Commit rewrites so ko does not fail on a dirty worktree.
+      git add \
+        "config/${KUBE_DISTRO}/base/operator.yaml" \
+        cmd/openshift/operator/kodata/cabundles/ 2>/dev/null || true
+      git -c user.name=tekton-robot -c user.email=tekton-robot@tekton.dev \
+        commit --allow-empty -m "Rewrite devel to $(params.versionTag) for ${KUBE_DISTRO}"
+
   - name: run-kustomize-ko
-    image: ghcr.io/tektoncd/plumbing/ko@sha256:ec9fb65fc9b3bb680cf4f1da0cecf598c9dab05026e1c55358c271a394a46298
+    image: ghcr.io/tektoncd/plumbing/ko@sha256:868afb8398022ad3e80388ce7296d3a7489f9adbcfacfeb01a4354b5606d7d90
     env:
     - name: KO_DOCKER_REPO
       value: $(params.imageRegistry)/$(params.imageRegistryPath)
@@ -139,6 +149,9 @@ spec:
 
       # Change to directory with our .ko.yaml
       cd ${PROJECT_ROOT}
+      git config --global --add safe.directory "${PROJECT_ROOT}"
+      SOURCE_DATE_EPOCH=$(git log -1 --format='%ct')
+      export SOURCE_DATE_EPOCH
 
       # For each cmd/<kubeDistro>/* directory, include a full gzipped tar of all source in
       # vendor/. This is overkill. Some deps' licenses require the source to be
@@ -192,7 +205,7 @@ spec:
       sed -i -E -e 's/(app.kubernetes.io\/version): "?devel"?/\1: "$(params.versionTag)"/g' -e 's/(operator.tekton.dev\/release): "?devel"?/\1: "$(params.versionTag)"/g' -e 's/(version): "?devel"?/\1: "$(params.versionTag)"/g' ${OUTPUT_RELEASE_DIR}/${FILENAME_PREFIX}release.yaml
       sed -i -E -e 's/(app.kubernetes.io\/version): "?devel"?/\1: "$(params.versionTag)"/g' -e 's/(operator.tekton.dev\/release): "?devel"?/\1: "$(params.versionTag)"/g' -e 's/(version): "?devel"?/\1: "$(params.versionTag)"/g' ${OUTPUT_RELEASE_DIR}/${FILENAME_PREFIX}release.notags.yaml
   - name: koparse
-    image: ghcr.io/tektoncd/plumbing/koparse@sha256:4598831b77dfbb17cc65c8bfc8426095dd3a23e7495e87e96f5e7cc60f6615e0
+    image: ghcr.io/tektoncd/plumbing/koparse@sha256:7a784842fa43f8b2f2852970c3c11495be86c125f12fc398b307b9a59209b8ff
     script: |
       set -ex
 
@@ -226,7 +239,7 @@ spec:
         ${PRESERVE_IMPORT_PATH} > /workspace/built_images
 
   - name: tag-images
-    image: cgr.dev/chainguard/crane:latest-dev@sha256:8eb18b800f2101050923cbfc6fbcdcd2395ae9927aeb2158f5f24edeb8bb5b8d
+    image: cgr.dev/chainguard/crane:latest-dev@sha256:91c52cabb130d4fd609b8fa2c5367671c04963f9d8d789b44a43bd617e1ad802
     script: |
       #!/bin/sh
       set -ex
