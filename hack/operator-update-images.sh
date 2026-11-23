@@ -21,6 +21,12 @@ function update_image_reference() {
     SOURCE_PATTEN="quay.io/.*/(pipeline-)?(.*@sha256:.+)"
     TARGET_PATTEN="${TARGET_REGISTRY}/\2"
     input=$1
+    # Third-party images (e.g. registry.redhat.io) are used as-is: they aren't
+    # mirrored, and skopeo can't inspect them here without registry credentials.
+    if [[ ! "$input" =~ ^quay\.io/ ]]; then
+        echo "$input"
+        return 0
+    fi
     output=$(echo "$input" | sed -E "s|$SOURCE_PATTEN|$TARGET_PATTEN|g")
 
 
@@ -41,6 +47,19 @@ for i in $(seq 0 $((${LENGTH}-1))); do
       echo "${NAME}: ${REFERENCE}"
 
       yq eval --inplace "(.spec.install.spec.deployments[] | select(.name == \"openshift-pipelines-operator\")| .spec.template.spec.containers[].env[] | select(.name == \"${NAME}\") | .value) = \"${REFERENCE}\"" $CSV_FILE
+      yq eval --inplace "(.spec.relatedImages[] | select(.name == \"${NAME}\") | .image) = \"${REFERENCE}\"" $CSV_FILE
+    fi
+done
+
+# Third-party images pulled directly by operands: add (or update) them in relatedImages
+LENGTH=$(yq e '.extraRelatedImages | length' project.yaml)
+for i in $(seq 0 $((${LENGTH}-1))); do
+    NAME=$(yq e ".extraRelatedImages.${i}.name" project.yaml)
+    REFERENCE=$(yq e ".extraRelatedImages.${i}.value" project.yaml)
+    echo "${NAME}: ${REFERENCE} (relatedImages only)"
+    if [ "$(yq e "[.spec.relatedImages[] | select(.name == \"${NAME}\")] | length" $CSV_FILE)" -eq 0 ]; then
+      yq eval --inplace ".spec.relatedImages += [{\"image\": \"${REFERENCE}\", \"name\": \"${NAME}\"}]" $CSV_FILE
+    else
       yq eval --inplace "(.spec.relatedImages[] | select(.name == \"${NAME}\") | .image) = \"${REFERENCE}\"" $CSV_FILE
     fi
 done
