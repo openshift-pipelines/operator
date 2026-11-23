@@ -37,6 +37,14 @@
     fi
 
    export BUNDLE_IMAGE BUNDLE_VERSION BASE_VERSION
+
+   # Release branches are cut from next and inherit its nightly bundle (e.g. 5.0.5-928).
+   # When rendering a release version, drop nightly entries of other versions so they
+   # don't become the head of the latest channel.
+   if [[ "$BUNDLE_VERSION" != *-* ]]; then
+     yq -i 'del(.bundles[] | select((.version | test("-")) and ((.version | sub("-.*$"; "")) != env(BASE_VERSION))))' "$FILE"
+   fi
+
    EXISTING=$(yq e '.bundles[] | select(.version | test("^" + env(BASE_VERSION) + "(-.*)?$")) | .version' "$FILE")
    if [[ -n "$EXISTING" ]]; then
      log "INFO" "Updating existing bundle $EXISTING -> $BUNDLE_VERSION"
