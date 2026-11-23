@@ -18,12 +18,44 @@ package v1alpha1
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 
+	dynamicclient "github.com/tektoncd/operator/pkg/client/injection/dynamic"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"knative.dev/pkg/logging"
 	"knative.dev/pkg/ptr"
 )
+
+// isOpenShiftBuildsInstalled detects standalone Builds using OpenShiftBuild/cluster.
+// Detection is best-effort so an unavailable legacy API does not prevent
+// If detection fails, assume OpenShiftBuilds Operator is installed.
+// TektonConfig admission.
+func isOpenShiftBuildsInstalled(ctx context.Context) (bool, error) {
+	client := dynamicclient.Get(ctx)
+	if client == nil {
+		return false, fmt.Errorf("unable to get dynamic client")
+	}
+
+	// Fetch the OpenShiftBuild cluster resource
+	gvr := schema.GroupVersionResource{
+		Group:    "operator.openshift.io",
+		Version:  "v1alpha1",
+		Resource: "openshiftbuilds",
+	}
+
+	if _, err := client.Resource(gvr).Get(ctx, "cluster", metav1.GetOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
+}
 
 // MigrateScheduler copies the deprecated scheduler configuration to kueue.
 // An explicitly configured kueue field takes precedence.
@@ -31,7 +63,12 @@ func (spec *TektonConfigSpec) MigrateScheduler() bool {
 	if reflect.DeepEqual(spec.Scheduler, Scheduler{}) {
 		return false
 	}
-	if reflect.DeepEqual(spec.Kueue, Kueue{}) {
+	// CRD defaulting can populate the fleet manager before legacy migration.
+	kueue := spec.Kueue
+	if kueue.FleetManager == FleetManagerManual {
+		kueue.FleetManager = ""
+	}
+	if reflect.DeepEqual(kueue, Kueue{}) {
 		spec.Kueue = spec.Scheduler.ToKueue()
 	}
 	spec.Scheduler = Scheduler{}
@@ -123,6 +160,7 @@ func MigrateLegacyNamespaceSyncParams(tc *TektonConfig) bool {
 }
 
 func (tc *TektonConfig) SetDefaults(ctx context.Context) {
+	logger := logging.FromContext(ctx)
 	if tc.Spec.Profile == "" {
 		tc.Spec.Profile = ProfileBasic
 	}
@@ -214,6 +252,27 @@ func (tc *TektonConfig) SetDefaults(ctx context.Context) {
 			ns.CreateSCCRoleBinding = ptr.Bool(true)
 		}
 
+		// Leave both Builds components to the standalone operator when its CR
+		// exists, regardless of its component states. Explicit user settings win.
+		// TODO: Remove this check after OpenShift Builds Operator is decommissioned
+		enableComponent := true
+		if tc.Spec.Platforms.OpenShift.ShipwrightBuild == nil || tc.Spec.Platforms.OpenShift.SharedResource == nil {
+			if installed, err := isOpenShiftBuildsInstalled(ctx); err != nil {
+				// If there's error, assume OpenShift Builds is installed and disable Shipwright and Shared Resource
+				logger.Error("Error detecting OpenShift Builds installation, Shipwright and Shared Resource will be disabled", err)
+				enableComponent = false
+			} else {
+				enableComponent = !installed
+			}
+		}
+		if tc.Spec.Platforms.OpenShift.ShipwrightBuild == nil {
+			tc.Spec.Platforms.OpenShift.ShipwrightBuild = &ShipwrightBuildConfig{Enabled: enableComponent}
+		}
+
+		if tc.Spec.Platforms.OpenShift.SharedResource == nil {
+			tc.Spec.Platforms.OpenShift.SharedResource = &SharedResourceConfig{Enabled: enableComponent}
+		}
+
 		setAddonDefaults(&tc.Spec.Addon)
 	} else {
 		// Kubernetes Platform
@@ -242,6 +301,13 @@ func (tc *TektonConfig) SetDefaults(ctx context.Context) {
 			logger := logging.FromContext(ctx)
 			tc.Spec.Platforms.Kubernetes.PipelinesAsCode.PACSettings.setPACDefaults(logger)
 		}
+
+		// ShipwrightBuild is disabled by default on Kubernetes. Only default when the
+		// block is absent so an explicit user block (incl. enabled: true) is kept.
+		if tc.Spec.Platforms.Kubernetes.ShipwrightBuild == nil {
+			tc.Spec.Platforms.Kubernetes.ShipwrightBuild = &ShipwrightBuildConfig{Enabled: false}
+		}
+
 		setAddonDefaults(&tc.Spec.Addon)
 	}
 

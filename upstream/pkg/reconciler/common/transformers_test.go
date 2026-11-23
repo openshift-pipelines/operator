@@ -223,6 +223,35 @@ func TestReplaceImages(t *testing.T) {
 		assertStatefulSetContainersHasImage(t, newManifest.Resources(), "sidecar", "busybox")
 	})
 
+	t.Run("replace daemonset containers by name", func(t *testing.T) {
+		image := "foo.bar/image/controller"
+		images := map[string]string{
+			"controller_deployment": image,
+		}
+		testData := path.Join("testdata", "test-replace-daemonset-image.yaml")
+
+		manifest, err := mf.ManifestFrom(mf.Recursive(testData))
+		assertNoError(t, err)
+		newManifest, err := manifest.Transform(DaemonSetImages(images))
+		assertNoError(t, err)
+		assertDaemonSetContainersHasImage(t, newManifest.Resources(), "controller-deployment", image)
+		assertDaemonSetContainersHasImage(t, newManifest.Resources(), "sidecar", "busybox")
+	})
+
+	t.Run("ignore non daemonset", func(t *testing.T) {
+		testData := path.Join("testdata", "test-replace-image.yaml")
+		expected, _ := mf.ManifestFrom(mf.Recursive(testData))
+
+		manifest, err := mf.ManifestFrom(mf.Recursive(testData))
+		assertNoError(t, err)
+		newManifest, err := manifest.Transform(DaemonSetImages(map[string]string{}))
+		assertNoError(t, err)
+
+		if d := cmp.Diff(expected.Resources(), newManifest.Resources()); d != "" {
+			t.Errorf("failed to ignore non daemonset %s", diff.PrintWantGot(d))
+		}
+	})
+
 	t.Run("skip replacement when step image contains param substitution", func(t *testing.T) {
 		image := "foo.bar/image/builder"
 		images := map[string]string{
@@ -312,6 +341,137 @@ func TestDeploymentContainerArgsImagesRegistryOverrideFallback(t *testing.T) {
 	assertDeployContainerArgsHasImage(t, newManifest.Resources(), "-git", "git")
 }
 
+// envImageDeployment builds a Deployment whose container carries image-bearing
+// and non-image env vars (including a ValueFrom entry) so the env-image
+// replacement behavior can be exercised.
+func envImageDeployment(t *testing.T) unstructured.Unstructured {
+	t.Helper()
+	d := &appsv1.Deployment{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+		ObjectMeta: metav1.ObjectMeta{Name: "controller", Namespace: "test"},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:  "controller-deployment",
+						Image: "busybox",
+						Env: []corev1.EnvVar{
+							{Name: "SIDECAR_IMAGE", Value: "busybox"},
+							{Name: "FOO", Value: "bar"},
+							{Name: "DOWNWARD_IMAGE", ValueFrom: &corev1.EnvVarSource{
+								FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+							}},
+						},
+					}},
+				},
+			},
+		},
+	}
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(d)
+	assertNoError(t, err)
+	return unstructured.Unstructured{Object: obj}
+}
+
+func deployContainerEnv(t *testing.T, resources []unstructured.Unstructured, containerName, envName string) corev1.EnvVar {
+	t.Helper()
+	for _, r := range resources {
+		d := deploymentFor(t, r)
+		for _, c := range d.Spec.Template.Spec.Containers {
+			if c.Name != containerName {
+				continue
+			}
+			for _, e := range c.Env {
+				if e.Name == envName {
+					return e
+				}
+			}
+		}
+	}
+	t.Fatalf("env var %q not found on container %q", envName, containerName)
+	return corev1.EnvVar{}
+}
+
+func TestEnvImages(t *testing.T) {
+	// A per-image map entry keyed by the env var name replaces the env var's value.
+	images := map[string]string{
+		"sidecar_image": "foo.bar/image/sidecar",
+	}
+
+	manifest, err := mf.ManifestFrom(mf.Slice([]unstructured.Unstructured{envImageDeployment(t)}))
+	assertNoError(t, err)
+	newManifest, err := manifest.Transform(EnvImages(images))
+	assertNoError(t, err)
+
+	if got := deployContainerEnv(t, newManifest.Resources(), "controller-deployment", "SIDECAR_IMAGE"); got.Value != "foo.bar/image/sidecar" {
+		t.Errorf("expected SIDECAR_IMAGE replaced with mapped image, got %q", got.Value)
+	}
+	// Non-image env vars are left untouched.
+	if got := deployContainerEnv(t, newManifest.Resources(), "controller-deployment", "FOO"); got.Value != "bar" {
+		t.Errorf("expected FOO unchanged, got %q", got.Value)
+	}
+}
+
+func TestEnvImagesRegistryOverrideFallback(t *testing.T) {
+	t.Setenv("TEKTON_REGISTRY_OVERRIDE", "custom-registry.io/custom-path")
+	// No per-image entry matches, so only the registry-domain fallback applies, and
+	// only to env vars whose name looks like an image.
+	images := map[string]string{
+		"some_other_image": "foo.bar/unrelated",
+	}
+
+	manifest, err := mf.ManifestFrom(mf.Slice([]unstructured.Unstructured{envImageDeployment(t)}))
+	assertNoError(t, err)
+	newManifest, err := manifest.Transform(EnvImages(images))
+	assertNoError(t, err)
+
+	// "SIDECAR_IMAGE" is image-like, so the registry override fallback rewrites it.
+	if got := deployContainerEnv(t, newManifest.Resources(), "controller-deployment", "SIDECAR_IMAGE"); got.Value != "custom-registry.io/custom-path/busybox" {
+		t.Errorf("expected SIDECAR_IMAGE registry-overridden, got %q", got.Value)
+	}
+	// "FOO" is not image-like and must be left untouched.
+	if got := deployContainerEnv(t, newManifest.Resources(), "controller-deployment", "FOO"); got.Value != "bar" {
+		t.Errorf("expected FOO unchanged, got %q", got.Value)
+	}
+	// A ValueFrom env carries no literal image and must be left untouched.
+	if got := deployContainerEnv(t, newManifest.Resources(), "controller-deployment", "DOWNWARD_IMAGE"); got.Value != "" || got.ValueFrom == nil {
+		t.Errorf("expected DOWNWARD_IMAGE ValueFrom untouched, got value=%q valueFrom=%v", got.Value, got.ValueFrom)
+	}
+}
+
+func TestDaemonSetImagesRegistryOverrideFallback(t *testing.T) {
+	t.Setenv("TEKTON_REGISTRY_OVERRIDE", "custom-registry.io/custom-path")
+	// no per-image env var matches any container in the manifest
+	images := map[string]string{
+		"some_other_image": "foo.bar/unrelated",
+	}
+	testData := path.Join("testdata", "test-replace-daemonset-image.yaml")
+
+	manifest, err := mf.ManifestFrom(mf.Recursive(testData))
+	assertNoError(t, err)
+	newManifest, err := manifest.Transform(DaemonSetImages(images))
+	assertNoError(t, err)
+	assertDaemonSetContainersHasImage(t, newManifest.Resources(), "controller-deployment", "custom-registry.io/custom-path/busybox")
+	assertDaemonSetContainersHasImage(t, newManifest.Resources(), "sidecar", "custom-registry.io/custom-path/busybox")
+}
+
+func TestDaemonSetContainerArgsImagesRegistryOverrideFallback(t *testing.T) {
+	t.Setenv("TEKTON_REGISTRY_OVERRIDE", "custom-registry.io/custom-path")
+	// no per-image env var matches any arg in the manifest
+	images := map[string]string{
+		"some_other_image": "foo.bar/unrelated",
+	}
+	testData := path.Join("testdata", "test-replace-daemonset-image.yaml")
+
+	manifest, err := mf.ManifestFrom(mf.Recursive(testData))
+	assertNoError(t, err)
+	newManifest, err := manifest.Transform(DaemonSetImages(images))
+	assertNoError(t, err)
+	// "-bash-image" ends in "-image", so the registry override fallback applies.
+	assertDaemonSetContainerArgsHasImage(t, newManifest.Resources(), "-bash-image", "custom-registry.io/custom-path/busybox")
+	// "-git" does not look like an image flag and must be left untouched.
+	assertDaemonSetContainerArgsHasImage(t, newManifest.Resources(), "-git", "git")
+}
+
 func TestTaskImagesRegistryOverrideFallback(t *testing.T) {
 	t.Setenv("TEKTON_REGISTRY_OVERRIDE", "custom-registry.io/custom-path")
 	images := map[string]string{}
@@ -394,6 +554,46 @@ func assertStatefulSetContainersHasImage(t *testing.T, resources []unstructured.
 
 			if container.Image != image {
 				t.Errorf("assertion failed; unexpected image: expected %s and got %s", image, container.Image)
+			}
+		}
+	}
+}
+
+func assertDaemonSetContainersHasImage(t *testing.T, resources []unstructured.Unstructured, name string, image string) {
+	t.Helper()
+
+	for _, resource := range resources {
+		set := daemonSetFor(t, resource)
+		containers := set.Spec.Template.Spec.Containers
+
+		for _, container := range containers {
+			if container.Name != name {
+				continue
+			}
+
+			if container.Image != image {
+				t.Errorf("assertion failed; unexpected image: expected %s and got %s", image, container.Image)
+			}
+		}
+	}
+}
+
+func assertDaemonSetContainerArgsHasImage(t *testing.T, resources []unstructured.Unstructured, arg string, image string) {
+	t.Helper()
+
+	for _, resource := range resources {
+		set := daemonSetFor(t, resource)
+		containers := set.Spec.Template.Spec.Containers
+
+		for _, container := range containers {
+			if len(container.Args) == 0 {
+				continue
+			}
+
+			for a, argument := range container.Args {
+				if argument == arg && container.Args[a+1] != image {
+					t.Errorf("not equal: expected %v, got %v", image, container.Args[a+1])
+				}
 			}
 		}
 	}
@@ -541,6 +741,15 @@ func statefulSetFor(t *testing.T, unstr unstructured.Unstructured) *appsv1.State
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstr.Object, set)
 	if err != nil {
 		t.Errorf("failed to load deployment yaml")
+	}
+	return set
+}
+
+func daemonSetFor(t *testing.T, unstr unstructured.Unstructured) *appsv1.DaemonSet {
+	set := &appsv1.DaemonSet{}
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstr.Object, set)
+	if err != nil {
+		t.Errorf("failed to load daemonset yaml")
 	}
 	return set
 }
@@ -1615,4 +1824,112 @@ func TestGetSortedKeys(t *testing.T) {
 
 	out := getSortedKeys(in)
 	assert.Equal(t, true, reflect.DeepEqual(out, expectedOut))
+}
+
+func TestOverrideImageRegistry(t *testing.T) {
+	const registry = "nexus.example.com:5000"
+	tests := []struct {
+		image string
+		want  string
+	}{
+		{"ghcr.io/tektoncd/pipeline/nop:v1@sha256:abcd", registry + "/tektoncd/pipeline/nop:v1@sha256:abcd"},
+		{"cgr.dev/chainguard/busybox@sha256:abcd", registry + "/chainguard/busybox@sha256:abcd"},
+		{"localhost/foo/bar:v1", registry + "/foo/bar:v1"},
+		{"localhost:5000/foo:v1", registry + "/foo:v1"},
+		// no registry host: keep the namespace
+		{"bitnami/postgresql@sha256:abcd", registry + "/bitnami/postgresql@sha256:abcd"},
+		{"busybox", registry + "/busybox"},
+		{"$(params.builder-image)", "$(params.builder-image)"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		if got := overrideImageRegistry(registry, tt.image); got != tt.want {
+			t.Errorf("overrideImageRegistry(%q) = %q, want %q", tt.image, got, tt.want)
+		}
+	}
+	if got := overrideImageRegistry("", "ghcr.io/foo:v1"); got != "ghcr.io/foo:v1" {
+		t.Errorf("empty registry must not change the image, got %q", got)
+	}
+}
+
+// A second pass must be a no-op, including when the registry carries a path.
+func TestOverrideImageRegistryIdempotent(t *testing.T) {
+	for _, registry := range []string{"nexus.example.com:5000", "nexus.example.com/mirror", "nexus.example.com/mirror/"} {
+		for _, image := range []string{"ghcr.io/tektoncd/pipeline/nop:v1", "bitnami/postgresql", "busybox"} {
+			once := overrideImageRegistry(registry, image)
+			if twice := overrideImageRegistry(registry, once); twice != once {
+				t.Errorf("registry %q: second pass on %q = %q, want %q", registry, once, twice, once)
+			}
+		}
+	}
+}
+
+// TEKTON_REGISTRY_OVERRIDE alone must rewrite container, arg and StatefulSet images.
+func TestRegistryOverrideOnlyAirgapped(t *testing.T) {
+	const registry = "nexus.example.com:5000"
+	t.Setenv("TEKTON_REGISTRY_OVERRIDE", registry)
+	images := ImageRegistryDomainOverride(map[string]string{})
+
+	manifest, err := mf.ManifestFrom(mf.Recursive(path.Join("testdata", "test-replace-image-airgapped.yaml")))
+	assertNoError(t, err)
+	newManifest, err := manifest.Transform(DeploymentImages(images), StatefulSetImages(images))
+	assertNoError(t, err)
+
+	wantArgs := map[string][]string{
+		"tekton-pipelines-controller": {
+			"-entrypoint-image", registry + "/tektoncd/pipeline/entrypoint-bff0a22da108bc2f16c818c97641a296:v1.15.0@sha256:bbbb",
+			"-nop-image", registry + "/tektoncd/pipeline/nop-8eac7c133edad5df719dc37b36b62482:v1.15.0@sha256:cccc",
+			"-sidecarlogresults-image", registry + "/tektoncd/pipeline/sidecarlogresults-7501c6a20d741631510a448b48ab098f:v1.15.0@sha256:dddd",
+			"-workingdirinit-image", registry + "/tektoncd/pipeline/workingdirinit-0c558922ec6a1b739e550e349f2d5fc1:v1.15.0@sha256:eeee",
+			"-shell-image", registry + "/chainguard/busybox@sha256:ffff",
+			"-shell-image-win", registry + "/powershell:nanoserver@sha256:9999",
+			"-disable-ha=false",
+			"-trailing-image",
+		},
+		"tekton-triggers-controller": {
+			"-logtostderr",
+			"-stderrthreshold", "INFO",
+			"-el-image", registry + "/tektoncd/triggers/eventlistenersink-7ad1faa98cddbcb0c24990303b220bb8:v0.37.0@sha256:1111",
+			"-el-port", "8080",
+			"-el-security-context=true",
+			"-el-events", "disable",
+		},
+	}
+	wantImages := map[string]string{
+		"tekton-pipelines-controller": registry + "/tektoncd/pipeline/controller-10a3e32792f33651396d02b6855a6e36:v1.15.0@sha256:aaaa",
+		"tekton-triggers-controller":  registry + "/tektoncd/triggers/controller-13c3e5ef5e0ad5a6b2a5de1fa6d5a9a4:v0.37.0",
+	}
+
+	for _, u := range newManifest.Resources() {
+		switch u.GetKind() {
+		case "Deployment":
+			d := deploymentFor(t, u)
+			c := d.Spec.Template.Spec.Containers[0]
+			if c.Image != wantImages[d.Name] {
+				t.Errorf("%s image: got %q, want %q", d.Name, c.Image, wantImages[d.Name])
+			}
+			if diff := cmp.Diff(wantArgs[d.Name], c.Args); diff != "" {
+				t.Errorf("%s args mismatch (-want +got):\n%s", d.Name, diff)
+			}
+		case "StatefulSet":
+			got, _, _ := unstructured.NestedSlice(u.Object, "spec", "template", "spec", "containers")
+			img := got[0].(map[string]interface{})["image"]
+			if want := registry + "/bitnami/postgresql@sha256:2222"; img != want {
+				t.Errorf("postgres image: got %q, want %q", img, want)
+			}
+		}
+	}
+}
+
+func TestDeploymentContainerArgsImageValueNotTreatedAsFlag(t *testing.T) {
+	t.Setenv("TEKTON_REGISTRY_OVERRIDE", "nexus.example.com")
+	containers := []corev1.Container{{
+		Name: "c",
+		Args: []string{"-foo-image", "ghcr.io/org/my-image:v1", "-port", "8080"},
+	}}
+	replaceContainerImages(containers, map[string]string{})
+	want := []string{"-foo-image", "nexus.example.com/org/my-image:v1", "-port", "8080"}
+	if diff := cmp.Diff(want, containers[0].Args); diff != "" {
+		t.Errorf("args mismatch (-want +got):\n%s", diff)
+	}
 }
