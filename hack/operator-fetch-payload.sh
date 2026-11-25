@@ -78,6 +78,9 @@ yq e -i '.metadata.annotations["operators.openshift.io/valid-subscription"] = "[
 # Update VERSION env variable to use ${VERSION=}
 yq e -i "(.spec.install.spec.deployments[] | select (.name == \"openshift-pipelines-operator\") | .spec.template.spec.containers[0].env[] | select (.name == \"VERSION\") | .value) = \"${CURRENT_VERSION}\"" \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+# The MultiKueue plugin installs OpenShift Pipelines on worker clusters from this channel
+yq e -i "(.spec.install.spec.deployments[] | select (.name == \"openshift-pipelines-operator\") | .spec.template.spec.containers[0].env[] | select (.name == \"PIPELINES_OPERATOR_CHANNEL\") | .value) = \"${CHANNEL_NAME}\"" \
+   .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 # FIXME: we *may* need to clean some of those generated files
 
 # fix serve-tkn-cli wrong image
