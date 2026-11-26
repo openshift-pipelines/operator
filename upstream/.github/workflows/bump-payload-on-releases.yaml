@@ -44,7 +44,7 @@ jobs:
       with:
         ref: main
         persist-credentials: false
-    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+    - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0
       with:
         go-version-file: "go.mod"
     - name: Build operator tool and cache scripts from main
@@ -91,7 +91,7 @@ jobs:
       run: |
         rm -f bump-output.txt commit-message.txt pr-body.txt
     - name: create pull request
-      uses: peter-evans/create-pull-request@15733dbdfeedb4f7fdb73d13c6f5ac83b710fab8  # v8.1.2
+      uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1  # v8.1.3
       with:
         token: ${{ secrets.CHATOPS_TOKEN }}
         commit-message: ${{ steps.generate-message.outputs.commit_message }}
