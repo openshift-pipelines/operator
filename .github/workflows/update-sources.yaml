@@ -10,7 +10,7 @@ on:
 jobs:
   update-sources:
     # This line prevents the job from running if CodeFreeze is true
-    if: true
+    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -58,6 +58,33 @@ jobs:
             git checkout HEAD .
           popd
       
+      - name: Configure Docker authentication
+        env:
+          DOCKER_CONFIG: /home/runner/.docker
+          DOCKER_JSON: ${{ secrets.DOCKER_REGISTRY_SECRET }}
+        run: |
+          mkdir -p $DOCKER_CONFIG
+          echo "${DOCKER_JSON}" > $DOCKER_CONFIG/config.json
+
+      - name: update-rpms
+        continue-on-error: true
+        run: |
+          set -x
+          export BASE_IMAGE=$(grep -h "_RUNTIME=" .konflux/dockerfiles/* | sed -E 's/.*_RUNTIME=["'\'']?([^"'\'' ]+).*/\1/' | head -n 1)
+          docker run --rm\
+            -e BASE_IMAGE=$BASE_IMAGE \
+            -v ./.konflux/rpms/:/rpms -w /rpms $BASE_IMAGE  sh -c "
+              cp -f /etc/yum.repos.d/*.repo ./
+              sed -i 's/^\[ubi-9-/\[ubi-9-for-\$basearch-/' *.repo
+              sed -i 's/^\[ubi-10-/\[ubi-10-for-\$basearch-/' *.repo
+          "
+          docker run  --rm\
+            -e BASE_IMAGE=$BASE_IMAGE \
+            -v ./.konflux/rpms/:/rpms -w /rpms registry.access.redhat.com/ubi9/ubi-minimal:latest sh -c "
+          	  microdnf update -y	 &&   microdnf install -y python3-dnf skopeo pip
+              python3 -m pip install https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/v0.21.0.tar.gz
+              rpm-lockfile-prototype --image $BASE_IMAGE rpms.in.yaml
+            "
       - name: Commit new changes
         run: |          
         
