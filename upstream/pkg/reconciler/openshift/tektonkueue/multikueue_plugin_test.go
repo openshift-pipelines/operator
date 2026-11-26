@@ -58,35 +58,20 @@ func pluginManifest(t *testing.T) mf.Manifest {
 	return m
 }
 
+// pluginDiscovery serves the APIs the plugin needs to start. The hub has no
+// cert-manager and no Kueue: the plugin installs them.
 func pluginDiscovery() *discoveryfake.FakeDiscovery {
 	d := k8sfake.NewSimpleClientset().Discovery().(*discoveryfake.FakeDiscovery)
 	for _, gv := range []string{
 		"cluster.open-cluster-management.io/v1", "authentication.open-cluster-management.io/v1beta1",
 		"work.open-cluster-management.io/v1", "operators.coreos.com/v1", "operators.coreos.com/v1alpha1",
-		"kueue.openshift.io/v1", "kueue.x-k8s.io/v1beta2",
 	} {
 		d.Resources = append(d.Resources, &metav1.APIResourceList{GroupVersion: gv})
 	}
 	return d
 }
 
-func TestPluginLifecycle(t *testing.T) {
-	ctx := t.Context()
-	kueue := pluginKueue()
-	isClient := isfake.NewFakeISClient()
-	oe := openshiftExtension{
-		manifest: pluginManifest(t), discovery: pluginDiscovery(),
-		installerSetClient: client.NewInstallerSetClient(isClient, "v1", "plugin", v1alpha1.KindTektonKueue, nil),
-	}
-	assert.NilError(t, oe.PreReconcile(ctx, kueue))
-	assert.Equal(t, oe.PostReconcile(ctx, kueue), v1alpha1.REQUEUE_EVENT_AFTER)
-	sets, err := isClient.List(ctx, metav1.ListOptions{})
-	assert.NilError(t, err)
-	assert.Equal(t, len(sets.Items), 1)
-	set := sets.Items[0]
-	assert.Equal(t, set.OwnerReferences[0].UID, kueue.UID)
-	assert.Equal(t, set.Labels[v1alpha1.InstallerSetType], "custom-multikueue-plugin")
-	assert.Assert(t, !kueue.Status.IsReady())
+func markSetReady(set *v1alpha1.TektonInstallerSet) {
 	set.Status.MarkCRDsInstalled()
 	set.Status.MarkNamespaceScopedResourcesInstalled()
 	set.Status.MarkClustersScopedResourcesInstalled()
@@ -97,17 +82,55 @@ func TestPluginLifecycle(t *testing.T) {
 	set.Status.MarkWebhookReady()
 	set.Status.MarkAllDeploymentsReady()
 	set.Status.MarkJobsInstalled()
+}
+
+// pluginEnv returns the env of the plugin container in the transformed manifest.
+func pluginEnv(t *testing.T, resources []unstructured.Unstructured) map[string]string {
+	t.Helper()
+	for _, obj := range resources {
+		if obj.GetKind() != "Deployment" {
+			continue
+		}
+		deployment := &appsv1.Deployment{}
+		assert.NilError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, deployment))
+		env := map[string]string{}
+		for _, e := range deployment.Spec.Template.Spec.Containers[0].Env {
+			env[e.Name] = e.Value
+		}
+		return env
+	}
+	t.Fatal("no Deployment in the plugin manifest")
+	return nil
+}
+
+func TestPluginLifecycle(t *testing.T) {
+	ctx := t.Context()
+	kueue := pluginKueue()
+	isClient := isfake.NewFakeISClient()
+	oe := openshiftExtension{
+		manifest: pluginManifest(t), discovery: pluginDiscovery(),
+		installerSetClient: client.NewInstallerSetClient(isClient, "v1", "plugin", v1alpha1.KindTektonKueue, nil),
+	}
+	// PreReconcile installs the plugin, and asks for a retry until it is ready.
+	assert.ErrorIs(t, oe.PreReconcile(ctx, kueue), v1alpha1.REQUEUE_EVENT_AFTER)
+	sets, err := isClient.List(ctx, metav1.ListOptions{})
+	assert.NilError(t, err)
+	assert.Equal(t, len(sets.Items), 1)
+	set := sets.Items[0]
+	assert.Equal(t, set.OwnerReferences[0].UID, kueue.UID)
+	assert.Equal(t, set.Labels[v1alpha1.InstallerSetType], "custom-multikueue-plugin")
+	markSetReady(&set)
 	_, err = isClient.Update(ctx, &set, metav1.UpdateOptions{})
 	assert.NilError(t, err)
-	assert.NilError(t, oe.PostReconcile(ctx, kueue))
+	assert.NilError(t, oe.PreReconcile(ctx, kueue))
 	sets, err = isClient.List(ctx, metav1.ListOptions{})
 	assert.NilError(t, err)
 	assert.Equal(t, sets.Items[0].Name, set.Name)
 
 	// An operator upgrade replaces the plugin set using the pinned payload.
 	oe.installerSetClient = client.NewInstallerSetClient(isClient, "v2", "plugin", v1alpha1.KindTektonKueue, nil)
-	assert.Equal(t, oe.PostReconcile(ctx, kueue), v1alpha1.REQUEUE_EVENT_AFTER)
-	assert.Equal(t, oe.PostReconcile(ctx, kueue), v1alpha1.REQUEUE_EVENT_AFTER)
+	assert.ErrorIs(t, oe.PreReconcile(ctx, kueue), v1alpha1.REQUEUE_EVENT_AFTER)
+	assert.ErrorIs(t, oe.PreReconcile(ctx, kueue), v1alpha1.REQUEUE_EVENT_AFTER)
 	sets, err = isClient.List(ctx, metav1.ListOptions{})
 	assert.NilError(t, err)
 	assert.Equal(t, len(sets.Items), 1)
@@ -157,15 +180,12 @@ func TestPluginInactiveAndFinalize(t *testing.T) {
 	}
 }
 
+// A plugin that cannot be installed asks for a retry, and says why.
 func TestPluginMissingDependency(t *testing.T) {
-	kueue := pluginKueue()
-	kueue.Status.InitializeConditions()
-	kueue.Status.MarkPostReconcilerComplete()
 	oe := openshiftExtension{discovery: k8sfake.NewSimpleClientset().Discovery()}
-	assert.Equal(t, oe.PostReconcile(t.Context(), kueue), v1alpha1.REQUEUE_EVENT_AFTER)
-	condition := kueue.Status.GetCondition(v1alpha1.PostReconciler)
-	assert.Equal(t, condition.Status, corev1.ConditionFalse)
-	assert.Assert(t, condition.Message != "")
+	err := oe.PreReconcile(t.Context(), pluginKueue())
+	assert.ErrorIs(t, err, v1alpha1.REQUEUE_EVENT_AFTER)
+	assert.ErrorContains(t, err, "ACM plugin requires API cluster.open-cluster-management.io/v1")
 }
 
 func TestPluginCleanupRetries(t *testing.T) {
@@ -230,4 +250,69 @@ func TestPluginTransforms(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The plugin installs OpenShift Pipelines on workers from the operator's channel.
+// Without it, the plugin uses its own default; deployment options override it.
+func TestPluginPipelinesChannel(t *testing.T) {
+	for _, tt := range []struct {
+		name, channel, option, want string
+	}{
+		{name: "unset"},
+		{name: "set", channel: "pipelines-1.25", want: "pipelines-1.25"},
+		{name: "option overrides", channel: "pipelines-1.25", option: "pipelines-1.24", want: "pipelines-1.24"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(pipelinesOperatorChannelEnv, tt.channel)
+			kueue := pluginKueue()
+			if tt.option != "" {
+				kueue.Spec.Options.Deployments = map[string]appsv1.Deployment{
+					"pipelines-multikueue-plugin-controller": {Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{Name: "controller", Env: []corev1.EnvVar{{Name: pipelinesOperatorChannelEnv, Value: tt.option}}}},
+					}}}},
+				}
+			}
+			m := pluginManifest(t)
+			transformed, err := transformPlugin(context.Background(), &m, kueue)
+			assert.NilError(t, err)
+			env := pluginEnv(t, transformed.Resources())
+			channel, ok := env[pipelinesOperatorChannelEnv]
+			assert.Equal(t, ok, tt.want != "")
+			assert.Equal(t, channel, tt.want)
+			assert.Equal(t, env["KUEUE_NAMESPACE"], "openshift-kueue-operator")
+		})
+	}
+}
+
+// The channel is not part of the TektonKueue spec, but a change of it must still
+// update the plugin set.
+func TestPluginChannelChangeUpdatesSet(t *testing.T) {
+	t.Setenv(pipelinesOperatorChannelEnv, "")
+	ctx := t.Context()
+	kueue := pluginKueue()
+	isClient := isfake.NewFakeISClient()
+	oe := openshiftExtension{
+		manifest: pluginManifest(t), discovery: pluginDiscovery(),
+		installerSetClient: client.NewInstallerSetClient(isClient, "v1", "plugin", v1alpha1.KindTektonKueue, nil),
+	}
+	assert.ErrorIs(t, oe.PreReconcile(ctx, kueue), v1alpha1.REQUEUE_EVENT_AFTER)
+	sets, err := isClient.List(ctx, metav1.ListOptions{})
+	assert.NilError(t, err)
+	set := sets.Items[0]
+	markSetReady(&set)
+	_, err = isClient.Update(ctx, &set, metav1.UpdateOptions{})
+	assert.NilError(t, err)
+	assert.NilError(t, oe.PreReconcile(ctx, kueue))
+
+	for _, channel := range []string{"pipelines-1.25", "pipelines-1.26", ""} {
+		t.Setenv(pipelinesOperatorChannelEnv, channel)
+		_ = oe.PreReconcile(ctx, kueue)
+		sets, err = isClient.List(ctx, metav1.ListOptions{})
+		assert.NilError(t, err)
+		assert.Equal(t, len(sets.Items), 1)
+		assert.Equal(t, sets.Items[0].Name, set.Name, "the set is updated, not replaced")
+		assert.Equal(t, pluginEnv(t, sets.Items[0].Spec.Manifests)[pipelinesOperatorChannelEnv], channel)
+	}
+	// The TektonKueue itself is not changed.
+	assert.Equal(t, len(kueue.Annotations), 0)
 }
