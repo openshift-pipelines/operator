@@ -169,7 +169,9 @@ spec:
         - --metrics-bind-address=:8443
         command:
         - /controller
-        env: []
+        env:
+        - name: PIPELINES_OPERATOR_CHANNEL
+          value: pipelines-5.0
         image: ghcr.io/openshift-pipelines/pipelines-multikueue-controller:v0.1.1
         imagePullPolicy: Always
         livenessProbe:
