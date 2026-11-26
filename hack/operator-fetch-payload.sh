@@ -115,6 +115,12 @@ while IFS= read -r -d '' f; do
         "${f}"
 done < <(find .konflux/olm-catalog/bundle/manifests .konflux/olm-catalog/bundle/kodata -type f -name '*.yaml' -print0)
 
+# Step 1b: the operator's own proxy-webhook payload also carries plain
+# metadata.labels.version: "devel" (Deployment, Service, HPA). Bundle manifests get
+# CURRENT_VERSION in that label (see the loop above), so use the same here.
+sed -i -E 's/^( +version): "?devel"?[[:space:]]*$/\1: "'"${CURRENT_VERSION}"'"/' \
+    .konflux/olm-catalog/bundle/kodata/webhook/webhook.yaml
+
 # Step 2: rewrite structural version fields in the CSV and ConfigMap only.
 # These paths (.spec.install.spec.deployments[].label.version, .data.version) are
 # specific to CSV and ConfigMap resources; applying yq to CRDs would materialise
