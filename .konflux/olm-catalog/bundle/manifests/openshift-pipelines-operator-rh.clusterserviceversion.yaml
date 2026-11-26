@@ -19,7 +19,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: 'false'
     features.operators.openshift.io/token-auth-azure: 'false'
     features.operators.openshift.io/token-auth-gcp: 'false'
-    olm.skipRange: '>=1.20.0 <5.0.5-894'
+    olm.skipRange: '>=1.24.0 <1.25.0'
     operators.openshift.io/infrastructure-features: '["disconnected","proxy-aware"]'
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/internal-objects: '["tektoninstallersets.operator.tekton.dev", "tektonconfigs.operator.tekton.dev","tektonpipelines.operator.tekton.dev","tektontriggers.operator.tekton.dev","tektonaddons.operator.tekton.dev", "tektonresults.operator.tekton.dev", "tektonchains.operator.tekton.dev", "openshiftpipelinesascodes.operator.tekton.dev", "manualapprovalgates.operator.tekton.dev","tektonpruners.operator.tekton.dev","tektonkueues.operator.tekton.dev","tektonschedulers.operator.tekton.dev","tektonmulticlusterproxyaaes.operator.tekton.dev","syncerservices.operator.tekton.dev","tektondashboards.operator.tekton.dev","shipwrightbuilds.operator.tekton.dev","sharedresources.operator.tekton.dev"]'
@@ -32,7 +32,7 @@ metadata:
     operatorframework.io/arch.arm64: supported
     operatorframework.io/arch.ppc64le: supported
     operatorframework.io/arch.s390x: supported
-  name: openshift-pipelines-operator-rh.v5.0.5-894
+  name: openshift-pipelines-operator-rh.v1.25.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -480,7 +480,7 @@ spec:
     ## Getting Started
 
 
-    In order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/pipelines/5.0/create/creating-applications-with-cicd-pipelines.html).
+    In order to get familiar with _OpenShift Pipelines_ concepts and create your first pipeline, follow the [OpenShift Pipelines Docs](https://docs.openshift.com/pipelines/1.25/create/creating-applications-with-cicd-pipelines.html).
 
 
     ## CLI (tkn)
@@ -1375,8 +1375,8 @@ spec:
           serviceAccountName: openshift-pipelines-operator
       deployments:
         - label:
-            operator.tekton.dev/release: "devel"
-            version: devel
+            operator.tekton.dev/release: "v0.82.0"
+            version: v0.82.0
           name: openshift-pipelines-operator
           spec:
             replicas: 1
@@ -1420,7 +1420,7 @@ spec:
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: VERSION
-                        value: 5.0.5-894
+                        value: 1.25.0
                       - name: PIPELINES_OPERATOR_CHANNEL
                       - name: AUTOINSTALL_COMPONENTS
                         valueFrom:
@@ -1537,7 +1537,7 @@ spec:
                       - name: IMAGE_MULTICLUSTERPROXYAAE_PROXY_AAE
                         value: quay.io/openshift-pipeline/pipelines-multicluster-proxy-aae-rhel10@sha256:17bf28398057a99af8afc15a27da42011f4e9d160595a59b63e23bf0383f09d5
                       - name: IMAGE_MULTIKUEUE_PLUGIN_CONTROLLER
-                        value: registry.redhat.io/openshift-pipelines/pipelines-multikueue-controller-rhel9@
+                        value: quay.io/openshift-pipeline/pipelines-multikueue-plugin-rhel10@sha256:68523bb5eae3f0d3a0875e6a626bee4b2aec51a6627a049c5493339c4325d003
                       - name: IMAGE_SYNCER_SERVICE_WORKLOAD_CONTROLLER
                         value: quay.io/openshift-pipeline/pipelines-syncer-service-rhel10@sha256:d5c220565fa0999da93828e00638ecbc288bf677a3fa507a18a10e501150c872
                       - name: IMAGE_PRUNER_WEBHOOK
@@ -1563,21 +1563,21 @@ spec:
                       - name: IMAGE_PIPELINES_CONSOLE_PLUGIN_LEGACY
                         value: quay.io/openshift-pipeline/pipelines-console-plugin-pf5-rhel10@sha256:7ed028978243543b4974f5d7dddaf30550a0e6f923fa29137e0c1e78ed6a5667
                       - name: IMAGE_SHIPWRIGHT_BUILD_SHIPWRIGHT_BUILD
-                        value: registry.redhat.io/openshift-builds/openshift-builds-controller-rhel10@
+                        value: registry.redhat.io/openshift-builds/openshift-builds-controller-rhel10@sha256:59a0b8054c6046d6dfd8756e154f81d22609406414ec261adc055bb534b68002
                       - name: IMAGE_SHIPWRIGHT_BUILD_SHIPWRIGHT_BUILD_WEBHOOK
-                        value: registry.redhat.io/openshift-builds/openshift-builds-webhook-rhel10@
+                        value: registry.redhat.io/openshift-builds/openshift-builds-webhook-rhel10@sha256:8ac7e9c484d9f5c41eba07ac1f774017a24c06efc06352bffb1dc62cdb8fd2a8
                       - name: IMAGE_SHIPWRIGHT_BUILD_GIT_CONTAINER_IMAGE
-                        value: registry.redhat.io/openshift-builds/openshift-builds-git-cloner-rhel10@
+                        value: registry.redhat.io/openshift-builds/openshift-builds-git-cloner-rhel10@sha256:1b802de289b7a160eeb008e0750dfa5dfa541b73fcad6684bed4df3044d2aa4e
                       - name: IMAGE_SHIPWRIGHT_BUILD_IMAGE_PROCESSING_CONTAINER_IMAGE
-                        value: registry.redhat.io/openshift-builds/openshift-builds-image-processing-rhel10@
+                        value: registry.redhat.io/openshift-builds/openshift-builds-image-processing-rhel10@sha256:79987bde8d31ed6875b8618261be1f6e12ae29c1c5d707e8e15123cb4004718f
                       - name: IMAGE_SHIPWRIGHT_BUILD_BUNDLE_CONTAINER_IMAGE
-                        value: registry.redhat.io/openshift-builds/openshift-builds-image-bundler-rhel10@
+                        value: registry.redhat.io/openshift-builds/openshift-builds-image-bundler-rhel10@sha256:47c36ae4bf43ac55ecc1b86952f9e2f7a1ba91a45153e3d5f78e6f55f49c4afa
                       - name: IMAGE_SHIPWRIGHT_BUILD_WAITER_CONTAINER_IMAGE
-                        value: registry.redhat.io/openshift-builds/openshift-builds-waiters-rhel10@
+                        value: registry.redhat.io/openshift-builds/openshift-builds-waiters-rhel10@sha256:5a24dcb5aff1a2ed93f2752942de83b5168f1f69c4d7db2fd954241c3181b70c
                       - name: IMAGE_SHARED_RESOURCE_SHARED_RESOURCE_CSI_DRIVER
-                        value: registry.redhat.io/openshift-builds/openshift-builds-shared-resource-rhel10@
+                        value: registry.redhat.io/openshift-builds/openshift-builds-shared-resource-rhel10@sha256:238eed034aca2910890427f43b44a488e6a06305b17cfc3ca3c683decd56ed11
                       - name: IMAGE_SHARED_RESOURCE_SHARED_RESOURCE_CSI_DRIVER_WEBHOOK
-                        value: registry.redhat.io/openshift-builds/openshift-builds-shared-resource-webhook-rhel10@
+                        value: registry.redhat.io/openshift-builds/openshift-builds-shared-resource-webhook-rhel10@sha256:119f2a4f516e68712a724ef85887d4d8cfe865e611991092d72d2b89d7ab79d3
                     image: quay.io/openshift-pipeline/pipelines-rhel9-operator@sha256:15a01718e975da36c3b3d002afa079b320689f7a9b5b6ca6ad3a04a79a91843d
                     imagePullPolicy: IfNotPresent
                     name: openshift-pipelines-operator-lifecycle
@@ -1616,7 +1616,7 @@ spec:
                       - name: PROFILING_PORT
                         value: '9009'
                       - name: VERSION
-                        value: 5.0.5-894
+                        value: 1.25.0
                       - name: METRICS_DOMAIN
                         value: tekton.dev/operator
                       - name: CONFIG_LEADERELECTION_NAME
@@ -1642,8 +1642,8 @@ spec:
                     type: RuntimeDefault
                 serviceAccountName: openshift-pipelines-operator
         - label:
-            operator.tekton.dev/release: "devel"
-            version: devel
+            operator.tekton.dev/release: "v0.82.0"
+            version: v0.82.0
           name: tekton-operator-webhook
           spec:
             replicas: 1
@@ -1841,7 +1841,7 @@ spec:
       name: IMAGE_KUEUE_WEBHOOK
     - image: quay.io/openshift-pipeline/pipelines-multicluster-proxy-aae-rhel10@sha256:17bf28398057a99af8afc15a27da42011f4e9d160595a59b63e23bf0383f09d5
       name: IMAGE_MULTICLUSTERPROXYAAE_PROXY_AAE
-    - image: registry.redhat.io/openshift-pipelines/pipelines-multikueue-controller-rhel9@
+    - image: quay.io/openshift-pipeline/pipelines-multikueue-plugin-rhel10@sha256:68523bb5eae3f0d3a0875e6a626bee4b2aec51a6627a049c5493339c4325d003
       name: IMAGE_MULTIKUEUE_PLUGIN_CONTROLLER
     - image: quay.io/openshift-pipeline/pipelines-syncer-service-rhel10@sha256:d5c220565fa0999da93828e00638ecbc288bf677a3fa507a18a10e501150c872
       name: IMAGE_SYNCER_SERVICE_WORKLOAD_CONTROLLER
@@ -1869,21 +1869,21 @@ spec:
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN
     - image: quay.io/openshift-pipeline/pipelines-console-plugin-pf5-rhel10@sha256:7ed028978243543b4974f5d7dddaf30550a0e6f923fa29137e0c1e78ed6a5667
       name: IMAGE_PIPELINES_CONSOLE_PLUGIN_LEGACY
-    - image: registry.redhat.io/openshift-builds/openshift-builds-controller-rhel10@
+    - image: registry.redhat.io/openshift-builds/openshift-builds-controller-rhel10@sha256:59a0b8054c6046d6dfd8756e154f81d22609406414ec261adc055bb534b68002
       name: IMAGE_SHIPWRIGHT_BUILD_SHIPWRIGHT_BUILD
-    - image: registry.redhat.io/openshift-builds/openshift-builds-webhook-rhel10@
+    - image: registry.redhat.io/openshift-builds/openshift-builds-webhook-rhel10@sha256:8ac7e9c484d9f5c41eba07ac1f774017a24c06efc06352bffb1dc62cdb8fd2a8
       name: IMAGE_SHIPWRIGHT_BUILD_SHIPWRIGHT_BUILD_WEBHOOK
-    - image: registry.redhat.io/openshift-builds/openshift-builds-git-cloner-rhel10@
+    - image: registry.redhat.io/openshift-builds/openshift-builds-git-cloner-rhel10@sha256:1b802de289b7a160eeb008e0750dfa5dfa541b73fcad6684bed4df3044d2aa4e
       name: IMAGE_SHIPWRIGHT_BUILD_GIT_CONTAINER_IMAGE
-    - image: registry.redhat.io/openshift-builds/openshift-builds-image-processing-rhel10@
+    - image: registry.redhat.io/openshift-builds/openshift-builds-image-processing-rhel10@sha256:79987bde8d31ed6875b8618261be1f6e12ae29c1c5d707e8e15123cb4004718f
       name: IMAGE_SHIPWRIGHT_BUILD_IMAGE_PROCESSING_CONTAINER_IMAGE
-    - image: registry.redhat.io/openshift-builds/openshift-builds-image-bundler-rhel10@
+    - image: registry.redhat.io/openshift-builds/openshift-builds-image-bundler-rhel10@sha256:47c36ae4bf43ac55ecc1b86952f9e2f7a1ba91a45153e3d5f78e6f55f49c4afa
       name: IMAGE_SHIPWRIGHT_BUILD_BUNDLE_CONTAINER_IMAGE
-    - image: registry.redhat.io/openshift-builds/openshift-builds-waiters-rhel10@
+    - image: registry.redhat.io/openshift-builds/openshift-builds-waiters-rhel10@sha256:5a24dcb5aff1a2ed93f2752942de83b5168f1f69c4d7db2fd954241c3181b70c
       name: IMAGE_SHIPWRIGHT_BUILD_WAITER_CONTAINER_IMAGE
-    - image: registry.redhat.io/openshift-builds/openshift-builds-shared-resource-rhel10@
+    - image: registry.redhat.io/openshift-builds/openshift-builds-shared-resource-rhel10@sha256:238eed034aca2910890427f43b44a488e6a06305b17cfc3ca3c683decd56ed11
       name: IMAGE_SHARED_RESOURCE_SHARED_RESOURCE_CSI_DRIVER
-    - image: registry.redhat.io/openshift-builds/openshift-builds-shared-resource-webhook-rhel10@
+    - image: registry.redhat.io/openshift-builds/openshift-builds-shared-resource-webhook-rhel10@sha256:119f2a4f516e68712a724ef85887d4d8cfe865e611991092d72d2b89d7ab79d3
       name: IMAGE_SHARED_RESOURCE_SHARED_RESOURCE_CSI_DRIVER_WEBHOOK
-  replaces: openshift-pipelines-operator-rh.v5.0.5-893
-  version: 5.0.5-894
+  replaces: openshift-pipelines-operator-rh.v1.24.4
+  version: 1.25.0
