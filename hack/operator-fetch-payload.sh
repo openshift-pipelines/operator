@@ -20,7 +20,7 @@ LATEST_OPENSHIFT_VERSION=$(yq e '.versions.openshift.latest' project.yaml)
 MIN_OPENSHIFT_VERSION=$(yq e '.versions.openshift.min' project.yaml)
 
 # Check for binaries required in the script
-for binary in operator-sdk kustomize yq curl; do
+for binary in operator-sdk kustomize yq curl git; do
     command -v $binary > /dev/null 2>&1 || { echo >&2 "$binary not installed, aborting..."; exit 1; }
 done
 
@@ -46,9 +46,11 @@ else
         UPSTREAM_VERSION_TAG="devel"
     else
         UPSTREAM_MINOR_VERSION=$(echo "${UPSTREAM_RELEASE_BRANCH}" | sed -E 's/^release-v([0-9]+\.[0-9]+)\.x$/\1/')
-        # Look up the latest release tag for this minor version from tektoncd/operator GitHub releases.
-        UPSTREAM_VERSION_TAG=$(curl -fsSL "https://api.github.com/repos/tektoncd/operator/releases" \
-            | yq e '.[] | select(.tag_name | test("^v?'"${UPSTREAM_MINOR_VERSION}"'\\.")) | .tag_name' - \
+        # Look up the latest release tag for this minor version from tektoncd/operator tags.
+        # git ls-remote is neither paginated nor rate-limited like the GitHub API.
+        UPSTREAM_VERSION_TAG=$(git ls-remote --tags --refs https://github.com/tektoncd/operator.git "refs/tags/v${UPSTREAM_MINOR_VERSION}.*" \
+            | awk '{print $2}' | sed 's%^refs/tags/%%' \
+            | grep -E "^v${UPSTREAM_MINOR_VERSION//./\\.}\.[0-9]+$" \
             | sort -V | tail -n1 || true)
         if [[ -z "${UPSTREAM_VERSION_TAG}" ]]; then
             echo "WARN: No upstream tag found for minor version ${UPSTREAM_MINOR_VERSION} in tektoncd/operator releases, falling back to 'devel'"
@@ -152,6 +154,23 @@ if [[ $(yq e '[.spec.install.spec.deployments[] | select(.name == "openshift-pip
 fi
 yq e -i "(.spec.install.spec.deployments[] | select (.name == \"openshift-pipelines-operator\") | .spec.template.spec.containers[0].env[] | select (.name == \"PIPELINES_OPERATOR_CHANNEL\") | .value) = \"${CHANNEL_NAME}\"" \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+# The MultiKueue plugin reads PIPELINES_OPERATOR_CHANNEL from its own Deployment
+# (default pipelines-1.22) and the operator does not pass it on yet, so set it on
+# the plugin Deployment in the bundled payload. The operator only adds or overwrites
+# env vars by name there, so this value is kept at runtime. sed keeps the payload's
+# formatting (yq would re-indent the whole file).
+for f in .konflux/olm-catalog/bundle/kodata/pipelines-multikueue-plugin/*/*.yaml; do
+  [ -f "$f" ] || continue
+  if grep -q 'name: PIPELINES_OPERATOR_CHANNEL' "$f"; then
+    sed -i -E '/name: PIPELINES_OPERATOR_CHANNEL/{n;s/(value: ).*/\1'"${CHANNEL_NAME}"'/}' "$f"
+  else
+    sed -i -E 's/^( +)env: \[\]$/\1env:\n\1- name: PIPELINES_OPERATOR_CHANNEL\n\1  value: '"${CHANNEL_NAME}"'/' "$f"
+  fi
+  if [[ $(yq e 'select(.kind == "Deployment" and .metadata.name == "pipelines-multikueue-plugin-controller") | .spec.template.spec.containers[] | select(.name == "controller") | .env[] | select(.name == "PIPELINES_OPERATOR_CHANNEL") | .value' "$f") != "${CHANNEL_NAME}" ]]; then
+    echo >&2 "ERROR: could not set PIPELINES_OPERATOR_CHANNEL=${CHANNEL_NAME} on the MultiKueue plugin Deployment in ${f}"
+    exit 1
+  fi
+done
 # FIXME: we *may* need to clean some of those generated files
 
 # fix serve-tkn-cli wrong image
