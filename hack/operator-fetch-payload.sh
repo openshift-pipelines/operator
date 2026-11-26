@@ -143,7 +143,13 @@ yq e -i '.metadata.annotations["operators.openshift.io/valid-subscription"] = "[
 # CURRENT_VERSION so that the downstream bundle always reports the correct OSP version.
 yq e -i "(.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name == \"VERSION\") | .value) = \"${CURRENT_VERSION}\"" \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
-# The MultiKueue plugin installs OpenShift Pipelines on worker clusters from this channel
+# The MultiKueue plugin installs OpenShift Pipelines on worker clusters from this channel.
+# Add the variable when the upstream operator deployment does not declare it yet.
+if [[ $(yq e '[.spec.install.spec.deployments[] | select(.name == "openshift-pipelines-operator") | .spec.template.spec.containers[0].env[] | select(.name == "PIPELINES_OPERATOR_CHANNEL")] | length' \
+      .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml) == 0 ]]; then
+  yq e -i '(.spec.install.spec.deployments[] | select(.name == "openshift-pipelines-operator") | .spec.template.spec.containers[0].env) += [{"name": "PIPELINES_OPERATOR_CHANNEL", "value": ""}]' \
+     .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
+fi
 yq e -i "(.spec.install.spec.deployments[] | select (.name == \"openshift-pipelines-operator\") | .spec.template.spec.containers[0].env[] | select (.name == \"PIPELINES_OPERATOR_CHANNEL\") | .value) = \"${CHANNEL_NAME}\"" \
    .konflux/olm-catalog/bundle/manifests/openshift-pipelines-operator-rh.clusterserviceversion.yaml
 # FIXME: we *may* need to clean some of those generated files
