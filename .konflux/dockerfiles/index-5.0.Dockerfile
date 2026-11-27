@@ -1,4 +1,4 @@
-FROM registry.redhat.io/openshift5/ose-operator-registry-rhel9:v5.0
+FROM registry.redhat.io/openshift5/ose-operator-registry-rhel9:v5.1.0
 
 ENTRYPOINT ["/bin/opm"]
 CMD ["serve", "/configs", "--cache-dir=/tmp/cache"]
